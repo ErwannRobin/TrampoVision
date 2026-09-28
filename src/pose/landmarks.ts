@@ -1,0 +1,45 @@
+/** MediaPipe / BlazePose 33-point topology (indices are the model's output order). */
+export const LM = {
+  NOSE: 0,
+  L_EAR: 7,
+  R_EAR: 8,
+  L_SHOULDER: 11,
+  R_SHOULDER: 12,
+  L_ELBOW: 13,
+  R_ELBOW: 14,
+  L_WRIST: 15,
+  R_WRIST: 16,
+  L_PINKY: 17,
+  R_PINKY: 18,
+  L_INDEX: 19,
+  R_INDEX: 20,
+  L_HIP: 23,
+  R_HIP: 24,
+  L_KNEE: 25,
+  R_KNEE: 26,
+  L_ANKLE: 27,
+  R_ANKLE: 28,
+  L_HEEL: 29,
+  R_HEEL: 30,
+  L_FOOT: 31,
+  R_FOOT: 32,
+} as const;
+
+export const LANDMARK_COUNT = 33;
+
+/** Landmarks whose visibility defines the frame "confidence" (head, arms, torso, legs). */
+export const CORE_LANDMARKS: number[] = [
+  LM.NOSE,
+  LM.L_SHOULDER,
+  LM.R_SHOULDER,
+  LM.L_ELBOW,
+  LM.R_ELBOW,
+  LM.L_WRIST,
+  LM.R_WRIST,
+  LM.L_HIP,
+  LM.R_HIP,
+  LM.L_KNEE,
+  LM.R_KNEE,
+  LM.L_ANKLE,
+  LM.R_ANKLE,
+];
