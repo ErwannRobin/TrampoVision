@@ -6,15 +6,65 @@ export const frameSeekTime = (k: number, fps: number) => (k + 0.5) / fps;
 /** Frame index shown at `time`. Works for both seek targets (k+0.5) and playback times (~k). */
 export const frameAtTime = (time: number, fps: number) => Math.max(0, Math.floor(time * fps + 0.25));
 
-export function loadVideo(url: string): Promise<HTMLVideoElement> {
+const LOAD_TIMEOUT_MS = 20000;
+const UNSUPPORTED_MESSAGE =
+  'This browser cannot decode the video (iPhone/HEVC .mov and ProRes are common causes). Try an MP4 (H.264) file.';
+
+/** Frees the decoder and removes the hidden element created by `loadVideo`. */
+export function disposeVideo(video: HTMLVideoElement) {
+  video.pause();
+  video.removeAttribute('src');
+  video.load();
+  video.remove();
+}
+
+/**
+ * Loads a video into a hidden element and resolves once its size and duration are known. Never
+ * waits forever: it rejects on a decode error, on a video without a decodable picture, and after
+ * `timeoutMs`. The element sits in the page (invisible) because some browsers, e.g. Safari, do not
+ * load or present frames for detached elements. Call `disposeVideo` when done.
+ */
+export function loadVideo(url: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<HTMLVideoElement> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     video.muted = true;
     video.playsInline = true;
     video.preload = 'auto';
-    video.onloadeddata = () => resolve(video);
-    video.onerror = () =>
-      reject(new Error('This browser cannot decode the video. Try an MP4 (H.264) file.'));
+    video.setAttribute('aria-hidden', 'true');
+    Object.assign(video.style, {
+      position: 'fixed', left: '0', top: '0', width: '1px', height: '1px', opacity: '0', pointerEvents: 'none',
+    });
+
+    const readyEvents = ['loadedmetadata', 'loadeddata', 'canplay'];
+    const cleanup = () => {
+      clearTimeout(timer);
+      readyEvents.forEach((name) => video.removeEventListener(name, onReady));
+      video.removeEventListener('error', onError);
+    };
+    const fail = (message: string) => {
+      cleanup();
+      disposeVideo(video);
+      reject(new Error(message));
+    };
+    const onReady = (e: Event) => {
+      if (video.videoWidth > 0) {
+        cleanup();
+        resolve(video);
+      } else if (e.type !== 'loadedmetadata') fail(UNSUPPORTED_MESSAGE); // data is there but no picture
+    };
+    const onError = () => fail(UNSUPPORTED_MESSAGE);
+    const timer = setTimeout(
+      () =>
+        fail(
+          `Loading the video timed out (readyState ${video.readyState}, networkState ${video.networkState}). ` +
+            'Try an MP4 (H.264) file.',
+        ),
+      timeoutMs,
+    );
+
+    readyEvents.forEach((name) => video.addEventListener(name, onReady));
+    video.addEventListener('error', onError);
+    document.body.appendChild(video);
     video.src = url;
   });
 }
@@ -40,17 +90,18 @@ const COMMON_FPS = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60, 90, 100, 119.8
 
 /**
  * Browsers don't expose the frame rate, so play the (muted) video briefly and measure the gap
- * between presented frames with requestVideoFrameCallback. Falls back to `fallback` when the
- * API is missing or playback is blocked. The result is snapped to common frame rates.
+ * between presented frames with requestVideoFrameCallback. Returns null when the API is missing,
+ * playback is blocked or no frames arrive in time, so the caller can say the rate is a guess.
+ * The result is snapped to common frame rates.
  */
-export async function estimateFps(video: HTMLVideoElement, fallback = 30): Promise<number> {
-  if (!('requestVideoFrameCallback' in video)) return fallback;
+export async function estimateFps(video: HTMLVideoElement, timeoutMs = 5000): Promise<number | null> {
+  if (!('requestVideoFrameCallback' in video)) return null;
   const times: number[] = [];
   const wasMuted = video.muted;
   video.muted = true;
   try {
     await new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, 1500);
+      const timer = setTimeout(resolve, timeoutMs);
       const tick = (_now: number, meta: VideoFrameCallbackMetadata) => {
         times.push(meta.mediaTime);
         if (times.length >= 14) {
@@ -70,7 +121,7 @@ export async function estimateFps(video: HTMLVideoElement, fallback = 30): Promi
     video.currentTime = 0;
   }
   const deltas = times.slice(1).map((t, i) => t - times[i]).filter((d) => d > 1e-4);
-  if (deltas.length < 3) return fallback;
+  if (deltas.length < 3) return null;
   deltas.sort((a, b) => a - b);
   const measured = 1 / deltas[Math.floor(deltas.length / 2)];
   const nearest = COMMON_FPS.reduce((best, f) => (Math.abs(f - measured) < Math.abs(best - measured) ? f : best));

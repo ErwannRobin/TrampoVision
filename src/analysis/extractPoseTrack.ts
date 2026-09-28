@@ -1,7 +1,7 @@
 import { createMediaPipeEstimator } from '../pose/MediaPipePoseEstimator';
 import { selectAthlete } from '../pose/selectAthlete';
 import type { EstimatorOptions, Keypoint, PoseEstimatorFactory } from '../pose/types';
-import { frameSeekTime, loadVideo, seekTo } from '../video/frames';
+import { disposeVideo, frameSeekTime, loadVideo, seekTo } from '../video/frames';
 import type { PoseTrack } from './types';
 
 export interface ExtractOptions extends EstimatorOptions {
@@ -21,6 +21,14 @@ export interface ExtractOptions extends EstimatorOptions {
  */
 export async function extractPoseTrack(url: string, opts: ExtractOptions): Promise<PoseTrack> {
   const video = await loadVideo(url);
+  try {
+    return await extractFromVideo(video, opts);
+  } finally {
+    disposeVideo(video);
+  }
+}
+
+async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): Promise<PoseTrack> {
   const { videoWidth: width, videoHeight: height, duration } = video;
   if (!width || !height || !Number.isFinite(duration)) throw new Error('Could not read the video dimensions/duration.');
 
@@ -66,7 +74,5 @@ export async function extractPoseTrack(url: string, opts: ExtractOptions): Promi
     };
   } finally {
     estimator.dispose();
-    video.removeAttribute('src');
-    video.load();
   }
 }
