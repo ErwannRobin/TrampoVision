@@ -4,7 +4,7 @@ import { download, toCsv, toJson } from './analysis/export';
 import { extractPoseTrack } from './analysis/extractPoseTrack';
 import type { PoseTrack } from './analysis/types';
 import type { ModelVariant } from './pose/types';
-import { estimateFps, loadVideo } from './video/frames';
+import { disposeVideo, estimateFps, loadVideo } from './video/frames';
 import type { OverlayOptions } from './video/overlay';
 import { Chart } from './ui/Chart';
 import { MetricsPanel } from './ui/MetricsPanel';
@@ -14,7 +14,7 @@ import { VideoPlayer } from './ui/VideoPlayer';
 
 type Status =
   | { kind: 'idle' }
-  | { kind: 'loading' }
+  | { kind: 'loading'; stage: 'reading' | 'measuring' }
   | { kind: 'analyzing'; done: number; total: number }
   | { kind: 'error'; message: string };
 
@@ -36,6 +36,7 @@ export default function App() {
   const [track, setTrack] = useState<PoseTrack | null>(null);
   const playhead = useMemo(() => new Playhead(), []);
   const abort = useRef<AbortController | null>(null);
+  const urlRef = useRef<string | null>(null); // latest selected file, to ignore stale async results
 
   // Athlete height only changes the scale, so re-derive metrics without re-running the model.
   const result = useMemo(() => (track ? computeAnalysis(track, { athleteHeightM: height }) : null), [track, height]);
@@ -49,16 +50,24 @@ export default function App() {
     setTrack(null);
     setBackend('');
     setFileName(file.name);
+    urlRef.current = next;
     setUrl(next);
-    setStatus({ kind: 'loading' });
+    setStatus({ kind: 'loading', stage: 'reading' });
+    const isCurrent = () => urlRef.current === next;
     try {
       const probe = await loadVideo(next);
-      setFps(await estimateFps(probe));
-      probe.removeAttribute('src');
-      probe.load();
-      setStatus({ kind: 'idle' });
+      if (isCurrent()) setStatus({ kind: 'loading', stage: 'measuring' });
+      const measured = isCurrent() ? await estimateFps(probe) : null;
+      disposeVideo(probe);
+      if (!isCurrent()) return;
+      setFps(measured ?? 30);
+      setStatus(
+        measured
+          ? { kind: 'idle' }
+          : { kind: 'error', message: 'Could not measure the frame rate. Using 30 fps: please set the real value in the settings.' },
+      );
     } catch (err) {
-      setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      if (isCurrent()) setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -183,7 +192,9 @@ export default function App() {
         </span>
       </p>
 
-      {status.kind === 'loading' && <p className="notice">Reading video… (measuring frame rate)</p>}
+      {status.kind === 'loading' && (
+        <p className="notice">{status.stage === 'reading' ? 'Reading video…' : 'Measuring frame rate…'}</p>
+      )}
       {status.kind === 'error' && <p className="notice error" role="alert">{status.message}</p>}
       {analyzing && (
         <div className="progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
