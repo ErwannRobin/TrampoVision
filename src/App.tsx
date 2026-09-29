@@ -1,10 +1,15 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { buildCalibration, DEFAULT_BED_M, type Quad, type TrampolineCalibration } from './analysis/calibration';
 import { computeAnalysis } from './analysis/computeAnalysis';
 import { download, toCsv, toJumpsCsv } from './analysis/export';
 import { extractPoseTrack } from './analysis/extractPoseTrack';
 import { stabilizePose } from './analysis/stabilize';
 import { sampleIndexAt } from './analysis/lookup';
+import { isStale, syncRecords, withTruth, withTwistTruth, type RecordContext } from './dataset/record';
+import type { TruthLabel } from './dataset/types';
+import { useDataset } from './dataset/useDataset';
+import { videoIdFromTrack, videoIdOf } from './dataset/videoId';
+import { analyzeTwist } from './pose3d/twist';
 import { analyzeSkills } from './skills/analyzeSkills';
 import { DEFAULT_SKILL_CONFIG, type SkillConfig } from './skills/config';
 import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from './skills/export';
@@ -15,11 +20,14 @@ import { disposeVideo, estimateFps, loadVideo } from './video/frames';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
 import { Chart } from './ui/Chart';
 import { DebugPanel } from './ui/DebugPanel';
+import { DatasetBar, EvaluatePanel, EvaluationReport } from './ui/EvaluationView';
 import { JumpView } from './ui/JumpView';
 import { PhaseTimeline } from './ui/PhaseTimeline';
+import { Pose3DSection } from './ui/Pose3DView';
 import { Playhead } from './ui/playhead';
 import { SkillPanel } from './ui/SkillPanel';
 import { TrajectoryPlot } from './ui/TrajectoryPlot';
+import { TwistPanel } from './ui/TwistPanel';
 import { VideoPlayer } from './ui/VideoPlayer';
 
 type Status =
@@ -82,7 +90,14 @@ export default function App() {
   // Skill recognition: thresholds, the jump being inspected, which side panel is open.
   const [skillConfig, setSkillConfig] = useState<SkillConfig>(DEFAULT_SKILL_CONFIG);
   const [selectedJump, setSelectedJump] = useState(0);
-  const [rightTab, setRightTab] = useState<'skill' | 'analysis'>('skill');
+  const [rightTab, setRightTab] = useState<'skill' | 'evaluate' | 'twist' | 'analysis'>('skill');
+  // 2D pose is the analysis; 3D pose is an experimental view next to it and does not feed the classifier.
+  const [poseView, setPoseView] = useState<'2d' | '3d'>('2d');
+  // Evaluation: which video the labels belong to, and whether the report covers this video or every saved one.
+  const [videoId, setVideoId] = useState<string | null>(null);
+  const [seriesName, setSeriesName] = useState<string | null>(null);
+  const [evalScope, setEvalScope] = useState<'video' | 'all'>('video');
+  const dataset = useDataset();
 
   const playhead = useMemo(() => new Playhead(), []);
   const abort = useRef<AbortController | null>(null);
@@ -115,6 +130,12 @@ export default function App() {
   const skills = useMemo(() => (result ? analyzeSkills(result, { config: skillConfig }) : null), [result, skillConfig]);
   const jumpCount = skills?.jumps.length ?? 0;
   const jumpSel = Math.min(selectedJump, Math.max(0, jumpCount - 1));
+
+  // Experimental 3D: twist about the longitudinal axis, from the 3D landmarks of the same frames.
+  const twist = useMemo(
+    () => (track && result ? analyzeTwist({ world: track.world, time: result.time, fps: result.meta.fps, cycles: result.jumps.cycles }) : null),
+    [track, result],
+  );
 
   useEffect(() => () => abort.current?.abort(), []);
 
@@ -176,6 +197,12 @@ export default function App() {
     }
     urlRef.current = nextUrl;
     setUrl(nextUrl);
+    // A stable id from the file itself, so labels stay attached to this video after a reload.
+    setVideoId(null);
+    setSeriesName(null);
+    void videoIdOf(next).then((id) => {
+      if (urlRef.current === nextUrl) setVideoId(id);
+    });
     setStatus({ kind: 'loading', stage: 'reading' });
     const isCurrent = () => urlRef.current === nextUrl;
     try {
@@ -231,6 +258,8 @@ export default function App() {
     try {
       const parsed = parsePoseSeries(await saved.text());
       setTrack(parsed.track);
+      setSeriesName(parsed.source.fileName);
+      setVideoId(parsed.source.videoId ?? videoId ?? videoIdFromTrack(parsed.source.fileName, parsed.track));
       setBackend(`${parsed.source.backend} (from file)`);
       setHeight(parsed.settings.athleteHeightM);
       setScaleSource(parsed.settings.scaleSource);
@@ -253,9 +282,50 @@ export default function App() {
     }
   }
 
+  // Local dataset: the jumps of this video as they would be saved now, next to what is already saved.
+  const fileNameForRecords = file?.name ?? seriesName ?? 'trampovision';
+  const recordCtx = useMemo<RecordContext | null>(
+    () => (result && skills && videoId ? { videoId, fileName: fileNameForRecords, result, skills, twist } : null),
+    [result, skills, videoId, fileNameForRecords, twist],
+  );
+  const videoRecords = useMemo(() => dataset.records.filter((r) => r.videoId === videoId), [dataset.records, videoId]);
+  const fresh = useMemo(() => (recordCtx ? syncRecords(videoRecords, recordCtx) : []), [recordCtx, videoRecords]);
+  const savedIds = useMemo(() => new Set(videoRecords.map((r) => r.id)), [videoRecords]);
+  const staleCount = useMemo(
+    () => fresh.filter((r) => { const s = videoRecords.find((v) => v.id === r.id); return !!s && isStale(s, r); }).length,
+    [fresh, videoRecords],
+  );
+  const { save: saveRecords } = dataset;
+  const labelJump = useCallback(
+    (k: number, label: TruthLabel | null) => {
+      if (fresh[k]) void saveRecords([withTruth(fresh[k], label)]);
+    },
+    [fresh, saveRecords],
+  );
+  const noteJump = useCallback(
+    (k: number, note: string) => {
+      const r = fresh[k];
+      if (r?.truth) void saveRecords([withTruth(r, r.truth.label, { note })]);
+    },
+    [fresh, saveRecords],
+  );
+  const annotateTwist = (halfTwists: number | null) => {
+    if (fresh[jumpSel]) void saveRecords([withTwistTruth(fresh[jumpSel], halfTwists)]);
+  };
+  /** Jump of the current video that has this apex time (a failure card asks to see it). */
+  const goToApex = (apexS: number) => {
+    const k = result?.jumps.cycles.findIndex((c) => Math.abs(c.apexTimeS - apexS) <= 0.2) ?? -1;
+    if (k >= 0) chooseJump(k);
+  };
+  const switchPoseView = (v: '2d' | '3d') => {
+    setPoseView(v);
+    if (v === '3d') setRightTab('twist');
+    else if (rightTab === 'twist') setRightTab('skill');
+  };
+
   const analyzing = status.kind === 'analyzing';
   const pct = analyzing ? Math.round((status.done / status.total) * 100) : 0;
-  const fileName = file?.name ?? 'trampovision';
+  const fileName = file?.name ?? seriesName ?? 'trampovision';
   const base = fileName.replace(/\.[^.]+$/, '') || 'trampovision';
 
   // Chart decorations derived from the jump cycles.
@@ -412,6 +482,14 @@ export default function App() {
       )}
 
       {!url && !result && <p className="empty">Choose a trampoline video to start. A side view with a fixed, level camera works best.</p>}
+      {!url && !result && (dataset.records.length > 0 || dataset.ready) && (
+        <section className="panel evaluation">
+          <DatasetBar dataset={dataset} baseName="trampovision" />
+          {dataset.records.length > 0 && (
+            <EvaluationReport records={dataset.records} videoId={null} scope="all" onScope={() => {}} baseName="trampovision" onGoTo={() => {}} />
+          )}
+        </section>
+      )}
 
       {(url || result) && (
         <section className="workspace">
@@ -437,6 +515,10 @@ export default function App() {
               <PhaseTimeline result={result} skills={skills} playhead={playhead} selected={jumpCount ? jumpSel : null} onSelect={(k) => setSelectedJump(k)} />
             )}
             <div className="toggles">
+              <div className="seg" role="group" aria-label="Pose view">
+                <button className={poseView === '2d' ? 'primary' : ''} aria-pressed={poseView === '2d'} onClick={() => switchPoseView('2d')}>2D pose</button>
+                <button className={poseView === '3d' ? 'primary' : ''} aria-pressed={poseView === '3d'} onClick={() => switchPoseView('3d')} title="Experimental: 3D skeleton and twist from the model's 3D landmarks. The classifier still uses the 2D pose.">3D pose (experimental)</button>
+              </div>
               {(['skeleton', 'com', 'trail', 'hud'] as const).map((k) => (
                 <label key={k} className="check">
                   <input type="checkbox" checked={overlay[k]} onChange={(e) => setOverlay({ ...overlay, [k]: e.target.checked })} />
@@ -454,7 +536,7 @@ export default function App() {
                   track &&
                   download(
                     `${base}-pose-series.json`,
-                    toSeriesJson(buildPoseSeries(result, track, { fileName, stride, minVisibility: 0.4, calibration })),
+                    toSeriesJson(buildPoseSeries(result, track, { fileName, videoId: videoId ?? undefined, stride, minVisibility: 0.4, calibration })),
                     'application/json',
                   )
                 }
@@ -479,6 +561,10 @@ export default function App() {
               <button disabled={!skills} title="One row per jump: features and prediction" onClick={() => skills && download(`${base}-skills.csv`, toSkillsCsv(skills), 'text/csv')}>Skills CSV</button>
               <button disabled={!skills} title="One row per jump and normalized sample" onClick={() => skills && download(`${base}-sequences.csv`, toSequencesCsv(skills), 'text/csv')}>Sequences CSV</button>
             </div>
+
+            {poseView === '3d' && result && track && twist && decorations && (
+              <Pose3DSection track={track} result={result} twist={twist} selected={jumpSel} playhead={playhead} markers={decorations.markers} bands={decorations.bands} />
+            )}
 
             <div className="panel calibration">
               <strong>Trampoline</strong>
@@ -520,6 +606,9 @@ export default function App() {
             {result && skills && (
               <JumpView result={result} skills={skills} playhead={playhead} selected={jumpSel} onSelect={chooseJump} />
             )}
+            {result && rightTab === 'evaluate' && (
+              <EvaluationReport records={dataset.records} videoId={videoId} scope={evalScope} onScope={setEvalScope} baseName={base} onGoTo={goToApex} />
+            )}
             <p className="hint muted">
               Space: play/pause · ←/→: previous/next frame (Shift: ±10) · click or drag on a chart to seek.
             </p>
@@ -528,10 +617,41 @@ export default function App() {
             <aside className="right">
               <div className="tabs" role="tablist">
                 <button role="tab" aria-selected={rightTab === 'skill'} className={rightTab === 'skill' ? 'primary' : ''} onClick={() => setRightTab('skill')}>Skill</button>
+                <button role="tab" aria-selected={rightTab === 'evaluate'} className={rightTab === 'evaluate' ? 'primary' : ''} onClick={() => setRightTab('evaluate')}>Evaluate</button>
+                <button role="tab" aria-selected={rightTab === 'twist'} className={rightTab === 'twist' ? 'primary' : ''} onClick={() => setRightTab('twist')}>Twist 3D</button>
                 <button role="tab" aria-selected={rightTab === 'analysis'} className={rightTab === 'analysis' ? 'primary' : ''} onClick={() => setRightTab('analysis')}>Analysis</button>
               </div>
               {rightTab === 'skill' && skills ? (
                 <SkillPanel result={result} skills={skills} selected={jumpSel} playhead={playhead} config={skillConfig} onConfig={setSkillConfig} onSelect={chooseJump} />
+              ) : rightTab === 'evaluate' && skills ? (
+                <EvaluatePanel
+                  skills={skills}
+                  selected={jumpSel}
+                  onSelect={chooseJump}
+                  playhead={playhead}
+                  videoId={videoId}
+                  fresh={fresh}
+                  savedIds={savedIds}
+                  staleCount={staleCount}
+                  dataset={dataset}
+                  baseName={base}
+                  onLabel={labelJump}
+                  onNote={noteJump}
+                  onSaveAll={() => void saveRecords(fresh)}
+                  onUpdateStale={() => void saveRecords(fresh.filter((r) => savedIds.has(r.id)))}
+                />
+              ) : rightTab === 'twist' && twist ? (
+                <TwistPanel
+                  result={result}
+                  twist={twist}
+                  hasWorld={!!twist.frames}
+                  selected={jumpSel}
+                  onSelect={chooseJump}
+                  playhead={playhead}
+                  annotation={fresh[jumpSel]?.twistTruth?.halfTwists ?? null}
+                  onAnnotate={annotateTwist}
+                  canAnnotate={!!fresh[jumpSel]}
+                />
               ) : (
                 <DebugPanel result={result} playhead={playhead} />
               )}
