@@ -51,10 +51,11 @@ describe('synthetic evaluation', () => {
       // Jumps that never invert are unaffected.
       for (const t of ['straight-jump', 'tuck-jump', 'pike-jump'] as const)
         expect(s.matrix[t][t] ?? 0).toBeGreaterThanOrEqual(ROUTINES * 0.95);
-      // The somersaults are reported as unclassified: the limit is shown, not hidden.
-      expect((s.matrix.back.unclassified ?? 0) + (s.matrix.front.unclassified ?? 0)).toBeGreaterThanOrEqual(
-        ROUTINES * 2 * 0.9,
-      );
+      // The somersaults are not named firmly (unclassified or a tentative guess): the limit is shown, not hidden.
+      const somersaults = s.rows.filter((r) => r.truth === 'back' || r.truth === 'front');
+      expect(
+        somersaults.filter((r) => r.predicted === 'unclassified' || r.certainty === 'tentative').length,
+      ).toBeGreaterThanOrEqual(ROUTINES * 2 * 0.9);
     },
   );
 

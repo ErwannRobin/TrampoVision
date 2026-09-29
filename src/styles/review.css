@@ -641,6 +641,11 @@
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
+.review-spark__line--ref {
+  stroke: var(--text-3);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
 .review-spark__note {
   color: var(--text-3);
   font-size: var(--fs-xs);

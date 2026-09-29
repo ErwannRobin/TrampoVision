@@ -50,6 +50,7 @@ export function buildJumpRecord(ctx: RecordContext, k: number, jumpId: number, p
     twist: estimate ? { estimate, sequence: seq } : null,
     truth: prior?.truth ?? null,
     twistTruth: prior?.twistTruth ?? null,
+    figure: prior?.figure ?? null,
   };
 }
 
@@ -121,4 +122,10 @@ export function withTruth(
 export function withTwistTruth(r: JumpRecord, halfTwists: number | null, now = new Date()): JumpRecord {
   const iso = now.toISOString();
   return { ...r, twistTruth: halfTwists === null ? null : { halfTwists, annotatedAt: iso }, savedAt: iso };
+}
+
+/** The figure of the jump (an element id of the table), or null to remove it. A jump with a figure becomes a reference example. */
+export function withFigure(r: JumpRecord, elementId: string | null, now = new Date()): JumpRecord {
+  const iso = now.toISOString();
+  return { ...r, figure: elementId === null ? null : { elementId, labeledAt: iso }, savedAt: iso };
 }

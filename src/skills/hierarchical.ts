@@ -43,7 +43,7 @@ const ID = { id: 'hierarchical', version: '1' } as const;
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 const gauss = (x: number, mean: number, sigma: number) => Math.exp(-0.5 * ((x - mean) / sigma) ** 2);
-const pct = (v: number) => `${Math.round(clamp01(v) * 100)}%`;
+export const pct = (v: number) => `${Math.round(clamp01(v) * 100)}%`;
 const normalize = <T extends string | number>(m: Map<T, number>): Map<T, number> => {
   let sum = 0;
   for (const v of m.values()) sum += v;
@@ -65,7 +65,7 @@ export function somersaultText(quarters: number): string {
   return `${whole || (frac ? '' : '0')}${frac}` || '0';
 }
 const rotationLabel = (q: number) => `${somersaultText(q)} somersault${q === 4 ? '' : 's'}`;
-const twistLabel = (h: number) =>
+export const twistLabel = (h: number) =>
   h === 0 ? 'no twist' : h === 1 ? '½ twist' : h === 2 ? '1 twist' : `${h / 2} twists`;
 
 /** Sequence columns used here (see SEQUENCE_COLUMNS). */
@@ -371,14 +371,14 @@ function labelled<T extends string | number>(m: Map<T, number>, name: (k: T) => 
 
 // --- candidates ---------------------------------------------------------------------------------------------------
 
-interface Stages {
+export interface Stages {
   rot: RotationStage;
   dir: DirectionStage;
   tw: TwistStage;
   pos: PositionStage;
 }
 
-interface Scored {
+export interface Scored {
   element: FigElement;
   /** [rotation, direction, twist, position] probability of the element's value at each stage, times the fit for rotation and twists. */
   factors: [number, number, number, number];
@@ -387,7 +387,7 @@ interface Scored {
   posterior: number;
 }
 
-const STAGE_ORDER: StageId[] = ['rotation', 'direction', 'twists', 'position'];
+export const STAGE_ORDER: StageId[] = ['rotation', 'direction', 'twists', 'position'];
 
 function scoreElements(s: Stages): { scored: Scored[]; outOfTable: number } {
   const scored: Scored[] = [];
@@ -413,7 +413,7 @@ function scoreElements(s: Stages): { scored: Scored[]; outOfTable: number } {
 const statusOf = (match: number, measured: boolean): CheckStatus =>
   !measured ? 'unmeasured' : match >= 0.6 ? 'match' : match >= 0.25 ? 'weak' : 'mismatch';
 
-function checksFor(sc: Scored, s: Stages): CandidateCheck[] {
+export function checksFor(sc: Scored, s: Stages): CandidateCheck[] {
   const e = sc.element;
   const maxOf = (m: Map<unknown, number>) => Math.max(...m.values());
   const ratio = (v: number, m: Map<unknown, number>) => (maxOf(m) > 0 ? clamp01(v / maxOf(m)) : 0);
@@ -455,7 +455,7 @@ function checksFor(sc: Scored, s: Stages): CandidateCheck[] {
   return out;
 }
 
-const candidateOf = (sc: Scored, s: Stages): ElementCandidate => ({
+export const candidateOf = (sc: Scored, s: Stages): ElementCandidate => ({
   elementId: sc.element.id,
   name: sc.element.name,
   movement: movementOf(sc.element),
@@ -463,7 +463,7 @@ const candidateOf = (sc: Scored, s: Stages): ElementCandidate => ({
   checks: checksFor(sc, s),
 });
 
-const movementOf = (e: Movement): Movement => ({
+export const movementOf = (e: Movement): Movement => ({
   direction: e.direction,
   somersaults: e.somersaults,
   twists: e.twists,
@@ -472,7 +472,13 @@ const movementOf = (e: Movement): Movement => ({
 
 // --- failure diagnosis --------------------------------------------------------------------------------------------
 
-function diagnose(f: JumpFeatures, s: Stages, best: Scored, outOfTable: number, quality: number): FailureDiagnosis {
+export function diagnose(
+  f: JumpFeatures,
+  s: Stages,
+  best: Scored,
+  outOfTable: number,
+  quality: number,
+): FailureDiagnosis {
   const e = best.element;
   const checks = checksFor(best, s);
   const distances = checks.map((c) => ({
@@ -539,13 +545,13 @@ type FailureKind = FailureDiagnosis['kind'];
 
 // --- the classifier -----------------------------------------------------------------------------------------------
 
-function legacyId(e: FigElement): SkillId {
+export function legacyId(e: FigElement): SkillId {
   if (e.somersaults === 0 && e.twists === 0) return `${e.position}-jump` as SkillId;
   if (e.somersaults === 1 && e.twists === 0) return e.direction === 'front' ? 'front' : 'back';
   return 'fig-element';
 }
 
-function cutOff(): SkillPrediction {
+export function cutOff(): SkillPrediction {
   return {
     classifier: ID,
     skill: 'unclassified',
@@ -574,32 +580,47 @@ function cutOff(): SkillPrediction {
   };
 }
 
+/** What the four stages say about one jump, before any element is named. Shared with the temporal classifier. */
+export interface StageAnalysis {
+  stages: Stages;
+  scored: Scored[];
+  outOfTable: number;
+  /** Data quality outside the four questions: pose reliability, camera view, orientation track. */
+  quality: number;
+}
+
+export function analyzeStages(input: ClassifierInput): StageAnalysis {
+  const { features: f, sequence, twist, config: cfg } = input;
+  const tm = temporal(sequence, twist ?? null, cfg);
+  const stages: Stages = {
+    rot: rotationStage(f, tm, cfg),
+    dir: directionStage(f),
+    tw: twistStage(f, twist ?? null, tm, cfg),
+    pos: positionStage(f, tm),
+  };
+  const { scored, outOfTable } = scoreElements(stages);
+
+  // Data quality outside the four questions: pose reliability and camera view.
+  const variation = f.quality.trunkLengthVariation;
+  const viewFactor =
+    variation === null || variation <= cfg.maxTrunkVariation
+      ? 1
+      : Math.max(0.2, 1 - 0.8 * ((variation - cfg.maxTrunkVariation) / 0.35));
+  // Rotation quality is a factor too, not only a wider tolerance: normalizing the stages would otherwise hide a bad orientation track.
+  const quality = clamp01(Math.sqrt(f.quality.pose) * viewFactor * stages.rot.quality);
+  return { stages, scored, outOfTable, quality };
+}
+
 export const hierarchicalClassifier: SkillClassifier = {
   ...ID,
   description:
     'Rotation, direction, twists and position as separate probabilistic stages; element chosen from a table.',
   classify(input: ClassifierInput): SkillPrediction {
-    const { features: f, sequence, twist, config: cfg } = input;
+    const { features: f, config: cfg } = input;
     if (!f.complete || f.rotation.totalDeg === null) return cutOff();
 
-    const tm = temporal(sequence, twist ?? null, cfg);
-    const stages: Stages = {
-      rot: rotationStage(f, tm, cfg),
-      dir: directionStage(f),
-      tw: twistStage(f, twist ?? null, tm, cfg),
-      pos: positionStage(f, tm),
-    };
-    const { scored, outOfTable } = scoreElements(stages);
+    const { stages, scored, outOfTable, quality } = analyzeStages(input);
     const best = scored[0];
-
-    // Data quality outside the four questions: pose reliability and camera view.
-    const variation = f.quality.trunkLengthVariation;
-    const viewFactor =
-      variation === null || variation <= cfg.maxTrunkVariation
-        ? 1
-        : Math.max(0.2, 1 - 0.8 * ((variation - cfg.maxTrunkVariation) / 0.35));
-    // Rotation quality is a factor too, not only a wider tolerance: normalizing the stages would otherwise hide a bad orientation track.
-    const quality = clamp01(Math.sqrt(f.quality.pose) * viewFactor * stages.rot.quality);
     const confidence = clamp01(best.posterior * quality);
     const candidates = scored.slice(0, 5).map((sc) => candidateOf(sc, stages));
     const stageReports = [stages.rot.report, stages.dir.report, stages.tw.report, stages.pos.report];

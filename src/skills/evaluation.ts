@@ -6,7 +6,7 @@ import type { Keypoint } from '../pose/types';
 import { analyzeSkills } from './analyzeSkills';
 import type { DeepPartial, SkillConfig } from './config';
 import { degradeTrack, mannequinRoutine, type MannequinJump, type MannequinShape } from './testMannequin';
-import type { SkillId } from './types';
+import type { Certainty, SkillClassifier, SkillId } from './types';
 
 /**
  * Synthetic evaluation harness (test support, not used by the app): random athletes and jumps with known
@@ -47,12 +47,12 @@ const pick = <T>(rnd: () => number, items: readonly T[]): T =>
   items[Math.min(items.length - 1, Math.floor(((rnd() + 1) / 2) * items.length))];
 
 /** 'textbook' = clean positions; 'sloppy' = loose tucks, bent-knee pikes, slightly piked layouts, so the classes overlap. */
-export type Execution = 'textbook' | 'sloppy';
+export type Execution = 'textbook' | 'sloppy' | 'loose';
 
 /** Random joint angles for a position. The label is the intended position, however well it is executed. */
 function randomShape(rnd: () => number, kind: 'straight' | 'tuck' | 'pike', execution: Execution): MannequinShape {
   const arms = { armDeg: range(rnd, 20, 170), elbowDeg: range(rnd, 0, 40), pointedToes: range(rnd, 0.3, 1) };
-  const sloppy = execution === 'sloppy';
+  const sloppy = execution !== 'textbook';
   if (kind === 'straight')
     return { hipFlexDeg: range(rnd, 0, sloppy ? 35 : 15), kneeFlexDeg: range(rnd, 0, sloppy ? 25 : 10), ...arms };
   if (kind === 'tuck')
@@ -72,7 +72,8 @@ export function randomJump(rnd: () => number, truth: TruthClass, execution: Exec
   if (truth === 'tuck-jump') return { ...base, shape: randomShape(rnd, 'tuck', execution) };
   if (truth === 'pike-jump') return { ...base, shape: randomShape(rnd, 'pike', execution) };
   // Somersault: front = the top of the body moves toward the face. Facing right + clockwise = front.
-  const turns = range(rnd, 0.92, 1.08);
+  // 'loose' = the landing comes before the rotation is quite finished or after it went a little past: 0.8 to 1.2 turns.
+  const turns = execution === 'loose' ? range(rnd, 0.8, 1.2) : range(rnd, 0.92, 1.08);
   const clockwise = truth === 'front' ? facing > 0 : facing < 0;
   return {
     ...base,
@@ -113,6 +114,8 @@ export interface EvalRow {
   predicted: SkillId;
   confidence: number;
   correct: boolean;
+  /** Set by the temporal classifier: a tentative name is a flagged guess, and counts as an abstention where firm answers are judged. */
+  certainty?: Certainty;
 }
 
 export interface EvalSummary {
@@ -125,6 +128,9 @@ export interface EvalSummary {
   accuracy: number;
   /** Jumps where the classifier declined (unclassified, or a somersault of unknown direction). */
   abstained: number;
+  /** Jumps named only as a tentative guess (counted in `abstained`), and how many of those guesses were right. */
+  tentative: number;
+  tentativeCorrect: number;
   /** Correct / jumps it answered (excludes abstentions). */
   accuracyWhenAnswered: number;
   /** Wrong answers given with confidence >= 0.6. */
@@ -142,6 +148,7 @@ export function evaluate(
     config?: DeepPartial<SkillConfig>;
     fps?: number;
     execution?: Execution;
+    classifier?: SkillClassifier;
   } = {},
 ): EvalSummary {
   const rnd = makeRng(options.seed ?? 11);
@@ -161,21 +168,29 @@ export function evaluate(
       seed: 1000 + r,
     });
     const result = computeAnalysis(degraded, { athleteHeightM: heightM });
-    const skills = analyzeSkills(result, { config: options.config });
+    const skills = analyzeSkills(result, { config: options.config, classifier: options.classifier });
     if (skills.jumps.length !== order.length) missed += Math.abs(order.length - skills.jumps.length);
     order.forEach((truth, k) => {
       const j = skills.jumps[k];
       if (!j || skills.jumps.length !== order.length) return;
       const predicted = j.prediction.skill;
-      rows.push({ truth, predicted, confidence: j.prediction.confidence, correct: predicted === truth });
+      rows.push({
+        truth,
+        predicted,
+        confidence: j.prediction.confidence,
+        correct: predicted === truth,
+        certainty: j.prediction.certainty,
+      });
     });
   }
   const matrix = Object.fromEntries(TRUTH_CLASSES.map((c) => [c, {}])) as EvalSummary['matrix'];
   for (const row of rows) matrix[row.truth][row.predicted] = (matrix[row.truth][row.predicted] ?? 0) + 1;
-  const abstain = (p: SkillId) => p === 'unclassified' || p === 'somersault-direction-unknown';
-  const answered = rows.filter((r) => !abstain(r.predicted));
+  const abstain = (r: EvalRow) =>
+    r.predicted === 'unclassified' || r.predicted === 'somersault-direction-unknown' || r.certainty === 'tentative';
+  const answered = rows.filter((r) => !abstain(r));
+  const tentative = rows.filter((r) => r.certainty === 'tentative');
   const correct = rows.filter((r) => r.correct);
-  const wrong = rows.filter((r) => !r.correct && !abstain(r.predicted));
+  const wrong = rows.filter((r) => !r.correct && !abstain(r));
   const mean = (a: EvalRow[]) => (a.length ? a.reduce((s, r) => s + r.confidence, 0) / a.length : NaN);
   return {
     condition,
@@ -184,6 +199,8 @@ export function evaluate(
     n: rows.length,
     accuracy: rows.length ? correct.length / rows.length : NaN,
     abstained: rows.length - answered.length,
+    tentative: tentative.length,
+    tentativeCorrect: tentative.filter((r) => r.correct).length,
     accuracyWhenAnswered: answered.length ? answered.filter((r) => r.correct).length / answered.length : NaN,
     confidentWrong: wrong.filter((r) => r.confidence >= 0.6).length,
     meanConfidenceCorrect: mean(correct),
@@ -213,7 +230,7 @@ export function formatSummary(s: EvalSummary): string {
     unclassified: 'none',
   };
   const lines = [
-    `${s.condition.name}: n=${s.n} accuracy ${(s.accuracy * 100).toFixed(0)}%, answered-correct ${(s.accuracyWhenAnswered * 100).toFixed(0)}%, abstained ${s.abstained}, confident-wrong ${s.confidentWrong}, missed jumps ${s.missedJumps}`,
+    `${s.condition.name}: n=${s.n} accuracy ${(s.accuracy * 100).toFixed(0)}%, answered-correct ${(s.accuracyWhenAnswered * 100).toFixed(0)}%, abstained ${s.abstained} (${s.tentative} tentative, ${s.tentativeCorrect} of them right), confident-wrong ${s.confidentWrong}, missed jumps ${s.missedJumps}`,
   ];
   lines.push(['truth \\ predicted', ...cols.map((c) => short[c])].map((x) => x.padEnd(10)).join(''));
   for (const t of TRUTH_CLASSES)

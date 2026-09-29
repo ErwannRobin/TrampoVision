@@ -5,7 +5,8 @@ import { download, toCsv, toJumpsCsv } from './analysis/export';
 import { extractPoseTrack } from './analysis/extractPoseTrack';
 import { stabilizePose } from './analysis/stabilize';
 import { sampleIndexAt } from './analysis/lookup';
-import { isStale, syncRecords, withTruth, withTwistTruth, type RecordContext } from './dataset/record';
+import { exampleCounts, referencesFromRecords } from './dataset/references';
+import { isStale, syncRecords, withFigure, withTruth, withTwistTruth, type RecordContext } from './dataset/record';
 import type { TruthLabel } from './dataset/types';
 import { useDataset } from './dataset/useDataset';
 import { videoIdFromTrack, videoIdOf } from './dataset/videoId';
@@ -159,10 +160,17 @@ export default function App() {
     [track, result],
   );
 
+  // The jumps the person labelled with a figure are reference examples for the classifier. Keyed on what matters, so saving a
+  // note or a skill label does not redo the classification.
+  const figureRecords = useMemo(() => dataset.records.filter((r) => r.figure), [dataset.records]);
+  const figureCounts = useMemo(() => exampleCounts(figureRecords), [figureRecords]);
+  const figureKey = figureRecords.map((r) => `${r.id}:${r.figure?.elementId}`).join('|');
+  const references = useMemo(() => referencesFromRecords(figureRecords), [figureKey]); // oxlint-disable-line react-hooks/exhaustive-deps
+
   // The twist feeds the classifier: 'twists' is one of its four questions.
   const skills = useMemo(
-    () => (result ? analyzeSkills(result, { config: skillConfig, twist }) : null),
-    [result, skillConfig, twist],
+    () => (result ? analyzeSkills(result, { config: skillConfig, twist, references, videoId }) : null),
+    [result, skillConfig, twist, references, videoId],
   );
   const jumpCount = skills?.jumps.length ?? 0;
   const jumpSel = Math.min(selectedJump, Math.max(0, jumpCount - 1));
@@ -437,6 +445,12 @@ export default function App() {
     (k: number, note: string) => {
       const r = fresh[k];
       if (r?.truth) void saveRecords([withTruth(r, r.truth.label, { note })]);
+    },
+    [fresh, saveRecords],
+  );
+  const figureJump = useCallback(
+    (k: number, elementId: string | null) => {
+      if (fresh[k]) void saveRecords([withFigure(fresh[k], elementId)]);
     },
     [fresh, saveRecords],
   );
@@ -729,6 +743,8 @@ export default function App() {
         dataset={dataset}
         baseName={base}
         onLabel={labelJump}
+        onFigure={figureJump}
+        exampleCounts={figureCounts}
         onNote={noteJump}
         onSaveAll={() => void saveRecords(fresh)}
         onUpdateStale={() => void saveRecords(fresh.filter((r) => savedIds.has(r.id)))}

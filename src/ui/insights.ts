@@ -33,8 +33,8 @@ export function confidenceTier(
 }
 
 /** What a skill is called to people: a jump the classifier could not name is "Not classified", not a class of its own. */
-export const skillName = (p: Pick<SkillPrediction, 'skill' | 'label'>): string =>
-  p.skill === 'unclassified' ? TIER_TEXT.none : p.label;
+export const skillName = (p: Pick<SkillPrediction, 'skill' | 'label' | 'certainty'>): string =>
+  p.skill === 'unclassified' ? TIER_TEXT.none : p.certainty === 'tentative' ? `${p.label}?` : p.label;
 
 /** Distance from the bed center (1 = the edge) under which a position is called "in the center". */
 export const BED_CENTER_BAND = 0.15;

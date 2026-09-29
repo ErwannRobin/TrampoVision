@@ -2,6 +2,8 @@ import type { JumpCycle } from '../analysis/jumpCycles';
 import type { TwistEstimate } from '../pose3d/twist';
 import type { SkillConfig } from './config';
 import type { Movement } from './fig/elements';
+import type { Reference } from './temporal/prototypes';
+import type { Channel, MeasuredMovement } from './temporal/signature';
 
 /** Body positions the rule set can tell apart. "unknown" = between the definitions or not enough data. */
 export const POSITIONS = ['straight', 'tuck', 'pike', 'unknown'] as const;
@@ -219,6 +221,28 @@ export interface ElementCandidate {
   /** Share of the probability mass of the whole movement space, 0..1. */
   posterior: number;
   checks: CandidateCheck[];
+  /** Temporal classifier: similarity of the jump's trajectories to the closest reference of this element, 0..1. */
+  similarity?: number;
+  /** Temporal classifier: what the structural stages give this element (same as `posterior`), kept next to the similarity. */
+  structure?: number;
+  /** Temporal classifier: confidence of this candidate (structure and similarity blended, times the data quality). */
+  score?: number;
+  /** Temporal classifier: the reference that matched best. */
+  reference?: { kind: 'model' | 'example'; id: string };
+}
+
+/** How firmly a name is given. Tentative = the best of the plausible candidates, but weakly supported: shown as a guess. */
+export type Certainty = 'confident' | 'probable' | 'tentative';
+
+/** The detected jump against its closest reference, both on the time axis of the jump (the reference warped onto it). */
+export interface TemporalComparison {
+  elementId: string;
+  referenceKind: 'model' | 'example';
+  referenceId: string;
+  /** Distance in tolerances (0 = identical). */
+  distance: number;
+  similarity: number;
+  channels: { channel: Channel; label: string; detected: number[]; reference: number[]; distance: number | null }[];
 }
 
 export interface StageReport {
@@ -284,6 +308,12 @@ export interface SkillPrediction {
   dataQuality?: number;
   /** Present when the jump was not named. */
   failure?: FailureDiagnosis;
+  /** Temporal classifier: how firmly the name is given. */
+  certainty?: Certainty;
+  /** Temporal classifier: what was measured (continuous counts) and the trajectories it comes from. */
+  measured?: MeasuredMovement;
+  /** Temporal classifier: the trajectories of the jump against those of the closest reference. */
+  comparison?: TemporalComparison;
 }
 
 /** The 3D twist of one jump: the estimate and its trajectory (degrees since takeoff, 32 samples from takeoff to landing). */
@@ -299,6 +329,8 @@ export interface ClassifierInput {
   features: JumpFeatures;
   sequence: JumpSequence | null;
   config: SkillConfig;
+  /** Labelled examples to compare with, on top of the models of the table (temporal classifier). */
+  references?: Reference[];
 }
 
 /** Anything that turns one jump's features/sequence into a prediction: the rule set now, a temporal model later. */
