@@ -28,12 +28,13 @@ export default defineConfig(({ mode }) => ({
       ],
     },
     {
-      // Link previews need absolute URLs. Set SITE_URL (e.g. https://example.org/trampovision/) when building.
+      // Link previews need absolute URLs. SITE_URL wins, then Vercel's production host, then the known deployment.
       name: 'open-graph-urls',
       apply: 'build',
       transformIndexHtml: () => {
-        const site = loadEnv(mode, '.', '').SITE_URL;
-        if (!site) return [];
+        const env = loadEnv(mode, '.', '');
+        const vercel = env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : '';
+        const site = env.SITE_URL || vercel || 'https://trampo-vision.vercel.app';
         const base = site.endsWith('/') ? site : `${site}/`;
         const image = `${base}og-image.png`;
         return [
