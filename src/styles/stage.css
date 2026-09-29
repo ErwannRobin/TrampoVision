@@ -1,0 +1,363 @@
+/*
+ * Stage: the video and what is drawn on it, the layers above it (busy, ready, calibration) and the transport bar.
+ * The stage is black in both themes, so everything inside it uses fixed light-on-dark colors instead of tokens.
+ */
+
+.stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-sheet);
+  background: var(--stage);
+  isolation: isolate;
+}
+.stage__frame {
+  position: absolute;
+}
+.stage__frame[data-hidden] {
+  visibility: hidden;
+  pointer-events: none;
+}
+.stage__video,
+.stage__overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.stage__video {
+  display: block;
+  object-fit: contain;
+  background: #000;
+}
+.stage__overlay {
+  pointer-events: none;
+}
+.stage__overlay--editing {
+  pointer-events: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* The 3D pane keeps the page's colors: its drawing reads the theme tokens. */
+.stage__pane {
+  position: absolute;
+  overflow: hidden;
+  border-radius: var(--r-pop);
+  background: var(--panel);
+}
+
+.stage__views {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+}
+.stage__views .seg {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(12, 13, 15, 0.6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.stage__views .seg__thumb {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: none;
+}
+.stage__views .seg__opt {
+  color: rgba(255, 255, 255, 0.7);
+}
+.stage__views .seg__opt:hover,
+.stage__views .seg__opt[aria-checked='true'] {
+  color: #fff;
+}
+
+/* Layers above the video ignore the pointer except where they have controls. */
+.stage__layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.stage__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+}
+.stage__empty-title {
+  margin-top: 6px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.stage__empty-text {
+  max-width: 320px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: var(--fs-sm);
+}
+.stage__pick {
+  position: relative;
+  margin-top: 10px;
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+}
+.stage__pick:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.stage__pick:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.stage__pick input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Busy: reading, converting, analyzing. ------------------------------------------------------------------------ */
+
+.busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 9, 11, 0.58);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: fade-in var(--t-med) var(--ease);
+  pointer-events: auto;
+}
+.busy__panel {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-width: 340px;
+  padding: 24px;
+  color: #fff;
+  text-align: center;
+}
+.busy__title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.busy__text {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--fs-sm);
+}
+.busy__percent {
+  font-size: 15px;
+  font-weight: 600;
+}
+.busy__percent--big {
+  font-size: 30px;
+}
+.busy .ring {
+  color: #fff;
+}
+.busy .ring__track {
+  stroke: rgba(255, 255, 255, 0.2);
+}
+.busy .btn--secondary {
+  margin-top: 6px;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.busy .btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Ready: a clip is loaded and waits to be analyzed. ------------------------------------------------------------ */
+
+.ready {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+.ready__panel {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: 100%;
+  padding: 10px 10px 10px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--r-pill);
+  background: rgba(12, 13, 15, 0.72);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: #fff;
+  pointer-events: auto;
+  animation: pop-in var(--t-med) var(--ease);
+}
+.ready__text {
+  min-width: 0;
+}
+.ready__name {
+  max-width: 260px;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ready__hint {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: var(--fs-sm);
+}
+.ready .btn--primary,
+.calbar .btn--primary {
+  background: #fff;
+  color: #0b0c0e;
+}
+.ready .btn--primary:hover:not(:disabled),
+.calbar .btn--primary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.88);
+}
+@media (max-width: 520px) {
+  .ready {
+    padding: 12px;
+  }
+  .ready__panel {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--r-pop);
+    text-align: center;
+  }
+  .ready__name {
+    max-width: none;
+  }
+}
+
+/* Calibration bar. --------------------------------------------------------------------------------------------- */
+
+.calbar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  max-width: 660px;
+  margin: 0 auto;
+  padding: 10px 10px 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--r-pop);
+  background: rgba(12, 13, 15, 0.8);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  pointer-events: auto;
+  animation: pop-in var(--t-med) var(--ease);
+}
+.calbar__steps {
+  display: flex;
+  gap: 5px;
+}
+.calbar__dot {
+  width: 9px;
+  height: 9px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+}
+.calbar__dot--set {
+  border: 0;
+  background: #19d3c5;
+}
+.calbar__text {
+  flex: 1 1 200px;
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.calbar__actions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+.calbar .btn--ghost {
+  color: rgba(255, 255, 255, 0.75);
+}
+.calbar .btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+/* Transport: the top row of the dock. ------------------------------------------------------------------------- */
+
+.transport {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 2px 0 10px;
+}
+.transport__buttons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.transport__play {
+  margin: 0 6px;
+}
+.transport__time {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+.transport__code {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+}
+.transport__frame {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.transport__tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-left: auto;
+}
+.transport__layers {
+  display: flex;
+  gap: 2px;
+}
+.transport__speed {
+  width: auto;
+}
+
+@media (max-width: 720px) {
+  .transport {
+    gap: 8px 12px;
+  }
+  .transport__tools {
+    justify-content: space-between;
+    width: 100%;
+    margin-left: 0;
+  }
+}
+@media (max-width: 640px) {
+  .stage {
+    border-radius: 0;
+  }
+  .transport__far {
+    display: none;
+  }
+}

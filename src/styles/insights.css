@@ -1,0 +1,398 @@
+/* Insights: the athlete's plain answers for the selected jump, in the rail. */
+
+.ins {
+  display: flex;
+  flex-direction: column;
+}
+.ins-fade {
+  animation: fade-in var(--t-med) var(--ease);
+}
+
+.ins-section {
+  padding: 22px 0;
+  border-top: 1px solid var(--line);
+}
+.ins-h {
+  margin-bottom: 14px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.ins-quiet {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.ins-quiet-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+/* The answer ------------------------------------------------------------------------------------------------- */
+
+.ins-answer {
+  padding-bottom: 22px;
+}
+.ins-answer__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.ins-count {
+  color: var(--text-2);
+  font-size: var(--fs-base);
+  font-weight: 550;
+}
+.ins-headline {
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+.ins-headline--lg {
+  font-size: 36px;
+}
+.ins-headline--md {
+  font-size: 26px;
+}
+/* A best guess or an unclassified jump is not an answer: quieter. */
+.ins-headline--open {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.ins-conf {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+.ins-conf__meter {
+  flex: 0 0 96px;
+}
+.ins-conf__text {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.ins-summary {
+  max-width: 34em;
+  margin-top: 12px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+/* Four figures ------------------------------------------------------------------------------------------------ */
+
+.ins-figs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.ins-fig {
+  gap: 6px;
+  padding: 2px 0 22px;
+}
+.ins-fig--end {
+  padding-left: 22px;
+  border-left: 1px solid var(--line);
+}
+.ins-fig--low {
+  padding: 22px 0 0;
+  border-top: 1px solid var(--line);
+}
+.ins-fig--end.ins-fig--low {
+  padding-left: 22px;
+}
+.ins-fig .stat__value {
+  font-size: 44px;
+}
+.ins-fig__word {
+  display: inline-block;
+  font-size: 26px;
+  font-stretch: var(--wd-text);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+.ins-fig__none {
+  color: var(--text-3);
+}
+.ins-fig__hint {
+  display: block;
+}
+
+/* Landing on the bed ------------------------------------------------------------------------------------------ */
+
+.ins-bed {
+  margin-bottom: 10px;
+}
+.ins-bed__svg {
+  display: block;
+  overflow: visible;
+}
+.ins-bed__bar {
+  fill: var(--panel-3);
+}
+.ins-bed__tick {
+  stroke: var(--line-2);
+  stroke-width: 1.5;
+}
+.ins-bed__label {
+  fill: var(--text-3);
+  font-size: 10.5px;
+}
+.ins-glyph {
+  stroke: var(--panel);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.ins-glyph--takeoff,
+.ins-glyph--landing {
+  fill: var(--text);
+}
+.ins-glyph--apex {
+  fill: var(--gold-fill);
+}
+/* The real position lies past the edge of the bed: the mark sits on the edge and is dashed. */
+.ins-glyph--beyond {
+  stroke: var(--text);
+  stroke-dasharray: 2 2;
+  stroke-width: 1.5;
+}
+.ins-bed__sentence {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.75;
+}
+.ins-ev {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 0.15em;
+  color: var(--text);
+  font-weight: 550;
+}
+.ins-ev__glyph {
+  flex: none;
+}
+
+/* Worth knowing ------------------------------------------------------------------------------------------------ */
+
+.ins-notes {
+  display: grid;
+  gap: 16px;
+}
+.ins-note {
+  display: grid;
+  gap: 3px;
+  padding-left: 14px;
+  border-left: 2px dashed var(--line-2);
+}
+.ins-note__signal {
+  font-weight: 600;
+}
+.ins-note__text {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.ins-note__tag {
+  color: var(--text);
+  font-weight: 550;
+}
+.ins-folds {
+  margin-top: 16px;
+}
+
+/* No jump found ------------------------------------------------------------------------------------------------ */
+
+.ins-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 22px;
+}
+.ins-empty__title {
+  font-size: 30px;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+.ins-empty__check {
+  margin: 10px 0 0;
+}
+.ins-checks {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  list-style: disc;
+}
+
+/* The jumps of the clip ------------------------------------------------------------------------------------- */
+
+.ins-list {
+  --row-h: 56px;
+}
+.ins-list__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px 64px;
+  column-gap: 8px;
+  align-items: baseline;
+  padding-bottom: 8px;
+}
+.ins-list__head .ins-h {
+  margin: 0;
+}
+.ins-list__col {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  text-align: right;
+}
+.ins-list__body {
+  position: relative;
+  margin: 0 -10px;
+}
+.ins-list__body ul {
+  position: relative;
+}
+.ins-list__thumb {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--row-h);
+  border-radius: 12px;
+  background: var(--panel-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transform: translateY(calc(var(--sel, 0) * var(--row-h)));
+  transition: transform var(--t-med) var(--ease);
+  pointer-events: none;
+}
+.ins-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 64px 64px;
+  column-gap: 8px;
+  align-items: center;
+  width: 100%;
+  height: var(--row-h);
+  padding: 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  transition: background var(--t-fast);
+}
+.ins-row:hover {
+  background: color-mix(in srgb, var(--panel-2) 55%, transparent);
+}
+.ins-row__num {
+  color: var(--text-2);
+  font-size: 19px;
+  font-weight: 600;
+}
+.ins-row__num--on {
+  color: var(--text);
+}
+.ins-row__main {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.ins-row__skill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.ins-row__label {
+  overflow: hidden;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ins-row__unsure {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 1.5px dashed var(--text-2);
+  border-radius: 50%;
+}
+.ins-row__bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--panel-3);
+}
+.ins-row__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--text-3);
+  transition: width var(--t-slow) var(--ease);
+}
+.ins-row__fill--on {
+  background: var(--text);
+}
+/* A jump the clip cut off: a dashed bar, because its height is not the whole story. */
+.ins-row__fill--open {
+  background: repeating-linear-gradient(90deg, var(--text-3) 0 5px, transparent 5px 8px);
+}
+.ins-row__fill--open.ins-row__fill--on {
+  background: repeating-linear-gradient(90deg, var(--text) 0 5px, transparent 5px 8px);
+}
+.ins-row__fig {
+  font-size: 17px;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+.ins-row__fig--time {
+  color: var(--text-2);
+}
+.ins-row__unit {
+  margin-left: 2px;
+  color: var(--text-2);
+  font-size: 11px;
+  font-stretch: 88%;
+  font-weight: 500;
+}
+.ins-list__note {
+  margin-top: 10px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+
+.ins-coach {
+  justify-self: start;
+  margin-left: -12px;
+}
+.ins > .ins-section:last-child {
+  display: grid;
+  gap: 6px;
+}
+
+@media (max-width: 420px) {
+  .ins-row,
+  .ins-list__head {
+    grid-template-columns: 22px minmax(0, 1fr) 56px 50px;
+  }
+  .ins-list__head {
+    grid-template-columns: minmax(0, 1fr) 56px 50px;
+  }
+  .ins-headline--lg {
+    font-size: 30px;
+  }
+  .ins-fig .stat__value {
+    font-size: 38px;
+  }
+  .ins-fig--end {
+    padding-left: 16px;
+  }
+}

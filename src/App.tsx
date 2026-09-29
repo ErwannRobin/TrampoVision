@@ -21,25 +21,32 @@ import { loadSample, samplePath } from './video/sample';
 import { dragHasFiles, pickDroppedVideo } from './video/drop';
 import { transcodeToH264 } from './video/transcode';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
-import { Chart } from './ui/Chart';
-import { DebugPanel } from './ui/DebugPanel';
-import { DatasetBar, EvaluatePanel, EvaluationReport } from './ui/EvaluationView';
-import { JumpView } from './ui/JumpView';
-import { PhaseTimeline } from './ui/PhaseTimeline';
-import { Pose3DSection } from './ui/Pose3DView';
+import { EvaluatePanel, EvaluationReport } from './ui/EvaluationView';
+import { Landing } from './ui/Landing';
+import { Pose3DView } from './ui/Pose3DView';
 import { Playhead } from './ui/playhead';
-import { SkillPanel } from './ui/SkillPanel';
-import { TrajectoryPlot } from './ui/TrajectoryPlot';
-import { TwistPanel } from './ui/TwistPanel';
-import { VideoPlayer } from './ui/VideoPlayer';
-
-type Status =
-  | { kind: 'idle' }
-  | { kind: 'loading'; stage: 'reading' | 'measuring' | 'converting'; progress?: number }
-  | { kind: 'analyzing'; done: number; total: number }
-  | { kind: 'error'; message: string };
+import { StatusBanners } from './ui/StatusBanners';
+import { TechnicalData } from './ui/TechnicalData';
+import { Timeline } from './ui/Timeline';
+import { TopBar } from './ui/TopBar';
+import { Icon, ActivityToast, type MenuGroupDef } from './ui/kit';
+import { useLocalStorage } from './ui/hooks';
+import { analysisWarnings } from './ui/quality';
+import { AthleteInsights } from './ui/rail/AthleteInsights';
+import { CoachRail } from './ui/rail/CoachRail';
+import { SetupPanel } from './ui/rail/SetupPanel';
+import { CalibrationBar } from './ui/stage/CalibrationBar';
+import { ProcessingOverlay } from './ui/stage/ProcessingOverlay';
+import { Stage } from './ui/stage/Stage';
+import { Transport } from './ui/stage/Transport';
+import type { Appearance, Audience, CoachTab, RailView, StageView, Status } from './ui/types';
+import { useAnnotatedExport } from './ui/useAnnotatedExport';
+import { plural } from './ui/format';
 
 const webgpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
+
+const AUDIENCES = ['athlete', 'coach'] as const;
+const APPEARANCES = ['system', 'light', 'dark'] as const;
 
 interface SavedCalibration {
   corners: Point[];
@@ -90,12 +97,19 @@ export default function App() {
   const [firstSide, setFirstSide] = useState<'long' | 'short'>('long');
   const [scaleSource, setScaleSource] = useState<ScaleSource | 'auto'>('auto');
 
-  // Skill recognition: thresholds, the jump being inspected, which side panel is open.
+  // Skill recognition: thresholds and the jump being inspected.
   const [skillConfig, setSkillConfig] = useState<SkillConfig>(DEFAULT_SKILL_CONFIG);
   const [selectedJump, setSelectedJump] = useState(0);
-  const [rightTab, setRightTab] = useState<'skill' | 'evaluate' | 'twist' | 'analysis'>('skill');
-  // 2D pose is the analysis; 3D pose is an experimental view next to it and does not feed the classifier.
-  const [poseView, setPoseView] = useState<'2d' | '3d'>('2d');
+
+  // How the interface presents itself. Athlete and coach see the same analysis; only the depth differs.
+  const [audience, setAudience] = useLocalStorage<Audience>('trampovision.audience', 'athlete', AUDIENCES);
+  const [appearance, setAppearance] = useLocalStorage<Appearance>('trampovision.appearance', 'system', APPEARANCES);
+  const [railView, setRailView] = useState<RailView>('setup');
+  const [coachTab, setCoachTab] = useState<CoachTab>('skill');
+  // 2D pose is the analysis; the 3D skeleton is an experimental view next to it and does not feed the classifier.
+  const [stageView, setStageView] = useState<StageView>('video');
+  const [loop, setLoop] = useState(false);
+
   // Evaluation: which video the labels belong to, and whether the report covers this video or every saved one.
   const [videoId, setVideoId] = useState<string | null>(null);
   const [seriesName, setSeriesName] = useState<string | null>(null);
@@ -105,6 +119,12 @@ export default function App() {
   const playhead = useMemo(() => new Playhead(), []);
   const abort = useRef<AbortController | null>(null);
   const fileRef = useRef<File | null>(null); // latest selected file, to ignore stale async results
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (appearance === 'system') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', appearance);
+  }, [appearance]);
 
   const calibration = useMemo<TrampolineCalibration | null>(
     () =>
@@ -143,11 +163,15 @@ export default function App() {
     [track, result],
   );
 
+  const notes = useMemo(() => (result ? analysisWarnings(result) : []), [result]);
+
   useEffect(() => () => abort.current?.abort(), []);
 
-  // A new analysis starts at the first jump.
+  // A new analysis starts at the first jump and shows its insights; no analysis shows the setup.
   useEffect(() => {
     setSelectedJump(0);
+    setRailView(track ? 'insights' : 'setup');
+    setStageView('video');
   }, [track]);
 
   // While the video plays or is scrubbed, the jump view follows the jump under the playhead.
@@ -171,6 +195,30 @@ export default function App() {
     // Half a frame past the event, so the frame shown is the takeoff frame and not the one before it.
     if (c && result) playhead.seek((c.takeoffTimeS ?? c.apexTimeS) + 0.5 / result.meta.sourceFps);
   };
+  const stepJump = (delta: -1 | 1) => {
+    if (jumpCount === 0) return;
+    const k = jumpSel + delta;
+    if (k >= 0 && k < jumpCount) chooseJump(k);
+  };
+  /** Play the selected jump with a little run-up and landing. */
+  const playJump = () => {
+    const c = result?.jumps.cycles[jumpSel];
+    if (c) playhead.playRange((c.takeoffTimeS ?? c.apexTimeS) - 0.4, (c.landingTimeS ?? c.apexTimeS) + 0.3, loop);
+  };
+
+  // [ and ] go to the previous and next jump.
+  const stepRef = useRef(stepJump);
+  stepRef.current = stepJump;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.ctrlKey || e.metaKey || e.altKey || (t && /INPUT|TEXTAREA|SELECT/.test(t.tagName))) return;
+      if (e.key === '[') stepRef.current(-1);
+      else if (e.key === ']') stepRef.current(1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Remember the calibration per video file.
   useEffect(() => {
@@ -264,7 +312,9 @@ export default function App() {
           ? { kind: 'idle' }
           : {
               kind: 'error',
-              message: 'Could not measure the frame rate. Using 30 fps: please set the real value in the settings.',
+              severity: 'warning',
+              message:
+                'Could not measure the frame rate, so 30 fps is assumed. Set the real value under Analysis in the settings.',
             },
       );
     } catch (err) {
@@ -305,7 +355,7 @@ export default function App() {
     }
   }
 
-  /** Opens a saved series (JSON): no need to run the pose model again. */
+  /** Opens a saved analysis (JSON): no need to run the pose model again. */
   async function openSeries(saved: File) {
     try {
       const parsed = parsePoseSeries(await saved.text());
@@ -327,11 +377,32 @@ export default function App() {
       setStatus({ kind: 'idle' });
       setNotice(
         `Opened ${saved.name} (${parsed.track.frames.length} frames). ` +
-          (url ? 'Make sure the loaded video is the same clip.' : 'Load the video too to see the overlay.'),
+          (url ? 'Make sure the loaded video is the same clip.' : 'Add the video too to see the overlay.'),
       );
     } catch (err) {
       setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
     }
+  }
+
+  /** Back to the first screen. Closing an analysis is asked for first: the numbers are not stored anywhere else. */
+  function goHome() {
+    if (result && !window.confirm('Close this analysis? Save it from the export menu first if you want to keep it.'))
+      return;
+    abort.current?.abort();
+    if (url) URL.revokeObjectURL(url);
+    fileRef.current = null;
+    setUrl(null);
+    setFile(null);
+    setTrack(null);
+    setBackend('');
+    setNotice('');
+    setStatus({ kind: 'idle' });
+    setCorners([]);
+    setEditingCal(false);
+    setVideoId(null);
+    setSeriesName(null);
+    setSelectedJump(0);
+    playhead.setTime(0);
   }
 
   // Local dataset: the jumps of this video as they would be saved now, next to what is already saved.
@@ -373,13 +444,14 @@ export default function App() {
     const k = result?.jumps.cycles.findIndex((c) => Math.abs(c.apexTimeS - apexS) <= 0.2) ?? -1;
     if (k >= 0) chooseJump(k);
   };
-  const switchPoseView = (v: '2d' | '3d') => {
-    setPoseView(v);
-    if (v === '3d') setRightTab('twist');
-    else if (rightTab === 'twist') setRightTab('skill');
+  const switchStageView = (v: StageView) => {
+    setStageView(v);
+    if (v !== 'video') setCoachTab('twist');
+    else if (coachTab === 'twist') setCoachTab('skill');
   };
 
   const analyzing = status.kind === 'analyzing';
+  const loading = status.kind === 'loading';
 
   // Drop a video anywhere on the page. The handlers read the latest onFile/analyzing through a ref.
   const dropRef = useRef({ onFile, analyzing });
@@ -422,42 +494,13 @@ export default function App() {
       window.removeEventListener('drop', drop);
     };
   }, []);
-  const pct = analyzing ? Math.round((status.done / status.total) * 100) : 0;
+
   const fileName = file?.name ?? seriesName ?? 'trampovision';
   const base = fileName.replace(/\.[^.]+$/, '') || 'trampovision';
 
-  // Chart decorations derived from the jump cycles.
-  const decorations = useMemo(() => {
-    if (!result) return null;
-    const markers = result.jumps.cycles.flatMap((c) => [
-      ...(c.takeoffTimeS !== null ? [{ t: c.takeoffTimeS, label: 'T' }] : []),
-      { t: c.apexTimeS, label: 'A' },
-      ...(c.landingTimeS !== null ? [{ t: c.landingTimeS, label: 'L' }] : []),
-    ]);
-    const bands = result.jumps.cycles.map((c) => ({
-      from: c.takeoffTimeS ?? result.time[0],
-      to: c.landingTimeS ?? result.time[result.time.length - 1],
-    }));
-    const halfBed =
-      calibrationModel?.ok && result.meta.calibrated
-        ? calibrationModel.model.halfExtentM / calibrationModel.model.metersPerPixel / result.meta.pixelsPerMeter
-        : NaN;
-    const bedGuides = Number.isFinite(halfBed)
-      ? [
-          { value: -halfBed, label: 'bed edge' },
-          { value: halfBed, label: 'bed edge' },
-        ]
-      : [];
-    const orient = Array.from(result.orientation).filter(Number.isFinite);
-    const turnGuides: { value: number; label?: string }[] = [];
-    if (orient.length) {
-      const lo = Math.ceil(Math.min(...orient) / 360);
-      const hi = Math.floor(Math.max(...orient) / 360);
-      for (let k = lo; k <= hi && k - lo < 40; k++)
-        turnGuides.push({ value: k * 360, label: `${k} turn${Math.abs(k) === 1 ? '' : 's'}` });
-    }
-    return { markers, bands, bedGuides, turnGuides };
-  }, [result, calibrationModel]);
+  useEffect(() => {
+    document.title = url || result ? `${base} – TrampoVision` : 'TrampoVision';
+  }, [url, result, base]);
 
   const calStatus = (() => {
     if (editingCal) {
@@ -469,612 +512,408 @@ export default function App() {
       return 'Optional. Marks the bed so positions are measured relative to it. Works best with a level camera facing a side of the bed.';
     if (!calibrationModel.ok) return calibrationModel.error;
     const m = calibrationModel.model;
-    return `Bed scale ${(1 / m.metersPerPixel).toFixed(0)} px/m at the bed center · camera sees the bed ${m.viewAngleDeg.toFixed(0)}° from face-on (0° = a long side)`;
+    return `Bed scale ${(1 / m.metersPerPixel).toFixed(0)} px/m at the bed center. The camera sees the bed ${m.viewAngleDeg.toFixed(0)}° from face-on (0° = a long side).`;
   })();
 
+  // Labels on the video say more to a coach than to an athlete.
+  const overlayOpts = useMemo<OverlayOptions>(
+    () => ({ ...overlay, detail: audience === 'coach' ? 'full' : 'simple' }),
+    [overlay, audience],
+  );
+
+  const annotated = useAnnotatedExport({
+    url,
+    fps,
+    result,
+    skills,
+    overlay: overlayOpts,
+    calibration: calDraw,
+    baseName: base,
+    playhead,
+  });
+
+  const exportGroups = useMemo<MenuGroupDef[] | null>(() => {
+    if (!result) return null;
+    return [
+      {
+        id: 'video',
+        title: 'Video',
+        items: [
+          {
+            id: 'annotated',
+            label: 'Annotated video (MP4)',
+            hint: 'The video with the skeleton, trajectory, labels and trampoline outline that are visible now',
+            icon: 'film',
+            disabled: !url || !annotated.available || annotated.exporting,
+            onSelect: () => void annotated.start(),
+          },
+        ],
+      },
+      {
+        id: 'data',
+        title: 'Data',
+        items: [
+          {
+            id: 'frames',
+            label: 'Frames (CSV)',
+            hint: 'One row per frame',
+            icon: 'download',
+            onSelect: () => download(`${base}-frames.csv`, toCsv(result), 'text/csv'),
+          },
+          {
+            id: 'jumps',
+            label: 'Jumps (CSV)',
+            hint: 'One row per jump',
+            icon: 'download',
+            onSelect: () => download(`${base}-jumps.csv`, toJumpsCsv(result), 'text/csv'),
+          },
+          {
+            id: 'series',
+            label: 'Save analysis (JSON)',
+            hint: 'Every frame: all joints with scores, center of mass, orientation, phase, plus the raw model output. Open it later to skip the analysis.',
+            icon: 'download',
+            disabled: !track,
+            onSelect: () =>
+              track &&
+              download(
+                `${base}-pose-series.json`,
+                toSeriesJson(
+                  buildPoseSeries(result, track, {
+                    fileName,
+                    videoId: videoId ?? undefined,
+                    stride,
+                    minVisibility: 0.4,
+                    calibration,
+                  }),
+                ),
+                'application/json',
+              ),
+          },
+        ],
+      },
+      {
+        id: 'skills',
+        title: 'Skills',
+        items: [
+          {
+            id: 'skills-json',
+            label: 'Skills report (JSON)',
+            hint: 'Per jump: normalized sequence, features, prediction with evidence, and the thresholds used',
+            icon: 'download',
+            disabled: !skills,
+            onSelect: () =>
+              skills &&
+              download(
+                `${base}-skills.json`,
+                toSkillReportJson(
+                  buildSkillReport(skills, {
+                    fileName,
+                    fps: result.meta.fps,
+                    width: result.meta.width,
+                    height: result.meta.height,
+                  }),
+                ),
+                'application/json',
+              ),
+          },
+          {
+            id: 'skills-csv',
+            label: 'Skills (CSV)',
+            hint: 'One row per jump: features and prediction',
+            icon: 'download',
+            disabled: !skills,
+            onSelect: () => skills && download(`${base}-skills.csv`, toSkillsCsv(skills), 'text/csv'),
+          },
+          {
+            id: 'sequences-csv',
+            label: 'Sequences (CSV)',
+            hint: 'One row per jump and normalized sample',
+            icon: 'download',
+            disabled: !skills,
+            onSelect: () => skills && download(`${base}-sequences.csv`, toSequencesCsv(skills), 'text/csv'),
+          },
+        ],
+      },
+    ];
+  }, [result, skills, track, url, base, fileName, videoId, stride, calibration, annotated]);
+
+  const hasClip = !!url || !!result;
+  const view: StageView = audience === 'coach' ? stageView : 'video';
+  const clipDetail = result
+    ? `${jumpCount} ${plural(jumpCount, 'jump')}, ${(result.time[result.time.length - 1] ?? 0).toFixed(1)} s`
+    : '';
+
+  const pane =
+    view !== 'video' && result && track && twist ? (
+      <Pose3DView
+        track={track}
+        result={result}
+        twist={twist}
+        selected={jumpSel}
+        playhead={playhead}
+        baseName={base}
+        sideBySide={url ? { url, fps, skills, overlay: overlayOpts, calibration: calDraw } : null}
+        fill
+      />
+    ) : null;
+
+  const setup = (
+    <SetupPanel
+      hasVideo={!!url}
+      hasResult={!!result}
+      busy={analyzing ? 'analyzing' : loading ? 'loading' : 'idle'}
+      fileName={file?.name ?? seriesName}
+      model={model}
+      onModel={setModel}
+      numPoses={numPoses}
+      onNumPoses={setNumPoses}
+      stride={stride}
+      onStride={setStride}
+      preferGpu={preferGpu}
+      onPreferGpu={setPreferGpu}
+      fps={fps}
+      onFps={(next) => {
+        if (next === fps) return;
+        setFps(next);
+        setTrack(null);
+      }}
+      backend={backend}
+      webgpu={webgpu}
+      onAnalyze={() => void analyze()}
+      onCancel={() => abort.current?.abort()}
+      height={height}
+      onHeight={(m) => setHeight(m || 1.75)}
+      calibration={{
+        corners,
+        editing: editingCal,
+        bedLong,
+        bedShort,
+        firstSide,
+        scaleSource,
+        status: calStatus,
+        error: !!calibrationModel && !calibrationModel.ok,
+      }}
+      onEditCalibration={setEditingCal}
+      onUndoCorner={() => setCorners(corners.slice(0, -1))}
+      onClearCalibration={() => {
+        setCorners([]);
+        setEditingCal(true);
+      }}
+      onBedLong={(m) => setBedLong(m || DEFAULT_BED_M.long)}
+      onBedShort={(m) => setBedShort(m || DEFAULT_BED_M.short)}
+      onFirstSide={setFirstSide}
+      onScaleSource={setScaleSource}
+      onSample={samplePath ? () => void onSample() : null}
+      onOpenSeries={(f) => void openSeries(f)}
+      appearance={appearance}
+      onAppearance={setAppearance}
+      onClose={result ? () => setRailView('insights') : undefined}
+    />
+  );
+
+  const review =
+    result && skills ? (
+      <EvaluatePanel
+        skills={skills}
+        selected={jumpSel}
+        onSelect={chooseJump}
+        playhead={playhead}
+        videoId={videoId}
+        fresh={fresh}
+        savedIds={savedIds}
+        staleCount={staleCount}
+        dataset={dataset}
+        baseName={base}
+        onLabel={labelJump}
+        onNote={noteJump}
+        onSaveAll={() => void saveRecords(fresh)}
+        onUpdateStale={() => void saveRecords(fresh.filter((r) => savedIds.has(r.id)))}
+      />
+    ) : null;
+
   return (
-    <div className="app">
-      {dragging && <div className="dropzone">{analyzing ? 'Analysis in progress' : 'Drop a video to analyse it'}</div>}
-      <header>
-        <h1>TrampoVision</h1>
-        <span className="muted">Trampoline motion analysis · prototype · video never leaves your browser</span>
-      </header>
-
-      <section className="panel controls">
-        <label className="file">
-          <span>Video (MP4 / MOV)</span>
-          <input
-            type="file"
-            accept="video/mp4,video/quicktime,.mp4,.mov"
-            disabled={analyzing}
-            onChange={(e) => e.target.files?.[0] && void onFile(e.target.files[0])}
-          />
-        </label>
-        {samplePath && (
-          <button type="button" onClick={() => void onSample()} disabled={analyzing}>
-            Use sample video
-          </button>
-        )}
-        <label>
-          Model
-          <select value={model} onChange={(e) => setModel(e.target.value as ModelVariant)} disabled={analyzing}>
-            <option value="lite">Lite (fast)</option>
-            <option value="full">Full</option>
-            <option value="heavy">Heavy (most accurate)</option>
-          </select>
-        </label>
-        <label>
-          Athlete height (m)
-          <input
-            type="number"
-            min={1}
-            max={2.3}
-            step={0.01}
-            value={height}
-            onChange={(e) => setHeight(Number(e.target.value) || 1.75)}
-          />
-        </label>
-        <label>
-          Video fps
-          <input
-            type="number"
-            min={1}
-            max={480}
-            step={0.001}
-            value={fps}
-            disabled={analyzing}
-            onChange={(e) => {
-              setFps(Number(e.target.value) || 30);
-              setTrack(null);
-            }}
-          />
-        </label>
-        <label>
-          Analyze every
-          <select value={stride} onChange={(e) => setStride(Number(e.target.value))} disabled={analyzing}>
-            {(
-              [
-                [1, 'frame'],
-                [2, '2nd frame'],
-                [3, '3rd frame'],
-                [4, '4th frame'],
-              ] as const
-            ).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          People to look for
-          <select value={numPoses} onChange={(e) => setNumPoses(Number(e.target.value))} disabled={analyzing}>
-            {[1, 2, 3].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={preferGpu}
-            onChange={(e) => setPreferGpu(e.target.checked)}
-            disabled={analyzing}
-          />
-          Use GPU if possible
-        </label>
-        {analyzing ? (
-          <button onClick={() => abort.current?.abort()}>Cancel</button>
-        ) : (
-          <button className="primary" onClick={() => void analyze()} disabled={!url || status.kind === 'loading'}>
-            Analyze video
-          </button>
-        )}
-        <label className="file">
-          <span>…or open saved data (JSON)</span>
-          <input
-            type="file"
-            accept="application/json,.json"
-            disabled={analyzing}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void openSeries(f);
-              e.target.value = '';
-            }}
-          />
-        </label>
-      </section>
-
-      <p className="chips">
-        <span className="chip">Runtime: {backend || 'not started'}</span>
-        <span className="chip">
-          WebGPU:{' '}
-          {webgpu
-            ? 'available in this browser, but MediaPipe uses WebGL (GPU delegate) or WASM (CPU)'
-            : 'not available'}
-        </span>
-      </p>
-
-      {status.kind === 'loading' && (
-        <p className="notice">
-          {status.stage === 'reading' && 'Reading video…'}
-          {status.stage === 'measuring' && 'Measuring frame rate…'}
-          {status.stage === 'converting' &&
-            `Converting the video for this browser (runs locally, may take a while)… ${Math.round((status.progress ?? 0) * 100)}%`}
-        </p>
-      )}
-      {status.kind === 'error' && (
-        <p className="notice error" role="alert">
-          {status.message}
-        </p>
-      )}
-      {notice && status.kind !== 'error' && <p className="notice">{notice}</p>}
-      {analyzing && (
-        <div className="progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-          <div style={{ width: `${pct}%` }} />
-          <span className="mono">
-            Analyzing frame {status.done} / {status.total} ({pct}%)
-          </span>
+    <div className="app" data-audience={audience}>
+      {dragging && (
+        <div className="dropzone" role="presentation">
+          <Icon name="upload" size={40} strokeWidth={1.5} />
+          <span className="dropzone__title">{analyzing ? 'Analysis in progress' : 'Drop a video to analyze it'}</span>
+          <span className="dropzone__text">{analyzing ? 'Wait for it to finish first.' : 'MP4 or MOV'}</span>
         </div>
       )}
 
-      {!url && !result && (
-        <p className="empty">Choose a trampoline video to start. A side view with a fixed, level camera works best.</p>
-      )}
-      {!url && !result && (dataset.records.length > 0 || dataset.ready) && (
-        <section className="panel evaluation">
-          <DatasetBar dataset={dataset} baseName="trampovision" />
-          {dataset.records.length > 0 && (
-            <EvaluationReport
-              records={dataset.records}
-              videoId={null}
-              scope="all"
-              onScope={() => {}}
-              baseName="trampovision"
-              onGoTo={() => {}}
-            />
-          )}
-        </section>
-      )}
+      <TopBar
+        clip={hasClip ? { name: fileName, detail: clipDetail } : null}
+        audience={audience}
+        onAudience={setAudience}
+        showAudience={!!result}
+        exportGroups={exportGroups}
+        setupOpen={!!result && railView === 'setup'}
+        onToggleSetup={() => setRailView(railView === 'setup' ? 'insights' : 'setup')}
+        onFile={hasClip && !analyzing ? (f) => void onFile(f) : null}
+        onHome={hasClip && !analyzing ? goHome : null}
+      />
 
-      {(url || result) && (
-        <section className="workspace">
-          <div className="left">
-            {url ? (
-              <VideoPlayer
-                url={url}
-                fps={fps}
-                result={result}
-                skills={skills}
-                overlay={overlay}
-                playhead={playhead}
-                speed={speed}
-                onSpeed={setSpeed}
-                onError={(message) => setStatus({ kind: 'error', message })}
-                calibration={calDraw}
-                onCornersChange={setCorners}
-                baseName={base}
-              />
-            ) : (
-              <p className="notice">
-                No video loaded. Load the clip to see the skeleton on it; the charts and the panel work without it.
-              </p>
-            )}
-            {result && (
-              <PhaseTimeline
-                result={result}
-                skills={skills}
-                playhead={playhead}
-                selected={jumpCount ? jumpSel : null}
-                onSelect={(k) => setSelectedJump(k)}
-              />
-            )}
-            <div className="toggles">
-              <div className="seg" role="group" aria-label="Pose view">
-                <button
-                  className={poseView === '2d' ? 'primary' : ''}
-                  aria-pressed={poseView === '2d'}
-                  onClick={() => switchPoseView('2d')}
+      <StatusBanners
+        status={status}
+        notice={notice}
+        exportError={annotated.error}
+        onDismissStatus={() => setStatus({ kind: 'idle' })}
+        onDismissNotice={() => setNotice('')}
+        onDismissExportError={annotated.clearError}
+      />
+
+      <main className="app__main">
+        {hasClip && <h1 className="sr-only">{result ? `Analysis of ${fileName}` : `Set up ${fileName}`}</h1>}
+        {!hasClip ? (
+          <Landing
+            onFile={(f) => void onFile(f)}
+            onSample={samplePath ? () => void onSample() : null}
+            onOpenSeries={(f) => void openSeries(f)}
+            dataset={dataset}
+            busy={loading}
+          />
+        ) : (
+          <>
+            <div className="workspace">
+              <div className="workspace__stage">
+                <Stage
+                  url={url}
+                  fps={fps}
+                  result={result}
+                  skills={skills}
+                  overlay={overlayOpts}
+                  playhead={playhead}
+                  speed={speed}
+                  calibration={calDraw}
+                  onCornersChange={setCorners}
+                  onError={(message) => setStatus({ kind: 'error', message })}
+                  onPickVideo={(f) => void onFile(f)}
+                  view={view}
+                  onView={audience === 'coach' && result && twist ? switchStageView : undefined}
+                  pane={pane}
                 >
-                  2D pose
-                </button>
-                <button
-                  className={poseView === '3d' ? 'primary' : ''}
-                  aria-pressed={poseView === '3d'}
-                  onClick={() => switchPoseView('3d')}
-                  title="Experimental: 3D skeleton and twist from the model's 3D landmarks. The classifier still uses the 2D pose."
-                >
-                  3D pose (experimental)
-                </button>
-              </div>
-              {(['skeleton', 'com', 'trail', 'hud'] as const).map((k) => (
-                <label key={k} className="check">
-                  <input
-                    type="checkbox"
-                    checked={overlay[k]}
-                    onChange={(e) => setOverlay({ ...overlay, [k]: e.target.checked })}
+                  {editingCal && (
+                    <CalibrationBar
+                      corners={corners.length}
+                      onUndo={() => setCorners(corners.slice(0, -1))}
+                      onClear={() => setCorners([])}
+                      onDone={() => setEditingCal(false)}
+                    />
+                  )}
+                  <ProcessingOverlay
+                    status={status}
+                    ready={!!url && !result && !editingCal}
+                    fileName={file?.name ?? ''}
+                    backend={backend}
+                    onAnalyze={() => void analyze()}
+                    onCancel={() => abort.current?.abort()}
                   />
-                  {k === 'skeleton'
-                    ? 'Skeleton'
-                    : k === 'com'
-                      ? 'Center of mass'
-                      : k === 'trail'
-                        ? 'COM trajectory'
-                        : 'Skill labels'}
-                </label>
-              ))}
-              <span className="spacer" />
-              <button
-                disabled={!result}
-                onClick={() => result && download(`${base}-frames.csv`, toCsv(result), 'text/csv')}
-              >
-                Frames CSV
-              </button>
-              <button
-                disabled={!result}
-                onClick={() => result && download(`${base}-jumps.csv`, toJumpsCsv(result), 'text/csv')}
-              >
-                Jumps CSV
-              </button>
-              <button
-                disabled={!result}
-                title="Every frame: all joints with scores, center of mass, orientation, phase, plus the raw model output"
-                onClick={() =>
-                  result &&
-                  track &&
-                  download(
-                    `${base}-pose-series.json`,
-                    toSeriesJson(
-                      buildPoseSeries(result, track, {
-                        fileName,
-                        videoId: videoId ?? undefined,
-                        stride,
-                        minVisibility: 0.4,
-                        calibration,
-                      }),
-                    ),
-                    'application/json',
-                  )
-                }
-              >
-                Save data (JSON)
-              </button>
-              <button
-                disabled={!skills}
-                title="Per jump: normalized sequence, features, prediction with evidence, and the thresholds used"
-                onClick={() =>
-                  result &&
-                  skills &&
-                  download(
-                    `${base}-skills.json`,
-                    toSkillReportJson(
-                      buildSkillReport(skills, {
-                        fileName,
-                        fps: result.meta.fps,
-                        width: result.meta.width,
-                        height: result.meta.height,
-                      }),
-                    ),
-                    'application/json',
-                  )
-                }
-              >
-                Skills JSON
-              </button>
-              <button
-                disabled={!skills}
-                title="One row per jump: features and prediction"
-                onClick={() => skills && download(`${base}-skills.csv`, toSkillsCsv(skills), 'text/csv')}
-              >
-                Skills CSV
-              </button>
-              <button
-                disabled={!skills}
-                title="One row per jump and normalized sample"
-                onClick={() => skills && download(`${base}-sequences.csv`, toSequencesCsv(skills), 'text/csv')}
-              >
-                Sequences CSV
-              </button>
-            </div>
-
-            {poseView === '3d' && result && track && twist && decorations && (
-              <Pose3DSection
-                track={track}
-                result={result}
-                twist={twist}
-                selected={jumpSel}
-                playhead={playhead}
-                baseName={base}
-                sideBySide={url ? { url, fps, skills, overlay, calibration: calDraw } : null}
-                markers={decorations.markers}
-                bands={decorations.bands}
-              />
-            )}
-
-            <div className="panel calibration">
-              <strong>Trampoline</strong>
-              {editingCal ? (
-                <>
-                  <button className="primary" onClick={() => setEditingCal(false)}>
-                    Done
-                  </button>
-                  <button disabled={corners.length === 0} onClick={() => setCorners(corners.slice(0, -1))}>
-                    Undo last corner
-                  </button>
-                </>
-              ) : (
-                <button disabled={!url} onClick={() => setEditingCal(true)}>
-                  {corners.length === 4 ? 'Edit corners' : 'Set up calibration'}
-                </button>
-              )}
-              {corners.length > 0 && (
-                <button
-                  onClick={() => {
-                    setCorners([]);
-                    setEditingCal(true);
-                  }}
-                >
-                  Clear
-                </button>
-              )}
-              <label>
-                Bed
-                <input
-                  type="number"
-                  min={0.5}
-                  max={10}
-                  step={0.01}
-                  value={bedLong}
-                  onChange={(e) => setBedLong(Number(e.target.value) || DEFAULT_BED_M.long)}
-                />
-                ×
-                <input
-                  type="number"
-                  min={0.5}
-                  max={10}
-                  step={0.01}
-                  value={bedShort}
-                  onChange={(e) => setBedShort(Number(e.target.value) || DEFAULT_BED_M.short)}
-                />
-                m
-              </label>
-              <label>
-                Side 1→2 is the
-                <select value={firstSide} onChange={(e) => setFirstSide(e.target.value as 'long' | 'short')}>
-                  <option value="long">long side</option>
-                  <option value="short">short side</option>
-                </select>
-              </label>
-              <label>
-                Meters from
-                <select value={scaleSource} onChange={(e) => setScaleSource(e.target.value as ScaleSource | 'auto')}>
-                  <option value="auto">auto (bed if set)</option>
-                  <option value="trampoline">the bed</option>
-                  <option value="athlete">athlete height</option>
-                </select>
-              </label>
-              <span className={`status ${calibrationModel && !calibrationModel.ok ? 'error-text' : 'muted'}`}>
-                {calStatus}
-              </span>
-            </div>
-            {result && skills && (
-              <JumpView result={result} skills={skills} playhead={playhead} selected={jumpSel} onSelect={chooseJump} />
-            )}
-            {result && rightTab === 'evaluate' && (
-              <EvaluationReport
-                records={dataset.records}
-                videoId={videoId}
-                scope={evalScope}
-                onScope={setEvalScope}
-                baseName={base}
-                onGoTo={goToApex}
-              />
-            )}
-            <p className="hint muted">
-              Space: play/pause · ←/→: previous/next frame (Shift: ±10) · click or drag on a chart to seek.
-            </p>
-          </div>
-          {result && (
-            <aside className="right">
-              <div className="tabs" role="tablist">
-                <button
-                  role="tab"
-                  aria-selected={rightTab === 'skill'}
-                  className={rightTab === 'skill' ? 'primary' : ''}
-                  onClick={() => setRightTab('skill')}
-                >
-                  Skill
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={rightTab === 'evaluate'}
-                  className={rightTab === 'evaluate' ? 'primary' : ''}
-                  onClick={() => setRightTab('evaluate')}
-                >
-                  Evaluate
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={rightTab === 'twist'}
-                  className={rightTab === 'twist' ? 'primary' : ''}
-                  onClick={() => setRightTab('twist')}
-                >
-                  Twist 3D
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={rightTab === 'analysis'}
-                  className={rightTab === 'analysis' ? 'primary' : ''}
-                  onClick={() => setRightTab('analysis')}
-                >
-                  Analysis
-                </button>
+                </Stage>
               </div>
-              {rightTab === 'skill' && skills ? (
-                <SkillPanel
-                  result={result}
-                  skills={skills}
-                  selected={jumpSel}
-                  playhead={playhead}
-                  config={skillConfig}
-                  onConfig={setSkillConfig}
-                  onSelect={chooseJump}
-                />
-              ) : rightTab === 'evaluate' && skills ? (
-                <EvaluatePanel
-                  skills={skills}
-                  selected={jumpSel}
-                  onSelect={chooseJump}
-                  playhead={playhead}
-                  videoId={videoId}
-                  fresh={fresh}
-                  savedIds={savedIds}
-                  staleCount={staleCount}
-                  dataset={dataset}
-                  baseName={base}
-                  onLabel={labelJump}
-                  onNote={noteJump}
-                  onSaveAll={() => void saveRecords(fresh)}
-                  onUpdateStale={() => void saveRecords(fresh.filter((r) => savedIds.has(r.id)))}
-                />
-              ) : rightTab === 'twist' && twist ? (
-                <TwistPanel
-                  result={result}
-                  twist={twist}
-                  hasWorld={!!twist.frames}
-                  selected={jumpSel}
-                  onSelect={chooseJump}
-                  playhead={playhead}
-                  annotation={fresh[jumpSel]?.twistTruth?.halfTwists ?? null}
-                  onAnnotate={annotateTwist}
-                  canAnnotate={!!fresh[jumpSel]}
-                />
-              ) : (
-                <DebugPanel result={result} playhead={playhead} />
-              )}
-            </aside>
-          )}
-        </section>
-      )}
 
-      {result && decorations && (
-        <section className="charts">
-          <Chart
-            title="COM height"
-            unit={`m above ${result.meta.heightReference}`}
-            time={result.time}
-            playhead={playhead}
-            confidence={result.confidence}
-            decimals={2}
-            minSpan={0.5}
-            markers={decorations.markers}
-            bands={decorations.bands}
-            series={[{ label: 'Height', values: result.height, color: '--series-1' }]}
-          />
-          <Chart
-            title="COM vertical velocity"
-            unit="m/s, up = +"
-            time={result.time}
-            playhead={playhead}
-            confidence={result.confidence}
-            decimals={2}
-            zeroLine
-            minSpan={2}
-            markers={decorations.markers}
-            bands={decorations.bands}
-            series={[{ label: 'Vy', values: result.vy, color: '--series-1' }]}
-          />
-          <Chart
-            title="COM horizontal position"
-            unit={`m from ${result.meta.calibrated ? 'bed center' : 'start'}, + = right`}
-            time={result.time}
-            playhead={playhead}
-            confidence={result.confidence}
-            decimals={2}
-            zeroLine
-            minSpan={0.5}
-            guides={decorations.bedGuides}
-            markers={decorations.markers}
-            bands={decorations.bands}
-            series={[{ label: 'x', values: result.x, color: '--series-1' }]}
-          />
-          <TrajectoryPlot
-            result={result}
-            playhead={playhead}
-            calibration={calibrationModel?.ok && result.meta.calibrated ? calibrationModel.model : null}
-          />
-          <Chart
-            title="Body orientation (continuous)"
-            unit="°, keeps counting past 360"
-            time={result.time}
-            playhead={playhead}
-            confidence={result.confidence}
-            decimals={0}
-            minSpan={40}
-            guides={decorations.turnGuides}
-            markers={decorations.markers}
-            bands={decorations.bands}
-            series={[{ label: 'Orientation', values: result.orientation, color: '--series-1' }]}
-          />
-          <Chart
-            title="Body angle (wrapped)"
-            unit="° from vertical, + = clockwise"
-            time={result.time}
-            playhead={playhead}
-            confidence={result.confidence}
-            zeroLine
-            minSpan={20}
-            breakOnJump={180}
-            series={[
-              { label: 'Trunk', values: result.trunkAngle, color: '--series-1' },
-              { label: 'Body line', values: result.lineAngle, color: '--series-2' },
-            ]}
-          />
-          <Chart
-            title="Angular velocity"
-            unit="°/s"
-            time={result.time}
-            playhead={playhead}
-            confidence={result.confidence}
-            decimals={0}
-            zeroLine
-            minSpan={60}
-            series={[{ label: 'ω', values: result.angularVelocity, color: '--series-1' }]}
-          />
-          {(
-            [
-              ['Knee angle', 'leftKnee', 'rightKnee'],
-              ['Hip angle', 'leftHip', 'rightHip'],
-              ['Shoulder angle', 'leftShoulder', 'rightShoulder'],
-              ['Elbow angle', 'leftElbow', 'rightElbow'],
-            ] as const
-          ).map(([title, l, r]) => (
-            <Chart
-              key={title}
-              title={title}
-              unit="°, 180 = straight"
-              time={result.time}
-              playhead={playhead}
-              confidence={result.confidence}
-              minSpan={30}
-              series={[
-                { label: 'Left', values: result.joints[l], color: '--series-1' },
-                { label: 'Right', values: result.joints[r], color: '--series-2' },
-              ]}
-            />
-          ))}
-          <Chart
-            title="Pose confidence"
-            unit="0–1, shaded when < 0.5"
-            time={result.time}
-            playhead={playhead}
-            decimals={2}
-            yDomain={[0, 1]}
-            series={[{ label: 'Confidence', values: result.confidence, color: '--series-1' }]}
-          />
-        </section>
+              <div className="workspace__dock sheet">
+                {url && (
+                  <Transport
+                    playhead={playhead}
+                    fps={fps}
+                    speed={speed}
+                    onSpeed={setSpeed}
+                    overlay={overlay}
+                    onOverlay={setOverlay}
+                    hasVideo
+                    hasResult={!!result}
+                  />
+                )}
+                {result && (
+                  <Timeline
+                    result={result}
+                    skills={skills}
+                    playhead={playhead}
+                    selected={jumpCount ? jumpSel : null}
+                    onSelect={setSelectedJump}
+                    onStepJump={stepJump}
+                    onPlayJump={playJump}
+                    loop={loop}
+                    onLoop={setLoop}
+                  />
+                )}
+              </div>
+
+              <aside
+                className="workspace__rail sheet"
+                aria-label={railView === 'setup' || !result ? 'Settings' : 'Analysis'}
+              >
+                {!result || !skills || railView === 'setup' ? (
+                  setup
+                ) : audience === 'athlete' ? (
+                  <AthleteInsights
+                    result={result}
+                    skills={skills}
+                    selected={jumpSel}
+                    onSelect={chooseJump}
+                    onPlayJump={playJump}
+                    onOpenSetup={() => setRailView('setup')}
+                    onShowCoach={() => setAudience('coach')}
+                    notes={notes}
+                  />
+                ) : (
+                  <CoachRail
+                    tab={coachTab}
+                    onTab={setCoachTab}
+                    result={result}
+                    skills={skills}
+                    selected={jumpSel}
+                    onSelect={chooseJump}
+                    onPlayJump={playJump}
+                    playhead={playhead}
+                    config={skillConfig}
+                    onConfig={setSkillConfig}
+                    twist={twist}
+                    annotation={fresh[jumpSel]?.twistTruth?.halfTwists ?? null}
+                    onAnnotate={annotateTwist}
+                    canAnnotate={!!fresh[jumpSel]}
+                    review={review}
+                    notes={notes}
+                  />
+                )}
+              </aside>
+            </div>
+
+            {result && audience === 'coach' && (
+              <div className="app__technical">
+                <TechnicalData
+                  result={result}
+                  skills={skills}
+                  track={track}
+                  twist={twist}
+                  playhead={playhead}
+                  selected={jumpSel}
+                  calibration={calibrationModel?.ok && result.meta.calibrated ? calibrationModel.model : null}
+                  validation={
+                    coachTab === 'review' ? (
+                      <EvaluationReport
+                        records={dataset.records}
+                        videoId={videoId}
+                        scope={evalScope}
+                        onScope={setEvalScope}
+                        baseName={base}
+                        onGoTo={goToApex}
+                      />
+                    ) : undefined
+                  }
+                />
+              </div>
+            )}
+          </>
+        )}
+      </main>
+
+      {annotated.exporting && (
+        <ActivityToast
+          label="Exporting the annotated video"
+          progress={annotated.progress ?? 0}
+          onCancel={annotated.cancel}
+        />
       )}
     </div>
   );

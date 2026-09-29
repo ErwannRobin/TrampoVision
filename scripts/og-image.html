@@ -1,68 +1,92 @@
 <!doctype html>
 <meta charset="utf-8" />
 <style>
+  /* The typeface ships with the app (npm install); the path is relative to this file. */
+  @font-face {
+    font-family: 'Archivo Variable';
+    src: url('../node_modules/@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2')
+      format('woff2-variations');
+    font-weight: 100 900;
+    font-stretch: 62% 125%;
+  }
   html,
   body {
     margin: 0;
   }
   body {
+    position: relative;
     width: 1200px;
     height: 630px;
-    background: #121211;
-    color: #f4f4f1;
-    font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
-    position: relative;
     overflow: hidden;
+    background: #0b0c0e;
+    color: #f1f2f4;
+    font-family: 'Archivo Variable', system-ui, sans-serif;
+  }
+  .brand {
+    position: absolute;
+    left: 80px;
+    top: 64px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 30px;
+    font-weight: 700;
+    font-stretch: 118%;
+    letter-spacing: -0.015em;
   }
   h1 {
     position: absolute;
     left: 80px;
-    top: 200px;
+    top: 150px;
     margin: 0;
-    font-size: 104px;
-    letter-spacing: -2px;
+    font-size: 84px;
+    font-weight: 800;
+    font-stretch: 118%;
+    letter-spacing: -0.03em;
+    line-height: 1;
   }
   p {
     position: absolute;
     left: 80px;
-    top: 335px;
+    top: 262px;
     margin: 0;
-    width: 560px;
-    font-size: 38px;
-    line-height: 1.3;
-    color: #b9b8b3;
+    width: 760px;
+    font-size: 30px;
+    line-height: 1.35;
+    color: #a2a8b1;
   }
-  small {
+  svg.flights {
     position: absolute;
-    left: 80px;
-    bottom: 60px;
-    font-size: 26px;
-    color: #8a8985;
-  }
-  svg {
-    position: absolute;
-    right: 60px;
-    top: 40px;
+    left: 0;
+    bottom: 0;
   }
 </style>
-<h1>TrampoVision</h1>
-<p>Trampoline motion analysis from a single video</p>
-<small>Runs in your browser · video never leaves your device</small>
-<svg width="460" height="550" viewBox="0 0 460 550">
-  <line x1="40" y1="500" x2="420" y2="500" stroke="#2f2f2c" stroke-width="6" stroke-linecap="round" />
-  <g stroke-width="10" stroke-linecap="round" fill="none">
-    <path d="M230 150 L230 290" stroke="#f4f4f1" />
-    <path d="M230 170 L170 230 L120 170" stroke="#2a78d6" />
-    <path d="M230 170 L290 230 L340 170" stroke="#eb6834" />
-    <path d="M230 290 L190 370 L150 440" stroke="#2a78d6" />
-    <path d="M230 290 L275 360 L330 410" stroke="#eb6834" />
+<div class="brand">
+  <svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true">
+    <path d="M4 25 Q16 -3 28 25" fill="none" stroke="#f1f2f4" stroke-width="2.6" stroke-linecap="round" />
+    <circle cx="16" cy="11" r="3.4" fill="#ffc933" />
+  </svg>
+  TrampoVision
+</div>
+<h1>Measure every jump.</h1>
+<p>Trampoline analysis from a single video. Height, time in the air, rotation and skill, in your browser.</p>
+<svg class="flights" width="1200" height="290" viewBox="0 0 1200 290" aria-hidden="true">
+  <line x1="0" y1="250" x2="1200" y2="250" stroke="#262a31" stroke-width="2" />
+  <g fill="none" stroke-width="5" stroke-linecap="round">
+    <!-- Four flights: rising in blue, falling in orange, the center of mass in gold at the top of each. -->
+    <path d="M60 250 Q120 100 180 100" stroke="#5da9ff" />
+    <path d="M180 100 Q240 100 300 250" stroke="#ff9350" />
+    <path d="M330 250 Q395 60 460 60" stroke="#5da9ff" />
+    <path d="M460 60 Q525 60 590 250" stroke="#ff9350" />
+    <path d="M620 250 Q672 130 724 130" stroke="#5da9ff" />
+    <path d="M724 130 Q776 130 828 250" stroke="#ff9350" />
+    <path d="M858 250 Q921 40 984 40" stroke="#5da9ff" />
+    <path d="M984 40 Q1047 40 1110 250" stroke="#ff9350" />
   </g>
-  <circle cx="230" cy="105" r="34" fill="none" stroke="#f4f4f1" stroke-width="10" />
-  <g fill="#f4f4f1">
-    <circle cx="170" cy="230" r="9" />
-    <circle cx="290" cy="230" r="9" />
-    <circle cx="190" cy="370" r="9" />
-    <circle cx="275" cy="360" r="9" />
+  <g fill="#ffc933" stroke="#0b0c0e" stroke-width="4">
+    <circle cx="180" cy="100" r="9" />
+    <circle cx="460" cy="60" r="9" />
+    <circle cx="724" cy="130" r="9" />
+    <circle cx="984" cy="40" r="9" />
   </g>
-  <ellipse cx="230" cy="290" rx="120" ry="26" fill="none" stroke="#e8a92b" stroke-width="4" stroke-dasharray="10 10" />
 </svg>

@@ -1,0 +1,458 @@
+/* Panels: the coach's rail. Dense lists read label left, condensed figure right, hairlines between rows, no boxes. */
+
+.coach {
+  display: flex;
+  flex-direction: column;
+}
+/* The jump and the tabs stay in view while a long tab scrolls. */
+.coach__top {
+  position: sticky;
+  top: -20px;
+  z-index: 3;
+  margin: -20px -22px 0;
+  padding: 20px 22px 0;
+  background: var(--panel);
+}
+.coach__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+.coach__nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.coach__jump {
+  min-width: 108px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+.coach__panel {
+  min-width: 0;
+  padding-bottom: 8px;
+  animation: fade-in var(--t-med) var(--ease);
+}
+.coach__panel:focus-visible {
+  outline-offset: 4px;
+}
+
+/* Lead: the answer of a tab ------------------------------------------------------------------------------------ */
+
+.coach__lead {
+  display: grid;
+  gap: 10px;
+  padding: 18px 0 20px;
+}
+.coach__skill {
+  font-size: 30px;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+.coach__skill--long {
+  font-size: 23px;
+}
+.coach__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0 2px;
+}
+.coach__h2 {
+  font-size: var(--fs-xl);
+  letter-spacing: -0.015em;
+}
+.coach__verdict {
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.coach__result {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.coach__big {
+  font-size: 46px;
+  font-weight: 600;
+  line-height: 1;
+}
+.coach__result-unit {
+  color: var(--text-2);
+  font-size: var(--fs-md);
+}
+.coach__conf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.coach__tier {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.coach__readings {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.coach__pct {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+}
+.coach__extra {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.coach__note,
+.coach__quiet,
+.coach__empty,
+.coach__para {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.coach__empty {
+  padding: 18px 0;
+}
+.coach__quiet {
+  padding: 12px 0 4px;
+}
+.coach__para + .coach__para {
+  margin-top: 8px;
+}
+.coach__caution,
+.coach__warning {
+  padding: 10px 12px;
+  border: 1px dashed color-mix(in srgb, var(--warn) 55%, transparent);
+  border-radius: 10px;
+  background: var(--warn-bg);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+/* Groups ------------------------------------------------------------------------------------------------------ */
+
+.coach__group {
+  padding: 18px 0 8px;
+  border-top: 1px solid var(--line);
+}
+.coach__gh {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.coach__heading {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.coach__meta {
+  display: flex;
+  gap: 12px;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+.coach__sub + .coach__sub {
+  margin-top: 10px;
+}
+.coach__subheading {
+  margin: 12px 0 0;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.coach__more {
+  margin-top: 12px;
+}
+.coach__notes {
+  display: grid;
+  gap: 10px;
+}
+
+/* Dense rows --------------------------------------------------------------------------------------------------- */
+
+.coach__rows {
+  margin: 0;
+}
+.coach__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.coach__row:last-child {
+  border-bottom: 0;
+}
+.coach__label {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.coach__hint {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+}
+.coach__val {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 60%;
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  text-align: right;
+}
+.coach__fig {
+  overflow-wrap: break-word;
+}
+.coach__fig .num {
+  white-space: nowrap;
+}
+.coach__fig--muted {
+  color: var(--text-2);
+  font-weight: 500;
+}
+.coach__unit {
+  margin-left: 3px;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.coach__glyph {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.coach__glyph--lift {
+  background: var(--lift);
+}
+.coach__glyph--drop {
+  background: var(--drop);
+}
+.coach__glyph--gold {
+  background: var(--gold-fill);
+  box-shadow: 0 0 0 1px var(--line-2);
+}
+.coach__glyph--up,
+.coach__glyph--down {
+  border-radius: 0;
+  background: var(--text);
+}
+.coach__glyph--up {
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.coach__glyph--down {
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+/* Gaps, not facts: dashed edge. */
+.coach__limits {
+  display: grid;
+  gap: 14px;
+}
+.coach__limit {
+  padding-left: 14px;
+  border-left: 2px dashed var(--line-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.coach__limit strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.coach__needed {
+  display: block;
+  margin-top: 2px;
+}
+
+/* Thresholds --------------------------------------------------------------------------------------------------- */
+
+.coach__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.coach__facing {
+  margin-bottom: 12px;
+}
+.coach__actions {
+  margin: 4px 0 10px;
+}
+
+/* Tables ------------------------------------------------------------------------------------------------------- */
+
+.coach__scroll {
+  overflow-x: auto;
+}
+.coach__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.coach__th {
+  padding: 6px 6px;
+  border-bottom: 1px solid var(--line-2);
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+.coach__th .coach__glyph {
+  margin-right: 5px;
+}
+.coach__th--lead {
+  text-align: left;
+}
+.coach__thu {
+  margin-left: 3px;
+  opacity: 0.8;
+}
+.coach__td {
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+.coach__td--lead {
+  text-align: left;
+}
+.coach__td--name {
+  color: var(--text-2);
+  font-weight: 500;
+}
+.coach__scroll .coach__tr {
+  cursor: pointer;
+}
+.coach__scroll .coach__tr:hover,
+.coach__tr--on {
+  background: var(--panel-2);
+}
+.coach__tr--on {
+  box-shadow: inset 2px 0 0 var(--text);
+}
+.coach__go {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-weight: 600;
+}
+.coach__foot {
+  margin-top: 8px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+
+@media (max-width: 1099px) {
+  .coach__top {
+    position: static;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* The 3D view: the stage pane, or a fixed-height view on its own. ------------------------------------------------ */
+
+.p3d {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.p3d--fixed {
+  height: 320px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pop);
+}
+.p3d__canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+.p3d__canvas:active {
+  cursor: grabbing;
+}
+.p3d__top {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+}
+.p3d__legend {
+  position: absolute;
+  top: 52px;
+  left: 10px;
+  z-index: 2;
+  max-width: min(340px, calc(100% - 20px));
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pop);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.p3d__bottom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.p3d__exports {
+  display: flex;
+  gap: 4px;
+}
+.p3d__error {
+  position: absolute;
+  right: 10px;
+  bottom: 52px;
+  left: 10px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent);
+  border-radius: 10px;
+  background: var(--danger-bg);
+  font-size: var(--fs-sm);
+}
+
+/* The review tab has no lead of its own: give it the room a lead would have. */
+.coach__panel > .review {
+  padding-top: 14px;
+}

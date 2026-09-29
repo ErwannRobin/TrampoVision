@@ -1,0 +1,173 @@
+/*
+ * Design tokens (see docs/ui-design.md).
+ *
+ * Two themes: light ("chalk", the default) and dark ("night"). Dark follows the OS unless <html data-theme="light|dark">
+ * says otherwise. Canvas drawing reads some of these through cssVar(): the values in the "canvas" groups are therefore
+ * literal colors (no var(), no color-mix()) and their names must stay stable.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Type: one family, three widths. Expanded speaks for the brand, normal for reading, condensed for measurements. */
+  --font: 'Archivo Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --wd-brand: 118%;
+  --wd-text: 100%;
+  --wd-figure: 72%;
+
+  --fs-xs: 11.5px;
+  --fs-sm: 12.5px;
+  --fs-base: 13.5px;
+  --fs-md: 15px;
+  --fs-lg: 17px;
+  --fs-xl: 22px;
+  --fs-2xl: 30px;
+  --fs-hero: clamp(40px, 5.6vw, 68px);
+
+  /* Space (4px grid). */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+
+  /* Radii differ by role: pills for controls, softer for inputs, large for the big surfaces. */
+  --r-input: 10px;
+  --r-pill: 999px;
+  --r-pop: 14px;
+  --r-sheet: 18px;
+
+  /* Motion. */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-fast: 120ms;
+  --t-med: 220ms;
+  --t-slow: 420ms;
+
+  /* Layout. */
+  --topbar-h: 56px;
+  --rail-w: clamp(380px, 31vw, 500px);
+  --gutter: 12px;
+
+  /* --- Light: chalk -------------------------------------------------------------------------------------- */
+  --bg: #eceef1;
+  --panel: #ffffff;
+  --panel-2: #f4f5f7;
+  --panel-3: #e8eaee;
+  --line: rgba(20, 22, 26, 0.09);
+  --line-2: rgba(20, 22, 26, 0.17);
+  --text: #14161a;
+  --text-2: #596069;
+  --text-3: #676d77;
+  --inverse: #ffffff;
+  --focus: #1a6fe0;
+
+  /* Data colors. Rising is cool, falling is warm, the center of mass is gold. */
+  --lift: #1a6fe0;
+  --drop: #d9530a;
+  --gold: #b37f00;
+  --gold-fill: #ffc933;
+
+  --danger: #c42b1f;
+  --danger-bg: #fdecea;
+  --warn: #8f5200;
+  --warn-bg: #fff3dc;
+  --ok: #12794a;
+  --ok-bg: #e3f4ec;
+
+  --seg-thumb: #ffffff;
+  --stage: #000000;
+  --scrim: rgba(20, 22, 26, 0.5);
+  --shadow-pop: 0 1px 2px rgba(20, 22, 26, 0.08), 0 14px 36px rgba(20, 22, 26, 0.18);
+
+  /* canvas: colors read by drawing code (literal values only) */
+  --surface: #ffffff;
+  --grid: rgba(20, 22, 26, 0.09);
+  --series-1: #1a6fe0;
+  --series-2: #d9530a;
+  --band: rgba(217, 83, 10, 0.12);
+  --flight-band: rgba(26, 111, 224, 0.08);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0b0c0e;
+    --panel: #14161a;
+    --panel-2: #1b1e23;
+    --panel-3: #262a31;
+    --line: rgba(255, 255, 255, 0.09);
+    --line-2: rgba(255, 255, 255, 0.18);
+    --text: #f1f2f4;
+    --text-2: #a2a8b1;
+    --text-3: #868d98;
+    --inverse: #0b0c0e;
+    --focus: #5da9ff;
+
+    --lift: #5da9ff;
+    --drop: #ff9350;
+    --gold: #ffc933;
+    --gold-fill: #ffc933;
+
+    --danger: #ff7b72;
+    --danger-bg: rgba(255, 107, 98, 0.13);
+    --warn: #f2b04c;
+    --warn-bg: rgba(242, 176, 76, 0.12);
+    --ok: #4cd48b;
+    --ok-bg: rgba(76, 212, 139, 0.12);
+
+    --seg-thumb: #2f343c;
+    --scrim: rgba(0, 0, 0, 0.6);
+    --shadow-pop: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 16px 40px rgba(0, 0, 0, 0.55);
+
+    --surface: #14161a;
+    --grid: rgba(255, 255, 255, 0.09);
+    --series-1: #5da9ff;
+    --series-2: #ff9350;
+    --band: rgba(255, 147, 80, 0.16);
+    --flight-band: rgba(93, 169, 255, 0.1);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0b0c0e;
+  --panel: #14161a;
+  --panel-2: #1b1e23;
+  --panel-3: #262a31;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-2: rgba(255, 255, 255, 0.18);
+  --text: #f1f2f4;
+  --text-2: #a2a8b1;
+  --text-3: #868d98;
+  --inverse: #0b0c0e;
+  --focus: #5da9ff;
+
+  --lift: #5da9ff;
+  --drop: #ff9350;
+  --gold: #ffc933;
+  --gold-fill: #ffc933;
+
+  --danger: #ff7b72;
+  --danger-bg: rgba(255, 107, 98, 0.13);
+  --warn: #f2b04c;
+  --warn-bg: rgba(242, 176, 76, 0.12);
+  --ok: #4cd48b;
+  --ok-bg: rgba(76, 212, 139, 0.12);
+
+  --seg-thumb: #2f343c;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 16px 40px rgba(0, 0, 0, 0.55);
+
+  --surface: #14161a;
+  --grid: rgba(255, 255, 255, 0.09);
+  --series-1: #5da9ff;
+  --series-2: #ff9350;
+  --band: rgba(255, 147, 80, 0.16);
+  --flight-band: rgba(93, 169, 255, 0.1);
+}

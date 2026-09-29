@@ -1,0 +1,162 @@
+/*
+ * App shell: the workspace grid and the slots each part of the UI lives in.
+ *
+ *   wide:    stage | rail          narrow:   stage
+ *            dock  (full width)               dock
+ *                                             rail
+ *
+ * The stage and the dock keep the video and its timeline in view; only the rail scrolls. Below 1100px the page scrolls
+ * instead and the rail follows the dock.
+ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+  /* Tooltips that are hidden still count as overflow: nothing here may make the page scroll sideways. */
+  overflow-x: clip;
+  min-height: 100dvh;
+}
+.app__main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--rail-w);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'stage rail'
+    'dock dock';
+  gap: var(--gutter);
+  height: calc(100dvh - var(--topbar-h));
+  min-height: 620px;
+  padding: 0 var(--gutter) var(--gutter);
+  animation: fade-in var(--t-slow) var(--ease) both;
+}
+.workspace__stage {
+  grid-area: stage;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.workspace__stage > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.workspace__rail {
+  grid-area: rail;
+  min-width: 0;
+  min-height: 0;
+  padding: 20px 22px 28px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.workspace__dock {
+  grid-area: dock;
+  min-width: 0;
+  padding: 10px 16px 14px;
+}
+
+.app__technical {
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 4px var(--gutter) 64px;
+}
+
+@media (max-width: 1099px) {
+  .workspace {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+    padding-bottom: 28px;
+  }
+  .workspace__stage {
+    flex: none;
+    height: clamp(300px, 58dvh, 720px);
+  }
+  .workspace__rail {
+    overflow: visible;
+    padding: 18px 18px 26px;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace {
+    gap: 8px;
+    padding: 0 8px 24px;
+  }
+  .workspace__stage {
+    height: clamp(260px, 60dvh, 640px);
+    margin: 0 -8px;
+  }
+  .workspace__dock {
+    padding: 8px 10px 12px;
+  }
+  .workspace__rail {
+    padding: 16px 16px 24px;
+  }
+  .app__technical {
+    padding-inline: 8px;
+  }
+}
+
+/* Banners float over the top of the workspace so they never move the video. */
+.banners {
+  position: fixed;
+  top: calc(var(--topbar-h) + 8px);
+  left: 50%;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(720px, calc(100vw - 24px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.banners > * {
+  pointer-events: auto;
+  box-shadow: var(--shadow-pop);
+}
+/* Wide: they float over the stage, not over the rail they would hide. */
+@media (min-width: 1100px) {
+  .banners {
+    left: calc((100vw - var(--rail-w) - var(--gutter)) / 2);
+    width: min(600px, calc(100vw - var(--rail-w) - 4 * var(--gutter)));
+  }
+}
+
+/* Dropping a video anywhere on the page. */
+.dropzone {
+  position: fixed;
+  inset: 12px;
+  z-index: 70;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  border: 2px dashed var(--text-2);
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: var(--text);
+  pointer-events: none;
+  animation: fade-in var(--t-fast) var(--ease);
+}
+.dropzone__title {
+  font-size: var(--fs-2xl);
+  font-stretch: var(--wd-brand);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.dropzone__text {
+  color: var(--text-2);
+}
