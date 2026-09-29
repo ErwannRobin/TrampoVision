@@ -7,6 +7,7 @@
   --text-2: #52514e;
   --grid: #e8e7e3;
   --band: rgba(235, 104, 52, 0.13);
+  --flight-band: rgba(42, 120, 214, 0.09);
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --danger: #b3261e;
@@ -21,6 +22,7 @@
     --text-2: #c3c2b7;
     --grid: #2a2a28;
     --band: rgba(217, 89, 38, 0.18);
+    --flight-band: rgba(57, 135, 229, 0.13);
     --series-1: #3987e5;
     --series-2: #d95926;
     --danger: #ffb4ab;
@@ -79,10 +81,11 @@ button.primary { background: var(--series-1); border-color: var(--series-1); col
 .progress div { position: absolute; inset: 0 auto 0 0; background: var(--series-1); opacity: 0.35; transition: width 0.1s; }
 .progress span { position: relative; line-height: 24px; padding-left: 10px; font-size: 12px; }
 
-.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; margin-top: 12px; align-items: start; }
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; margin-top: 12px; align-items: start; }
 .stage { position: relative; width: 100%; background: #000; border-radius: 8px; overflow: hidden; margin: 0 auto; }
 .stage video { display: block; width: 100%; height: 100%; object-fit: contain; }
 .stage .overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.stage .overlay.editing { pointer-events: auto; cursor: crosshair; touch-action: none; }
 
 .transport { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
 .transport .scrub { flex: 1 1 200px; min-width: 120px; }
@@ -116,3 +119,28 @@ button.primary { background: var(--series-1); border-color: var(--series-1); col
   .workspace { grid-template-columns: 1fr; }
   .charts { grid-template-columns: 1fr; }
 }
+
+/* Analysis panel */
+.metrics.debug { display: flex; flex-direction: column; gap: 2px; }
+.small { font-size: 12px; margin: 4px 0; }
+.phase { font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--grid); }
+.phase-ascent { background: rgba(42, 120, 214, 0.22); }
+.phase-descent { background: rgba(235, 104, 52, 0.22); }
+.phase-apex, .phase-takeoff, .phase-landing { background: rgba(255, 212, 0, 0.35); }
+.warnings { margin: 10px 0 0; padding: 8px 10px 8px 26px; font-size: 12px; border-radius: 8px; color: var(--danger); background: var(--danger-bg); border: 1px solid var(--danger); }
+.warnings li + li { margin-top: 4px; }
+.metrics table.jumps { font-size: 12px; }
+.metrics table.jumps th { font-size: 10.5px; padding: 3px 2px; }
+.metrics table.jumps td { padding: 3px 2px; }
+.metrics table.jumps tbody tr { cursor: pointer; }
+.metrics table.jumps tbody tr:hover, .metrics table.jumps tr.current { background: var(--grid); }
+.metrics details { margin-top: 10px; }
+.metrics summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+
+/* Calibration bar */
+.calibration { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 10px; padding: 8px 10px; }
+.calibration label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
+.calibration input[type='number'] { width: 64px; }
+.calibration .status { font-size: 12px; flex-basis: 100%; }
+.error-text { color: var(--danger); }
+.error-text { color: var(--danger); }

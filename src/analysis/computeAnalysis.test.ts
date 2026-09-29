@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { computeAnalysis } from './computeAnalysis';
+import { LM } from '../pose/landmarks';
+import type { TrampolineCalibration } from './calibration';
+import { JUMP_PHASES } from './jumpCycles';
 import { rotateAbout, standingPose } from './testPose';
+import { addNoise, syntheticRoutine } from './testTracks';
 import type { PoseTrack } from './types';
 
 const G = 9.81;
@@ -91,5 +95,105 @@ describe('computeAnalysis on a synthetic somersault', () => {
     expect(Number.isNaN(r.comY[track.frames.length - 1])).toBe(true);
     expect(r.confidence[10]).toBe(0);
     expect(r.summary.validFraction).toBeLessThan(1);
+  });
+});
+
+describe('full pipeline on a synthetic routine', () => {
+  const routine = { jumps: [{ v0: 4.2 }, { v0: 5.2, turns: 2, driftM: 0.6 }, { v0: 4.6, turns: -1 }] };
+
+  it('finds the jumps, their timing and the somersault counts through noise, glitches and a dropout', () => {
+    const { track, truth } = syntheticRoutine(routine);
+    const bad = addNoise(track, 1.5);
+    bad.frames[25] = bad.frames[25]!.map((p, k) => (k === LM.L_WRIST ? { ...p, x: p.x + 130, y: p.y - 80 } : p));
+    for (let i = 60; i < 64; i++) bad.frames[i] = null; // ~0.13 s without a detection
+    const r = computeAnalysis(bad);
+    expect(r.jumps.cycles).toHaveLength(3);
+    r.jumps.cycles.forEach((c, k) => {
+      expect(Math.abs(c.flightTimeS! / truth.flight[k] - 1)).toBeLessThan(0.08);
+      expect(Math.abs(c.takeoffTimeS! - truth.takeoff[k])).toBeLessThan(0.07);
+    });
+    expect(r.jumps.cycles.map((c) => c.quarterTurns)).toEqual([0, 8, -4]);
+    expect(r.jumps.cycles.map((c) => c.completedRotations)).toEqual([0, 2, -1]);
+    expect(r.summary.completedRotations).toBe(3);
+    expect(r.summary.jumpCount).toBe(3);
+    expect(r.meta.maxRotationStepDeg).toBeLessThan(60);
+  });
+
+  it('keeps the body orientation continuous through a double somersault (never wraps back)', () => {
+    const { track, truth } = syntheticRoutine({ jumps: [{ v0: 5, turns: 2 }] });
+    const r = computeAnalysis(track);
+    for (let i = 1; i < r.orientation.length; i++) expect(Math.abs(r.orientation[i] - r.orientation[i - 1])).toBeLessThan(45);
+    const i0 = Math.round(truth.takeoff[0] * 30) - 3;
+    const i1 = Math.round(truth.landing[0] * 30) + 3;
+    expect(r.orientation[i1] - r.orientation[i0]).toBeGreaterThan(680);
+    expect(r.orientation[i1] - r.orientation[i0]).toBeLessThan(760);
+    // The wrapped angle does wrap; the orientation does not.
+    expect(Math.min(...Array.from(r.trunkAngle).filter(Number.isFinite))).toBeLessThan(-150);
+  });
+
+  it('labels the phases frame by frame', () => {
+    const { track, truth } = syntheticRoutine({ jumps: [{ v0: 5 }] });
+    const r = computeAnalysis(track);
+    const phaseAt = (t: number) => JUMP_PHASES[r.jumps.phase[Math.round(t * 30)]];
+    expect(phaseAt(0.1)).toBe('ground');
+    expect(phaseAt(truth.takeoff[0] + 0.2)).toBe('ascent');
+    expect(phaseAt(truth.apex[0])).toBe('apex');
+    expect(phaseAt(truth.apex[0] + 0.2)).toBe('descent');
+    expect(phaseAt(truth.landing[0] + 0.3)).toBe('ground');
+  });
+
+  describe('with a trampoline calibration', () => {
+    // Bed drawn as a rectangle 428 px wide (100 px/m along x) centered at the athlete's start x.
+    const corners: TrampolineCalibration['corners'] = [
+      { x: 106, y: 640 },
+      { x: 534, y: 640 },
+      { x: 534, y: 560 },
+      { x: 106, y: 560 },
+    ];
+    const calibration: TrampolineCalibration = { corners, firstSideM: 4.28, secondSideM: 2.14 };
+
+    it('normalizes position to the bed: height above the bed and horizontal offset from its center', () => {
+      const { track, truth } = syntheticRoutine({ jumps: [{ v0: 5, driftM: 1.0 }] });
+      const r = computeAnalysis(track, { calibration });
+      expect(r.meta.calibrated).toBe(true);
+      expect(r.meta.scaleSource).toBe('trampoline');
+      expect(r.meta.heightReference).toBe('bed');
+      expect(r.meta.pixelsPerMeter).toBeCloseTo(100, 0);
+      expect(r.meta.trampolinePixelsPerMeter / r.meta.athletePixelsPerMeter).toBeGreaterThan(0.9);
+      expect(r.meta.trampolinePixelsPerMeter / r.meta.athletePixelsPerMeter).toBeLessThan(1.1);
+      // Standing on the bed: the center of mass is about a meter above it, and over the bed center.
+      expect(r.height[2]).toBeGreaterThan(0.85);
+      expect(r.height[2]).toBeLessThan(1.1);
+      expect(Math.abs(r.x[2])).toBeLessThan(0.05);
+      expect(Math.abs(r.xNorm[2])).toBeLessThan(0.03);
+      const c = r.jumps.cycles[0];
+      expect(Math.abs(c.horizontalDisplacementM! - 1.0)).toBeLessThan(0.1);
+      // After landing the athlete stands 1 m to the right of the bed center: half the bed's half-length.
+      const last = r.x.length - 1;
+      expect(r.x[last]).toBeGreaterThan(0.9);
+      expect(r.xNorm[last]).toBeCloseTo(1.0 / 2.14, 1);
+      void truth;
+    });
+
+    it('stays uncalibrated without corners, and reports bad corners instead of failing', () => {
+      const { track } = syntheticRoutine({ jumps: [{ v0: 5 }] });
+      const plain = computeAnalysis(track);
+      expect(plain.meta.calibrated).toBe(false);
+      expect(plain.meta.heightReference).toBe('lowest point');
+      expect(Number.isNaN(plain.xNorm[5])).toBe(true);
+      const bowTie = { ...calibration, corners: [corners[0], corners[2], corners[1], corners[3]] as TrampolineCalibration['corners'] };
+      const r = computeAnalysis(track, { calibration: bowTie });
+      expect(r.meta.calibrated).toBe(false);
+      expect(r.meta.calibrationError).toMatch(/order/);
+      expect(r.meta.scaleSource).toBe('athlete');
+    });
+
+    it('can use the athlete height for the scale even when calibrated', () => {
+      const { track } = syntheticRoutine({ jumps: [{ v0: 5 }] });
+      const r = computeAnalysis(track, { calibration, scaleSource: 'athlete' });
+      expect(r.meta.scaleSource).toBe('athlete');
+      expect(r.meta.heightReference).toBe('bed');
+      expect(r.meta.pixelsPerMeter).toBeCloseTo(r.meta.athletePixelsPerMeter, 6);
+    });
   });
 });

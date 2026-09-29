@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { CalibrationModel } from '../analysis/calibration';
 import { sampleIndexAt } from '../analysis/lookup';
 import type { AnalysisResult } from '../analysis/types';
 import { niceTicks } from './Chart';
@@ -8,11 +9,13 @@ import { cssVar, useThemeVersion } from './theme';
 interface Props {
   result: AnalysisResult;
   playhead: Playhead;
+  /** Trampoline calibration, to draw the bed under the path. */
+  calibration?: CalibrationModel | null;
   height?: number;
 }
 
 /** Center-of-mass path in the image plane (horizontal offset vs. height), equal axis scales. */
-export function TrajectoryPlot({ result, playhead, height = 330 }: Props) {
+export function TrajectoryPlot({ result, playhead, calibration, height = 330 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [width, setWidth] = useState(400);
@@ -38,10 +41,11 @@ export function TrajectoryPlot({ result, playhead, height = 330 }: Props) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
-    const { comX, height: h, meta } = result;
-    const xs = new Float64Array(meta.count).fill(NaN);
-    const firstX = comX.find(Number.isFinite) ?? 0;
-    for (let i = 0; i < meta.count; i++) xs[i] = (comX[i] - firstX) / meta.pixelsPerMeter;
+    const { x: xs, height: h, meta } = result;
+    // Half-size of the bed along the on-screen horizontal, in the meters used for x (only when calibrated).
+    const bedHalf = calibration
+      ? calibration.halfExtentM / calibration.metersPerPixel / meta.pixelsPerMeter
+      : NaN;
 
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (let i = 0; i < meta.count; i++) {
@@ -56,6 +60,11 @@ export function TrajectoryPlot({ result, playhead, height = 330 }: Props) {
       ctx.font = '13px system-ui, sans-serif';
       ctx.fillText('No trajectory (scale could not be estimated)', 12, 24);
       return;
+    }
+    if (Number.isFinite(bedHalf)) {
+      x0 = Math.min(x0, -bedHalf);
+      x1 = Math.max(x1, bedHalf);
+      y0 = Math.min(y0, 0);
     }
     // Keep at least 1 m of range so a tiny wobble isn't blown up, and use the same scale on both axes.
     const rx = Math.max(x1 - x0, 1);
@@ -100,6 +109,24 @@ export function TrajectoryPlot({ result, playhead, height = 330 }: Props) {
       ctx.fillText(`${Number(v.toFixed(2))}`, x, height - m.b + 5);
     }
 
+    // The trampoline bed: a bar at height 0 from one edge to the other, with the center marked.
+    if (Number.isFinite(bedHalf)) {
+      ctx.lineCap = 'butt';
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = text;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.moveTo(X(-bedHalf), Y(0));
+      ctx.lineTo(X(bedHalf), Y(0));
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(X(0), Y(0) - 8);
+      ctx.lineTo(X(0), Y(0) + 8);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
     const cur = sampleIndexAt(meta, time);
     const path = (from: number, to: number) => {
       ctx.beginPath();
@@ -132,13 +159,27 @@ export function TrajectoryPlot({ result, playhead, height = 330 }: Props) {
       ctx.strokeStyle = cssVar('--surface');
       ctx.stroke();
     }
-  }, [result, width, height, theme, time]);
+    // Takeoff (T), apex (A) and landing (L) of every jump.
+    ctx.font = '600 10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    for (const c of result.jumps.cycles) {
+      for (const [idx, label] of [[c.takeoff, 'T'], [c.apex, 'A'], [c.landing, 'L']] as const) {
+        if (idx === null || !Number.isFinite(xs[idx]) || !Number.isFinite(h[idx])) continue;
+        ctx.fillStyle = text;
+        ctx.fillText(label, X(xs[idx]), Y(h[idx]) - 5);
+        ctx.beginPath();
+        ctx.arc(X(xs[idx]), Y(h[idx]), 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }, [result, width, height, theme, time, calibration]);
 
   return (
     <figure className="chart tall">
       <figcaption>
         <span className="chart-title">
-          Center-of-mass path <span className="muted">(m, x offset vs. height)</span>
+          Center-of-mass path <span className="muted">(m, x from {result.meta.calibrated ? 'bed center' : 'start'} vs. height)</span>
         </span>
       </figcaption>
       <div ref={wrapRef} className="chart-body" style={{ height }}>

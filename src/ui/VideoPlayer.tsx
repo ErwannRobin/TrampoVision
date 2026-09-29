@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { sampleIndexAt } from '../analysis/lookup';
 import type { AnalysisResult } from '../analysis/types';
 import { frameAtTime, frameSeekTime } from '../video/frames';
-import { drawOverlay, type OverlayOptions } from '../video/overlay';
+import type { Point } from '../pose/types';
+import { drawCalibration, drawOverlay, type CalibrationDraw, type OverlayOptions } from '../video/overlay';
 import { Playhead, usePlayheadTime } from './playhead';
 
 export const SPEEDS = [0.1, 0.25, 0.5, 1, 2];
@@ -16,21 +17,65 @@ interface Props {
   speed: number;
   onSpeed: (s: number) => void;
   onError: (message: string) => void;
+  /** Trampoline outline to draw; while `editing`, clicks add corners and corners can be dragged. */
+  calibration: CalibrationDraw | null;
+  onCornersChange: (corners: Point[]) => void;
 }
 
-export function VideoPlayer({ url, fps, result, overlay, playhead, speed, onSpeed, onError }: Props) {
+const PICK_RADIUS_PX = 16;
+
+export function VideoPlayer({ url, fps, result, overlay, playhead, speed, onSpeed, onError, calibration, onCornersChange }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ratio, setRatio] = useState(16 / 9);
   const [playing, setPlaying] = useState(false);
 
   // Latest props for the rAF loop (avoids restarting the loop on every change).
-  const live = useRef({ result, overlay, fps });
-  live.current = { result, overlay, fps };
+  const live = useRef({ result, overlay, fps, calibration });
+  live.current = { result, overlay, fps, calibration };
   const dirty = useRef(true);
   useEffect(() => {
     dirty.current = true;
-  }, [result, overlay]);
+  }, [result, overlay, calibration]);
+  const dragging = useRef<number | null>(null);
+
+  /** Pointer position in video pixels, or null before the video size is known. */
+  const toVideoPoint = (e: React.PointerEvent<HTMLCanvasElement>): { p: Point; cssPerPx: number } | null => {
+    const v = videoRef.current;
+    if (!v || !v.videoWidth) return null;
+    const rect = e.currentTarget.getBoundingClientRect();
+    return {
+      p: { x: ((e.clientX - rect.left) / rect.width) * v.videoWidth, y: ((e.clientY - rect.top) / rect.height) * v.videoHeight },
+      cssPerPx: rect.width / v.videoWidth,
+    };
+  };
+
+  const onCanvasDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const cal = live.current.calibration;
+    const hit = toVideoPoint(e);
+    if (!cal?.editing || !hit) return;
+    let nearest = -1;
+    let best = PICK_RADIUS_PX / hit.cssPerPx;
+    cal.corners.forEach((c, i) => {
+      const d = Math.hypot(c.x - hit.p.x, c.y - hit.p.y);
+      if (d < best) {
+        best = d;
+        nearest = i;
+      }
+    });
+    if (nearest >= 0) {
+      dragging.current = nearest;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } else if (cal.corners.length < 4) {
+      onCornersChange([...cal.corners, hit.p]);
+    }
+  };
+  const onCanvasMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const cal = live.current.calibration;
+    const hit = toVideoPoint(e);
+    if (dragging.current === null || !cal || !hit) return;
+    onCornersChange(cal.corners.map((c, i) => (i === dragging.current ? hit.p : c)));
+  };
 
   const totalFrames = () => {
     const v = videoRef.current;
@@ -88,7 +133,7 @@ export function VideoPlayer({ url, fps, result, overlay, playhead, speed, onSpee
       const c = canvasRef.current;
       if (v && c) {
         playhead.setTime(v.currentTime);
-        const { result: res, overlay: opts, fps: f } = live.current;
+        const { result: res, overlay: opts, fps: f, calibration: cal } = live.current;
         const rect = c.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
         const w = Math.round(rect.width * dpr);
@@ -107,6 +152,7 @@ export function VideoPlayer({ url, fps, result, overlay, playhead, speed, onSpee
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             if (res) drawOverlay(ctx, rect.width, rect.height, res, sampleIndexAt(res.meta, v.currentTime), opts);
             else ctx.clearRect(0, 0, rect.width, rect.height);
+            if (cal && v.videoWidth) drawCalibration(ctx, rect.width, rect.height, v.videoWidth, v.videoHeight, cal);
           }
         }
       }
@@ -152,7 +198,14 @@ export function VideoPlayer({ url, fps, result, overlay, playhead, speed, onSpee
           onEnded={() => setPlaying(false)}
           onError={() => onError('This browser cannot play the video. Try an MP4 (H.264) file.')}
         />
-        <canvas ref={canvasRef} className="overlay" />
+        <canvas
+          ref={canvasRef}
+          className={calibration?.editing ? 'overlay editing' : 'overlay'}
+          onPointerDown={onCanvasDown}
+          onPointerMove={onCanvasMove}
+          onPointerUp={() => (dragging.current = null)}
+          onPointerCancel={() => (dragging.current = null)}
+        />
       </div>
       <Transport
         playhead={playhead}

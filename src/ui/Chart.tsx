@@ -9,6 +9,23 @@ export interface ChartSeries {
   color: string;
 }
 
+export interface ChartMarker {
+  /** Time in seconds. */
+  t: number;
+  label: string;
+}
+
+export interface ChartBand {
+  from: number;
+  to: number;
+}
+
+export interface ChartGuide {
+  /** y value of a dashed horizontal reference line. */
+  value: number;
+  label?: string;
+}
+
 interface Props {
   title: string;
   unit: string;
@@ -26,6 +43,12 @@ interface Props {
   minSpan?: number;
   /** Lift the pen when consecutive samples differ by more than this (e.g. 180 for wrapped angles). */
   breakOnJump?: number;
+  /** Labelled vertical lines (events such as takeoff / apex / landing). */
+  markers?: ChartMarker[];
+  /** Shaded time ranges (e.g. the flights). */
+  bands?: ChartBand[];
+  /** Dashed horizontal reference lines; they also widen the y range. */
+  guides?: ChartGuide[];
 }
 
 const M = { left: 46, right: 12, top: 8, bottom: 20 };
@@ -41,7 +64,7 @@ export function niceTicks(min: number, max: number, target = 5): number[] {
   return out;
 }
 
-function domain(series: ChartSeries[], zeroLine: boolean, minSpan: number): [number, number] {
+function domain(series: ChartSeries[], zeroLine: boolean, minSpan: number, guides: ChartGuide[]): [number, number] {
   let lo = Infinity;
   let hi = -Infinity;
   for (const s of series)
@@ -51,6 +74,10 @@ function domain(series: ChartSeries[], zeroLine: boolean, minSpan: number): [num
         hi = Math.max(hi, v);
       }
   if (!Number.isFinite(lo)) return [0, 1];
+  for (const g of guides) {
+    lo = Math.min(lo, g.value);
+    hi = Math.max(hi, g.value);
+  }
   if (zeroLine) {
     lo = Math.min(lo, 0);
     hi = Math.max(hi, 0);
@@ -70,7 +97,7 @@ function indexAt(time: Float64Array, t: number): number {
   return Math.min(Math.max(Math.round((t - time[0]) / dt), 0), time.length - 1);
 }
 
-export function Chart({ title, unit, time, series, playhead, confidence, decimals = 1, zeroLine = false, height = 150, yDomain, minSpan = 1e-6, breakOnJump }: Props) {
+export function Chart({ title, unit, time, series, playhead, confidence, decimals = 1, zeroLine = false, height = 150, yDomain, minSpan = 1e-6, breakOnJump, markers, bands, guides }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLCanvasElement>(null);
@@ -89,7 +116,7 @@ export function Chart({ title, unit, time, series, playhead, confidence, decimal
     return () => ro.disconnect();
   }, []);
 
-  const [lo, hi] = yDomain ?? domain(series, zeroLine, minSpan);
+  const [lo, hi] = yDomain ?? domain(series, zeroLine, minSpan, guides ?? []);
   const t0 = time[0] ?? 0;
   const t1 = time[time.length - 1] ?? 1;
   const px = (t: number) => M.left + ((t - t0) / (t1 - t0 || 1)) * (width - M.left - M.right);
@@ -113,6 +140,15 @@ export function Chart({ title, unit, time, series, playhead, confidence, decimal
     const grid = cssVar('--grid');
     const text = cssVar('--text-2');
     ctx.font = '11px system-ui, sans-serif';
+
+    if (bands?.length) {
+      ctx.fillStyle = cssVar('--flight-band');
+      for (const b of bands) {
+        const x0 = px(Math.max(b.from, t0));
+        const x1 = px(Math.min(b.to, t1));
+        if (x1 > x0) ctx.fillRect(x0, M.top, x1 - x0, height - M.top - M.bottom);
+      }
+    }
 
     if (confidence) {
       ctx.fillStyle = cssVar('--band');
@@ -159,8 +195,52 @@ export function Chart({ title, unit, time, series, playhead, confidence, decimal
       }
       ctx.stroke();
     }
+
+    if (guides?.length) {
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = text;
+      ctx.fillStyle = text;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      for (const g of guides) {
+        if (g.value < lo || g.value > hi) continue;
+        const y = Math.round(py(g.value)) + 0.5;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(M.left, y);
+        ctx.lineTo(width - M.right, y);
+        ctx.stroke();
+        if (g.label) ctx.fillText(g.label, width - M.right - 2, y - 2);
+      }
+      ctx.restore();
+    }
+
+    if (markers?.length) {
+      ctx.save();
+      ctx.font = '600 10px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 3]);
+      for (const m of markers) {
+        if (m.t < t0 || m.t > t1) continue;
+        const x = Math.round(px(m.t)) + 0.5;
+        ctx.strokeStyle = text;
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        ctx.moveTo(x, M.top);
+        ctx.lineTo(x, height - M.bottom);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = text;
+        ctx.fillText(m.label, x, M.top + 1);
+      }
+      ctx.restore();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [time, series, confidence, width, height, theme, lo, hi]);
+  }, [time, series, confidence, width, height, theme, lo, hi, markers, bands, guides]);
 
   // Cursor layer: playhead line + markers, and hover crosshair.
   useEffect(() => {
