@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { sampleIndexAt } from '../analysis/lookup';
 import type { AnalysisResult } from '../analysis/types';
+import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { frameAtTime, frameSeekTime } from '../video/frames';
 import type { Point } from '../pose/types';
 import { drawCalibration, drawOverlay, type CalibrationDraw, type OverlayOptions } from '../video/overlay';
@@ -12,6 +13,8 @@ interface Props {
   url: string;
   fps: number;
   result: AnalysisResult | null;
+  /** Skill labels drawn on the video (body position, rotation, predicted skill). */
+  skills?: SkillAnalysis | null;
   overlay: OverlayOptions;
   playhead: Playhead;
   speed: number;
@@ -24,19 +27,21 @@ interface Props {
 
 const PICK_RADIUS_PX = 16;
 
-export function VideoPlayer({ url, fps, result, overlay, playhead, speed, onSpeed, onError, calibration, onCornersChange }: Props) {
+export function VideoPlayer({ url, fps, result, skills = null, overlay, playhead, speed, onSpeed, onError, calibration, onCornersChange }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ratio, setRatio] = useState(16 / 9);
   const [playing, setPlaying] = useState(false);
 
   // Latest props for the rAF loop (avoids restarting the loop on every change).
-  const live = useRef({ result, overlay, fps, calibration });
-  live.current = { result, overlay, fps, calibration };
+  const live = useRef({ result, skills, overlay, fps, calibration });
+  live.current = { result, skills, overlay, fps, calibration };
   const dirty = useRef(true);
   useEffect(() => {
     dirty.current = true;
-  }, [result, overlay, calibration]);
+  }, [result, skills, overlay, calibration]);
+  /** A stretch of the video that is being played on request ("play this jump"). */
+  const playing_ = useRef<{ from: number; to: number; loop: boolean } | null>(null);
   const dragging = useRef<number | null>(null);
 
   /** Pointer position in video pixels, or null before the video size is known. */
@@ -121,6 +126,19 @@ export function VideoPlayer({ url, fps, result, overlay, playhead, speed, onSpee
   }, [playhead, fps, seekFrame]);
 
   useEffect(() => {
+    playhead.playRangeHandler = (from, to, loop) => {
+      const v = videoRef.current;
+      if (!v) return;
+      seekFrame(frameAtTime(from, fps));
+      playing_.current = { from, to, loop };
+      void v.play();
+    };
+    return () => {
+      playhead.playRangeHandler = null;
+    };
+  }, [playhead, fps, seekFrame]);
+
+  useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = speed;
   }, [speed, url]);
 
@@ -133,7 +151,15 @@ export function VideoPlayer({ url, fps, result, overlay, playhead, speed, onSpee
       const c = canvasRef.current;
       if (v && c) {
         playhead.setTime(v.currentTime);
-        const { result: res, overlay: opts, fps: f, calibration: cal } = live.current;
+        const range = playing_.current;
+        if (range && !v.paused && v.currentTime >= range.to) {
+          if (range.loop) seekFrame(frameAtTime(range.from, live.current.fps));
+          else {
+            playing_.current = null;
+            v.pause();
+          }
+        }
+        const { result: res, skills: sk, overlay: opts, fps: f, calibration: cal } = live.current;
         const rect = c.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
         const w = Math.round(rect.width * dpr);
@@ -150,7 +176,7 @@ export function VideoPlayer({ url, fps, result, overlay, playhead, speed, onSpee
           const ctx = c.getContext('2d');
           if (ctx) {
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            if (res) drawOverlay(ctx, rect.width, rect.height, res, sampleIndexAt(res.meta, v.currentTime), opts);
+            if (res) drawOverlay(ctx, rect.width, rect.height, res, sampleIndexAt(res.meta, v.currentTime), opts, sk);
             else ctx.clearRect(0, 0, rect.width, rect.height);
             if (cal && v.videoWidth) drawCalibration(ctx, rect.width, rect.height, v.videoWidth, v.videoHeight, cal);
           }
@@ -160,7 +186,7 @@ export function VideoPlayer({ url, fps, result, overlay, playhead, speed, onSpee
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [playhead]);
+  }, [playhead, seekFrame]);
 
   // Keyboard: space = play/pause, arrows = frame step (shift = 10 frames).
   useEffect(() => {
@@ -194,7 +220,10 @@ export function VideoPlayer({ url, fps, result, overlay, playhead, speed, onSpee
             e.currentTarget.playbackRate = speed;
           }}
           onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
+          onPause={() => {
+            setPlaying(false);
+            playing_.current = null;
+          }}
           onEnded={() => setPlaying(false)}
           onError={() => onError('This browser cannot play the video. Try an MP4 (H.264) file.')}
         />

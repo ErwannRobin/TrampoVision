@@ -4,6 +4,10 @@ import { computeAnalysis } from './analysis/computeAnalysis';
 import { download, toCsv, toJumpsCsv } from './analysis/export';
 import { extractPoseTrack } from './analysis/extractPoseTrack';
 import { stabilizePose } from './analysis/stabilize';
+import { sampleIndexAt } from './analysis/lookup';
+import { analyzeSkills } from './skills/analyzeSkills';
+import { DEFAULT_SKILL_CONFIG, type SkillConfig } from './skills/config';
+import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from './skills/export';
 import { buildPoseSeries, parsePoseSeries, toSeriesJson } from './analysis/timeSeries';
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point } from './pose/types';
@@ -11,7 +15,10 @@ import { disposeVideo, estimateFps, loadVideo } from './video/frames';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
 import { Chart } from './ui/Chart';
 import { DebugPanel } from './ui/DebugPanel';
+import { JumpView } from './ui/JumpView';
+import { PhaseTimeline } from './ui/PhaseTimeline';
 import { Playhead } from './ui/playhead';
+import { SkillPanel } from './ui/SkillPanel';
 import { TrajectoryPlot } from './ui/TrajectoryPlot';
 import { VideoPlayer } from './ui/VideoPlayer';
 
@@ -58,7 +65,7 @@ export default function App() {
   const [preferGpu, setPreferGpu] = useState(true);
   const [height, setHeight] = useState(1.75);
   const [speed, setSpeed] = useState(1);
-  const [overlay, setOverlay] = useState<OverlayOptions>({ skeleton: true, com: true, trail: true });
+  const [overlay, setOverlay] = useState<OverlayOptions>({ skeleton: true, com: true, trail: true, hud: true });
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [backend, setBackend] = useState('');
   const [track, setTrack] = useState<PoseTrack | null>(null);
@@ -71,6 +78,11 @@ export default function App() {
   const [bedShort, setBedShort] = useState(DEFAULT_BED_M.short);
   const [firstSide, setFirstSide] = useState<'long' | 'short'>('long');
   const [scaleSource, setScaleSource] = useState<ScaleSource | 'auto'>('auto');
+
+  // Skill recognition: thresholds, the jump being inspected, which side panel is open.
+  const [skillConfig, setSkillConfig] = useState<SkillConfig>(DEFAULT_SKILL_CONFIG);
+  const [selectedJump, setSelectedJump] = useState(0);
+  const [rightTab, setRightTab] = useState<'skill' | 'analysis'>('skill');
 
   const playhead = useMemo(() => new Playhead(), []);
   const abort = useRef<AbortController | null>(null);
@@ -100,7 +112,38 @@ export default function App() {
     [track, stabilized, height, analysisCalibration, scaleSource],
   );
 
+  const skills = useMemo(() => (result ? analyzeSkills(result, { config: skillConfig }) : null), [result, skillConfig]);
+  const jumpCount = skills?.jumps.length ?? 0;
+  const jumpSel = Math.min(selectedJump, Math.max(0, jumpCount - 1));
+
   useEffect(() => () => abort.current?.abort(), []);
+
+  // A new analysis starts at the first jump.
+  useEffect(() => {
+    setSelectedJump(0);
+  }, [track]);
+
+  // While the video plays or is scrubbed, the jump view follows the jump under the playhead.
+  const selectedRef = useRef(0);
+  selectedRef.current = jumpSel;
+  useEffect(() => {
+    if (!result) return;
+    const unsubscribe = playhead.subscribe(() => {
+      const idx = result.jumps.cycleIndex[sampleIndexAt(result.meta, playhead.getSnapshot())];
+      if (idx >= 0 && idx !== selectedRef.current) setSelectedJump(idx);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [result, playhead]);
+
+  /** Choose a jump and move the video to its takeoff. */
+  const chooseJump = (k: number) => {
+    setSelectedJump(k);
+    const c = result?.jumps.cycles[k];
+    // Half a frame past the event, so the frame shown is the takeoff frame and not the one before it.
+    if (c && result) playhead.seek((c.takeoffTimeS ?? c.apexTimeS) + 0.5 / result.meta.sourceFps);
+  };
 
   // Remember the calibration per video file.
   useEffect(() => {
@@ -378,6 +421,7 @@ export default function App() {
                 url={url}
                 fps={fps}
                 result={result}
+                skills={skills}
                 overlay={overlay}
                 playhead={playhead}
                 speed={speed}
@@ -389,11 +433,14 @@ export default function App() {
             ) : (
               <p className="notice">No video loaded. Load the clip to see the skeleton on it; the charts and the panel work without it.</p>
             )}
+            {result && (
+              <PhaseTimeline result={result} skills={skills} playhead={playhead} selected={jumpCount ? jumpSel : null} onSelect={(k) => setSelectedJump(k)} />
+            )}
             <div className="toggles">
-              {(['skeleton', 'com', 'trail'] as const).map((k) => (
+              {(['skeleton', 'com', 'trail', 'hud'] as const).map((k) => (
                 <label key={k} className="check">
                   <input type="checkbox" checked={overlay[k]} onChange={(e) => setOverlay({ ...overlay, [k]: e.target.checked })} />
-                  {k === 'skeleton' ? 'Skeleton' : k === 'com' ? 'Center of mass' : 'COM trajectory'}
+                  {k === 'skeleton' ? 'Skeleton' : k === 'com' ? 'Center of mass' : k === 'trail' ? 'COM trajectory' : 'Skill labels'}
                 </label>
               ))}
               <span className="spacer" />
@@ -414,6 +461,23 @@ export default function App() {
               >
                 Save data (JSON)
               </button>
+              <button
+                disabled={!skills}
+                title="Per jump: normalized sequence, features, prediction with evidence, and the thresholds used"
+                onClick={() =>
+                  result &&
+                  skills &&
+                  download(
+                    `${base}-skills.json`,
+                    toSkillReportJson(buildSkillReport(skills, { fileName, fps: result.meta.fps, width: result.meta.width, height: result.meta.height })),
+                    'application/json',
+                  )
+                }
+              >
+                Skills JSON
+              </button>
+              <button disabled={!skills} title="One row per jump: features and prediction" onClick={() => skills && download(`${base}-skills.csv`, toSkillsCsv(skills), 'text/csv')}>Skills CSV</button>
+              <button disabled={!skills} title="One row per jump and normalized sample" onClick={() => skills && download(`${base}-sequences.csv`, toSequencesCsv(skills), 'text/csv')}>Sequences CSV</button>
             </div>
 
             <div className="panel calibration">
@@ -453,13 +517,24 @@ export default function App() {
               </label>
               <span className={`status ${calibrationModel && !calibrationModel.ok ? 'error-text' : 'muted'}`}>{calStatus}</span>
             </div>
+            {result && skills && (
+              <JumpView result={result} skills={skills} playhead={playhead} selected={jumpSel} onSelect={chooseJump} />
+            )}
             <p className="hint muted">
               Space: play/pause · ←/→: previous/next frame (Shift: ±10) · click or drag on a chart to seek.
             </p>
           </div>
           {result && (
             <aside className="right">
-              <DebugPanel result={result} playhead={playhead} />
+              <div className="tabs" role="tablist">
+                <button role="tab" aria-selected={rightTab === 'skill'} className={rightTab === 'skill' ? 'primary' : ''} onClick={() => setRightTab('skill')}>Skill</button>
+                <button role="tab" aria-selected={rightTab === 'analysis'} className={rightTab === 'analysis' ? 'primary' : ''} onClick={() => setRightTab('analysis')}>Analysis</button>
+              </div>
+              {rightTab === 'skill' && skills ? (
+                <SkillPanel result={result} skills={skills} selected={jumpSel} playhead={playhead} config={skillConfig} onConfig={setSkillConfig} onSelect={chooseJump} />
+              ) : (
+                <DebugPanel result={result} playhead={playhead} />
+              )}
             </aside>
           )}
         </section>
