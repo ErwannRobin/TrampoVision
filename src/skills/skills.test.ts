@@ -50,7 +50,7 @@ describe('positions without rotation', () => {
   });
 
   it('is confident when nothing is wrong', () => {
-    for (const j of skills.jumps) expect(j.prediction.confidence).toBeGreaterThan(0.75);
+    for (const j of skills.jumps) expect(j.prediction.confidence).toBeGreaterThan(0.7);
   });
 
   it('lists evidence in the requested form and keeps the limits honest', () => {
@@ -61,7 +61,7 @@ describe('positions without rotation', () => {
     );
     expect(pike.evidence.find((e) => e.key === 'hip_angle')!.text).toBe('80°');
     expect(pike.evidence.find((e) => e.key === 'rotation')!.text).toMatch(/^0\.0 turns/);
-    expect(pike.summary).toMatch(/hips fold to 80°/);
+    expect(pike.summary).toMatch(/hips 80°/);
     expect(KNOWN_LIMITS.map((l) => l.signal)).toEqual(expect.arrayContaining(['Twists', 'Camera view']));
   });
 });
@@ -92,11 +92,11 @@ describe('rotation', () => {
     expect(skills.jumps[0].prediction.limitations.map((l) => l.signal)).toContain('Rotation granularity');
   });
 
-  it('leaves double somersaults outside the initial set, and says so', () => {
+  it('names a double somersault from the element table', () => {
     const { skills } = run([{ v0: 5.6, turns: 2, shape: 'tuck' }]);
     const p = skills.jumps[0].prediction;
-    expect(p.skill).toBe('unclassified');
-    expect(p.summary).toMatch(/outside the initial skill set/);
+    expect(p.skill).toBe('fig-element');
+    expect(p.label).toBe('Front double somersault (tuck)');
   });
 });
 

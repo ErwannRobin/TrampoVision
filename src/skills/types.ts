@@ -1,5 +1,7 @@
 import type { JumpCycle } from '../analysis/jumpCycles';
+import type { TwistEstimate } from '../pose3d/twist';
 import type { SkillConfig } from './config';
+import type { Movement } from './fig/elements';
 
 /** Body positions the rule set can tell apart. "unknown" = between the definitions or not enough data. */
 export const POSITIONS = ['straight', 'tuck', 'pike', 'unknown'] as const;
@@ -155,7 +157,14 @@ export interface JumpSequence {
 }
 
 export type SkillId =
-  'straight-jump' | 'tuck-jump' | 'pike-jump' | 'back' | 'front' | 'somersault-direction-unknown' | 'unclassified';
+  | 'straight-jump'
+  | 'tuck-jump'
+  | 'pike-jump'
+  | 'back'
+  | 'front'
+  | 'fig-element'
+  | 'somersault-direction-unknown'
+  | 'unclassified';
 
 export const SKILL_LABELS: Record<SkillId, string> = {
   'straight-jump': 'Straight Jump',
@@ -163,6 +172,7 @@ export const SKILL_LABELS: Record<SkillId, string> = {
   'pike-jump': 'Pike Jump',
   back: 'Back',
   front: 'Front',
+  'fig-element': 'Element',
   'somersault-direction-unknown': 'Somersault (front or back undetermined)',
   unclassified: 'Unclassified',
 };
@@ -186,6 +196,66 @@ export interface Limitation {
   needed: string;
 }
 
+/** The four questions the hierarchical classifier answers, in the order it asks them. */
+export type StageId = 'rotation' | 'direction' | 'twists' | 'position';
+
+/** How one measurement stands against what an element needs. `unmeasured` = the signal is missing, so it neither confirms nor rejects. */
+export type CheckStatus = 'match' | 'weak' | 'mismatch' | 'unmeasured';
+
+export interface CandidateCheck {
+  stage: StageId;
+  criterion: string;
+  expected: string;
+  observed: string;
+  status: CheckStatus;
+  /** Likelihood of this element's value at this stage relative to the stage's best value, 0..1. */
+  match: number;
+}
+
+export interface ElementCandidate {
+  elementId: string;
+  name: string;
+  movement: Movement;
+  /** Share of the probability mass of the whole movement space, 0..1. */
+  posterior: number;
+  checks: CandidateCheck[];
+}
+
+export interface StageReport {
+  stage: StageId;
+  title: string;
+  /** False when the signal for this question was missing and a prior stood in. */
+  measured: boolean;
+  observed: string;
+  /** Probability of each answer, best first. */
+  distribution: { label: string; p: number }[];
+  notes: string[];
+}
+
+export type FailureKind =
+  | 'cut-off'
+  | 'rotation-off-grid'
+  | 'rotation-ambiguous'
+  | 'direction-unknown'
+  | 'twist-ambiguous'
+  | 'twist-unmeasured'
+  | 'position-ambiguous'
+  | 'not-in-table'
+  | 'low-data-quality';
+
+/** Why a jump was not named: which criterion fell short, by how much, and what would fix it. */
+export interface FailureDiagnosis {
+  kind: FailureKind;
+  criterion: StageId | 'data' | 'table';
+  message: string;
+  /** The closest element in the table. */
+  closest: { elementId: string; name: string } | null;
+  /** Per criterion, how far the measurement is from that element (text with units). */
+  distances: { stage: StageId; text: string; match: number }[];
+  /** Confidence of the closest element if the failing criterion were certain. */
+  ifResolved: number | null;
+}
+
 export interface SkillPrediction {
   classifier: { id: string; version: string };
   skill: SkillId;
@@ -200,10 +270,32 @@ export interface SkillPrediction {
   limitations: Limitation[];
   /** One sentence saying why the skill was chosen or why it could not be. */
   summary: string;
+  /** What the classifier recognized, before any naming. Absent for classifiers that do not work in stages. */
+  movement?: Movement;
+  /** The element of the table this movement maps to (see `fig/elements.ts`). */
+  elementId?: string;
+  /** Best candidates with their checks, best first (at most 5). */
+  candidates?: ElementCandidate[];
+  /** The four stages with the probability of each answer. */
+  stages?: StageReport[];
+  /** Probability mass outside the element table (quarter turns, four somersaults, ...). */
+  outOfTable?: number;
+  /** Factor from the data quality (pose, camera view) applied to the confidence. */
+  dataQuality?: number;
+  /** Present when the jump was not named. */
+  failure?: FailureDiagnosis;
+}
+
+/** The 3D twist of one jump: the estimate and its trajectory (degrees since takeoff, 32 samples from takeoff to landing). */
+export interface TwistContext {
+  estimate: TwistEstimate;
+  trajectory: number[] | null;
 }
 
 export interface ClassifierInput {
   cycle: JumpCycle;
+  /** Twist about the long axis, when 3D landmarks exist. */
+  twist?: TwistContext | null;
   features: JumpFeatures;
   sequence: JumpSequence | null;
   config: SkillConfig;

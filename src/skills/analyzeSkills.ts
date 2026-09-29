@@ -1,8 +1,10 @@
 import type { AnalysisResult } from '../analysis/types';
-import { ruleBasedClassifier } from './classifier';
+import type { TwistAnalysis } from '../pose3d/twist';
+import { hierarchicalClassifier } from './hierarchical';
 import { mergeSkillConfig, type DeepPartial, type SkillConfig } from './config';
 import { computeFrameShape, type FrameShape } from './frameShape';
 import { extractJump } from './jumpFeatures';
+import { twistTrajectory } from './twistTrajectory';
 import type { JumpSkillResult, SkillClassifier } from './types';
 
 export interface SkillAnalysis {
@@ -25,14 +27,21 @@ export interface SkillAnalysis {
  */
 export function analyzeSkills(
   result: AnalysisResult,
-  options: { config?: DeepPartial<SkillConfig>; classifier?: SkillClassifier } = {},
+  options: { config?: DeepPartial<SkillConfig>; classifier?: SkillClassifier; twist?: TwistAnalysis | null } = {},
 ): SkillAnalysis {
   const config = mergeSkillConfig(options.config);
-  const classifier = options.classifier ?? ruleBasedClassifier;
+  const classifier = options.classifier ?? hierarchicalClassifier;
   const frames = computeFrameShape(result, config);
-  const jumps = result.jumps.cycles.map<JumpSkillResult>((cycle) => {
+  const jumps = result.jumps.cycles.map<JumpSkillResult>((cycle, i) => {
     const { features, sequence } = extractJump(result, frames, cycle, config);
-    const prediction = classifier.classify({ cycle, features, sequence, config });
+    const estimate = options.twist?.jumps[i];
+    const twist = estimate
+      ? {
+          estimate,
+          trajectory: twistTrajectory(options.twist?.frames ?? null, result.time, cycle, config.sequenceSamples),
+        }
+      : null;
+    const prediction = classifier.classify({ cycle, features, sequence, twist, config });
     return { cycle, features, sequence, prediction };
   });
   return { config, classifier: { id: classifier.id, version: classifier.version }, frames, jumps };

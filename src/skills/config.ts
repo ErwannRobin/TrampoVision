@@ -52,6 +52,22 @@ export interface LegSeparationConfig {
   highMin: number;
 }
 
+/** Tolerances of the hierarchical classifier: how much noise each measurement is expected to have. */
+export interface ClassificationConfig {
+  /** Standard deviation of the measured somersault rotation, degrees, for a clean measurement (noisier data widens it). */
+  rotationSigmaDeg: number;
+  /** Same for the rotation path length (sum of |orientation steps|), in turns. Weak second opinion on the count. */
+  pathSigmaTurns: number;
+  /** Prior weight of a rotation that is not a whole number of somersaults (quarter and half rotations; 1 = as likely as a whole one). */
+  offGridPrior: number;
+  /** Standard deviation of the measured twist, degrees, for a reliable measurement. */
+  twistSigmaDeg: number;
+  /** Prior weight of each extra half twist when twist is not measured (1 = as likely as no twist). */
+  unmeasuredTwistWeight: number;
+  /** Twist still changing by more than this in the last tenth of the flight means the landing came before the twist ended, degrees. */
+  twistSettleDeg: number;
+}
+
 export interface SkillConfig {
   /** Samples per normalized jump sequence. */
   sequenceSamples: number;
@@ -65,6 +81,7 @@ export interface SkillConfig {
   rotation: RotationConfig;
   facing: FacingConfig;
   legSeparation: LegSeparationConfig;
+  classification: ClassificationConfig;
   /** Predictions below this confidence are reported as unclassified. */
   minConfidence: number;
   /** Trunk length changing by more than this share during a flight means the camera is not side-on. */
@@ -88,6 +105,14 @@ export const DEFAULT_SKILL_CONFIG: SkillConfig = {
   rotation: { stepDeg: 180, toleranceDeg: 60, maxStepDeg: 120, reversalOkDeg: 25, reversalMaxDeg: 90 },
   facing: { override: 'auto', faceSaturation: 0.1, kneeSaturation: 0.06, minConfidence: 0.35 },
   legSeparation: { lowMax: 0.15, highMin: 0.4 },
+  classification: {
+    rotationSigmaDeg: 36,
+    pathSigmaTurns: 0.3,
+    offGridPrior: 0.15,
+    twistSigmaDeg: 50,
+    unmeasuredTwistWeight: 0.05,
+    twistSettleDeg: 60,
+  },
   minConfidence: 0.3,
   maxTrunkVariation: 0.25,
 };
@@ -102,6 +127,7 @@ export function mergeSkillConfig(partial: DeepPartial<SkillConfig> = {}): SkillC
     rotation: { ...d.rotation, ...partial.rotation },
     facing: { ...d.facing, ...partial.facing },
     legSeparation: { ...d.legSeparation, ...partial.legSeparation },
+    classification: { ...d.classification, ...partial.classification },
     positionWindow: (partial.positionWindow as [number, number] | undefined) ?? d.positionWindow,
   };
 }

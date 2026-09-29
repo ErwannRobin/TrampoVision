@@ -1,9 +1,11 @@
 import type { SkillAnalysis } from '../../../skills/analyzeSkills';
 import { KNOWN_LIMITS } from '../../../skills/classifier';
+import { CHECK_MARK, diagnoseUnclassified, formatClassificationDebug, movementText } from '../../../skills/debug';
 import { DEFAULT_SKILL_CONFIG, type SkillConfig } from '../../../skills/config';
 import { pct } from '../../format';
 import { confidenceTier, skillName, TIER_TEXT } from '../../insights';
 import { Button, ConfidenceMeter, cx, Disclosure, NumberField, SelectField } from '../../kit';
+import type { SkillPrediction } from '../../../skills/types';
 import { fig, row } from './figures';
 import { Group, Limits, Rows } from './parts';
 import { FACING_OPTIONS, THRESHOLD_FIELDS } from './thresholds';
@@ -51,8 +53,10 @@ export function SkillTab({ skills, selected, config, onConfig }: Props) {
         </p>
       </section>
 
+      <ClassificationDebug p={p} skills={skills} />
+
       {p.evidence.length > 0 && (
-        <Group title="Evidence">
+        <Group title="Measurements">
           <Rows rows={p.evidence.map((e) => row(e.key, e.label, fig(e.text), e.note))} />
         </Group>
       )}
@@ -75,6 +79,84 @@ export function SkillTab({ skills, selected, config, onConfig }: Props) {
         )}
         <Thresholds config={config} onConfig={onConfig} />
         <KnownLimits />
+      </div>
+    </>
+  );
+}
+
+/** The classification explained: the movement, one check per question, the alternatives, and the unclassified jumps of the clip. */
+function ClassificationDebug({ p, skills }: { p: SkillPrediction; skills: SkillAnalysis }) {
+  const cands = p.candidates;
+  if (!cands || cands.length === 0) return null;
+  const named = p.skill !== 'unclassified';
+  const top = cands[0];
+  const alternatives = cands.slice(named ? 1 : 0, named ? 4 : 3);
+  const unclassified = diagnoseUnclassified(skills);
+  return (
+    <>
+      <Group title={named ? 'Movement' : 'Closest element'}>
+        <Rows
+          rows={[
+            row('predicted', named ? 'Predicted' : 'Closest', fig(named ? p.label : top.name)),
+            ...(named ? [row('movement', 'Movement', fig(movementText(p)))] : []),
+            ...top.checks.map((c) =>
+              row(
+                `check_${c.stage}`,
+                `${CHECK_MARK[c.status]} ${c.criterion}`,
+                fig(c.observed, undefined, c.status === 'unmeasured'),
+                c.status === 'unmeasured' ? `not measured; ${c.expected} assumed` : `element needs ${c.expected}`,
+              ),
+            ),
+          ]}
+        />
+        {p.failure && <p className="coach__note">{p.failure.message}</p>}
+        {p.failure?.ifResolved != null && (
+          <p className="coach__note">
+            If the {p.failure.criterion} were certain, {p.failure.closest?.name} would score {pct(p.failure.ifResolved)}
+            .
+          </p>
+        )}
+      </Group>
+      {alternatives.length > 0 && (
+        <Group title="Alternatives">
+          <Rows rows={alternatives.map((c) => row(c.elementId, c.name, fig(pct(c.posterior))))} />
+        </Group>
+      )}
+      <div className="coach__more">
+        {p.stages && (
+          <Disclosure title="Answer of each question">
+            {p.stages.map((st) => (
+              <Rows
+                key={st.stage}
+                rows={[
+                  row(st.stage, st.title, fig(st.observed, undefined, !st.measured), st.notes.join('. ') || undefined),
+                  ...st.distribution
+                    .slice(0, 3)
+                    .map((d) => row(`${st.stage}_${d.label}`, `  ${d.label}`, fig(pct(d.p)))),
+                ]}
+              />
+            ))}
+            {p.outOfTable !== undefined && (
+              <p className="coach__note">Outside the element table: {pct(p.outOfTable)} of the probability.</p>
+            )}
+          </Disclosure>
+        )}
+        {unclassified.unclassified > 0 && (
+          <Disclosure title={`Unclassified in this clip (${unclassified.unclassified} of ${unclassified.total})`}>
+            <Rows
+              rows={unclassified.byKind.map((b) => row(b.kind, b.kind.replaceAll('-', ' '), fig(String(b.count))))}
+            />
+            {unclassified.jumps.map((r) => (
+              <p key={r.jump} className="coach__note">
+                Jump {r.jump + 1}: {r.message}
+                {r.top.length > 0 && ` ${r.top.map((t) => `${t.name} ${pct(t.posterior)}`).join(' · ')}.`}
+              </p>
+            ))}
+          </Disclosure>
+        )}
+        <Disclosure title="Debug text">
+          <pre className="coach__note">{formatClassificationDebug(p)}</pre>
+        </Disclosure>
       </div>
     </>
   );

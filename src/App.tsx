@@ -150,10 +150,6 @@ export default function App() {
     [track, stabilized, height, analysisCalibration, scaleSource],
   );
 
-  const skills = useMemo(() => (result ? analyzeSkills(result, { config: skillConfig }) : null), [result, skillConfig]);
-  const jumpCount = skills?.jumps.length ?? 0;
-  const jumpSel = Math.min(selectedJump, Math.max(0, jumpCount - 1));
-
   // Experimental 3D: twist about the longitudinal axis, from the 3D landmarks of the same frames.
   const twist = useMemo(
     () =>
@@ -162,6 +158,14 @@ export default function App() {
         : null,
     [track, result],
   );
+
+  // The twist feeds the classifier: 'twists' is one of its four questions.
+  const skills = useMemo(
+    () => (result ? analyzeSkills(result, { config: skillConfig, twist }) : null),
+    [result, skillConfig, twist],
+  );
+  const jumpCount = skills?.jumps.length ?? 0;
+  const jumpSel = Math.min(selectedJump, Math.max(0, jumpCount - 1));
 
   const notes = useMemo(() => (result ? analysisWarnings(result) : []), [result]);
 
