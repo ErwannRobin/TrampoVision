@@ -1,8 +1,11 @@
 import { createMediaPipeEstimator } from '../pose/MediaPipePoseEstimator';
-import { selectAthlete } from '../pose/selectAthlete';
+import { AthleteTracker } from '../pose/selectAthlete';
 import type { EstimatorOptions, Keypoint, PoseEstimatorFactory, WorldPoint } from '../pose/types';
 import { disposeVideo, frameSeekTime, loadVideo, seekTo } from '../video/frames';
 import type { PoseTrack } from './types';
+
+/** People detected per frame, whatever the setting: the tracker needs to see the others to ignore them. */
+const MIN_POSES = 4;
 
 export interface ExtractOptions extends EstimatorOptions {
   sourceFps: number;
@@ -32,7 +35,12 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
   const { videoWidth: width, videoHeight: height, duration } = video;
   if (!width || !height || !Number.isFinite(duration)) throw new Error('Could not read the video dimensions/duration.');
 
-  const estimator = await (opts.createEstimator ?? createMediaPipeEstimator)(opts);
+  // Always look for several people: with a single pose the model picks who to follow by itself and can swap to somebody
+  // in the foreground. Seeing everyone lets the tracker keep the person it locked on.
+  const estimator = await (opts.createEstimator ?? createMediaPipeEstimator)({
+    ...opts,
+    numPoses: Math.max(opts.numPoses, MIN_POSES),
+  });
   const { backend } = estimator;
   opts.onBackend?.(
     `${backend.engine} · ${backend.delegate}${backend.fallbackReason ? ' (GPU failed, using CPU)' : ''}`,
@@ -43,7 +51,7 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
     const times: number[] = [];
     const frames: (Keypoint[] | null)[] = [];
     const world: (WorldPoint[] | null)[] = [];
-    let previous: Keypoint[] | null = null;
+    const tracker = new AthleteTracker();
     let lastTs = 0;
 
     for (let i = 0; i < total; i++) {
@@ -56,8 +64,7 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
       const candidates = detections.map((d) =>
         d.landmarks.map((p) => ({ x: p.x * width, y: p.y * height, visibility: p.visibility })),
       );
-      const athlete = selectAthlete(candidates, previous);
-      if (athlete) previous = athlete;
+      const athlete = tracker.select(candidates);
       // The 3D landmarks of the same person: `selectAthlete` returns one of the candidates, so its index is the detection's index.
       const chosen = athlete ? candidates.indexOf(athlete) : -1;
       world.push(chosen >= 0 ? (detections[chosen].world ?? null) : null);
