@@ -742,6 +742,7 @@ export default function App() {
                 twist={twist}
                 selected={jumpSel}
                 playhead={playhead}
+                baseName={base}
                 markers={decorations.markers}
                 bands={decorations.bands}
               />

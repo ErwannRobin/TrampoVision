@@ -1,7 +1,10 @@
 import { ArrayBufferTarget, Muxer } from 'mp4-muxer';
 import { sampleIndexAt } from '../analysis/lookup';
-import type { AnalysisResult } from '../analysis/types';
+import type { AnalysisResult, PoseTrack } from '../analysis/types';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
+import { drawPose3D, twistSinceTakeoff, type View } from '../pose3d/draw';
+import type { TwistAnalysis } from '../pose3d/twist';
+import { cssVar, pose3dColors } from '../ui/theme';
 import { disposeVideo, frameSeekTime, loadVideo, seekTo } from './frames';
 import { drawCalibration, drawOverlay, type CalibrationDraw, type OverlayOptions } from './overlay';
 
@@ -14,6 +17,62 @@ import { drawCalibration, drawOverlay, type CalibrationDraw, type OverlayOptions
 /** The overlay is laid out for a picture about this wide (CSS px); it is scaled to the export size. */
 const REFERENCE_WIDTH = 960;
 const MAX_LONG_SIDE = 1920;
+
+interface EncodeOptions {
+  width: number;
+  height: number;
+  fps: number;
+  frames: number;
+  /** Paints frame `k` into the (already sized) canvas. */
+  drawFrame: (k: number, ctx: CanvasRenderingContext2D) => Promise<void> | void;
+  onProgress?: (fraction: number) => void;
+  signal?: AbortSignal;
+}
+
+/** Encodes `frames` painted canvases as an H.264 MP4. Shared by every export. */
+async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
+  if (!canExportVideo()) throw new Error('This browser cannot export video (WebCodecs is not available).');
+  const { width, height, fps, frames, signal } = opts;
+  const config = await pickConfig(width, height, fps);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not create a drawing surface for the export.');
+
+  const muxer = new Muxer({
+    target: new ArrayBufferTarget(),
+    video: { codec: 'avc', width, height, frameRate: fps },
+    fastStart: 'in-memory',
+  });
+  let encodeError: Error | null = null;
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (e) => (encodeError = e),
+  });
+  try {
+    encoder.configure(config);
+    const frameUs = 1e6 / fps;
+    for (let k = 0; k < frames; k++) {
+      if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
+      if (encodeError) throw encodeError;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      await opts.drawFrame(k, ctx);
+      const frame = new VideoFrame(canvas, { timestamp: Math.round(k * frameUs), duration: Math.round(frameUs) });
+      encoder.encode(frame, { keyFrame: k % 60 === 0 });
+      frame.close();
+      // Keep the encoder queue short so memory stays flat on long videos.
+      while (encoder.encodeQueueSize > 8) await new Promise((r) => setTimeout(r, 5));
+      opts.onProgress?.((k + 1) / frames);
+    }
+    await encoder.flush();
+    if (encodeError) throw encodeError;
+    muxer.finalize();
+    return new Blob([muxer.target.buffer], { type: 'video/mp4' });
+  } finally {
+    if (encoder.state !== 'closed') encoder.close();
+  }
+}
 
 export interface ExportOptions {
   url: string;
@@ -46,65 +105,91 @@ async function pickConfig(width: number, height: number, fps: number): Promise<V
 }
 
 export async function exportAnnotatedVideo(opts: ExportOptions): Promise<Blob> {
-  if (!canExportVideo()) throw new Error('This browser cannot export video (WebCodecs is not available).');
-  const { fps, result, skills, overlay, calibration, signal } = opts;
+  const { fps, result, skills, overlay, calibration } = opts;
   const video = await loadVideo(opts.url);
-  let encoder: VideoEncoder | null = null;
   try {
     const { width, height } = exportSize(video.videoWidth, video.videoHeight);
-    const total = Math.max(1, Math.floor(video.duration * fps));
-    const config = await pickConfig(width, height, fps);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Could not create a drawing surface for the export.');
-
-    const muxer = new Muxer({
-      target: new ArrayBufferTarget(),
-      video: { codec: 'avc', width, height, frameRate: fps },
-      fastStart: 'in-memory',
-    });
-    let encodeError: Error | null = null;
-    encoder = new VideoEncoder({
-      output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-      error: (e) => (encodeError = e),
-    });
-    encoder.configure(config);
-
     const cssWidth = REFERENCE_WIDTH;
     const cssHeight = (REFERENCE_WIDTH * height) / width;
     const scale = width / cssWidth;
-    const frameUs = 1e6 / fps;
-
-    for (let k = 0; k < total; k++) {
-      if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
-      if (encodeError) throw encodeError;
-      const time = Math.min(frameSeekTime(k, fps), video.duration - 1e-3);
-      await seekTo(video, time);
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.drawImage(video, 0, 0, width, height);
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      if (result)
-        drawOverlay(ctx, cssWidth, cssHeight, result, sampleIndexAt(result.meta, time), overlay, skills, false);
-      if (calibration) drawCalibration(ctx, cssWidth, cssHeight, video.videoWidth, video.videoHeight, calibration);
-
-      const frame = new VideoFrame(canvas, { timestamp: Math.round(k * frameUs), duration: Math.round(frameUs) });
-      encoder.encode(frame, { keyFrame: k % 60 === 0 });
-      frame.close();
-      // Keep the encoder queue short so memory stays flat on long videos.
-      while (encoder.encodeQueueSize > 8) await new Promise((r) => setTimeout(r, 5));
-      opts.onProgress?.((k + 1) / total);
-    }
-
-    await encoder.flush();
-    if (encodeError) throw encodeError;
-    muxer.finalize();
-    return new Blob([muxer.target.buffer], { type: 'video/mp4' });
+    return await encodeMp4({
+      width,
+      height,
+      fps,
+      frames: Math.max(1, Math.floor(video.duration * fps)),
+      signal: opts.signal,
+      onProgress: opts.onProgress,
+      drawFrame: async (k, ctx) => {
+        const time = Math.min(frameSeekTime(k, fps), video.duration - 1e-3);
+        await seekTo(video, time);
+        ctx.drawImage(video, 0, 0, width, height);
+        ctx.setTransform(scale, 0, 0, scale, 0, 0);
+        if (result)
+          drawOverlay(ctx, cssWidth, cssHeight, result, sampleIndexAt(result.meta, time), overlay, skills, false);
+        if (calibration) drawCalibration(ctx, cssWidth, cssHeight, video.videoWidth, video.videoHeight, calibration);
+      },
+    });
   } finally {
-    if (encoder && encoder.state !== 'closed') encoder.close();
     disposeVideo(video);
   }
+}
+
+export interface Export3DOptions {
+  track: PoseTrack;
+  result: AnalysisResult;
+  twist: TwistAnalysis;
+  /** Takeoff sample of the selected jump, which the twist dial is measured from. */
+  takeoff: number | null;
+  view: View;
+  onProgress?: (fraction: number) => void;
+  signal?: AbortSignal;
+}
+
+const SCENE_WIDTH = 1280;
+const SCENE_HEIGHT = 720;
+
+/**
+ * The analysis without the footage: the 3D skeleton (with torso, long axis and twist dial) drawn from the
+ * estimated 3D landmarks, one frame per analyzed sample, on a plain background. It needs no video.
+ */
+export async function exportPose3DVideo(opts: Export3DOptions): Promise<Blob> {
+  const { track, result, twist, takeoff, view } = opts;
+  const colors = pose3dColors();
+  const bg = cssVar('--surface', '#fff');
+  const cssHeight = 360; // drawn at 640 x 360 and scaled up 2x
+  const cssWidth = (cssHeight * SCENE_WIDTH) / SCENE_HEIGHT;
+  const scale = SCENE_WIDTH / cssWidth;
+  return encodeMp4({
+    width: SCENE_WIDTH,
+    height: SCENE_HEIGHT,
+    fps: result.meta.fps,
+    frames: result.meta.count,
+    signal: opts.signal,
+    onProgress: opts.onProgress,
+    drawFrame: (i, ctx) => {
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, SCENE_WIDTH, SCENE_HEIGHT);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      drawPose3D(ctx, cssWidth, cssHeight, { world: track.world?.[i] ?? null, twist, takeoff, i, view, colors });
+      const rel = twistSinceTakeoff(twist, takeoff, i);
+      ctx.font = '600 13px system-ui, sans-serif';
+      ctx.fillStyle = colors.ink;
+      ctx.textAlign = 'left';
+      const sign = rel !== null && rel < 0 ? '−' : '+';
+      ctx.fillText(
+        `${result.time[i].toFixed(2)} s` + (rel !== null ? ` · twist ${sign}${Math.abs(Math.round(rel))}°` : ''),
+        12,
+        22,
+      );
+    },
+  });
+}
+
+/** Offers a blob to the user as a file download. */
+export function saveBlob(blob: Blob, filename: string) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 }

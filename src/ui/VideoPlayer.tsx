@@ -4,7 +4,7 @@ import type { AnalysisResult } from '../analysis/types';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { frameAtTime, frameSeekTime } from '../video/frames';
 import type { Point } from '../pose/types';
-import { canExportVideo, exportAnnotatedVideo } from '../video/exportVideo';
+import { canExportVideo, exportAnnotatedVideo, saveBlob } from '../video/exportVideo';
 import { drawCalibration, drawOverlay, type CalibrationDraw, type OverlayOptions } from '../video/overlay';
 import { Playhead, usePlayheadTime } from './playhead';
 
@@ -72,11 +72,7 @@ export function VideoPlayer({
         signal: ctl.signal,
         onProgress: (progress) => setExporting({ progress }),
       });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `${baseName}-annotated.mp4`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+      saveBlob(blob, `${baseName}-annotated.mp4`);
     } catch (err) {
       if (!(err instanceof DOMException && err.name === 'AbortError'))
         setExportError(err instanceof Error ? err.message : String(err));
