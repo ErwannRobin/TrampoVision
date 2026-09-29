@@ -1,0 +1,647 @@
+/*
+ * Review and evaluation (ui/EvaluationView.tsx and ui/review/*): labeling one jump at a time in the coach's Review tab,
+ * the dataset kept in this browser, and the report of how the classifier does against those labels.
+ *
+ * The report is used full width under the charts and in a narrow column on the first screen, so it answers to the width
+ * it is given (a container query on .review-report), not to the width of the window.
+ */
+
+/* Shared ----------------------------------------------------------------------------------------------------- */
+
+.review-note {
+  max-width: 80ch;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.review-empty {
+  max-width: 80ch;
+  padding-bottom: var(--sp-4);
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.review-heading,
+.review-subhead {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+/* A key of the keyboard, drawn on the control it presses. */
+.review-keycap {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--keycap-line, var(--line-2));
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--keycap-bg, var(--panel));
+  color: var(--keycap-ink, var(--text-2));
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1;
+}
+@media (hover: none) and (pointer: coarse) {
+  .review-keycap {
+    display: none;
+  }
+}
+
+/* Panel: the Review tab ---------------------------------------------------------------------------------------- */
+
+.review {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.review-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding: var(--sp-4) 0 var(--sp-5);
+  border-top: 1px solid var(--line);
+}
+.review-section--lead {
+  padding-top: 0;
+  border-top: 0;
+}
+.review-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 20px;
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.review-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.review-progress__text {
+  flex: none;
+}
+.review-progress__track {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 40px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--panel-3);
+  overflow: hidden;
+}
+.review-progress__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--text);
+  transition: width var(--t-slow) var(--ease);
+}
+
+/* What the classifier said about the jump, kept compact: the name, the score, how sure it is, the one-line reason. */
+.review-classifier {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.review-classifier__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.review-classifier__skill {
+  min-width: 0;
+  font-size: var(--fs-lg);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.review-classifier__pct {
+  flex: none;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+.review-classifier__tier {
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+
+/* The six labels: the chosen one is filled, like the primary button. */
+.review-labels {
+  display: grid;
+  /* Three across when there is room for it, two on a phone; never four with two left over. */
+  grid-template-columns: repeat(auto-fit, minmax(max(104px, calc((100% - 2 * var(--sp-2)) / 3 - 1px)), 1fr));
+  gap: var(--sp-2);
+}
+.review-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-input);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: var(--fs-base);
+  font-weight: 550;
+  text-align: left;
+  transition:
+    background var(--t-fast),
+    border-color var(--t-fast),
+    color var(--t-fast),
+    transform var(--t-fast) var(--ease);
+}
+.review-label:hover:not(:disabled) {
+  background: var(--panel-3);
+}
+.review-label:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.review-label:disabled {
+  opacity: 0.4;
+}
+.review-label[aria-pressed='true'] {
+  --keycap-line: color-mix(in srgb, var(--inverse) 45%, transparent);
+  --keycap-bg: transparent;
+  --keycap-ink: var(--inverse);
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--inverse);
+}
+.review-label[aria-pressed='true']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 86%, var(--bg));
+}
+.review-label__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  .review-label {
+    min-height: 44px;
+  }
+}
+
+.review-label-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.review-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.review-hint__ok {
+  color: var(--ok);
+}
+
+/* Predictions made with other settings than the ones on screen: not sure, so dashed. */
+.review-stale {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px dashed color-mix(in srgb, var(--warn) 60%, transparent);
+  border-radius: var(--r-input);
+  background: var(--warn-bg);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+/* Dataset on this computer ------------------------------------------------------------------------------------- */
+
+.review-dataset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.review-dataset__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.review-dataset__summary {
+  line-height: 1.5;
+}
+.review-dataset__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.review-dataset__delete {
+  margin-left: auto;
+}
+.review-file {
+  position: relative;
+  cursor: pointer;
+}
+/* The file input is visually hidden, so the ring goes on the button that wraps it. */
+.review-file:has(:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.review-warning {
+  padding-left: var(--sp-3);
+  border-left: 2px dashed color-mix(in srgb, var(--warn) 60%, transparent);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.review-warning--error {
+  border-left: 2px solid var(--danger);
+}
+
+/* Report ------------------------------------------------------------------------------------------------------- */
+
+.review-report {
+  container: review-report / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  width: 100%;
+  min-width: 0;
+}
+.review-report__intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.review-report__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3) var(--sp-4);
+}
+.review-report__title {
+  font-size: var(--fs-lg);
+}
+.review-report__exports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
+
+.review-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.review-block__title {
+  font-size: var(--fs-md);
+}
+.review-block__count {
+  margin-left: 6px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+.review-report__tables {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-5) var(--sp-6);
+}
+@container review-report (min-width: 1240px) {
+  .review-report__tables {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  }
+}
+
+/* The headline figures: big condensed numbers, hairlines between them, no tiles. The row is pulled left by the padding
+   and the hairline of the first figure of each line, and clipped, so a wrapped line starts flush with the edge. */
+.review-figures {
+  overflow: hidden;
+}
+.review-figures__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-items: baseline;
+  gap: var(--sp-5) 0;
+  margin-left: calc(-1 * var(--sp-5) - 1px);
+}
+.review-figure {
+  min-width: 0;
+  padding: 0 var(--sp-4) 0 var(--sp-5);
+  border-left: 1px solid var(--line);
+}
+
+/* Reasons not to over-read the numbers: a dashed edge, the mark of "we are not sure". */
+.review-caveats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-width: 80ch;
+  padding-left: var(--sp-3);
+  border-left: 2px dashed color-mix(in srgb, var(--warn) 60%, transparent);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+/* Tables: real tables, scrolling sideways inside their own wrapper when the width is short. ---------------------- */
+
+.review-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.review-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-base);
+}
+.review-table--checks {
+  min-width: 520px;
+}
+.review-table--matrix {
+  min-width: 560px;
+}
+.review-cell {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+.review-cell--head {
+  border-bottom-color: var(--line-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  line-height: 1.3;
+  vertical-align: bottom;
+}
+.review-cell--row {
+  color: var(--text);
+  font-weight: 550;
+}
+.review-cell--num {
+  text-align: right;
+}
+.review-cell--center {
+  text-align: center;
+}
+.review-cell--nowrap {
+  white-space: nowrap;
+}
+.review-cell--muted {
+  color: var(--text-2);
+}
+.review-cell--icon {
+  width: 32px;
+  padding-right: 0;
+}
+.review-cell__ci {
+  color: var(--text-3);
+}
+.review-cell--group {
+  border-bottom-color: var(--line);
+}
+.review-cell--column {
+  min-width: 64px;
+  max-width: 104px;
+}
+
+/* Confusion matrix: agree in --ok, differ in --danger, the tint (--strength) grows with the count. */
+.review-cell--agree {
+  background: color-mix(in srgb, var(--ok) var(--strength, 30%), transparent);
+  font-weight: 600;
+}
+.review-cell--differ {
+  background: color-mix(in srgb, var(--danger) var(--strength, 30%), transparent);
+  font-weight: 600;
+}
+.review-cell--zero {
+  color: var(--text-3);
+}
+.review-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-4);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+.review-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.review-legend__swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.review-legend__swatch--agree {
+  background: color-mix(in srgb, var(--ok) 45%, transparent);
+}
+.review-legend__swatch--differ {
+  background: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+/* Failure cases ------------------------------------------------------------------------------------------------ */
+
+.review-fails {
+  display: flex;
+  flex-direction: column;
+}
+.review-fail__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.review-fail__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--sp-2);
+}
+.review-fail__file {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.review-fail__jump {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+}
+.review-fail__what {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+}
+.review-fail__value {
+  color: var(--text);
+  font-weight: 600;
+}
+.review-fail__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.review-fail__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-5);
+}
+@container review-report (min-width: 720px) {
+  .review-fail__grid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+.review-fail__part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.review-fail__summary {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.review-check--differs {
+  background: var(--danger-bg);
+}
+.review-status--ok {
+  color: var(--ok);
+}
+.review-status--off {
+  color: var(--danger);
+}
+.review-status--unknown {
+  color: var(--text-3);
+}
+
+/* Label and value rows: the label left, the figure right, a hairline between. */
+.review-rows {
+  display: flex;
+  flex-direction: column;
+}
+.review-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+}
+.review-row__label {
+  min-width: 0;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.review-row__value {
+  min-width: 0;
+  max-width: 60%;
+  font-size: var(--fs-base);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.review-limits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-left: var(--sp-3);
+  border-left: 2px dashed color-mix(in srgb, var(--warn) 60%, transparent);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.review-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  column-gap: var(--sp-6);
+}
+
+/* Sparks: one curve of the normalized jump each. Lines in --lift, everything else in tokens. ---------------------- */
+
+.review-sparks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+  gap: var(--sp-4) var(--sp-5);
+}
+.review-spark {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.review-spark__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+}
+.review-spark__title {
+  color: var(--text-2);
+}
+.review-spark__range {
+  font-size: var(--fs-base);
+  white-space: nowrap;
+}
+.review-spark__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 150 / 40;
+}
+.review-spark__bg {
+  fill: var(--panel-2);
+}
+.review-spark__guide {
+  stroke: var(--text-3);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+.review-spark__line {
+  stroke: var(--lift);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.review-spark__note {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}

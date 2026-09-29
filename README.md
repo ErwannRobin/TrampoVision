@@ -40,21 +40,25 @@ Videos the browser cannot decode (iPhone HEVC `.mov` in desktop Chrome) are conv
 
 ## Use
 
-1. Choose an MP4/MOV. The frame rate is measured automatically (editable).
-2. Pick a model (Full is a good default; Heavy is the most accurate/slowest) and enter the athlete height.
-3. _(Optional, recommended)_ **Trampoline → Set up calibration**: scrub to a frame where the bed is visible and click its
+1. Choose an MP4/MOV, drop one anywhere on the page, or use the sample. The frame rate is measured automatically (editable).
+2. The rail shows the **Settings** of the clip. Enter the athlete height. Pick a model if you like (Full is a good default; Heavy is the most accurate and the slowest) under _Analysis_.
+3. _(Optional, recommended)_ **Trampoline → Mark the trampoline**: scrub to a frame where the bed is visible and click its
    four corners, going around it. Drag a corner to adjust, then **Done**. Enter the bed size if it is not 4.28 × 2.14 m and
    say whether side 1→2 is the long or the short side. The calibration is remembered for that file (browser storage only).
 4. **Analyze video**. It seeks frame by frame, so the result does not depend on machine speed.
-5. Play, slow down (0.1×–2×), step frame by frame (`←` `→`, `Shift` = 10 frames, `Space` = play/pause), or click/drag
-   on any chart to seek. The video shows the skeleton, a solid COM dot with its trajectory, the bed outline and the current
-   jump phase. The **analysis panel** shows, for the current frame: COM, height, vertical velocity, horizontal displacement
-   from the bed center, body angle (wrapped and continuous), rotation count and jump phase, plus a table of all jumps and
-   data-quality warnings. Click a jump row to go to its takeoff.
-6. **Frames CSV**, **Jumps CSV**, or **Save data (JSON)**. The JSON is the complete frame-by-frame store (below). Use
-   _open saved data_ later to get the same results without running the pose model again (the file now also holds the 3D landmarks and the video id).
-7. **Validate:** open the _Evaluate_ tab, watch each jump and give it a label (keys 1–6). Metrics, the confusion matrix and the failure cases appear under the jump view; everything is stored in this browser and exported as JSON / CSV.
-8. **3D pose (experimental):** the _2D pose / 3D pose_ toggle above the video adds the 3D skeleton, the longitudinal axis and the twist estimate.
+5. The result opens on the **timeline**: one strip of arches for the whole clip, with takeoff (▲), apex (●) and landing (▼)
+   of every detected jump, a chip per jump with its skill, and the playhead. Press or drag on it to scrub, press inside a
+   flight to select that jump, zoom to one jump, or play it with a loop. `[` and `]` go to the previous and next jump.
+   Play, slow down (0.1×–2×), step frame by frame (`←` `→`, `Shift` = 10 frames, `Space` = play/pause) or click/drag on any chart to seek.
+   The video shows the skeleton, the center of mass with its trajectory, the bed outline and labels; the layers can be toggled.
+6. The top bar switches the interface between **Athlete** and **Coach**:
+   - _Athlete_: the plain answers for the selected jump (skill and how sure the classifier is, peak height, time in the air, rotation, body shape, where it landed on the bed) and every jump of the clip compared with the others of that clip.
+   - _Coach_: the same analysis in depth. Tabs for the **Skill** (evidence, confidence parts, limitations, thresholds), **Metrics** (values at the playhead, every measurement, table of all jumps), **Twist** (experimental), **Review** (labels) and **Data** (warnings, data quality, joint angles), the stage view (video, split with the 3D skeleton, or 3D) and, below, all the charts (**Technical data**).
+7. **Export** (top bar): the annotated video, **Frames CSV**, **Jumps CSV**, **Save analysis (JSON)** (the complete frame-by-frame store, below), and the skills JSON / CSV files. **Settings → Open saved analysis** later gives the same results without running the pose model again (the file also holds the 3D landmarks and the video id).
+8. **Validate:** in the coach's _Review_ tab, watch each jump and give it a label (keys 1–6). Metrics, the confusion matrix and the failure cases appear under the charts; everything is stored in this browser and exported as JSON / CSV.
+9. **3D pose (experimental):** in the coach's stage, _Split_ or _3D_ shows the 3D skeleton, the longitudinal axis and the twist estimate.
+
+The interface adapts from phones to wide screens and follows the system's light or dark appearance (or the choice in _Settings_). Its design rules, tokens and parts are in [`docs/ui-design.md`](docs/ui-design.md).
 
 ## Pipeline and code map
 
@@ -65,36 +69,37 @@ video ─► extractPoseTrack ─► PoseTrack ─► stabilizePose ─► compu
                                                                                   └─► UI / exports (PoseSeries JSON, CSV, skills JSON/CSV)
 ```
 
-| Module                                                       | Role                                                                                                                                           |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/pose/types.ts`                                          | `PoseEstimator` interface. Any backend that returns the 33-point BlazePose topology can be plugged in.                                         |
-| `src/pose/MediaPipePoseEstimator.ts`                         | MediaPipe Pose Landmarker, GPU delegate first, CPU (WASM) fallback.                                                                            |
-| `src/analysis/stabilize.ts`                                  | Low-confidence gating, glitch rejection, gap filling, confidence-weighted smoothing, per-joint state.                                          |
-| `src/analysis/signal.ts`                                     | Median, spike mask, gap filling (linear / quadratic), weighted Savitzky–Golay-style fits, peak finder, angle unwrapping.                       |
-| `src/analysis/com.ts`                                        | Segment-based COM (14 segments, de Leva-style mass fractions).                                                                                 |
-| `src/analysis/calibration.ts`                                | Four bed corners → scale, bed center, position normalized to the trampoline.                                                                   |
-| `src/analysis/jumpCycles.ts`                                 | Apex / takeoff / landing detection, per-frame phase, jump metrics, rotation counting.                                                          |
-| `src/analysis/computeAnalysis.ts`                            | Orchestrates the above and derives height, velocity, joint angles, body orientation.                                                           |
-| `src/analysis/timeSeries.ts`                                 | The frame-by-frame store (`PoseSeries` JSON, import/export) and a numeric feature matrix.                                                      |
-| `src/video/overlay.ts`, `src/ui/*`                           | Canvas overlay, calibration tool, player, charts (custom canvas), analysis panel.                                                              |
-| `src/localOnlyGuard.ts` + CSP in `vite.config.ts`            | Blocks any cross-origin network request (see below).                                                                                           |
-| `src/analysis/testTracks.ts`                                 | Test-only synthetic routines with analytic ground truth.                                                                                       |
-| `src/skills/frameShape.ts`                                   | Per-sample pose measurements: hip/knee angles, knee-to-torso distance, compactness, leg separation, body-frame joint coordinates, facing cues. |
-| `src/skills/jumpFeatures.ts`                                 | One normalized sequence and one feature object (`JumpFeatures`) per detected jump.                                                             |
-| `src/skills/bodyPosition.ts`, `rotation.ts`, `facing.ts`     | Rule-based body position, rotation in half turns with confidence, facing direction.                                                            |
-| `src/skills/classifier.ts`                                   | `SkillClassifier` interface + the rule-based classifier (evidence, limitations). A learned model can replace it.                               |
-| `src/skills/config.ts`                                       | Every threshold in one object (editable in the UI, saved in the export).                                                                       |
-| `src/skills/export.ts`                                       | Skills JSON, per-jump CSV, per-sample sequences CSV.                                                                                           |
-| `src/skills/testMannequin.ts`, `evaluation.ts`               | Test-only articulated athlete (known joint angles) and the synthetic evaluation harness.                                                       |
-| `src/ui/PhaseTimeline.tsx`, `JumpView.tsx`, `SkillPanel.tsx` | Event timeline, per-jump normalized charts, prediction with evidence.                                                                          |
-| `src/dataset/record.ts`, `types.ts`, `videoId.ts`            | The saved jump record (`JumpRecord`), how records are built, matched and refreshed, and the stable video id.                                   |
-| `src/dataset/store.ts`, `useDataset.ts`                      | Local storage in the browser (IndexedDB, memory fallback), merge on import.                                                                    |
-| `src/dataset/metrics.ts`, `failures.ts`, `export.ts`         | Accuracy / precision / recall / confusion matrix, label-vs-measurement checks for failures, dataset and evaluation JSON/CSV.                   |
-| `src/ui/EvaluationView.tsx`                                  | The _Evaluate_ tab (review and label), the metrics report and the failure cards.                                                               |
-| `src/pose3d/torso.ts`, `twist.ts`, `config.ts`, `vec3.ts`    | Experimental 3D: torso frame from the 3D landmarks, twist about the longitudinal axis with reliability checks.                                 |
-| `src/pose3d/capabilities.ts`                                 | Measures what this browser can run (WebGPU, WebGL 2, WASM SIMD / threads).                                                                     |
-| `src/pose3d/testTwistMannequin.ts`, `evaluation.ts`          | Test-only 3D athlete with known somersault and twist, and its degradations.                                                                    |
-| `src/ui/Pose3DView.tsx`, `TwistPanel.tsx`                    | 3D skeleton view (torso, axis, twist dial), twist curves, twist numbers and limits.                                                            |
+| Module                                                    | Role                                                                                                                                           |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/pose/types.ts`                                       | `PoseEstimator` interface. Any backend that returns the 33-point BlazePose topology can be plugged in.                                         |
+| `src/pose/MediaPipePoseEstimator.ts`                      | MediaPipe Pose Landmarker, GPU delegate first, CPU (WASM) fallback.                                                                            |
+| `src/analysis/stabilize.ts`                               | Low-confidence gating, glitch rejection, gap filling, confidence-weighted smoothing, per-joint state.                                          |
+| `src/analysis/signal.ts`                                  | Median, spike mask, gap filling (linear / quadratic), weighted Savitzky–Golay-style fits, peak finder, angle unwrapping.                       |
+| `src/analysis/com.ts`                                     | Segment-based COM (14 segments, de Leva-style mass fractions).                                                                                 |
+| `src/analysis/calibration.ts`                             | Four bed corners → scale, bed center, position normalized to the trampoline.                                                                   |
+| `src/analysis/jumpCycles.ts`                              | Apex / takeoff / landing detection, per-frame phase, jump metrics, rotation counting.                                                          |
+| `src/analysis/computeAnalysis.ts`                         | Orchestrates the above and derives height, velocity, joint angles, body orientation.                                                           |
+| `src/analysis/timeSeries.ts`                              | The frame-by-frame store (`PoseSeries` JSON, import/export) and a numeric feature matrix.                                                      |
+| `src/video/overlay.ts`                                    | Canvas overlay drawn on the video and in the exported video: skeleton, center of mass, trajectory comet, label chips, bed outline.             |
+| `src/ui/*`, `src/styles/*`                                | The interface (see `docs/ui-design.md`): design tokens and kit, stage and transport, timeline, athlete and coach rails, charts, settings.      |
+| `src/localOnlyGuard.ts` + CSP in `vite.config.ts`         | Blocks any cross-origin network request (see below).                                                                                           |
+| `src/analysis/testTracks.ts`                              | Test-only synthetic routines with analytic ground truth.                                                                                       |
+| `src/skills/frameShape.ts`                                | Per-sample pose measurements: hip/knee angles, knee-to-torso distance, compactness, leg separation, body-frame joint coordinates, facing cues. |
+| `src/skills/jumpFeatures.ts`                              | One normalized sequence and one feature object (`JumpFeatures`) per detected jump.                                                             |
+| `src/skills/bodyPosition.ts`, `rotation.ts`, `facing.ts`  | Rule-based body position, rotation in half turns with confidence, facing direction.                                                            |
+| `src/skills/classifier.ts`                                | `SkillClassifier` interface + the rule-based classifier (evidence, limitations). A learned model can replace it.                               |
+| `src/skills/config.ts`                                    | Every threshold in one object (editable in the UI, saved in the export).                                                                       |
+| `src/skills/export.ts`                                    | Skills JSON, per-jump CSV, per-sample sequences CSV.                                                                                           |
+| `src/skills/testMannequin.ts`, `evaluation.ts`            | Test-only articulated athlete (known joint angles) and the synthetic evaluation harness.                                                       |
+| `src/ui/Timeline.tsx`, `JumpView.tsx`, `rail/*`           | Event timeline, per-jump normalized charts, the athlete's insights and the coach's tabs (prediction with evidence).                            |
+| `src/dataset/record.ts`, `types.ts`, `videoId.ts`         | The saved jump record (`JumpRecord`), how records are built, matched and refreshed, and the stable video id.                                   |
+| `src/dataset/store.ts`, `useDataset.ts`                   | Local storage in the browser (IndexedDB, memory fallback), merge on import.                                                                    |
+| `src/dataset/metrics.ts`, `failures.ts`, `export.ts`      | Accuracy / precision / recall / confusion matrix, label-vs-measurement checks for failures, dataset and evaluation JSON/CSV.                   |
+| `src/ui/EvaluationView.tsx`, `src/ui/review/*`            | The _Review_ tab (label the jumps), the metrics report and the failure cards.                                                                  |
+| `src/pose3d/torso.ts`, `twist.ts`, `config.ts`, `vec3.ts` | Experimental 3D: torso frame from the 3D landmarks, twist about the longitudinal axis with reliability checks.                                 |
+| `src/pose3d/capabilities.ts`                              | Measures what this browser can run (WebGPU, WebGL 2, WASM SIMD / threads).                                                                     |
+| `src/pose3d/testTwistMannequin.ts`, `evaluation.ts`       | Test-only 3D athlete with known somersault and twist, and its degradations.                                                                    |
+| `src/ui/Pose3DView.tsx`, `rail/coach/TwistTab.tsx`        | 3D skeleton view (torso, axis, twist dial), twist curves, twist numbers and limits.                                                            |
 
 ## What is computed
 
@@ -272,7 +277,7 @@ timeline, position strip, normalized charts, exports and _Play jump_ work, forci
 
 The goal is to find out whether the representation is good enough, with real numbers from real jumps. Everything stays in your browser.
 
-**Saving jumps (local dataset).** In the _Evaluate_ tab, choose a label for the jump you are looking at (`Straight`, `Tuck`, `Pike`, `Back`, `Front`, `Unknown`; keys 1–6). The jump is
+**Saving jumps (local dataset).** In the coach's _Review_ tab, choose a label for the jump you are looking at (`Straight`, `Tuck`, `Pike`, `Back`, `Front`, `Unknown`; keys 1–6). The jump is
 saved with everything the app measured. _Save all jumps_ stores the whole video without labels. Storage is the browser's own IndexedDB (database `trampovision`); if the browser blocks it, the app says so and keeps the
 dataset in memory only. **Nothing is uploaded and the video is never stored, only numbers.** A record (`JumpRecord`, `src/dataset/types.ts`) holds:
 
@@ -288,7 +293,7 @@ dataset in memory only. **Nothing is uploaded and the video is never stored, onl
 | `twist`               | the experimental 3D twist estimate and its curve (below)                                                                                                                                                                                       |
 | `truth`, `twistTruth` | your label (with time and note); your optional count of half twists, kept apart from the skill label                                                                                                                                           |
 
-**Review.** _Evaluate_ shows, for the jump on the timeline, the video with skeleton, COM and predicted skill on it (as everywhere), the classifier's answer and confidence, and the label buttons. _Play jump_ replays it; _Next unlabeled_ (key N) moves on. If
+**Review.** The _Review_ tab shows, for the jump on the timeline, the video with skeleton, COM and predicted skill on it (as everywhere), the classifier's answer and confidence, and the label buttons. _Play jump_ replays it; _Next unlabeled_ (key N) moves on. If
 you change the thresholds or the athlete height after saving, the saved predictions are marked out of date and _Update predictions_ refreshes them (labels are kept). Metrics always use the saved predictions, so nothing changes under you.
 
 **Metrics** (`src/dataset/metrics.ts`, tested by hand-computed cases):
@@ -311,7 +316,7 @@ It does not decide who is right (the label or the measurement); it shows where t
 
 ## 3D pose and twist (experimental)
 
-The **2D / 3D toggle** above the video adds a 3D view and a twist estimate. It does **not** replace the 2D pipeline, and the classifier still uses the 2D pose only.
+The stage view (_Split_ or _3D_ in the coach's interface) adds a 3D view and a twist estimate. It does **not** replace the 2D pipeline, and the classifier still uses the 2D pose only.
 
 **Can this browser run a 3D pose model? (measured, not assumed).** The MediaPipe pose model already in the app returns 3D landmarks (BlazePose GHUM "world" landmarks, meters, hip-centered) with every frame; the app used to throw
 them away and now keeps them, so **no second model is loaded**. MediaPipe Tasks Vision runs them on WebGL ("GPU") or WebAssembly ("CPU"); it does not use WebGPU. The 3D panel probes your browser (WebGPU adapter, WebGL 2, WASM SIMD, threads) and says what it found. In the headless Chromium used here: WebGPU adapter yes (software), WebGL 2 yes, WASM SIMD yes, WASM threads no
@@ -394,5 +399,5 @@ cameras that are not level. Real COM estimates also move with arm and leg motion
 - **Video codecs depend on the browser.** MP4 (H.264) is safest. HEVC `.mov` from iPhones plays in Safari and recent Chrome/Edge, not everywhere.
 - **Privacy note.** The MediaPipe runtime contains a usage-logging call to `odml.pa.googleapis.com`. The app blocks all cross-origin
   requests at runtime (`localOnlyGuard.ts`) and the production build enforces `connect-src 'self' blob: data:` via CSP. Video frames are never uploaded.
-  What is stored in the browser: the calibration corners per file name and size (`localStorage`), and the jump dataset you save (IndexedDB `trampovision`: measurements, predictions and labels, never the video). _Delete all_ in the Evaluate tab removes the dataset.
+  What is stored in the browser: the calibration corners per file name and size (`localStorage`), and the jump dataset you save (IndexedDB `trampovision`: measurements, predictions and labels, never the video). _Delete all_ in the Review tab (_Dataset on this computer_) removes the dataset.
 - Multi-person scenes: the athlete is followed by continuity; a coach walking next to the athlete can still steal the track.

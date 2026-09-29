@@ -1,26 +1,34 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { sampleIndexAt } from '../analysis/lookup';
 import type { AnalysisResult, PoseTrack } from '../analysis/types';
-import type { SkillAnalysis } from '../skills/analyzeSkills';
-import type { CalibrationDraw, OverlayOptions } from '../video/overlay';
 import { drawPose3D, twistSinceTakeoff, type View } from '../pose3d/draw';
 import type { TwistAnalysis } from '../pose3d/twist';
+import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { canExportVideo, exportPose3DVideo, exportSideBySideVideo, saveBlob } from '../video/exportVideo';
-import { Chart, type ChartBand, type ChartMarker } from './Chart';
-import { Playhead, usePlayheadTime } from './playhead';
+import type { CalibrationDraw, OverlayOptions } from '../video/overlay';
+import { useElementSize } from './hooks';
+import { Badge, Button, IconButton, Segmented } from './kit';
+import { usePlayheadTime, type Playhead } from './playhead';
 import { pose3dColors, useThemeVersion } from './theme';
 
-const PRESETS: { name: string; view: View; title: string }[] = [
-  { name: 'Camera view', view: { yaw: 0, pitch: 0 }, title: 'As the camera sees it: x to the right, y down' },
+const PRESETS: { value: string; label: string; view: View; title: string }[] = [
   {
-    name: 'From the side',
+    value: 'camera',
+    label: 'Camera',
+    view: { yaw: 0, pitch: 0 },
+    title: 'As the camera sees it: x to the right, y down',
+  },
+  {
+    value: 'side',
+    label: 'Side',
     view: { yaw: 90, pitch: 0 },
     title: 'Looking along the camera’s x axis: shows the depth the model estimated',
   },
-  { name: 'From above', view: { yaw: 0, pitch: 90 }, title: 'Looking down from above the athlete' },
+  { value: 'above', label: 'Above', view: { yaw: 0, pitch: 90 }, title: 'Looking down from above the athlete' },
 ];
 
-const HEIGHT = 320;
+/** The height of the view when it is not asked to fill its parent. */
+const FIXED_HEIGHT = 320;
 
 /** What the side-by-side export needs to paint the annotated video next to the 3D view. */
 export interface SideBySideSource {
@@ -41,9 +49,14 @@ interface Props {
   baseName?: string;
   /** Video and its annotations; without it there is no side-by-side export. */
   sideBySide?: SideBySideSource | null;
+  /** Fill the space of the parent (the stage pane) instead of the fixed height. */
+  fill?: boolean;
 }
 
-/** The 3D skeleton at the playhead, with the torso, the longitudinal axis and the twist dial. */
+/**
+ * The 3D skeleton at the playhead, with the torso, the longitudinal axis and the twist dial. Drag to turn it. It is an
+ * experimental reading: the classifier never uses it.
+ */
 export function Pose3DView({
   track,
   result,
@@ -52,11 +65,16 @@ export function Pose3DView({
   playhead,
   baseName = 'trampovision',
   sideBySide = null,
+  fill = false,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [width, setWidth] = useState(420);
+  const size = useElementSize(wrapRef);
+  const width = Math.max(1, Math.round(size.width));
+  const height = fill ? Math.max(1, Math.round(size.height)) : FIXED_HEIGHT;
+  const [preset, setPreset] = useState(PRESETS[0].value);
   const [view, setView] = useState<View>(PRESETS[0].view);
+  const [legend, setLegend] = useState(false);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const [exporting, setExporting] = useState<number | null>(null);
   const [exportKind, setExportKind] = useState<'3d' | 'side'>('3d');
@@ -86,8 +104,7 @@ export function Pose3DView({
         onProgress: setExporting,
       };
       if (kind === 'side' && sideBySide) {
-        const blob = await exportSideBySideVideo({ ...common, ...sideBySide });
-        saveBlob(blob, `${baseName}-side-by-side.mp4`);
+        saveBlob(await exportSideBySideVideo({ ...common, ...sideBySide }), `${baseName}-side-by-side.mp4`);
       } else {
         saveBlob(await exportPose3DVideo(common), `${baseName}-3d-pose.mp4`);
       }
@@ -100,24 +117,15 @@ export function Pose3DView({
   }
 
   useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(Math.max(240, el.clientWidth)));
-    ro.observe(el);
-    setWidth(Math.max(240, el.clientWidth));
-    return () => ro.disconnect();
-  }, []);
-
-  useEffect(() => {
     const c = canvasRef.current;
-    if (!c) return;
+    if (!c || size.width === 0) return;
     const dpr = window.devicePixelRatio || 1;
-    c.width = width * dpr;
-    c.height = HEIGHT * dpr;
+    c.width = Math.round(width * dpr);
+    c.height = Math.round(height * dpr);
     const ctx = c.getContext('2d')!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, width, HEIGHT);
-    drawPose3D(ctx, width, HEIGHT, {
+    ctx.clearRect(0, 0, width, height);
+    drawPose3D(ctx, width, height, {
       world: track.world?.[i] ?? null,
       twist,
       takeoff: cycle?.takeoff ?? null,
@@ -126,191 +134,98 @@ export function Pose3DView({
       colors: pose3dColors(),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track, twist, i, view, width, theme, cycle]);
+  }, [track, twist, i, view, width, height, size.width, theme, cycle]);
 
   const rel = twistSinceTakeoff(twist, cycle?.takeoff ?? null, i);
-  const move = (e: React.PointerEvent) => {
+  const move = (e: PointerEvent) => {
     if (!drag.current) return;
     const dx = e.clientX - drag.current.x;
     const dy = e.clientY - drag.current.y;
     drag.current = { x: e.clientX, y: e.clientY };
+    setPreset('');
     setView((v) => ({ yaw: v.yaw + dx * 0.5, pitch: Math.max(-90, Math.min(90, v.pitch + dy * 0.5)) }));
+  };
+  const choose = (value: string) => {
+    const p = PRESETS.find((x) => x.value === value);
+    if (!p) return;
+    setPreset(value);
+    setView(p.view);
   };
 
   return (
-    <div className="pose3d">
-      <div className="pose3d-bar">
-        <strong>3D pose</strong> <span className="badge weak">experimental</span>
-        <span className="spacer" />
-        {PRESETS.map((p) => (
-          <button key={p.name} className="tiny" title={p.title} onClick={() => setView(p.view)}>
-            {p.name}
-          </button>
-        ))}
-        {canExportVideo() &&
-          (exporting !== null ? (
-            <>
-              <progress value={exporting} max={1} />
-              <button className="tiny" onClick={() => exportAbort.current?.abort()}>
-                Cancel {exportKind === 'side' ? 'side by side ' : ''}
-                {Math.round(exporting * 100)}%
-              </button>
-            </>
-          ) : (
-            <button
-              className="tiny"
-              title="Video of the 3D skeleton for the whole clip, from the viewpoint selected here (no footage)"
-              onClick={() => void onExport('3d')}
-            >
-              ⬇ Download 3D video
-            </button>
-          ))}
-        {canExportVideo() && sideBySide && exporting === null && (
-          <button
-            className="tiny"
-            title="Annotated video and this 3D view side by side, same instant, for the whole clip"
-            onClick={() => void onExport('side')}
-          >
-            ⬇ Side by side
-          </button>
-        )}
-      </div>
-      {exportError && <p className="notice">{exportError}</p>}
-      <div ref={wrapRef} className="pose3d-body" style={{ height: HEIGHT }}>
-        <canvas
-          ref={canvasRef}
-          style={{ width, height: HEIGHT, cursor: 'grab', touchAction: 'none' }}
-          onPointerDown={(e) => {
-            drag.current = { x: e.clientX, y: e.clientY };
-            e.currentTarget.setPointerCapture(e.pointerId);
-          }}
-          onPointerMove={move}
-          onPointerUp={() => (drag.current = null)}
-          aria-label="3D skeleton. Drag to rotate."
-        />
-        {estimate && estimate.available && !estimate.reliable && (
-          <div className="pose3d-flag">twist not reliable for this jump</div>
-        )}
-      </div>
-      <p className="muted small">
-        Blue = left, orange = right. Dashed amber = the longitudinal axis (hips to shoulders). Black dot = chest
-        direction. The ring is the plane perpendicular to the axis: grey = where the shoulder line pointed at takeoff,
-        amber arc = the twist since then
-        {rel !== null ? ` (now ${rel >= 0 ? '+' : '−'}${Math.abs(Math.round(rel))}°)` : ''}. Drag to rotate.
-      </p>
-    </div>
-  );
-}
-
-interface SectionProps extends Props {
-  markers: ChartMarker[];
-  bands: ChartBand[];
-}
-
-/** 3D view and the twist curves of the whole clip, with the events of the jumps marked. */
-export function Pose3DSection({
-  track,
-  result,
-  twist,
-  selected,
-  playhead,
-  markers,
-  bands,
-  baseName,
-  sideBySide,
-}: SectionProps) {
-  const f = twist.frames;
-  const guides = useMemo(() => {
-    if (!f) return [];
-    const v = Array.from(f.angle).filter(Number.isFinite);
-    if (!v.length) return [];
-    const lo = Math.ceil(Math.min(...v) / 180);
-    const hi = Math.floor(Math.max(...v) / 180);
-    const out: { value: number; label?: string }[] = [];
-    for (let k = lo; k <= hi && out.length < 30; k++)
-      out.push({
-        value: k * 180,
-        label: k === 0 ? undefined : `${Math.abs(k) / 2} twist${Math.abs(k) === 2 ? '' : 's'}`,
-      });
-    return out;
-  }, [f]);
-  return (
-    <section className="panel pose3d-section">
-      <Pose3DView
-        track={track}
-        result={result}
-        twist={twist}
-        selected={selected}
-        playhead={playhead}
-        baseName={baseName}
-        sideBySide={sideBySide}
+    <div className={fill ? 'p3d' : 'p3d p3d--fixed'} ref={wrapRef}>
+      <canvas
+        ref={canvasRef}
+        className="p3d__canvas"
+        style={{ width, height }}
+        onPointerDown={(e) => {
+          drag.current = { x: e.clientX, y: e.clientY };
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={move}
+        onPointerUp={() => (drag.current = null)}
+        onPointerCancel={() => (drag.current = null)}
+        aria-label="3D skeleton. Drag to rotate."
       />
-      {f && (
-        <div className="jumpcharts">
-          <Chart
-            title="Twist angle (accumulated)"
-            unit="°, + = counter-clockwise seen from above the head"
-            time={result.time}
-            playhead={playhead}
-            confidence={f.torso.visibility}
-            decimals={0}
-            zeroLine
-            minSpan={200}
-            guides={guides}
-            markers={markers}
-            bands={bands}
-            series={[
-              { label: 'Full 3D axis', values: f.angle, color: '--series-1' },
-              { label: 'Axis in the image plane', values: f.anglePlane, color: '--series-2' },
-            ]}
-            height={150}
-          />
-          <Chart
-            title="Twist angular velocity"
-            unit="°/s"
-            time={result.time}
-            playhead={playhead}
-            confidence={f.torso.visibility}
-            decimals={0}
-            zeroLine
-            minSpan={200}
-            markers={markers}
-            bands={bands}
-            series={[{ label: 'ω twist', values: f.angularVelocity, color: '--series-1' }]}
-            height={150}
-          />
-          <Chart
-            title="Trunk axis out of the image plane"
-            unit="°: 0 = in the plane, large = pointing at the camera"
-            time={result.time}
-            playhead={playhead}
-            decimals={0}
-            minSpan={30}
-            markers={markers}
-            bands={bands}
-            series={[{ label: 'Tilt', values: f.torso.axisTiltDeg, color: '--series-1' }]}
-            height={150}
-          />
-          <Chart
-            title="Shoulder width in 3D"
-            unit="m: a rigid body keeps it constant; changes are depth error"
-            time={result.time}
-            playhead={playhead}
-            decimals={2}
-            minSpan={0.1}
-            markers={markers}
-            bands={bands}
-            series={[
-              { label: 'Shoulders', values: f.torso.shoulderWidthM, color: '--series-1' },
-              { label: 'Hips', values: f.torso.hipWidthM, color: '--series-2' },
-            ]}
-            height={150}
-          />
-        </div>
+
+      <div className="p3d__top">
+        <Badge tone="outline">Experimental</Badge>
+        {estimate && estimate.available && !estimate.reliable && <Badge tone="warn">Twist not reliable here</Badge>}
+        <IconButton
+          icon="info"
+          label="How to read this view"
+          size="sm"
+          pressed={legend}
+          onClick={() => setLegend((v) => !v)}
+        />
+      </div>
+      {legend && (
+        <p className="p3d__legend" role="note">
+          Blue = left, orange = right. Dashed amber = the longitudinal axis (hips to shoulders). Dark dot = chest
+          direction. The ring is the plane perpendicular to the axis: grey = where the shoulder line pointed at takeoff,
+          amber arc = the twist since then
+          {rel !== null ? ` (now ${rel >= 0 ? '+' : '−'}${Math.abs(Math.round(rel))}°)` : ''}. Drag to rotate.
+        </p>
       )}
-      <p className="hint muted">
-        Shaded = a jump. The faded parts of a curve are frames where the model was not sure of the shoulders and hips.
-      </p>
-    </section>
+
+      <div className="p3d__bottom">
+        <Segmented
+          ariaLabel="Point of view"
+          size="sm"
+          value={preset}
+          onChange={choose}
+          options={PRESETS.map(({ value, label, title }) => ({ value, label, title }))}
+        />
+        {canExportVideo() && (
+          <div className="p3d__exports">
+            {exporting !== null ? (
+              <Button size="sm" onClick={() => exportAbort.current?.abort()}>
+                Cancel {exportKind === 'side' ? 'side by side' : '3D video'} {Math.round(exporting * 100)}%
+              </Button>
+            ) : (
+              <>
+                <IconButton
+                  icon="download"
+                  label="Download the 3D skeleton as a video (no footage)"
+                  size="sm"
+                  variant="solid"
+                  onClick={() => void onExport('3d')}
+                />
+                {sideBySide && (
+                  <IconButton
+                    icon="split"
+                    label="Download the annotated video and this 3D view side by side"
+                    size="sm"
+                    variant="solid"
+                    onClick={() => void onExport('side')}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+      {exportError && <p className="p3d__error">{exportError}</p>}
+    </div>
   );
 }

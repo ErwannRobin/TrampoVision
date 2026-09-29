@@ -1,0 +1,110 @@
+/* Timeline: the flights of the clip as one strip, in the dock under the video. */
+
+.tl__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 2px 0 8px;
+}
+.tl__nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.tl__title {
+  min-width: 118px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+.tl__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tl__legend {
+  display: flex;
+  align-items: center;
+  gap: 4px 16px;
+  margin-left: auto;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+.tl__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tl__glyph {
+  width: 10px;
+  height: 10px;
+  fill: var(--text);
+}
+.tl__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gold-fill);
+  box-shadow: 0 0 0 1.5px var(--panel);
+  outline: 1px solid var(--line-2);
+}
+
+.tl__strip {
+  position: relative;
+  min-width: 0;
+}
+.tl__canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+}
+.tl__cursor {
+  border-radius: 12px;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+
+.tl__tip {
+  position: absolute;
+  top: 40px;
+  z-index: 2;
+  display: grid;
+  gap: 1px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--text);
+  color: var(--inverse);
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fade-in var(--t-fast) var(--ease);
+}
+.tl__tip-time {
+  font-size: 14px;
+  font-weight: 700;
+}
+.tl__tip-text {
+  opacity: 0.8;
+}
+
+@media (max-width: 900px) {
+  .tl__legend {
+    display: none;
+  }
+  .tl__zoom {
+    margin-left: auto;
+  }
+}
+@media (max-width: 520px) {
+  .tl__head {
+    gap: 4px 8px;
+  }
+  .tl__title {
+    min-width: 96px;
+    font-size: var(--fs-base);
+  }
+}
