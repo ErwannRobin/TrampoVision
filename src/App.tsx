@@ -255,7 +255,8 @@ export default function App() {
         return;
       }
       const msg = err instanceof Error ? err.message : String(err);
-      setStatus({ kind: 'error', message: `${msg} — if the model failed to load, run "npm run fetch-assets".` });
+      const hint = /^Seek to /.test(msg) ? '' : ` — if the model failed to load, run "npm run fetch-assets".`;
+      setStatus({ kind: 'error', message: `${msg}${hint}` });
     }
   }
 

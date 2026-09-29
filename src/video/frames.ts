@@ -75,21 +75,47 @@ export function loadVideo(url: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<HTM
   });
 }
 
-/** Resolves once the decoder shows the frame at `time`. */
-export function seekTo(video: HTMLVideoElement, time: number, timeoutMs = 8000): Promise<void> {
-  if (Math.abs(video.currentTime - time) < 1e-6) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      video.removeEventListener('seeked', onSeeked);
-      reject(new Error(`Seek to ${time.toFixed(3)}s timed out`));
-    }, timeoutMs);
-    const onSeeked = () => {
+const SEEK_ATTEMPT_MS = 2500;
+const SEEK_ATTEMPTS = 3;
+
+/** One seek attempt. Resolves on `seeked`, or by polling if the event was missed (seen on desktop Chrome). */
+function seekOnce(video: HTMLVideoElement, time: number, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const done = (ok: boolean) => {
       clearTimeout(timer);
-      resolve();
+      clearInterval(poll);
+      video.removeEventListener('seeked', onSeeked);
+      resolve(ok);
     };
-    video.addEventListener('seeked', onSeeked, { once: true });
+    const onSeeked = () => done(true);
+    const timer = setTimeout(() => done(false), timeoutMs);
+    const poll = setInterval(() => {
+      if (!video.seeking && video.readyState >= 2 && Math.abs(video.currentTime - time) < 0.5 / 1000) done(true);
+    }, 50);
+    video.addEventListener('seeked', onSeeked);
     video.currentTime = time;
   });
+}
+
+/**
+ * Resolves once the decoder shows the frame at `time`. A stalled seek is retried: first by nudging
+ * the playhead away and back (which forces the decoder to re-seek), so one lost event does not
+ * abort a whole analysis.
+ */
+export async function seekTo(video: HTMLVideoElement, time: number, timeoutMs = SEEK_ATTEMPT_MS): Promise<void> {
+  if (Math.abs(video.currentTime - time) < 1e-6 && !video.seeking) return;
+  for (let attempt = 0; attempt < SEEK_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      const away = Math.max(0, time + (time > 0.5 ? -0.25 : 0.25));
+      await seekOnce(video, away, timeoutMs);
+    }
+    if (await seekOnce(video, time, timeoutMs)) return;
+  }
+  throw new Error(
+    `Seek to ${time.toFixed(3)}s timed out after ${SEEK_ATTEMPTS} attempts ` +
+      `(readyState ${video.readyState}, networkState ${video.networkState}, seeking ${video.seeking}, ` +
+      `currentTime ${video.currentTime.toFixed(3)}s). The browser may not decode this file; try an MP4 (H.264).`,
+  );
 }
 
 const COMMON_FPS = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60, 90, 100, 119.88, 120, 240];
