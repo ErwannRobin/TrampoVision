@@ -8,6 +8,7 @@ import {
   movementOf,
   pct,
   twistLabel,
+  viewFactorOf,
 } from '../hierarchical';
 import {
   SKILL_LABELS,
@@ -232,7 +233,7 @@ export const temporalClassifier: SkillClassifier = {
       elementId = e.id;
       summary = `${e.name} (${certaintyWord[certainty]}, ${pct(confidence)}): measured ${measuredText}; ${pct(best.sim)} match to the expected trajectory.`;
     } else {
-      failure = diagnose(f, stages, best.sc, outOfTable, quality);
+      failure = diagnose(f, stages, best.sc, outOfTable, quality, viewFactorOf(f, cfg));
       summary = `No plausible candidate: the closest is ${e.name} (${pct(best.sim)} trajectory match, ${pct(best.sc.posterior)} structural). ${failure.message}`;
     }
 

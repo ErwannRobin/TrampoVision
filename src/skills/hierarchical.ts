@@ -348,6 +348,19 @@ interface PositionStage {
   report: StageReport;
 }
 
+const MIN_VIEW_FACTOR = 0.2;
+
+/** 1 for a side-on view, falling as the trunk length changes during the flight (an oblique camera foreshortens it). */
+export function viewFactorOf(f: JumpFeatures, cfg: SkillConfig): number {
+  const variation = f.quality.trunkLengthVariation;
+  return variation === null || variation <= cfg.maxTrunkVariation
+    ? 1
+    : Math.max(MIN_VIEW_FACTOR, 1 - 0.8 * ((variation - cfg.maxTrunkVariation) / 0.35));
+}
+
+const viewNote = (f: JumpFeatures) =>
+  f.quality.trunkLengthVariation === null ? '' : `: the trunk length changes by ${pct(f.quality.trunkLengthVariation)}`;
+
 function positionStage(f: JumpFeatures, tm: Temporal): PositionStage {
   const p = f.position;
   const raw = new Map<KnownPosition, number>();
@@ -498,6 +511,7 @@ export function diagnose(
   best: Scored,
   outOfTable: number,
   quality: number,
+  view: number,
 ): FailureDiagnosis {
   const e = best.element;
   const checks = checksFor(best, s);
@@ -525,7 +539,7 @@ export function diagnose(
   if (quality < 0.5) {
     kind = 'low-data-quality';
     criterion = 'data';
-    message = `The measurements are too unreliable to name the movement (data quality ${pct(quality)}: pose ${pct(f.quality.pose)}, orientation checks ${pct(s.rot.quality)}).`;
+    message = `The measurements are too unreliable to name the movement (data quality ${pct(quality)}: pose ${pct(f.quality.pose)}, orientation checks ${pct(s.rot.quality)}, camera view ${pct(view)}${viewNote(f)}).`;
   } else if (rotationOffGrid > 0.4 || bestWholeFit < 0.4) {
     kind = 'rotation-off-grid';
     criterion = 'rotation';
@@ -621,11 +635,7 @@ export function analyzeStages(input: ClassifierInput): StageAnalysis {
   const { scored, outOfTable } = scoreElements(stages);
 
   // Data quality outside the four questions: pose reliability and camera view.
-  const variation = f.quality.trunkLengthVariation;
-  const viewFactor =
-    variation === null || variation <= cfg.maxTrunkVariation
-      ? 1
-      : Math.max(0.2, 1 - 0.8 * ((variation - cfg.maxTrunkVariation) / 0.35));
+  const viewFactor = viewFactorOf(f, cfg);
   // Rotation quality is a factor too, not only a wider tolerance: normalizing the stages would otherwise hide a bad orientation track.
   const quality = clamp01(Math.sqrt(f.quality.pose) * viewFactor * stages.rot.quality);
   return { stages, scored, outOfTable, quality };
@@ -694,7 +704,7 @@ export const hierarchicalClassifier: SkillClassifier = {
         .join(', ')}.`;
     }
     if (skill === 'unclassified') {
-      failure = diagnose(f, stages, best, outOfTable, quality);
+      failure = diagnose(f, stages, best, outOfTable, quality, viewFactorOf(f, cfg));
       summary = `Best guess ${best.element.name} at ${pct(confidence)}, below the minimum of ${pct(cfg.minConfidence)}. ${failure.message}`;
     }
 

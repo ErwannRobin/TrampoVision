@@ -104,6 +104,8 @@ export function formatClassificationDebug(p: SkillPrediction): string {
         (a) => `${a.name} — ${pct(a.posterior)}${a.similarity === null ? '' : ` (trajectory ${pct(a.similarity)})`}`,
       ),
     );
+  if (p.evidence.length)
+    lines.push('', 'Measurements:', ...p.evidence.map((e) => `- ${e.label}: ${e.text}${e.note ? ` (${e.note})` : ''}`));
   return lines.join('\n').trimEnd();
 }
 

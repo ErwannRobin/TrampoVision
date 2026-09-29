@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { SkillAnalysis } from '../../../skills/analyzeSkills';
 import { KNOWN_LIMITS } from '../../../skills/classifier';
 import { CHECK_MARK, diagnoseUnclassified, formatClassificationDebug, movementText } from '../../../skills/debug';
@@ -184,10 +185,30 @@ function ClassificationDebug({ p, skills }: { p: SkillPrediction; skills: SkillA
           </Disclosure>
         )}
         <Disclosure title="Debug text">
+          <CopyButton text={formatClassificationDebug(p)} />
           <pre className="coach__note">{formatClassificationDebug(p)}</pre>
         </Disclosure>
       </div>
     </>
+  );
+}
+
+/** Copies a text to the clipboard and says so for a moment; falls back to a selection when the clipboard is blocked. */
+function CopyButton({ text }: { text: string }) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState('copied');
+    } catch {
+      setState('failed');
+    }
+    setTimeout(() => setState('idle'), 2000);
+  };
+  return (
+    <Button size="sm" onClick={copy} aria-live="polite">
+      {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed: select the text' : 'Copy debug text'}
+    </Button>
   );
 }
 
