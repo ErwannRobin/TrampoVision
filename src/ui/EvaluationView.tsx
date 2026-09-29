@@ -12,6 +12,7 @@ import { Badge, Button, ConfidenceMeter, Field, Icon, Segmented } from './kit';
 import type { Playhead } from './playhead';
 import { DatasetBar } from './review/DatasetBar';
 import { FailureCase } from './review/FailureCase';
+import { FigurePicker } from './review/FigurePicker';
 import { Keycap, LabelPicker } from './review/LabelPicker';
 import { describeCounts, jumpPlayRange, labelForKey, labelStatus, nextUnlabeled, reportCaveats } from './review/logic';
 import { ReportCaveats, ReportFigures } from './review/ReportFigures';
@@ -34,6 +35,10 @@ export interface EvaluatePanelProps {
   dataset: DatasetApi;
   baseName: string;
   onLabel: (jump: number, label: TruthLabel | null) => void;
+  /** Sets the figure of a jump (an element id) and so saves it as a reference example, or clears it. */
+  onFigure: (jump: number, elementId: string | null) => void;
+  /** Labelled examples per element, over the whole dataset. */
+  exampleCounts: ReadonlyMap<string, number>;
   onNote: (jump: number, note: string) => void;
   onSaveAll: () => void;
   onUpdateStale: () => void;
@@ -55,6 +60,8 @@ export function EvaluatePanel({
   dataset,
   baseName,
   onLabel,
+  onFigure,
+  exampleCounts,
   onNote,
   onSaveAll,
   onUpdateStale,
@@ -184,6 +191,18 @@ export function EvaluatePanel({
             }}
           />
         </Field>
+      </div>
+
+      <div className="review-section">
+        <h3 className="review-heading">Reference example</h3>
+        <FigurePicker
+          key={rec?.id}
+          figure={rec?.figure?.elementId ?? null}
+          predicted={jump.prediction.elementId ?? null}
+          counts={exampleCounts}
+          disabled={!canLabel}
+          onPick={(id) => onFigure(k, id)}
+        />
       </div>
 
       {staleCount > 0 && (

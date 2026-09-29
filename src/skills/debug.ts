@@ -17,7 +17,12 @@ export interface ClassificationDebug {
   movement: string;
   /** The top candidate's checks in the order the classifier asks them. */
   evidence: { mark: string; status: CheckStatus; text: string }[];
-  alternatives: { name: string; posterior: number }[];
+  /** `posterior` is the confidence of the alternative (temporal classifier: blended and times the data quality; hierarchical: structural probability). */
+  alternatives: { name: string; posterior: number; similarity: number | null }[];
+  certainty: string | null;
+  /** One line per trajectory: how far the jump is from the closest reference, in tolerances. */
+  trajectory: { label: string; distance: number | null }[];
+  similarity: number | null;
   /** Best guess when nothing reached the threshold. */
   closest: string | null;
   failure: string | null;
@@ -57,7 +62,12 @@ export function describeClassification(p: SkillPrediction): ClassificationDebug 
     confidence: p.confidence,
     movement: named ? movementText(p) : '–',
     evidence: evidenceOf(top),
-    alternatives: cands.slice(named ? 1 : 0, named ? 4 : 3).map((c) => ({ name: c.name, posterior: c.posterior })),
+    alternatives: cands
+      .slice(named ? 1 : 0, named ? 4 : 3)
+      .map((c) => ({ name: c.name, posterior: c.score ?? c.posterior, similarity: c.similarity ?? null })),
+    certainty: p.certainty ?? null,
+    similarity: p.comparison?.similarity ?? null,
+    trajectory: (p.comparison?.channels ?? []).map((c) => ({ label: c.label, distance: c.distance })),
     closest: named ? null : top.name,
     failure: p.failure?.message ?? null,
   };
@@ -67,13 +77,35 @@ export function describeClassification(p: SkillPrediction): ClassificationDebug 
 export function formatClassificationDebug(p: SkillPrediction): string {
   const d = describeClassification(p);
   if (!d) return `Predicted:\n${p.label}\n\n${p.summary}`;
-  const lines = [`Predicted:`, d.predicted, '', `Confidence:`, pct(d.confidence), ''];
+  const lines = [
+    `Predicted:`,
+    d.predicted,
+    '',
+    `Confidence:`,
+    `${pct(d.confidence)}${d.certainty === 'tentative' ? ' (tentative guess)' : ''}`,
+    '',
+  ];
   if (d.named) lines.push('Movement:', d.movement, '');
   else if (d.closest) lines.push('Closest element:', d.closest, '');
   lines.push('Evidence:', ...d.evidence.map((e) => `${e.mark} ${e.text}`), '');
+  if (d.trajectory.length)
+    lines.push(
+      `Trajectory match: ${d.similarity === null ? '–' : pct(d.similarity)}`,
+      ...d.trajectory.map(
+        (t) => `- ${t.label}: ${t.distance === null ? '–' : `${t.distance.toFixed(1)} tolerances off`}`,
+      ),
+      '',
+    );
   if (d.failure) lines.push('Why not named:', d.failure, '');
   if (d.alternatives.length)
-    lines.push('Alternatives:', ...d.alternatives.map((a) => `${a.name} — ${pct(a.posterior)}`));
+    lines.push(
+      'Alternatives:',
+      ...d.alternatives.map(
+        (a) => `${a.name} — ${pct(a.posterior)}${a.similarity === null ? '' : ` (trajectory ${pct(a.similarity)})`}`,
+      ),
+    );
+  if (p.evidence.length)
+    lines.push('', 'Measurements:', ...p.evidence.map((e) => `- ${e.label}: ${e.text}${e.note ? ` (${e.note})` : ''}`));
   return lines.join('\n').trimEnd();
 }
 

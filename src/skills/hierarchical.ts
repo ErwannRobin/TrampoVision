@@ -43,7 +43,7 @@ const ID = { id: 'hierarchical', version: '1' } as const;
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 const gauss = (x: number, mean: number, sigma: number) => Math.exp(-0.5 * ((x - mean) / sigma) ** 2);
-const pct = (v: number) => `${Math.round(clamp01(v) * 100)}%`;
+export const pct = (v: number) => `${Math.round(clamp01(v) * 100)}%`;
 const normalize = <T extends string | number>(m: Map<T, number>): Map<T, number> => {
   let sum = 0;
   for (const v of m.values()) sum += v;
@@ -65,7 +65,7 @@ export function somersaultText(quarters: number): string {
   return `${whole || (frac ? '' : '0')}${frac}` || '0';
 }
 const rotationLabel = (q: number) => `${somersaultText(q)} somersault${q === 4 ? '' : 's'}`;
-const twistLabel = (h: number) =>
+export const twistLabel = (h: number) =>
   h === 0 ? 'no twist' : h === 1 ? '½ twist' : h === 2 ? '1 twist' : `${h / 2} twists`;
 
 /** Sequence columns used here (see SEQUENCE_COLUMNS). */
@@ -145,10 +145,29 @@ interface RotationStage {
   report: StageReport;
 }
 
+/** Quality the apex orientation can restore at most: an agreeing witness is good, not perfect. */
+const CORROBORATED = 0.8;
+/** Tolerance of the trunk angle at the apex, degrees. */
+const APEX_SIGMA_DEG = 60;
+
+/** 0..1: how well the trunk angle at the apex (relative to takeoff) fits the nearest whole number of somersaults of the net rotation. */
+function apexAgreement(f: JumpFeatures, turns: number | null): number {
+  const { apexDeg, takeoffDeg } = f.orientation;
+  if (turns === null || apexDeg === null || takeoffDeg === null) return 0;
+  const expected = Math.round(Math.abs(turns)) * 180;
+  const rel = Math.abs(apexDeg - takeoffDeg);
+  const off = Math.abs(((((rel - expected) % 360) + 540) % 360) - 180);
+  return gauss(off, 0, APEX_SIGMA_DEG);
+}
+
 function rotationStage(f: JumpFeatures, tm: Temporal, cfg: SkillConfig): RotationStage {
   const r = f.rotation;
   const c = cfg.classification;
-  const quality = clamp01(r.parts.coverage * r.parts.steps * r.parts.crossCheck * r.parts.monotonic);
+  const summed = clamp01(r.parts.coverage * r.parts.steps * r.parts.crossCheck * r.parts.monotonic);
+  // A noisy orientation track (there-and-back swings, a pose flip) makes the sum of the rotation doubtful, not the count itself: the
+  // trunk angle at the apex is an independent witness. Half-way through a flight with n whole somersaults the body is n half turns
+  // from where it took off, so agreement there corroborates the count and restores part of the quality the noise took away.
+  const quality = Math.max(summed, CORROBORATED * apexAgreement(f, r.turns));
   const dist = new Map<number, number>();
   const notes: string[] = [];
   if (r.totalDeg === null || r.turns === null) {
@@ -172,9 +191,14 @@ function rotationStage(f: JumpFeatures, tm: Temporal, cfg: SkillConfig): Rotatio
   const obs = Math.abs(r.turns);
   // Noisier measurements widen the tolerance instead of failing a hard threshold.
   const sigmaTurns = c.rotationSigmaDeg / 360 / Math.sqrt(Math.max(quality, 0.15));
+  // Whole somersaults are read a little short; the quarter rotations, which are not skills, keep their exact value.
+  const readAt = (turns: number, whole: boolean) => (whole ? turns * (1 - c.underReadFraction) : turns);
+  const sigmaAt = (turns: number, whole = true) =>
+    obs < readAt(turns, whole) ? sigmaTurns * c.underRotationFactor : sigmaTurns;
   for (const q of ROTATION_QUARTERS) {
     const turns = q / 4;
-    let lik = gauss(obs, turns, sigmaTurns) * (q % 4 === 0 ? 1 : c.offGridPrior);
+    const whole = q % 4 === 0;
+    let lik = gauss(obs, readAt(turns, whole), sigmaAt(turns, whole)) * (whole ? 1 : c.offGridPrior);
     if (tm.pathTurns !== null) lik *= gauss(tm.pathTurns, turns, c.pathSigmaTurns + 0.25 * turns) ** 0.5;
     dist.set(q, lik + 1e-9);
   }
@@ -184,7 +208,7 @@ function rotationStage(f: JumpFeatures, tm: Temporal, cfg: SkillConfig): Rotatio
   notes.push(`tolerance ±${Math.round(sigmaTurns * 360)}° (measurement quality ${pct(quality)})`);
   return {
     dist: d,
-    fit: (n) => gauss(obs, n, sigmaTurns),
+    fit: (n) => gauss(obs, readAt(n, true), sigmaAt(n)),
     measured: true,
     observedTurns: obs,
     quality,
@@ -328,16 +352,43 @@ interface PositionStage {
   report: StageReport;
 }
 
+const MIN_VIEW_FACTOR = 0.2;
+
+/** 1 for a side-on view, falling as the trunk length changes during the flight (an oblique camera foreshortens it). */
+export function viewFactorOf(f: JumpFeatures, cfg: SkillConfig): number {
+  const variation = f.quality.trunkLengthVariation;
+  return variation === null || variation <= cfg.maxTrunkVariation
+    ? 1
+    : Math.max(MIN_VIEW_FACTOR, 1 - 0.8 * ((variation - cfg.maxTrunkVariation) / 0.35));
+}
+
+const viewNote = (f: JumpFeatures) =>
+  f.quality.trunkLengthVariation === null ? '' : `: the trunk length changes by ${pct(f.quality.trunkLengthVariation)}`;
+
+/** Folds that begin at this point of the flight (0..1) start to count as landing preparation, fully so `LATE_FOLD_SPAN` later. */
+const LATE_FOLD_FROM = 0.6;
+const LATE_FOLD_SPAN = 0.2;
+/** Share of the fold's score that a fully late fold gives up. */
+const LATE_FOLD_DISCOUNT = 0.75;
+
 function positionStage(f: JumpFeatures, tm: Temporal): PositionStage {
   const p = f.position;
   const raw = new Map<KnownPosition, number>();
   const notes: string[] = [];
   const informed = p.scores.straight + p.scores.tuck + p.scores.pike > 0;
   // The most closed moment (rule scores) backed up by the share of the flight in each shape. A shape held only briefly counts less.
+  // A tuck or pike is held through the rotation. Hips that fold only in the last part of the flight are a landing preparation at the
+  // end of a straight jump, not a position: what the fold loses goes to the straight position.
+  const late =
+    tm.closedFromU === null ? 0 : Math.min(1, Math.max(0, (tm.closedFromU - LATE_FOLD_FROM) / LATE_FOLD_SPAN));
+  const kept = 1 - LATE_FOLD_DISCOUNT * late;
+  let lost = 0;
   for (const k of POSITIONS) {
-    const hold = k === 'straight' ? 1 : 0.4 + 0.6 * p.stability;
-    raw.set(k, 0.6 * p.scores[k] * hold + 0.4 * p.timeShare[k] + 0.03);
+    const closed = k === 'straight' ? 0 : 0.6 * p.scores[k] * (0.4 + 0.6 * p.stability);
+    lost += closed * (1 - kept);
+    raw.set(k, (k === 'straight' ? 0.6 * p.scores[k] : closed * kept) + 0.4 * p.timeShare[k] + 0.03);
   }
+  raw.set('straight', (raw.get('straight') ?? 0) + lost);
   const dist = normalize(raw);
   notes.push(
     `most closed moment: ${p.label} (rule score ${pct(p.ruleScore)}, held ${pct(p.stability)})`,
@@ -371,14 +422,14 @@ function labelled<T extends string | number>(m: Map<T, number>, name: (k: T) => 
 
 // --- candidates ---------------------------------------------------------------------------------------------------
 
-interface Stages {
+export interface Stages {
   rot: RotationStage;
   dir: DirectionStage;
   tw: TwistStage;
   pos: PositionStage;
 }
 
-interface Scored {
+export interface Scored {
   element: FigElement;
   /** [rotation, direction, twist, position] probability of the element's value at each stage, times the fit for rotation and twists. */
   factors: [number, number, number, number];
@@ -387,7 +438,7 @@ interface Scored {
   posterior: number;
 }
 
-const STAGE_ORDER: StageId[] = ['rotation', 'direction', 'twists', 'position'];
+export const STAGE_ORDER: StageId[] = ['rotation', 'direction', 'twists', 'position'];
 
 function scoreElements(s: Stages): { scored: Scored[]; outOfTable: number } {
   const scored: Scored[] = [];
@@ -413,7 +464,7 @@ function scoreElements(s: Stages): { scored: Scored[]; outOfTable: number } {
 const statusOf = (match: number, measured: boolean): CheckStatus =>
   !measured ? 'unmeasured' : match >= 0.6 ? 'match' : match >= 0.25 ? 'weak' : 'mismatch';
 
-function checksFor(sc: Scored, s: Stages): CandidateCheck[] {
+export function checksFor(sc: Scored, s: Stages): CandidateCheck[] {
   const e = sc.element;
   const maxOf = (m: Map<unknown, number>) => Math.max(...m.values());
   const ratio = (v: number, m: Map<unknown, number>) => (maxOf(m) > 0 ? clamp01(v / maxOf(m)) : 0);
@@ -455,7 +506,7 @@ function checksFor(sc: Scored, s: Stages): CandidateCheck[] {
   return out;
 }
 
-const candidateOf = (sc: Scored, s: Stages): ElementCandidate => ({
+export const candidateOf = (sc: Scored, s: Stages): ElementCandidate => ({
   elementId: sc.element.id,
   name: sc.element.name,
   movement: movementOf(sc.element),
@@ -463,7 +514,7 @@ const candidateOf = (sc: Scored, s: Stages): ElementCandidate => ({
   checks: checksFor(sc, s),
 });
 
-const movementOf = (e: Movement): Movement => ({
+export const movementOf = (e: Movement): Movement => ({
   direction: e.direction,
   somersaults: e.somersaults,
   twists: e.twists,
@@ -472,7 +523,14 @@ const movementOf = (e: Movement): Movement => ({
 
 // --- failure diagnosis --------------------------------------------------------------------------------------------
 
-function diagnose(f: JumpFeatures, s: Stages, best: Scored, outOfTable: number, quality: number): FailureDiagnosis {
+export function diagnose(
+  f: JumpFeatures,
+  s: Stages,
+  best: Scored,
+  outOfTable: number,
+  quality: number,
+  view: number,
+): FailureDiagnosis {
   const e = best.element;
   const checks = checksFor(best, s);
   const distances = checks.map((c) => ({
@@ -499,7 +557,7 @@ function diagnose(f: JumpFeatures, s: Stages, best: Scored, outOfTable: number, 
   if (quality < 0.5) {
     kind = 'low-data-quality';
     criterion = 'data';
-    message = `The measurements are too unreliable to name the movement (data quality ${pct(quality)}: pose ${pct(f.quality.pose)}, orientation checks ${pct(s.rot.quality)}).`;
+    message = `The measurements are too unreliable to name the movement (data quality ${pct(quality)}: pose ${pct(f.quality.pose)}, orientation checks ${pct(s.rot.quality)}, camera view ${pct(view)}${viewNote(f)}).`;
   } else if (rotationOffGrid > 0.4 || bestWholeFit < 0.4) {
     kind = 'rotation-off-grid';
     criterion = 'rotation';
@@ -539,13 +597,13 @@ type FailureKind = FailureDiagnosis['kind'];
 
 // --- the classifier -----------------------------------------------------------------------------------------------
 
-function legacyId(e: FigElement): SkillId {
+export function legacyId(e: FigElement): SkillId {
   if (e.somersaults === 0 && e.twists === 0) return `${e.position}-jump` as SkillId;
   if (e.somersaults === 1 && e.twists === 0) return e.direction === 'front' ? 'front' : 'back';
   return 'fig-element';
 }
 
-function cutOff(): SkillPrediction {
+export function cutOff(): SkillPrediction {
   return {
     classifier: ID,
     skill: 'unclassified',
@@ -574,32 +632,43 @@ function cutOff(): SkillPrediction {
   };
 }
 
+/** What the four stages say about one jump, before any element is named. Shared with the temporal classifier. */
+export interface StageAnalysis {
+  stages: Stages;
+  scored: Scored[];
+  outOfTable: number;
+  /** Data quality outside the four questions: pose reliability, camera view, orientation track. */
+  quality: number;
+}
+
+export function analyzeStages(input: ClassifierInput): StageAnalysis {
+  const { features: f, sequence, twist, config: cfg } = input;
+  const tm = temporal(sequence, twist ?? null, cfg);
+  const stages: Stages = {
+    rot: rotationStage(f, tm, cfg),
+    dir: directionStage(f),
+    tw: twistStage(f, twist ?? null, tm, cfg),
+    pos: positionStage(f, tm),
+  };
+  const { scored, outOfTable } = scoreElements(stages);
+
+  // Data quality outside the four questions: pose reliability and camera view.
+  const viewFactor = viewFactorOf(f, cfg);
+  // Rotation quality is a factor too, not only a wider tolerance: normalizing the stages would otherwise hide a bad orientation track.
+  const quality = clamp01(Math.sqrt(f.quality.pose) * viewFactor * stages.rot.quality);
+  return { stages, scored, outOfTable, quality };
+}
+
 export const hierarchicalClassifier: SkillClassifier = {
   ...ID,
   description:
     'Rotation, direction, twists and position as separate probabilistic stages; element chosen from a table.',
   classify(input: ClassifierInput): SkillPrediction {
-    const { features: f, sequence, twist, config: cfg } = input;
+    const { features: f, config: cfg } = input;
     if (!f.complete || f.rotation.totalDeg === null) return cutOff();
 
-    const tm = temporal(sequence, twist ?? null, cfg);
-    const stages: Stages = {
-      rot: rotationStage(f, tm, cfg),
-      dir: directionStage(f),
-      tw: twistStage(f, twist ?? null, tm, cfg),
-      pos: positionStage(f, tm),
-    };
-    const { scored, outOfTable } = scoreElements(stages);
+    const { stages, scored, outOfTable, quality } = analyzeStages(input);
     const best = scored[0];
-
-    // Data quality outside the four questions: pose reliability and camera view.
-    const variation = f.quality.trunkLengthVariation;
-    const viewFactor =
-      variation === null || variation <= cfg.maxTrunkVariation
-        ? 1
-        : Math.max(0.2, 1 - 0.8 * ((variation - cfg.maxTrunkVariation) / 0.35));
-    // Rotation quality is a factor too, not only a wider tolerance: normalizing the stages would otherwise hide a bad orientation track.
-    const quality = clamp01(Math.sqrt(f.quality.pose) * viewFactor * stages.rot.quality);
     const confidence = clamp01(best.posterior * quality);
     const candidates = scored.slice(0, 5).map((sc) => candidateOf(sc, stages));
     const stageReports = [stages.rot.report, stages.dir.report, stages.tw.report, stages.pos.report];
@@ -653,7 +722,7 @@ export const hierarchicalClassifier: SkillClassifier = {
         .join(', ')}.`;
     }
     if (skill === 'unclassified') {
-      failure = diagnose(f, stages, best, outOfTable, quality);
+      failure = diagnose(f, stages, best, outOfTable, quality, viewFactorOf(f, cfg));
       summary = `Best guess ${best.element.name} at ${pct(confidence)}, below the minimum of ${pct(cfg.minConfidence)}. ${failure.message}`;
     }
 

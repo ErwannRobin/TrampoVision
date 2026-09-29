@@ -1,3 +1,4 @@
+import type { Channel } from './temporal/signature';
 /**
  * Every threshold of the skill logic lives here, so it can be tuned from the UI, saved in the export and
  * replaced by learned values later. Angles are degrees; distances are fractions of a body length,
@@ -56,6 +57,10 @@ export interface LegSeparationConfig {
 export interface ClassificationConfig {
   /** Standard deviation of the measured somersault rotation, degrees, for a clean measurement (noisier data widens it). */
   rotationSigmaDeg: number;
+  /** A somersault that falls short of the whole number is more likely than one that goes past it (the flight ends at touchdown, before the body finishes rotating): the tolerance below it is this many times wider. */
+  underRotationFactor: number;
+  /** Real somersaults measure short of the whole number of turns (0.79 to 0.90 for a full one, seen on real footage): the expected reading of n somersaults is n × (1 - this). */
+  underReadFraction: number;
   /** Same for the rotation path length (sum of |orientation steps|), in turns. Weak second opinion on the count. */
   pathSigmaTurns: number;
   /** Prior weight of a rotation that is not a whole number of somersaults (quarter and half rotations; 1 = as likely as a whole one). */
@@ -66,6 +71,34 @@ export interface ClassificationConfig {
   unmeasuredTwistWeight: number;
   /** Twist still changing by more than this in the last tenth of the flight means the landing came before the twist ended, degrees. */
   twistSettleDeg: number;
+}
+
+/** The temporal comparison: how a jump is matched against the reference signatures (see `temporal/`). */
+export interface TemporalConfig {
+  /** How far the time axes may drift apart in the warping, as a share of the flight. */
+  bandFraction: number;
+  /** Cost of being off the diagonal of the warping: timing counts, not only shape. */
+  warpPenalty: number;
+  /** Tolerance of the final rotation and twist, in turns, and how much a miss counts: a flight that ends a quarter turn off is not that skill, whatever its shape. */
+  endSigma: number;
+  endWeight: number;
+  /** The tolerance of the final rotation is this many times wider when the jump ends short of the reference (see `underRotationFactor`). */
+  endUnderFactor: number;
+  /** Distance (in tolerances) at which the similarity falls to 0.6. */
+  similarityScale: number;
+  /** Tolerance of each channel, in the channel's own unit: a difference of this size costs 1. */
+  sigma: Record<Channel, number>;
+  /** Importance of each channel. */
+  weights: Record<Channel, number>;
+  /** The similarity of the trajectories is a likelihood on top of the structural probability of each element, raised to this power (0 = ignored, 1 = as it is). */
+  similarityExponent: number;
+  /** A candidate is plausible, and the jump is named even at low confidence (as tentative), when its similarity and structural probability both reach these. */
+  plausibleSimilarity: number;
+  plausibleStructure: number;
+  /** ... unless the rotation is further than this many degrees from the nearest whole somersault: a quarter turn is a different skill or a measurement error, not a loose somersault. */
+  maxOffGridDeg: number;
+  /** Confidence from which a name is called confident, and from which it is called probable (below it: tentative). */
+  confidentAt: number;
 }
 
 export interface SkillConfig {
@@ -82,6 +115,7 @@ export interface SkillConfig {
   facing: FacingConfig;
   legSeparation: LegSeparationConfig;
   classification: ClassificationConfig;
+  temporal: TemporalConfig;
   /** Predictions below this confidence are reported as unclassified. */
   minConfidence: number;
   /** Trunk length changing by more than this share during a flight means the camera is not side-on. */
@@ -107,11 +141,48 @@ export const DEFAULT_SKILL_CONFIG: SkillConfig = {
   legSeparation: { lowMax: 0.15, highMin: 0.4 },
   classification: {
     rotationSigmaDeg: 36,
+    underRotationFactor: 2,
+    underReadFraction: 0.1,
     pathSigmaTurns: 0.3,
     offGridPrior: 0.15,
     twistSigmaDeg: 50,
     unmeasuredTwistWeight: 0.05,
     twistSettleDeg: 60,
+  },
+  temporal: {
+    bandFraction: 0.12,
+    warpPenalty: 0.5,
+    endSigma: 0.15,
+    endWeight: 1,
+    endUnderFactor: 2,
+    similarityScale: 1.4,
+    sigma: {
+      somersault: 0.2,
+      twist: 0.25,
+      hip: 0.2,
+      knee: 0.25,
+      shoulderHip: 0.35,
+      comHeight: 0.35,
+      angVel: 1.2,
+      orientSin: 0.5,
+      orientCos: 0.5,
+    },
+    weights: {
+      somersault: 3,
+      twist: 2.5,
+      hip: 2,
+      knee: 1,
+      shoulderHip: 0.3,
+      comHeight: 0.4,
+      angVel: 1,
+      orientSin: 0.5,
+      orientCos: 0.5,
+    },
+    similarityExponent: 1,
+    plausibleSimilarity: 0.15,
+    plausibleStructure: 0.01,
+    maxOffGridDeg: 55,
+    confidentAt: 0.6,
   },
   minConfidence: 0.3,
   maxTrunkVariation: 0.25,
@@ -128,6 +199,12 @@ export function mergeSkillConfig(partial: DeepPartial<SkillConfig> = {}): SkillC
     facing: { ...d.facing, ...partial.facing },
     legSeparation: { ...d.legSeparation, ...partial.legSeparation },
     classification: { ...d.classification, ...partial.classification },
+    temporal: {
+      ...d.temporal,
+      ...partial.temporal,
+      sigma: { ...d.temporal.sigma, ...partial.temporal?.sigma },
+      weights: { ...d.temporal.weights, ...partial.temporal?.weights },
+    },
     positionWindow: (partial.positionWindow as [number, number] | undefined) ?? d.positionWindow,
   };
 }

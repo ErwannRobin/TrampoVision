@@ -54,6 +54,8 @@ function panel(over: Partial<EvaluatePanelProps> = {}) {
     dataset: api(records.filter((r) => r.truth)),
     baseName: 'clip',
     onLabel: () => {},
+    onFigure: () => {},
+    exampleCounts: new Map(),
     onNote: () => {},
     onSaveAll: () => {},
     onUpdateStale: () => {},
@@ -130,6 +132,13 @@ describe('EvaluatePanel', () => {
     expect(html).toContain('Save all 4 jumps');
     expect(html).toContain('Import dataset…');
     expect(html).toContain('Delete all…');
+  });
+
+  it('offers the figure of the table as a reference example, with the example counts', () => {
+    const html = panel({ exampleCounts: new Map([['back-1s-0t-tuck', 2]]) });
+    expect(html).toMatch(/Which figure was it\?/);
+    expect(html).toMatch(/Back somersault \(tuck\) · 2 examples/);
+    expect(html).toMatch(/2 reference examples saved/);
   });
 
   it('says there is nothing to label when no jump was found', () => {

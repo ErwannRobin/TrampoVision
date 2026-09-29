@@ -34,6 +34,13 @@ export interface TwistTruth {
   annotatedAt: string;
 }
 
+/** The figure a person says the jump was: an element of the table. A record with a figure is a reference example for the temporal classifier. */
+export interface FigureLabel {
+  elementId: string;
+  /** ISO time of the last change. */
+  labeledAt: string;
+}
+
 /**
  * One detected jump with everything the app measured, the prediction, and the person's label.
  * The video itself is never stored: only numbers, so the dataset stays small and stays in this browser.
@@ -66,4 +73,6 @@ export interface JumpRecord {
   twist: { estimate: TwistEstimate; sequence: TwistSequence | null } | null;
   truth: GroundTruth | null;
   twistTruth: TwistTruth | null;
+  /** Full figure label; absent in files saved before it existed. */
+  figure?: FigureLabel | null;
 }

@@ -352,3 +352,39 @@ describe('labels', () => {
     expect([...TRUTH_LABELS]).toEqual(['straight', 'tuck', 'pike', 'back', 'front', 'unknown']);
   });
 });
+
+describe('reference examples (figure labels)', () => {
+  it('keeps the figure through a refresh, and turns a labelled jump into a reference of its element', async () => {
+    const { withFigure } = await import('./record');
+    const { referencesFromRecords, exampleCounts } = await import('./references');
+    const { track } = mannequinRoutine({ jumps: [{ v0: 4.8, turns: -1, facing: 1, shape: 'tuck' }], facing: 1 });
+    const result = computeAnalysis(track, { athleteHeightM: 1.75 });
+    const skills = analyzeSkills(result);
+    const ctx = { videoId: 'v', fileName: 'a.mp4', result, skills, twist: null };
+    const [rec] = syncRecords([], ctx);
+    expect(rec.figure).toBeNull();
+    const labelled = withFigure(rec, 'back-1s-0t-tuck');
+    expect(syncRecords([labelled], ctx)[0].figure?.elementId).toBe('back-1s-0t-tuck');
+    const refs = referencesFromRecords([labelled, rec]);
+    expect(refs).toHaveLength(1);
+    expect(refs[0]).toMatchObject({ elementId: 'back-1s-0t-tuck', kind: 'example', source: { videoId: 'v' } });
+    expect(exampleCounts([labelled, rec]).get('back-1s-0t-tuck')).toBe(1);
+    expect(withFigure(labelled, null).figure).toBeNull();
+    // Survives a dataset file.
+    const back = parseDataset(toDatasetJson([labelled]));
+    expect(back[0].figure?.elementId).toBe('back-1s-0t-tuck');
+  });
+
+  it('does not compare a labelled jump with its own example, and uses other examples', async () => {
+    const { withFigure } = await import('./record');
+    const { referencesFromRecords } = await import('./references');
+    const { track } = mannequinRoutine({ jumps: [{ v0: 4.8, turns: -1, facing: 1, shape: 'tuck' }], facing: 1 });
+    const result = computeAnalysis(track, { athleteHeightM: 1.75 });
+    const ctx = { videoId: 'v', fileName: 'a.mp4', result, skills: analyzeSkills(result), twist: null };
+    const example = referencesFromRecords([withFigure(syncRecords([], ctx)[0], 'back-1s-0t-tuck')]);
+    const own = analyzeSkills(result, { references: example, videoId: 'v' }).jumps[0].prediction;
+    const other = analyzeSkills(result, { references: example, videoId: 'another-video' }).jumps[0].prediction;
+    expect(own.comparison?.referenceKind).toBe('model');
+    expect(other.comparison?.referenceKind).toBe('example');
+  });
+});

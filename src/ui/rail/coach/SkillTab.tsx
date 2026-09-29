@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { SkillAnalysis } from '../../../skills/analyzeSkills';
 import { KNOWN_LIMITS } from '../../../skills/classifier';
 import { CHECK_MARK, diagnoseUnclassified, formatClassificationDebug, movementText } from '../../../skills/debug';
@@ -8,6 +9,7 @@ import { Button, ConfidenceMeter, cx, Disclosure, NumberField, SelectField } fro
 import type { SkillPrediction } from '../../../skills/types';
 import { fig, row } from './figures';
 import { Group, Limits, Rows } from './parts';
+import { TrajectoryCompare } from './TrajectoryCompare';
 import { FACING_OPTIONS, THRESHOLD_FIELDS } from './thresholds';
 
 interface Props {
@@ -48,6 +50,12 @@ export function SkillTab({ skills, selected, config, onConfig }: Props) {
         </div>
         <ConfidenceMeter value={p.confidence} tier={tier} label="Classifier confidence" />
         <p>{p.summary}</p>
+        {p.certainty === 'tentative' && (
+          <p className="coach__note">
+            Tentative guess: weakly supported, shown so it can be checked. The alternatives below say what else it may
+            be.
+          </p>
+        )}
         <p className="coach__note">
           Heuristic score, not a probability. Classifier: {p.classifier.id} v{p.classifier.version}.
         </p>
@@ -90,7 +98,7 @@ function ClassificationDebug({ p, skills }: { p: SkillPrediction; skills: SkillA
   if (!cands || cands.length === 0) return null;
   const named = p.skill !== 'unclassified';
   const top = cands[0];
-  const alternatives = cands.slice(named ? 1 : 0, named ? 4 : 3);
+  const alternatives = cands.slice(named ? 1 : 0, named ? 5 : 3);
   const unclassified = diagnoseUnclassified(skills);
   return (
     <>
@@ -119,7 +127,29 @@ function ClassificationDebug({ p, skills }: { p: SkillPrediction; skills: SkillA
       </Group>
       {alternatives.length > 0 && (
         <Group title="Alternatives">
-          <Rows rows={alternatives.map((c) => row(c.elementId, c.name, fig(pct(c.posterior))))} />
+          <Rows
+            rows={alternatives.map((c) =>
+              row(
+                c.elementId,
+                c.name,
+                fig(pct(c.score ?? c.posterior)),
+                c.similarity === undefined ? undefined : `trajectory match ${pct(c.similarity)}`,
+              ),
+            )}
+          />
+        </Group>
+      )}
+      {p.comparison && (
+        <Group
+          title="Jump against the closest reference"
+          meta={<span className="num">{pct(p.comparison.similarity)}</span>}
+        >
+          <TrajectoryCompare comparison={p.comparison} />
+          <p className="coach__note">
+            Solid: this jump. Dashed:{' '}
+            {p.comparison.referenceKind === 'example' ? 'a jump you labelled' : 'the expected movement'} for {top.name},
+            warped in time to fit. Distances are in tolerances: 1 is a normal difference.
+          </p>
         </Group>
       )}
       <div className="coach__more">
@@ -155,10 +185,30 @@ function ClassificationDebug({ p, skills }: { p: SkillPrediction; skills: SkillA
           </Disclosure>
         )}
         <Disclosure title="Debug text">
+          <CopyButton text={formatClassificationDebug(p)} />
           <pre className="coach__note">{formatClassificationDebug(p)}</pre>
         </Disclosure>
       </div>
     </>
+  );
+}
+
+/** Copies a text to the clipboard and says so for a moment; falls back to a selection when the clipboard is blocked. */
+function CopyButton({ text }: { text: string }) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState('copied');
+    } catch {
+      setState('failed');
+    }
+    setTimeout(() => setState('idle'), 2000);
+  };
+  return (
+    <Button size="sm" onClick={copy} aria-live="polite">
+      {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed: select the text' : 'Copy debug text'}
+    </Button>
   );
 }
 
