@@ -1,5 +1,5 @@
 import { CORE_LANDMARKS, LANDMARK_COUNT, LANDMARK_NAMES } from '../pose/landmarks';
-import type { Keypoint } from '../pose/types';
+import type { Keypoint, WorldPoint } from '../pose/types';
 import type { TrampolineCalibration } from './calibration';
 import { JUMP_PHASES, type JumpCycle, type JumpPhase } from './jumpCycles';
 import { JOINT_STATE_NAMES } from './stabilize';
@@ -71,6 +71,8 @@ export interface PoseSeries {
     sourceFps: number;
     stride: number;
     backend: string;
+    /** Stable id of the video (see dataset/videoId). Absent in older files. */
+    videoId?: string;
   };
   settings: {
     athleteHeightM: number;
@@ -91,6 +93,8 @@ export interface PoseSeries {
   jumps: JumpCycle[];
   /** Raw model output per frame, [x, y, visibility] per landmark (null = nobody detected). Enough to re-run the analysis. */
   raw: ([number, number, number][] | null)[];
+  /** Raw 3D (world) landmarks per frame, [x, y, z, visibility] in meters. Absent in files saved before 3D support. */
+  rawWorld?: ([number, number, number, number][] | null)[];
 }
 
 const r = (v: number, d = 3): number | null => (Number.isFinite(v) ? Number(v.toFixed(d)) : null);
@@ -98,6 +102,8 @@ const rn = (v: number, d = 3): number => (Number.isFinite(v) ? Number(v.toFixed(
 
 export interface SeriesInfo {
   fileName: string;
+  /** Stable id of the video (see dataset/videoId), so labels and saved jumps still belong to it after the data is reopened. */
+  videoId?: string;
   stride: number;
   minVisibility: number;
   calibration: TrampolineCalibration | null;
@@ -155,6 +161,7 @@ export function buildPoseSeries(result: AnalysisResult, track: PoseTrack, info: 
       sourceFps: meta.sourceFps,
       stride: info.stride,
       backend: meta.backend,
+      ...(info.videoId ? { videoId: info.videoId } : {}),
     },
     settings: { athleteHeightM: meta.athleteHeightM, scaleSource: meta.scaleSource, minVisibility: info.minVisibility },
     calibration: info.calibration,
@@ -164,6 +171,9 @@ export function buildPoseSeries(result: AnalysisResult, track: PoseTrack, info: 
     frames,
     jumps: result.jumps.cycles,
     raw: track.frames.map((f) => (f ? f.map((p) => [rn(p.x, 2), rn(p.y, 2), rn(p.visibility, 3)] as [number, number, number]) : null)),
+    ...(track.world
+      ? { rawWorld: track.world.map((f) => (f ? f.map((p) => [rn(p.x, 4), rn(p.y, 4), rn(p.z, 4), rn(p.visibility, 3)] as [number, number, number, number]) : null)) }
+      : {}),
   };
 }
 
@@ -199,6 +209,11 @@ export function parsePoseSeries(text: string): ParsedSeries {
     if (!Array.isArray(f) || f.length !== LANDMARK_COUNT) throw new Error(`A frame does not have ${LANDMARK_COUNT} landmarks.`);
     return f.map(([x, y, visibility]) => ({ x, y, visibility }));
   };
+  const worldPoints = (f: [number, number, number, number][] | null): WorldPoint[] | null => {
+    if (f === null) return null;
+    if (!Array.isArray(f) || f.length !== LANDMARK_COUNT) throw new Error(`A 3D frame does not have ${LANDMARK_COUNT} landmarks.`);
+    return f.map(([x, y, z, visibility]) => ({ x, y, z, visibility }));
+  };
   const track: PoseTrack = {
     width: source.width,
     height: source.height,
@@ -206,6 +221,7 @@ export function parsePoseSeries(text: string): ParsedSeries {
     sourceFps: source.sourceFps,
     times: frames.map((f) => f.t),
     frames: raw.map(keypoints),
+    ...(Array.isArray(data.rawWorld) && data.rawWorld.length === raw.length ? { world: data.rawWorld.map(worldPoints) } : {}),
     backend: source.backend,
   };
   return {

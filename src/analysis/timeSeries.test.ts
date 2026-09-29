@@ -119,3 +119,36 @@ describe('feature matrix for a future temporal model', () => {
     }
   });
 });
+
+describe('3D landmarks and the video id in the stored series', () => {
+  const { track } = syntheticRoutine({ jumps: [{ v0: 4.5 }] });
+  const world = track.frames.map((f, i) =>
+    f && i !== 5 ? f.map((_, k) => ({ x: k / 100, y: -k / 50, z: 0.123456789 + i, visibility: 0.9 })) : null,
+  );
+  const withWorld = { ...track, world };
+  const result = computeAnalysis(withWorld);
+
+  it('round-trips the raw 3D landmarks (rounded to 0.1 mm) and the video id', () => {
+    const text = toSeriesJson(buildPoseSeries(result, withWorld, { ...info(), videoId: 'v-abc123' }));
+    const parsed = parsePoseSeries(text);
+    expect(parsed.source.videoId).toBe('v-abc123');
+    expect(parsed.track.world).toHaveLength(track.frames.length);
+    expect(parsed.track.world![5]).toBeNull();
+    expect(parsed.track.world![10]![7].z).toBeCloseTo(10.1235, 4);
+    expect(parsed.track.world![10]![7].visibility).toBeCloseTo(0.9, 3);
+  });
+
+  it('still opens a file saved before 3D support: no world, no video id', () => {
+    const text = toSeriesJson(buildPoseSeries(computeAnalysis(track), track, info()));
+    expect(text).not.toContain('rawWorld');
+    const parsed = parsePoseSeries(text);
+    expect(parsed.track.world).toBeUndefined();
+    expect(parsed.source.videoId).toBeUndefined();
+  });
+
+  it('refuses a 3D frame with the wrong number of landmarks', () => {
+    const data = JSON.parse(toSeriesJson(buildPoseSeries(result, withWorld, info())));
+    data.rawWorld[10] = data.rawWorld[10].slice(0, 5);
+    expect(() => parsePoseSeries(JSON.stringify(data))).toThrow(/3D frame/);
+  });
+});

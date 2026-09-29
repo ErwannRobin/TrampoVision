@@ -1,4 +1,4 @@
-import type { Keypoint } from '../pose/types';
+import type { Keypoint, WorldPoint } from '../pose/types';
 import type { TrampolineCalibration } from './calibration';
 import type { JumpAnalysis } from './jumpCycles';
 import type { StabilizeStats } from './stabilize';
@@ -14,6 +14,12 @@ export interface PoseTrack {
   times: number[];
   /** Athlete landmarks per sample (33 points, pixels, y down) or null if nobody was found. */
   frames: (Keypoint[] | null)[];
+  /**
+   * The same athlete's 3D landmarks per sample, in meters (33 points). MediaPipe "world" frame: origin at the hip center,
+   * axes aligned with the camera (x right, y down, z away from the camera); measured on real output, it turns with the
+   * body in the image plane. Absent when the pose backend gives no 3D, null where nobody was found.
+   */
+  world?: (WorldPoint[] | null)[];
   backend: string;
 }
 
