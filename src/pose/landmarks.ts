@@ -1,8 +1,16 @@
 /** MediaPipe / BlazePose 33-point topology (indices are the model's output order). */
 export const LM = {
   NOSE: 0,
+  L_EYE_INNER: 1,
+  L_EYE: 2,
+  L_EYE_OUTER: 3,
+  R_EYE_INNER: 4,
+  R_EYE: 5,
+  R_EYE_OUTER: 6,
   L_EAR: 7,
   R_EAR: 8,
+  MOUTH_L: 9,
+  MOUTH_R: 10,
   L_SHOULDER: 11,
   R_SHOULDER: 12,
   L_ELBOW: 13,
@@ -13,6 +21,8 @@ export const LM = {
   R_PINKY: 18,
   L_INDEX: 19,
   R_INDEX: 20,
+  L_THUMB: 21,
+  R_THUMB: 22,
   L_HIP: 23,
   R_HIP: 24,
   L_KNEE: 25,
@@ -26,6 +36,11 @@ export const LM = {
 } as const;
 
 export const LANDMARK_COUNT = 33;
+
+/** Face points (nose, eyes, mouth): in a side view they sit in front of the ears, which tells where the athlete faces. */
+export const FACE_LANDMARKS: number[] = [
+  LM.NOSE, LM.L_EYE_INNER, LM.L_EYE, LM.L_EYE_OUTER, LM.R_EYE_INNER, LM.R_EYE, LM.R_EYE_OUTER, LM.MOUTH_L, LM.MOUTH_R,
+];
 
 /** Landmarks whose visibility defines the frame "confidence" (head, arms, torso, legs). */
 export const CORE_LANDMARKS: number[] = [

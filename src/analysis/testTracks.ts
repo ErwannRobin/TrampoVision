@@ -15,7 +15,28 @@ export interface JumpSpec {
   driftM?: number;
 }
 
+/** What the routine generator tells a pose builder about one frame. */
+export interface PoseContext {
+  /** Horizontal position of the athlete, px. */
+  x: number;
+  /** Image y of the feet of a standing athlete at this moment (the bed level moved by the height change), px. */
+  footY: number;
+  /** Body rotation, degrees, clockwise = + on screen. */
+  angleDeg: number;
+  pxPerM: number;
+  phase: 'rest' | 'contact' | 'flight';
+  /** 0..1 through the current flight or contact. */
+  u: number;
+  /** 0-based jump this frame belongs to (the contact before a jump belongs to that jump); -1 before the first. */
+  jump: number;
+  /** How far the body is below its resting height, m (>= 0): the bed depression during contact. */
+  depthM: number;
+}
+export type PoseBuilder = (c: PoseContext) => Keypoint[];
+
 export interface RoutineOptions {
+  /** Builds the skeleton of each frame. Default: a rigid straight standing figure rotated about the pelvis. */
+  pose?: PoseBuilder;
   fps?: number;
   pxPerM?: number;
   athleteHeightM?: number;
@@ -66,7 +87,15 @@ export function syntheticRoutine(o: RoutineOptions): { track: PoseTrack; truth: 
   const bedY = o.bedY ?? 600;
 
   // Piecewise description: [t0, t1, height(τ), angle(τ), x(τ)] in seconds.
-  type Piece = { t0: number; t1: number; h: (tau: number) => number; a: (tau: number) => number; x: (tau: number) => number };
+  type Piece = {
+    t0: number;
+    t1: number;
+    kind: PoseContext['phase'];
+    jump: number;
+    h: (tau: number) => number;
+    a: (tau: number) => number;
+    x: (tau: number) => number;
+  };
   const pieces: Piece[] = [];
   const truth: RoutineTruth = {
     takeoff: [], apex: [], landing: [], flight: [], rise: [], turns: [],
@@ -76,7 +105,7 @@ export function syntheticRoutine(o: RoutineOptions): { track: PoseTrack; truth: 
   let angle = 0;
   let x = x0;
 
-  pieces.push({ t0: t, t1: t + leadIn, h: () => 0, a: () => 0, x: () => x0 });
+  pieces.push({ t0: t, t1: t + leadIn, kind: 'rest', jump: -1, h: () => 0, a: () => 0, x: () => x0 });
   t += leadIn;
 
   o.jumps.forEach((jump, k) => {
@@ -91,7 +120,7 @@ export function syntheticRoutine(o: RoutineOptions): { track: PoseTrack; truth: 
     const xa = x;
     if (k === 0) {
       // h'(0) = 0, h(T) = 0, h'(T) = v0  ->  h = v0 τ² (τ - T) / T²
-      pieces.push({ t0: t, t1: t + contact, h: (tau) => (v0 * tau * tau * (tau - contact)) / (contact * contact), a: () => a0, x: () => xa });
+      pieces.push({ t0: t, t1: t + contact, kind: 'contact', jump: k, h: (tau) => (v0 * tau * tau * (tau - contact)) / (contact * contact), a: () => a0, x: () => xa });
     } else {
       // h'(0) = -vPrev, h(T) = 0, h'(T) = v0: a cubic h = b τ + c τ² + d τ³ with h(T) = 0.
       const T = contact;
@@ -100,7 +129,7 @@ export function syntheticRoutine(o: RoutineOptions): { track: PoseTrack; truth: 
       const det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
       const c = (rhs[0] * A[1][1] - A[0][1] * rhs[1]) / det;
       const d = (A[0][0] * rhs[1] - rhs[0] * A[1][0]) / det;
-      pieces.push({ t0: t, t1: t + T, h: (tau) => -vPrev * tau + c * tau * tau + d * tau ** 3, a: () => a0, x: () => xa });
+      pieces.push({ t0: t, t1: t + T, kind: 'contact', jump: k, h: (tau) => -vPrev * tau + c * tau * tau + d * tau ** 3, a: () => a0, x: () => xa });
     }
     t += contact;
     truth.takeoff.push(t);
@@ -113,6 +142,8 @@ export function syntheticRoutine(o: RoutineOptions): { track: PoseTrack; truth: 
     pieces.push({
       t0: t,
       t1: t + flight,
+      kind: 'flight',
+      jump: k,
       h: (tau) => v0 * tau - 0.5 * G * tau * tau,
       a: (tau) => a0 + (360 * turns * tau) / flight,
       x: (tau) => xt + (drift * tau) / flight,
@@ -132,10 +163,10 @@ export function syntheticRoutine(o: RoutineOptions): { track: PoseTrack; truth: 
     const det = T * T * 3 * T * T - T * T * T * 2 * T;
     const c = (vLast * T * 3 * T * T - T * T * T * vLast) / det;
     const d = (T * T * vLast - 2 * T * vLast * T) / det;
-    pieces.push({ t0: t, t1: t + T, h: (tau) => -vLast * tau + c * tau * tau + d * tau ** 3, a: () => aEnd, x: () => xEnd });
+    pieces.push({ t0: t, t1: t + T, kind: 'contact', jump: o.jumps.length, h: (tau) => -vLast * tau + c * tau * tau + d * tau ** 3, a: () => aEnd, x: () => xEnd });
     t += T;
   }
-  pieces.push({ t0: t, t1: t + tail, h: () => 0, a: () => aEnd, x: () => xEnd });
+  pieces.push({ t0: t, t1: t + tail, kind: 'rest', jump: o.jumps.length, h: () => 0, a: () => aEnd, x: () => xEnd });
   t += tail;
 
   const n = Math.floor(t * fps) + 1;
@@ -151,8 +182,23 @@ export function syntheticRoutine(o: RoutineOptions): { track: PoseTrack; truth: 
     hip[i] = p.h(tau);
     ang[i] = p.a(tau);
     hx[i] = p.x(tau);
-    const base = standingPose(hx[i], bedY - hip[i] * pxPerM, H);
-    frames.push(rotateAbout(base, { x: hx[i], y: bedY - hip[i] * pxPerM - 0.53 * H }, ang[i]));
+    if (o.pose) {
+      frames.push(
+        o.pose({
+          x: hx[i],
+          footY: bedY - hip[i] * pxPerM,
+          angleDeg: ang[i],
+          pxPerM,
+          phase: p.kind,
+          u: (ti - p.t0) / (p.t1 - p.t0),
+          jump: p.jump,
+          depthM: Math.max(0, -hip[i]),
+        }),
+      );
+    } else {
+      const base = standingPose(hx[i], bedY - hip[i] * pxPerM, H);
+      frames.push(rotateAbout(base, { x: hx[i], y: bedY - hip[i] * pxPerM - 0.53 * H }, ang[i]));
+    }
     times.push(ti);
   }
   truth.hipHeightM = hip;
