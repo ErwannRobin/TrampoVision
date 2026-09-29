@@ -1,6 +1,6 @@
 import { createMediaPipeEstimator } from '../pose/MediaPipePoseEstimator';
 import { selectAthlete } from '../pose/selectAthlete';
-import type { EstimatorOptions, Keypoint, PoseEstimatorFactory } from '../pose/types';
+import type { EstimatorOptions, Keypoint, PoseEstimatorFactory, WorldPoint } from '../pose/types';
 import { disposeVideo, frameSeekTime, loadVideo, seekTo } from '../video/frames';
 import type { PoseTrack } from './types';
 
@@ -42,6 +42,7 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
     const total = Math.max(1, Math.floor((duration * opts.sourceFps) / opts.stride));
     const times: number[] = [];
     const frames: (Keypoint[] | null)[] = [];
+    const world: (WorldPoint[] | null)[] = [];
     let previous: Keypoint[] | null = null;
     let lastTs = 0;
 
@@ -57,6 +58,9 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
       );
       const athlete = selectAthlete(candidates, previous);
       if (athlete) previous = athlete;
+      // The 3D landmarks of the same person: `selectAthlete` returns one of the candidates, so its index is the detection's index.
+      const chosen = athlete ? candidates.indexOf(athlete) : -1;
+      world.push(chosen >= 0 ? (detections[chosen].world ?? null) : null);
 
       times.push(frame / opts.sourceFps);
       frames.push(athlete);
@@ -70,6 +74,7 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
       sourceFps: opts.sourceFps,
       times,
       frames,
+      world,
       backend: `${backend.engine} (${backend.delegate})`,
     };
   } finally {

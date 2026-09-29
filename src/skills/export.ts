@@ -1,6 +1,6 @@
 import type { SkillAnalysis } from './analyzeSkills';
 import { KNOWN_LIMITS } from './classifier';
-import type { JumpSkillResult } from './types';
+import type { JumpFeatures, JumpSkillResult, SkillPrediction } from './types';
 
 export const SKILLS_SCHEMA = 'trampovision.jump-skills';
 export const SKILLS_VERSION = 1;
@@ -49,17 +49,25 @@ export function toSkillReportJson(report: SkillReport): string {
   return JSON.stringify(report, (_k, v) => (typeof v === 'number' && !Number.isFinite(v) ? null : v));
 }
 
-const cell = (v: number | string | boolean | null | undefined) => {
+export const cell = (v: number | string | boolean | null | undefined) => {
   if (v === null || v === undefined) return '';
   if (typeof v === 'boolean') return v ? '1' : '0';
   if (typeof v === 'string') return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
   return Number.isFinite(v) ? String(Number(v.toFixed(4))) : '';
 };
 
-type Getter = [string, (j: JumpSkillResult) => number | string | boolean | null];
+/** What the flat columns need from a jump: its index, its features and its prediction (a saved record has all three). */
+export interface FlatJump {
+  index: number;
+  features: JumpFeatures;
+  prediction: SkillPrediction;
+}
 
-const FEATURE_COLUMNS: Getter[] = [
-  ['jump', (j) => j.cycle.index + 1],
+type Getter = [string, (j: FlatJump) => number | string | boolean | null];
+
+/** The feature object flattened to named columns (shared by the skills CSV and the dataset CSV). */
+export const FEATURE_COLUMNS: Getter[] = [
+  ['jump', (j) => j.index + 1],
   ['complete', (j) => j.features.complete],
   ['takeoff_s', (j) => j.features.timing.takeoffTimeS],
   ['apex_s', (j) => j.features.timing.apexTimeS],
@@ -113,7 +121,10 @@ const FEATURE_COLUMNS: Getter[] = [
 /** One row per jump: the feature object flattened, plus the prediction. */
 export function toSkillsCsv(analysis: SkillAnalysis): string {
   const rows = [FEATURE_COLUMNS.map(([name]) => name).join(',')];
-  for (const j of analysis.jumps) rows.push(FEATURE_COLUMNS.map(([, get]) => cell(get(j))).join(','));
+  for (const j of analysis.jumps) {
+    const flat: FlatJump = { index: j.cycle.index, features: j.features, prediction: j.prediction };
+    rows.push(FEATURE_COLUMNS.map(([, get]) => cell(get(flat))).join(','));
+  }
   return rows.join('\n');
 }
 
