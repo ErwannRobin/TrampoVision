@@ -172,9 +172,10 @@ function rotationStage(f: JumpFeatures, tm: Temporal, cfg: SkillConfig): Rotatio
   const obs = Math.abs(r.turns);
   // Noisier measurements widen the tolerance instead of failing a hard threshold.
   const sigmaTurns = c.rotationSigmaDeg / 360 / Math.sqrt(Math.max(quality, 0.15));
+  const sigmaAt = (turns: number) => (obs < turns ? sigmaTurns * c.underRotationFactor : sigmaTurns);
   for (const q of ROTATION_QUARTERS) {
     const turns = q / 4;
-    let lik = gauss(obs, turns, sigmaTurns) * (q % 4 === 0 ? 1 : c.offGridPrior);
+    let lik = gauss(obs, turns, sigmaAt(turns)) * (q % 4 === 0 ? 1 : c.offGridPrior);
     if (tm.pathTurns !== null) lik *= gauss(tm.pathTurns, turns, c.pathSigmaTurns + 0.25 * turns) ** 0.5;
     dist.set(q, lik + 1e-9);
   }
@@ -184,7 +185,7 @@ function rotationStage(f: JumpFeatures, tm: Temporal, cfg: SkillConfig): Rotatio
   notes.push(`tolerance ±${Math.round(sigmaTurns * 360)}° (measurement quality ${pct(quality)})`);
   return {
     dist: d,
-    fit: (n) => gauss(obs, n, sigmaTurns),
+    fit: (n) => gauss(obs, n, sigmaAt(n)),
     measured: true,
     observedTurns: obs,
     quality,

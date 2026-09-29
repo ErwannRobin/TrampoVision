@@ -57,6 +57,8 @@ export interface LegSeparationConfig {
 export interface ClassificationConfig {
   /** Standard deviation of the measured somersault rotation, degrees, for a clean measurement (noisier data widens it). */
   rotationSigmaDeg: number;
+  /** A somersault that falls short of the whole number is more likely than one that goes past it (the flight ends at touchdown, before the body finishes rotating): the tolerance below it is this many times wider. */
+  underRotationFactor: number;
   /** Same for the rotation path length (sum of |orientation steps|), in turns. Weak second opinion on the count. */
   pathSigmaTurns: number;
   /** Prior weight of a rotation that is not a whole number of somersaults (quarter and half rotations; 1 = as likely as a whole one). */
@@ -78,6 +80,8 @@ export interface TemporalConfig {
   /** Tolerance of the final rotation and twist, in turns, and how much a miss counts: a flight that ends a quarter turn off is not that skill, whatever its shape. */
   endSigma: number;
   endWeight: number;
+  /** The tolerance of the final rotation is this many times wider when the jump ends short of the reference (see `underRotationFactor`). */
+  endUnderFactor: number;
   /** Distance (in tolerances) at which the similarity falls to 0.6. */
   similarityScale: number;
   /** Tolerance of each channel, in the channel's own unit: a difference of this size costs 1. */
@@ -135,6 +139,7 @@ export const DEFAULT_SKILL_CONFIG: SkillConfig = {
   legSeparation: { lowMax: 0.15, highMin: 0.4 },
   classification: {
     rotationSigmaDeg: 36,
+    underRotationFactor: 2,
     pathSigmaTurns: 0.3,
     offGridPrior: 0.15,
     twistSigmaDeg: 50,
@@ -146,6 +151,7 @@ export const DEFAULT_SKILL_CONFIG: SkillConfig = {
     warpPenalty: 0.5,
     endSigma: 0.15,
     endWeight: 1,
+    endUnderFactor: 2,
     similarityScale: 1.4,
     sigma: {
       somersault: 0.2,

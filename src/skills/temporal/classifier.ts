@@ -96,6 +96,7 @@ export const temporalClassifier: SkillClassifier = {
       warpPenalty: t.warpPenalty,
       endSigma: t.endSigma,
       endWeight: t.endWeight,
+      endUnderFactor: t.endUnderFactor,
       sigma: t.sigma,
       weights: t.weights,
     };
@@ -132,10 +133,13 @@ export const temporalClassifier: SkillClassifier = {
 
     const turns = Math.abs(f.rotation.turns ?? 0);
     const offGridDeg = Math.abs(turns - Math.round(turns)) * 360;
+    // Falling short of the whole somersault is tolerated further than going past it.
+    const offGridLimit =
+      turns < Math.round(turns) ? t.maxOffGridDeg * cfg.classification.underRotationFactor : t.maxOffGridDeg;
     const plausible =
       best.sim >= t.plausibleSimilarity &&
       best.sc.posterior >= t.plausibleStructure &&
-      offGridDeg <= t.maxOffGridDeg &&
+      offGridDeg <= offGridLimit &&
       quality >= 0.25;
     const certainty: Certainty | null =
       confidence >= t.confidentAt

@@ -8,6 +8,7 @@ export interface DtwOptions {
   /** Tolerance of the final somersault and twist (turns) and the weight of a miss in the distance. */
   endSigma: number;
   endWeight: number;
+  endUnderFactor?: number;
   /** Tolerance of each channel: a difference of this size costs 1. */
   sigma: Record<Channel, number>;
   /** Importance of each channel. */
@@ -116,7 +117,7 @@ export function dtw(a: MovementSignature, b: MovementSignature, o: DtwOptions): 
     const x = a.channels[c][n - 1];
     const y = b.channels[c][m - 1];
     if (o.weights[c] * a.trust[c] * b.trust[c] > 0 && Number.isFinite(x) && Number.isFinite(y))
-      end += ((x - y) / o.endSigma) ** 2;
+      end += ((x - y) / (c === 'somersault' && x < y ? o.endSigma * (o.endUnderFactor ?? 1) : o.endSigma)) ** 2;
   }
   return { distance: Math.sqrt(cost[n - 1][m - 1] / len[n - 1][m - 1] + o.endWeight * end), path, perChannel };
 }

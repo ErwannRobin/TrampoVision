@@ -120,6 +120,14 @@ describe('temporal classification', () => {
     expect(p.certainty).toBeDefined();
   });
 
+  it('names a somersault that lands short of the whole turn (0.82) but not a quarter turn over', () => {
+    const under = run({ v0: 4.6, turns: -0.82, facing: 1, shape: 'tuck' }).prediction;
+    expect(under.skill).not.toBe('unclassified');
+    expect(under.movement?.somersaults).toBe(1);
+    const over = run({ v0: 4.6, turns: -1.3, facing: 1, shape: 'tuck' }).prediction;
+    expect(over.skill).toBe('unclassified');
+  });
+
   it('still leaves a quarter rotation unnamed: the closest element is not a fair description', () => {
     const p = run({ v0: 4.6, turns: 1.25, shape: 'straight' }).prediction;
     expect(p.skill).toBe('unclassified');
