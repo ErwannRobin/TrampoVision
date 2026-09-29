@@ -8,16 +8,24 @@ const samples = import.meta.glob<string>('../../video-sample/*.{mp4,MOV,mov}', {
   import: 'default',
 });
 
-/** Safari (macOS/iOS) decodes HEVC .mov natively. Chromium browsers and Firefox do not reliably. */
-export function decodesHevcMov(userAgent: string = navigator.userAgent): boolean {
-  return /safari/i.test(userAgent) && !/chrome|chromium|crios|fxios|edg|opr|android/i.test(userAgent);
+/**
+ * Desktop Safari decodes the HEVC .mov natively. Chromium browsers and Firefox do not reliably, and on iPhone/iPad
+ * the 1080p HEVC clip fails the decode probe and ends up converted, so they all get the H.264 .mp4.
+ * iPadOS reports a Mac user agent, hence the touch check (Macs have no multi-touch screen).
+ */
+export function decodesHevcMov(
+  userAgent: string = navigator.userAgent,
+  maxTouchPoints: number = navigator.maxTouchPoints,
+): boolean {
+  const mobile = /iphone|ipad|ipod/i.test(userAgent) || (/macintosh/i.test(userAgent) && maxTouchPoints > 1);
+  return /safari/i.test(userAgent) && !/chrome|chromium|crios|fxios|edg|opr|android/i.test(userAgent) && !mobile;
 }
 
 const extensionOf = (path: string) => path.slice(path.lastIndexOf('.') + 1).toLowerCase();
 
 /** Path of the sample suited to this browser, or null when no sample is bundled. */
-export function pickSample(paths: string[], userAgent?: string): string | null {
-  const preferred = decodesHevcMov(userAgent) ? 'mov' : 'mp4';
+export function pickSample(paths: string[], userAgent?: string, maxTouchPoints?: number): string | null {
+  const preferred = decodesHevcMov(userAgent, maxTouchPoints) ? 'mov' : 'mp4';
   const sorted = [...paths].sort();
   return sorted.find((p) => extensionOf(p) === preferred) ?? sorted.find((p) => extensionOf(p) === 'mp4') ?? null;
 }
