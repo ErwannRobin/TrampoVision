@@ -191,10 +191,14 @@ function rotationStage(f: JumpFeatures, tm: Temporal, cfg: SkillConfig): Rotatio
   const obs = Math.abs(r.turns);
   // Noisier measurements widen the tolerance instead of failing a hard threshold.
   const sigmaTurns = c.rotationSigmaDeg / 360 / Math.sqrt(Math.max(quality, 0.15));
-  const sigmaAt = (turns: number) => (obs < turns ? sigmaTurns * c.underRotationFactor : sigmaTurns);
+  // Whole somersaults are read a little short; the quarter rotations, which are not skills, keep their exact value.
+  const readAt = (turns: number, whole: boolean) => (whole ? turns * (1 - c.underReadFraction) : turns);
+  const sigmaAt = (turns: number, whole = true) =>
+    obs < readAt(turns, whole) ? sigmaTurns * c.underRotationFactor : sigmaTurns;
   for (const q of ROTATION_QUARTERS) {
     const turns = q / 4;
-    let lik = gauss(obs, turns, sigmaAt(turns)) * (q % 4 === 0 ? 1 : c.offGridPrior);
+    const whole = q % 4 === 0;
+    let lik = gauss(obs, readAt(turns, whole), sigmaAt(turns, whole)) * (whole ? 1 : c.offGridPrior);
     if (tm.pathTurns !== null) lik *= gauss(tm.pathTurns, turns, c.pathSigmaTurns + 0.25 * turns) ** 0.5;
     dist.set(q, lik + 1e-9);
   }
@@ -204,7 +208,7 @@ function rotationStage(f: JumpFeatures, tm: Temporal, cfg: SkillConfig): Rotatio
   notes.push(`tolerance ±${Math.round(sigmaTurns * 360)}° (measurement quality ${pct(quality)})`);
   return {
     dist: d,
-    fit: (n) => gauss(obs, n, sigmaAt(n)),
+    fit: (n) => gauss(obs, readAt(n, true), sigmaAt(n)),
     measured: true,
     observedTurns: obs,
     quality,
@@ -361,16 +365,30 @@ export function viewFactorOf(f: JumpFeatures, cfg: SkillConfig): number {
 const viewNote = (f: JumpFeatures) =>
   f.quality.trunkLengthVariation === null ? '' : `: the trunk length changes by ${pct(f.quality.trunkLengthVariation)}`;
 
+/** Folds that begin at this point of the flight (0..1) start to count as landing preparation, fully so `LATE_FOLD_SPAN` later. */
+const LATE_FOLD_FROM = 0.6;
+const LATE_FOLD_SPAN = 0.2;
+/** Share of the fold's score that a fully late fold gives up. */
+const LATE_FOLD_DISCOUNT = 0.75;
+
 function positionStage(f: JumpFeatures, tm: Temporal): PositionStage {
   const p = f.position;
   const raw = new Map<KnownPosition, number>();
   const notes: string[] = [];
   const informed = p.scores.straight + p.scores.tuck + p.scores.pike > 0;
   // The most closed moment (rule scores) backed up by the share of the flight in each shape. A shape held only briefly counts less.
+  // A tuck or pike is held through the rotation. Hips that fold only in the last part of the flight are a landing preparation at the
+  // end of a straight jump, not a position: what the fold loses goes to the straight position.
+  const late =
+    tm.closedFromU === null ? 0 : Math.min(1, Math.max(0, (tm.closedFromU - LATE_FOLD_FROM) / LATE_FOLD_SPAN));
+  const kept = 1 - LATE_FOLD_DISCOUNT * late;
+  let lost = 0;
   for (const k of POSITIONS) {
-    const hold = k === 'straight' ? 1 : 0.4 + 0.6 * p.stability;
-    raw.set(k, 0.6 * p.scores[k] * hold + 0.4 * p.timeShare[k] + 0.03);
+    const closed = k === 'straight' ? 0 : 0.6 * p.scores[k] * (0.4 + 0.6 * p.stability);
+    lost += closed * (1 - kept);
+    raw.set(k, (k === 'straight' ? 0.6 * p.scores[k] : closed * kept) + 0.4 * p.timeShare[k] + 0.03);
   }
+  raw.set('straight', (raw.get('straight') ?? 0) + lost);
   const dist = normalize(raw);
   notes.push(
     `most closed moment: ${p.label} (rule score ${pct(p.ruleScore)}, held ${pct(p.stability)})`,

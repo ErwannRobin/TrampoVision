@@ -59,6 +59,8 @@ export interface ClassificationConfig {
   rotationSigmaDeg: number;
   /** A somersault that falls short of the whole number is more likely than one that goes past it (the flight ends at touchdown, before the body finishes rotating): the tolerance below it is this many times wider. */
   underRotationFactor: number;
+  /** Real somersaults measure short of the whole number of turns (0.79 to 0.90 for a full one, seen on real footage): the expected reading of n somersaults is n × (1 - this). */
+  underReadFraction: number;
   /** Same for the rotation path length (sum of |orientation steps|), in turns. Weak second opinion on the count. */
   pathSigmaTurns: number;
   /** Prior weight of a rotation that is not a whole number of somersaults (quarter and half rotations; 1 = as likely as a whole one). */
@@ -140,6 +142,7 @@ export const DEFAULT_SKILL_CONFIG: SkillConfig = {
   classification: {
     rotationSigmaDeg: 36,
     underRotationFactor: 2,
+    underReadFraction: 0.1,
     pathSigmaTurns: 0.3,
     offGridPrior: 0.15,
     twistSigmaDeg: 50,

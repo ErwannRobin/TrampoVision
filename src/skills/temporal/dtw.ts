@@ -9,6 +9,8 @@ export interface DtwOptions {
   endSigma: number;
   endWeight: number;
   endUnderFactor?: number;
+  /** Fraction of a whole turn that a measured somersault typically falls short of (the reference is scaled by 1 - this). */
+  underReadFraction?: number;
   /** Tolerance of each channel: a difference of this size costs 1. */
   sigma: Record<Channel, number>;
   /** Importance of each channel. */
@@ -116,8 +118,15 @@ export function dtw(a: MovementSignature, b: MovementSignature, o: DtwOptions): 
   for (const c of ['somersault', 'twist'] as const) {
     const x = a.channels[c][n - 1];
     const y = b.channels[c][m - 1];
-    if (o.weights[c] * a.trust[c] * b.trust[c] > 0 && Number.isFinite(x) && Number.isFinite(y))
-      end += ((x - y) / (c === 'somersault' && x < y ? o.endSigma * (o.endUnderFactor ?? 1) : o.endSigma)) ** 2;
+    if (o.weights[c] * a.trust[c] * b.trust[c] > 0 && Number.isFinite(x) && Number.isFinite(y)) {
+      // A measured rotation reads a little short of the whole turn (see `underReadFraction`).
+      const target = c === 'somersault' ? y * (1 - (o.underReadFraction ?? 0)) : y;
+      // A twist the estimator does not trust (trust 0.5 = no confidence) cannot rule an element out by where it ends.
+      const believed = c === 'twist' ? Math.min(1, Math.max(0, 2 * Math.min(a.trust[c], b.trust[c]) - 1)) : 1;
+      end +=
+        believed *
+        ((x - target) / (c === 'somersault' && x < target ? o.endSigma * (o.endUnderFactor ?? 1) : o.endSigma)) ** 2;
+    }
   }
   return { distance: Math.sqrt(cost[n - 1][m - 1] / len[n - 1][m - 1] + o.endWeight * end), path, perChannel };
 }

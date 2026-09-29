@@ -4,7 +4,8 @@ import { analyzeSkills } from '../analyzeSkills';
 import { DEFAULT_SKILL_CONFIG } from '../config';
 import { evaluate, formatSummary, type Condition } from '../evaluation';
 import { FIG_ELEMENTS, elementById } from '../fig/elements';
-import { hierarchicalClassifier } from '../hierarchical';
+import { analyzeStages, hierarchicalClassifier } from '../hierarchical';
+import type { ClassifierInput } from '../types';
 import { mannequinRoutine, type MannequinJump } from '../testMannequin';
 import { temporalClassifier } from './classifier';
 import { dtw } from './dtw';
@@ -148,6 +149,38 @@ describe('temporal classification', () => {
     };
     const p = analyzeSkills(result, { classifier: noisy }).jumps[0].prediction;
     expect(p.skill).toBe('straight-jump');
+  });
+
+  it('reads a fold that only starts in the last part of the flight as a landing preparation, not a pike', () => {
+    const shape = { hipFlexDeg: 70, kneeFlexDeg: 0, armDeg: 60, elbowDeg: 0, pointedToes: 0.8 };
+    const { track } = mannequinRoutine({
+      jumps: [{ v0: 4.4, facing: 1, shape, closeBy: 0.3, openFrom: 0.9 }],
+      facing: 1,
+    });
+    const result = computeAnalysis(track, { athleteHeightM: 1.75 });
+    const inputs: ClassifierInput[] = [];
+    analyzeSkills(result, {
+      classifier: {
+        ...temporalClassifier,
+        classify: (input) => (inputs.push(input), temporalClassifier.classify(input)),
+      },
+    });
+    const input = inputs[0];
+    const seq = input.sequence!;
+    const laterFold = {
+      ...input,
+      features: {
+        ...input.features,
+        position: { ...input.features.position, timeShare: { straight: 0.85, tuck: 0, pike: 0.15, unknown: 0 } },
+      },
+      sequence: {
+        ...seq,
+        data: seq.data.map((row) => (row[0] < 0.78 ? row.map((v, k) => (k === 12 ? 175 : v)) : row)),
+      },
+    };
+    const pike = (i: ClassifierInput) => analyzeStages(i).stages.pos.dist.get('pike')!;
+    expect(pike(input)).toBeGreaterThan(0.4);
+    expect(pike(laterFold)).toBeLessThan(0.3);
   });
 
   it('still leaves a quarter rotation unnamed: the closest element is not a fair description', () => {

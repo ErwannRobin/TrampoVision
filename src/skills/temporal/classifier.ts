@@ -37,7 +37,8 @@ interface Match {
 function bestMatches(sig: MovementSignature, refs: readonly Reference[], o: DtwOptions, scale: number) {
   const byElement = new Map<string, Match>();
   for (const reference of refs) {
-    const result = dtw(sig, reference.signature, o);
+    // A labelled example was measured like the jump: only the analytic models need the allowance for short readings.
+    const result = dtw(sig, reference.signature, reference.kind === 'example' ? { ...o, underReadFraction: 0 } : o);
     const sim = similarity(result.distance, scale);
     const have = byElement.get(reference.elementId);
     if (!have || sim > have.similarity) byElement.set(reference.elementId, { reference, result, similarity: sim });
@@ -98,6 +99,7 @@ export const temporalClassifier: SkillClassifier = {
       endSigma: t.endSigma,
       endWeight: t.endWeight,
       endUnderFactor: t.endUnderFactor,
+      underReadFraction: cfg.classification.underReadFraction,
       sigma: t.sigma,
       weights: t.weights,
     };
