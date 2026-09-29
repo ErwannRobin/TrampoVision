@@ -203,8 +203,10 @@ export function extractJump(
   const nFlight = complete ? to - from + 1 : 0;
   let trunkVariation: number | null = null;
   if (trunkLens.length >= 5) {
-    const mean = trunkLens.reduce((s, v) => s + v, 0) / trunkLens.length;
-    trunkVariation = (Math.max(...trunkLens) - Math.min(...trunkLens)) / mean;
+    // The 10th to 90th percentile, not the extremes: one glitched frame (motion blur, a swapped joint) is not the camera angle.
+    const sorted = [...trunkLens].sort((x, y) => x - y);
+    const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.round(q * (sorted.length - 1)))];
+    trunkVariation = (at(0.9) - at(0.1)) / at(0.5);
   }
 
   const features: JumpFeatures = {

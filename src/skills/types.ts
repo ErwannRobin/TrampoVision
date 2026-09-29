@@ -132,7 +132,7 @@ export interface JumpFeatures {
     pose: number;
     /** Share of the flight's samples with a center of mass. */
     comCoverage: number;
-    /** (max - min) / mean of the 2D trunk length during the flight: large = the camera is not side-on, or the pose is wrong. */
+    /** (90th - 10th percentile) / median of the 2D trunk length during the flight: large = the camera is not side-on, or the pose is wrong. */
     trunkLengthVariation: number | null;
   };
 }
