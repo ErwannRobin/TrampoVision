@@ -6,3 +6,4 @@ public/models
 .DS_Store
 .dev.vars
 .wrangler
+eval/
