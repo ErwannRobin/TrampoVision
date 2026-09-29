@@ -1,4 +1,4 @@
-// Copies the MediaPipe and ffmpeg WASM runtimes and downloads the pose models into public/,
+// Copies the MediaPipe WASM runtime and downloads the pose models into public/,
 // so the app runs fully offline after install. Non-fatal: a failed download only
 // prints a warning (re-run with `npm run fetch-assets`).
 import { cpSync, existsSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
@@ -9,8 +9,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const wasmSrc = join(root, 'node_modules/@mediapipe/tasks-vision/wasm');
 const wasmDst = join(root, 'public/mediapipe/wasm');
 const modelDir = join(root, 'public/models');
-const ffmpegSrc = join(root, 'node_modules/@ffmpeg/core/dist/esm');
-const ffmpegDst = join(root, 'public/ffmpeg');
 
 const MODEL_BASE = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker';
 const MODELS = ['lite', 'full', 'heavy'];
@@ -21,15 +19,6 @@ if (existsSync(wasmSrc)) {
   console.log('[assets] copied MediaPipe wasm ->', wasmDst);
 } else {
   console.warn('[assets] node_modules/@mediapipe/tasks-vision not found; run npm install first');
-}
-
-// ffmpeg.wasm converts videos the browser cannot decode (iPhone HEVC in Chrome) to H.264, in the browser.
-if (existsSync(ffmpegSrc)) {
-  mkdirSync(ffmpegDst, { recursive: true });
-  cpSync(ffmpegSrc, ffmpegDst, { recursive: true });
-  console.log('[assets] copied ffmpeg wasm ->', ffmpegDst);
-} else {
-  console.warn('[assets] node_modules/@ffmpeg/core not found; run npm install first');
 }
 
 mkdirSync(modelDir, { recursive: true });

@@ -1,7 +1,10 @@
+import coreURL from '@ffmpeg/core?url';
+import wasmURL from '@ffmpeg/core/wasm?url';
+
 /**
  * Fallback for files the browser cannot decode (typically iPhone HEVC .mov in desktop Chrome):
- * re-encode to H.264 MP4 with ffmpeg.wasm, entirely in the browser. The runtime is served from
- * /ffmpeg (copied by scripts/fetch-assets.mjs) and loaded lazily, so it costs nothing until used.
+ * re-encode to H.264 MP4 with ffmpeg.wasm, entirely in the browser. The runtime files are bundled by Vite as
+ * same-origin assets (only fetched when a conversion is needed, so they cost nothing until used).
  * Software decoding in WebAssembly is slow (roughly real time or slower), hence the progress callback.
  */
 
@@ -22,8 +25,7 @@ export async function transcodeToH264(file: File, opts: TranscodeOptions = {}): 
     ffmpeg.on('progress', ({ progress }) => {
       if (Number.isFinite(progress)) opts.onProgress?.(Math.min(1, Math.max(0, progress)));
     });
-    const base = `${import.meta.env.BASE_URL}ffmpeg/`;
-    await ffmpeg.load({ coreURL: `${base}ffmpeg-core.js`, wasmURL: `${base}ffmpeg-core.wasm` });
+    await ffmpeg.load({ coreURL, wasmURL });
     await ffmpeg.writeFile('input', new Uint8Array(await file.arrayBuffer()));
     const code = await ffmpeg.exec([
       '-i',
