@@ -18,6 +18,7 @@ import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo } from './video/frames';
 import { loadSample, samplePath } from './video/sample';
+import { dragHasFiles, pickDroppedVideo } from './video/drop';
 import { transcodeToH264 } from './video/transcode';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
 import { Chart } from './ui/Chart';
@@ -379,6 +380,48 @@ export default function App() {
   };
 
   const analyzing = status.kind === 'analyzing';
+
+  // Drop a video anywhere on the page. The handlers read the latest onFile/analyzing through a ref.
+  const dropRef = useRef({ onFile, analyzing });
+  dropRef.current = { onFile, analyzing };
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    let depth = 0;
+    const enter = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return;
+      e.preventDefault();
+      depth++;
+      setDragging(true);
+    };
+    const over = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return;
+      e.preventDefault(); // required for the drop event to fire
+      if (e.dataTransfer) e.dataTransfer.dropEffect = dropRef.current.analyzing ? 'none' : 'copy';
+    };
+    const leave = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setDragging(false);
+    };
+    const drop = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return;
+      e.preventDefault(); // otherwise the browser navigates to the file
+      depth = 0;
+      setDragging(false);
+      const video = pickDroppedVideo(e.dataTransfer?.files);
+      if (video && !dropRef.current.analyzing) void dropRef.current.onFile(video);
+    };
+    window.addEventListener('dragenter', enter);
+    window.addEventListener('dragover', over);
+    window.addEventListener('dragleave', leave);
+    window.addEventListener('drop', drop);
+    return () => {
+      window.removeEventListener('dragenter', enter);
+      window.removeEventListener('dragover', over);
+      window.removeEventListener('dragleave', leave);
+      window.removeEventListener('drop', drop);
+    };
+  }, []);
   const pct = analyzing ? Math.round((status.done / status.total) * 100) : 0;
   const fileName = file?.name ?? seriesName ?? 'trampovision';
   const base = fileName.replace(/\.[^.]+$/, '') || 'trampovision';
@@ -431,6 +474,7 @@ export default function App() {
 
   return (
     <div className="app">
+      {dragging && <div className="dropzone">{analyzing ? 'Analysis in progress' : 'Drop a video to analyse it'}</div>}
       <header>
         <h1>TrampoVision</h1>
         <span className="muted">Trampoline motion analysis · prototype · video never leaves your browser</span>

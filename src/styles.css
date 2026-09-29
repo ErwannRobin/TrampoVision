@@ -916,3 +916,19 @@ table.checks {
   background: rgba(217, 138, 31, 0.18);
   border: 1px solid #d98a1f;
 }
+
+.dropzone {
+  position: fixed;
+  inset: 12px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px dashed var(--series-1);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  color: var(--text);
+  font-size: 1.4rem;
+  font-weight: 600;
+  pointer-events: none;
+}
