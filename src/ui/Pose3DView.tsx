@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sampleIndexAt } from '../analysis/lookup';
 import type { AnalysisResult, PoseTrack } from '../analysis/types';
+import type { SkillAnalysis } from '../skills/analyzeSkills';
+import type { CalibrationDraw, OverlayOptions } from '../video/overlay';
 import { drawPose3D, twistSinceTakeoff, type View } from '../pose3d/draw';
 import type { TwistAnalysis } from '../pose3d/twist';
-import { canExportVideo, exportPose3DVideo, saveBlob } from '../video/exportVideo';
+import { canExportVideo, exportPose3DVideo, exportSideBySideVideo, saveBlob } from '../video/exportVideo';
 import { Chart, type ChartBand, type ChartMarker } from './Chart';
 import { Playhead, usePlayheadTime } from './playhead';
 import { pose3dColors, useThemeVersion } from './theme';
@@ -20,6 +22,15 @@ const PRESETS: { name: string; view: View; title: string }[] = [
 
 const HEIGHT = 320;
 
+/** What the side-by-side export needs to paint the annotated video next to the 3D view. */
+export interface SideBySideSource {
+  url: string;
+  fps: number;
+  skills: SkillAnalysis | null;
+  overlay: OverlayOptions;
+  calibration: CalibrationDraw | null;
+}
+
 interface Props {
   track: PoseTrack;
   result: AnalysisResult;
@@ -28,27 +39,44 @@ interface Props {
   playhead: Playhead;
   /** File name (without extension) for the exported video. */
   baseName?: string;
+  /** Video and its annotations; without it there is no side-by-side export. */
+  sideBySide?: SideBySideSource | null;
 }
 
 /** The 3D skeleton at the playhead, with the torso, the longitudinal axis and the twist dial. */
-export function Pose3DView({ track, result, twist, selected, playhead, baseName = 'trampovision' }: Props) {
+export function Pose3DView({
+  track,
+  result,
+  twist,
+  selected,
+  playhead,
+  baseName = 'trampovision',
+  sideBySide = null,
+}: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [width, setWidth] = useState(420);
   const [view, setView] = useState<View>(PRESETS[0].view);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const [exporting, setExporting] = useState<number | null>(null);
+  const [exportKind, setExportKind] = useState<'3d' | 'side'>('3d');
   const [exportError, setExportError] = useState('');
   const exportAbort = useRef<AbortController | null>(null);
   useEffect(() => () => exportAbort.current?.abort(), []);
+  const theme = useThemeVersion();
+  const time = usePlayheadTime(playhead);
+  const i = sampleIndexAt(result.meta, time);
+  const cycle = result.jumps.cycles[selected];
+  const estimate = twist.jumps[selected];
 
-  async function onExport() {
+  async function onExport(kind: '3d' | 'side') {
     const ctl = new AbortController();
     exportAbort.current = ctl;
     setExportError('');
+    setExportKind(kind);
     setExporting(0);
     try {
-      const blob = await exportPose3DVideo({
+      const common = {
         track,
         result,
         twist,
@@ -56,8 +84,13 @@ export function Pose3DView({ track, result, twist, selected, playhead, baseName 
         view,
         signal: ctl.signal,
         onProgress: setExporting,
-      });
-      saveBlob(blob, `${baseName}-3d-pose.mp4`);
+      };
+      if (kind === 'side' && sideBySide) {
+        const blob = await exportSideBySideVideo({ ...common, ...sideBySide });
+        saveBlob(blob, `${baseName}-side-by-side.mp4`);
+      } else {
+        saveBlob(await exportPose3DVideo(common), `${baseName}-3d-pose.mp4`);
+      }
     } catch (err) {
       if (!(err instanceof DOMException && err.name === 'AbortError'))
         setExportError(err instanceof Error ? err.message : String(err));
@@ -65,11 +98,6 @@ export function Pose3DView({ track, result, twist, selected, playhead, baseName 
       setExporting(null);
     }
   }
-  const theme = useThemeVersion();
-  const time = usePlayheadTime(playhead);
-  const i = sampleIndexAt(result.meta, time);
-  const cycle = result.jumps.cycles[selected];
-  const estimate = twist.jumps[selected];
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -124,18 +152,28 @@ export function Pose3DView({ track, result, twist, selected, playhead, baseName 
             <>
               <progress value={exporting} max={1} />
               <button className="tiny" onClick={() => exportAbort.current?.abort()}>
-                Cancel {Math.round(exporting * 100)}%
+                Cancel {exportKind === 'side' ? 'side by side ' : ''}
+                {Math.round(exporting * 100)}%
               </button>
             </>
           ) : (
             <button
               className="tiny"
               title="Video of the 3D skeleton for the whole clip, from the viewpoint selected here (no footage)"
-              onClick={() => void onExport()}
+              onClick={() => void onExport('3d')}
             >
               ⬇ Download 3D video
             </button>
           ))}
+        {canExportVideo() && sideBySide && exporting === null && (
+          <button
+            className="tiny"
+            title="Annotated video and this 3D view side by side, same instant, for the whole clip"
+            onClick={() => void onExport('side')}
+          >
+            ⬇ Side by side
+          </button>
+        )}
       </div>
       {exportError && <p className="notice">{exportError}</p>}
       <div ref={wrapRef} className="pose3d-body" style={{ height: HEIGHT }}>
@@ -170,7 +208,17 @@ interface SectionProps extends Props {
 }
 
 /** 3D view and the twist curves of the whole clip, with the events of the jumps marked. */
-export function Pose3DSection({ track, result, twist, selected, playhead, markers, bands, baseName }: SectionProps) {
+export function Pose3DSection({
+  track,
+  result,
+  twist,
+  selected,
+  playhead,
+  markers,
+  bands,
+  baseName,
+  sideBySide,
+}: SectionProps) {
   const f = twist.frames;
   const guides = useMemo(() => {
     if (!f) return [];
@@ -195,6 +243,7 @@ export function Pose3DSection({ track, result, twist, selected, playhead, marker
         selected={selected}
         playhead={playhead}
         baseName={baseName}
+        sideBySide={sideBySide}
       />
       {f && (
         <div className="jumpcharts">

@@ -743,6 +743,7 @@ export default function App() {
                 selected={jumpSel}
                 playhead={playhead}
                 baseName={base}
+                sideBySide={url ? { url, fps, skills, overlay, calibration: calDraw } : null}
                 markers={decorations.markers}
                 bands={decorations.bands}
               />

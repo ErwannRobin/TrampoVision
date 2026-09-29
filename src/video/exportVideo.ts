@@ -104,14 +104,32 @@ async function pickConfig(width: number, height: number, fps: number): Promise<V
   throw new Error('This browser cannot encode H.264 video.');
 }
 
+/** Paints the current video frame at (x, 0) in a w x h area, with the overlay and the trampoline outline on top. */
+function paintAnnotated(
+  ctx: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  time: number,
+  x: number,
+  w: number,
+  h: number,
+  o: Pick<ExportOptions, 'result' | 'skills' | 'overlay' | 'calibration'>,
+) {
+  const cssWidth = REFERENCE_WIDTH;
+  const cssHeight = (REFERENCE_WIDTH * h) / w;
+  const scale = w / cssWidth;
+  ctx.drawImage(video, x, 0, w, h);
+  ctx.setTransform(scale, 0, 0, scale, x, 0);
+  if (o.result)
+    drawOverlay(ctx, cssWidth, cssHeight, o.result, sampleIndexAt(o.result.meta, time), o.overlay, o.skills, false);
+  if (o.calibration) drawCalibration(ctx, cssWidth, cssHeight, video.videoWidth, video.videoHeight, o.calibration);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
 export async function exportAnnotatedVideo(opts: ExportOptions): Promise<Blob> {
-  const { fps, result, skills, overlay, calibration } = opts;
+  const { fps } = opts;
   const video = await loadVideo(opts.url);
   try {
     const { width, height } = exportSize(video.videoWidth, video.videoHeight);
-    const cssWidth = REFERENCE_WIDTH;
-    const cssHeight = (REFERENCE_WIDTH * height) / width;
-    const scale = width / cssWidth;
     return await encodeMp4({
       width,
       height,
@@ -122,11 +140,7 @@ export async function exportAnnotatedVideo(opts: ExportOptions): Promise<Blob> {
       drawFrame: async (k, ctx) => {
         const time = Math.min(frameSeekTime(k, fps), video.duration - 1e-3);
         await seekTo(video, time);
-        ctx.drawImage(video, 0, 0, width, height);
-        ctx.setTransform(scale, 0, 0, scale, 0, 0);
-        if (result)
-          drawOverlay(ctx, cssWidth, cssHeight, result, sampleIndexAt(result.meta, time), overlay, skills, false);
-        if (calibration) drawCalibration(ctx, cssWidth, cssHeight, video.videoWidth, video.videoHeight, calibration);
+        paintAnnotated(ctx, video, time, 0, width, height, opts);
       },
     });
   } finally {
@@ -147,42 +161,98 @@ export interface Export3DOptions {
 
 const SCENE_WIDTH = 1280;
 const SCENE_HEIGHT = 720;
+/** The 3D scene is laid out for a picture this tall (CSS px) and scaled to the export size. */
+const SCENE_CSS_HEIGHT = 360;
+
+/** Paints the 3D skeleton of analysis sample `i` (plus a time/twist readout) in a w x h area at (x, 0). */
+function paintPose3D(
+  ctx: CanvasRenderingContext2D,
+  i: number,
+  x: number,
+  w: number,
+  h: number,
+  o: Omit<Export3DOptions, 'onProgress' | 'signal'>,
+) {
+  const colors = pose3dColors();
+  const scale = h / SCENE_CSS_HEIGHT;
+  const cssWidth = w / scale;
+  ctx.fillStyle = cssVar('--surface', '#fff');
+  ctx.fillRect(x, 0, w, h);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, 0, w, h);
+  ctx.clip();
+  ctx.setTransform(scale, 0, 0, scale, x, 0);
+  drawPose3D(ctx, cssWidth, SCENE_CSS_HEIGHT, {
+    world: o.track.world?.[i] ?? null,
+    twist: o.twist,
+    takeoff: o.takeoff,
+    i,
+    view: o.view,
+    colors,
+  });
+  const rel = twistSinceTakeoff(o.twist, o.takeoff, i);
+  const sign = rel !== null && rel < 0 ? '−' : '+';
+  ctx.font = '600 13px system-ui, sans-serif';
+  ctx.fillStyle = colors.ink;
+  ctx.textAlign = 'left';
+  ctx.fillText(
+    `${o.result.time[i].toFixed(2)} s` + (rel !== null ? ` · twist ${sign}${Math.abs(Math.round(rel))}°` : ''),
+    12,
+    22,
+  );
+  ctx.restore();
+}
 
 /**
  * The analysis without the footage: the 3D skeleton (with torso, long axis and twist dial) drawn from the
  * estimated 3D landmarks, one frame per analyzed sample, on a plain background. It needs no video.
  */
-export async function exportPose3DVideo(opts: Export3DOptions): Promise<Blob> {
-  const { track, result, twist, takeoff, view } = opts;
-  const colors = pose3dColors();
-  const bg = cssVar('--surface', '#fff');
-  const cssHeight = 360; // drawn at 640 x 360 and scaled up 2x
-  const cssWidth = (cssHeight * SCENE_WIDTH) / SCENE_HEIGHT;
-  const scale = SCENE_WIDTH / cssWidth;
+export function exportPose3DVideo(opts: Export3DOptions): Promise<Blob> {
   return encodeMp4({
     width: SCENE_WIDTH,
     height: SCENE_HEIGHT,
-    fps: result.meta.fps,
-    frames: result.meta.count,
+    fps: opts.result.meta.fps,
+    frames: opts.result.meta.count,
     signal: opts.signal,
     onProgress: opts.onProgress,
-    drawFrame: (i, ctx) => {
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, SCENE_WIDTH, SCENE_HEIGHT);
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      drawPose3D(ctx, cssWidth, cssHeight, { world: track.world?.[i] ?? null, twist, takeoff, i, view, colors });
-      const rel = twistSinceTakeoff(twist, takeoff, i);
-      ctx.font = '600 13px system-ui, sans-serif';
-      ctx.fillStyle = colors.ink;
-      ctx.textAlign = 'left';
-      const sign = rel !== null && rel < 0 ? '−' : '+';
-      ctx.fillText(
-        `${result.time[i].toFixed(2)} s` + (rel !== null ? ` · twist ${sign}${Math.abs(Math.round(rel))}°` : ''),
-        12,
-        22,
-      );
-    },
+    drawFrame: (i, ctx) => paintPose3D(ctx, i, 0, SCENE_WIDTH, SCENE_HEIGHT, opts),
   });
+}
+
+const SIDE_BY_SIDE_MAX_HEIGHT = 720;
+
+export type ExportSideBySideOptions = ExportOptions &
+  Omit<Export3DOptions, 'result' | 'onProgress' | 'signal'> & {
+    result: AnalysisResult;
+  };
+
+/** The annotated video on the left, the 3D skeleton of the same instant on the right (a square panel). */
+export async function exportSideBySideVideo(opts: ExportSideBySideOptions): Promise<Blob> {
+  const { fps, result } = opts;
+  const video = await loadVideo(opts.url);
+  try {
+    const full = exportSize(video.videoWidth, video.videoHeight);
+    const height = Math.min(full.height, SIDE_BY_SIDE_MAX_HEIGHT);
+    const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
+    const videoWidth = even((height * video.videoWidth) / video.videoHeight);
+    return await encodeMp4({
+      width: videoWidth + height,
+      height,
+      fps,
+      frames: Math.max(1, Math.floor(video.duration * fps)),
+      signal: opts.signal,
+      onProgress: opts.onProgress,
+      drawFrame: async (k, ctx) => {
+        const time = Math.min(frameSeekTime(k, fps), video.duration - 1e-3);
+        await seekTo(video, time);
+        paintAnnotated(ctx, video, time, 0, videoWidth, height, opts);
+        paintPose3D(ctx, sampleIndexAt(result.meta, time), videoWidth, height, height, opts);
+      },
+    });
+  } finally {
+    disposeVideo(video);
+  }
 }
 
 /** Offers a blob to the user as a file download. */
