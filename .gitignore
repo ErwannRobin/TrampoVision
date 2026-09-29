@@ -4,3 +4,4 @@ dist
 public/mediapipe
 public/models
 .DS_Store
+public/ffmpeg

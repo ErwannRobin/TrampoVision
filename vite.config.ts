@@ -27,5 +27,6 @@ export default defineConfig({
       ],
     },
   ],
+  optimizeDeps: { exclude: ['@ffmpeg/ffmpeg'] },
   test: { environment: 'node', include: ['src/**/*.test.ts'] },
 });

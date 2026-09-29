@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev build preview typecheck lint format format-check test test-watch check assets clean distclean
+.PHONY: help install dev build preview typecheck lint format format-check test test-watch check assets convert clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -41,6 +41,10 @@ check: typecheck lint format-check test ## Typecheck, lint, format check, tests 
 
 assets: node_modules ## Re-download MediaPipe runtime + pose models into public/
 	npm run fetch-assets
+
+convert: ## Re-encode VIDEO=path/to.MOV to a Chrome-friendly H.264 .mp4 next to it (needs ffmpeg)
+	@test -n "$(VIDEO)" || { echo "usage: make convert VIDEO=path/to/file.MOV"; exit 1; }
+	ffmpeg -y -i "$(VIDEO)" -c:v libx264 -crf 18 -pix_fmt yuv420p -g 15 -an -movflags +faststart "$(basename $(VIDEO)).mp4"
 
 clean: ## Remove build output
 	rm -rf dist *.tsbuildinfo

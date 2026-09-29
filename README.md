@@ -34,6 +34,8 @@ npm run build        # production build (adds a strict Content-Security-Policy)
 `npm install` needs internet once (models come from Google's public MediaPipe bucket). Afterwards the app
 works offline. If the download failed, run `npm run fetch-assets`.
 
+Videos the browser cannot decode (iPhone HEVC `.mov` in desktop Chrome) are converted to H.264 (max 720p) in the browser with ffmpeg.wasm; expect it to take about as long as the video or longer. `make convert VIDEO=file.MOV` does the same with a local ffmpeg.
+
 ## Use
 
 1. Choose an MP4/MOV. The frame rate is measured automatically (editable).

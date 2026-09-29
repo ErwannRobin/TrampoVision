@@ -114,8 +114,25 @@ export async function seekTo(video: HTMLVideoElement, time: number, timeoutMs = 
   throw new Error(
     `Seek to ${time.toFixed(3)}s timed out after ${SEEK_ATTEMPTS} attempts ` +
       `(readyState ${video.readyState}, networkState ${video.networkState}, seeking ${video.seeking}, ` +
-      `currentTime ${video.currentTime.toFixed(3)}s). The browser may not decode this file; try an MP4 (H.264).`,
+      `currentTime ${video.currentTime.toFixed(3)}s). The decoder stalled: iPhone HEVC/HDR .mov files often do this ` +
+      'in desktop Chrome. Convert to H.264 (make convert VIDEO=file.MOV) and open the .mp4.',
   );
+}
+
+/**
+ * True when the browser can really decode this video: seeking to a few points must present a frame.
+ * Metadata loads even for codecs the browser cannot decode (HEVC in desktop Chrome), so this is what
+ * tells the app to convert the file. Leaves the playhead at the start.
+ */
+export async function canDecode(video: HTMLVideoElement, timeoutMs = 3000): Promise<boolean> {
+  try {
+    for (const fraction of [0.3, 0.6, 0.9]) {
+      if (!(await seekOnce(video, video.duration * fraction, timeoutMs))) return false;
+    }
+    return await seekOnce(video, 0, timeoutMs);
+  } catch {
+    return false;
+  }
 }
 
 const COMMON_FPS = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60, 90, 100, 119.88, 120, 240];

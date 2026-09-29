@@ -16,7 +16,8 @@ import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from
 import { buildPoseSeries, parsePoseSeries, toSeriesJson } from './analysis/timeSeries';
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point } from './pose/types';
-import { disposeVideo, estimateFps, loadVideo } from './video/frames';
+import { canDecode, disposeVideo, estimateFps, loadVideo } from './video/frames';
+import { transcodeToH264 } from './video/transcode';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
 import { Chart } from './ui/Chart';
 import { DebugPanel } from './ui/DebugPanel';
@@ -32,7 +33,7 @@ import { VideoPlayer } from './ui/VideoPlayer';
 
 type Status =
   | { kind: 'idle' }
-  | { kind: 'loading'; stage: 'reading' | 'measuring' }
+  | { kind: 'loading'; stage: 'reading' | 'measuring' | 'converting'; progress?: number }
   | { kind: 'analyzing'; done: number; total: number }
   | { kind: 'error'; message: string };
 
@@ -101,7 +102,7 @@ export default function App() {
 
   const playhead = useMemo(() => new Playhead(), []);
   const abort = useRef<AbortController | null>(null);
-  const urlRef = useRef<string | null>(null); // latest selected file, to ignore stale async results
+  const fileRef = useRef<File | null>(null); // latest selected file, to ignore stale async results
 
   const calibration = useMemo<TrampolineCalibration | null>(
     () =>
@@ -198,18 +199,49 @@ export default function App() {
       setBedShort(saved.bedShort);
       setFirstSide(saved.firstSide);
     }
-    urlRef.current = nextUrl;
+    fileRef.current = next;
     setUrl(nextUrl);
     // A stable id from the file itself, so labels stay attached to this video after a reload.
     setVideoId(null);
     setSeriesName(null);
     void videoIdOf(next).then((id) => {
-      if (urlRef.current === nextUrl) setVideoId(id);
+      if (fileRef.current === next) setVideoId(id);
     });
     setStatus({ kind: 'loading', stage: 'reading' });
-    const isCurrent = () => urlRef.current === nextUrl;
+    const isCurrent = () => fileRef.current === next;
+    const ctl = new AbortController();
+    abort.current = ctl;
     try {
-      const probe = await loadVideo(nextUrl);
+      // Metadata may fail to load, or load even though the codec cannot be decoded (iPhone HEVC in
+      // desktop Chrome). Either way convert to H.264 in the browser and use the converted video from here on.
+      let probe: HTMLVideoElement | null = null;
+      try {
+        probe = await loadVideo(nextUrl);
+        if (isCurrent() && !(await canDecode(probe))) {
+          disposeVideo(probe);
+          probe = null;
+        }
+      } catch {
+        probe = null;
+      }
+      if (isCurrent() && !probe) {
+        setStatus({ kind: 'loading', stage: 'converting', progress: 0 });
+        const blob = await transcodeToH264(next, {
+          signal: ctl.signal,
+          onProgress: (progress) => {
+            if (isCurrent()) setStatus({ kind: 'loading', stage: 'converting', progress });
+          },
+        });
+        if (!isCurrent()) return;
+        const convertedUrl = URL.createObjectURL(blob);
+        URL.revokeObjectURL(nextUrl);
+        setUrl(convertedUrl);
+        probe = await loadVideo(convertedUrl);
+        setNotice(
+          'This browser cannot decode the original file, so it was converted to H.264 (max 720p) in the browser.',
+        );
+      }
+      if (!probe) return;
       if (isCurrent()) setStatus({ kind: 'loading', stage: 'measuring' });
       const measured = isCurrent() ? await estimateFps(probe) : null;
       disposeVideo(probe);
@@ -224,6 +256,7 @@ export default function App() {
             },
       );
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       if (isCurrent()) setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
     }
   }
@@ -505,7 +538,12 @@ export default function App() {
       </p>
 
       {status.kind === 'loading' && (
-        <p className="notice">{status.stage === 'reading' ? 'Reading video…' : 'Measuring frame rate…'}</p>
+        <p className="notice">
+          {status.stage === 'reading' && 'Reading video…'}
+          {status.stage === 'measuring' && 'Measuring frame rate…'}
+          {status.stage === 'converting' &&
+            `Converting the video for this browser (runs locally, may take a while)… ${Math.round((status.progress ?? 0) * 100)}%`}
+        </p>
       )}
       {status.kind === 'error' && (
         <p className="notice error" role="alert">
