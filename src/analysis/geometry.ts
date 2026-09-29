@@ -1,3 +1,4 @@
+import { LM } from '../pose/landmarks';
 import type { Point } from '../pose/types';
 
 const RAD2DEG = 180 / Math.PI;
@@ -28,4 +29,13 @@ export function jointAngle(a: Point, b: Point, c: Point): number {
  */
 export function angleFromVertical(from: Point, to: Point): number {
   return Math.atan2(to.x - from.x, -(to.y - from.y)) * RAD2DEG;
+}
+
+/** Length of the nose → shoulders → hips → knees → ankles path (about 0.9 x standing height). NaN if a point is missing. */
+export function skeletonLength(pts: Point[]): number {
+  const shoulders = mid(pts[LM.L_SHOULDER], pts[LM.R_SHOULDER]);
+  const hips = mid(pts[LM.L_HIP], pts[LM.R_HIP]);
+  const knees = mid(pts[LM.L_KNEE], pts[LM.R_KNEE]);
+  const ankles = mid(pts[LM.L_ANKLE], pts[LM.R_ANKLE]);
+  return dist(pts[LM.NOSE], shoulders) + dist(shoulders, hips) + dist(hips, knees) + dist(knees, ankles);
 }

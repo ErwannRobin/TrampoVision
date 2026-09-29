@@ -1,8 +1,10 @@
-import { CORE_LANDMARKS, LANDMARK_COUNT, LM } from '../pose/landmarks';
-import type { Keypoint } from '../pose/types';
+import { LM } from '../pose/landmarks';
+import { buildCalibration } from './calibration';
 import { estimateCom } from './com';
-import { angleFromVertical, dist, jointAngle, mid } from './geometry';
-import { fillGaps, localPolyFit, median, oddWindow, unwrapDegrees } from './signal';
+import { angleFromVertical, jointAngle, mid, skeletonLength } from './geometry';
+import { detectJumps } from './jumpCycles';
+import { localPolyFit, median, oddWindow, unwrapDegrees } from './signal';
+import { stabilizePose, type StabilizedPose } from './stabilize';
 import {
   DEFAULT_ANALYSIS_OPTIONS,
   JOINT_NAMES,
@@ -10,13 +12,14 @@ import {
   type AnalysisResult,
   type JointName,
   type PoseTrack,
+  type ScaleSource,
 } from './types';
 
 /** Skeleton path length (nose→shoulders→hips→knees→ankles) is about 0.9x standing height. */
 const SKELETON_TO_HEIGHT = 0.9;
-const LANDMARK_SMOOTH_S = 0.15;
 const VELOCITY_WINDOW_S = 0.2;
-const MAX_GAP_S = 0.3;
+/** Below this share of body mass the center of mass is not trusted (e.g. only the legs were seen). */
+const MIN_COM_COVERAGE = 0.5;
 
 const nanSeries = (n: number) => new Float64Array(n).fill(NaN);
 
@@ -32,53 +35,30 @@ const JOINTS: Record<JointName, [number, number, number]> = {
   rightKnee: [LM.R_HIP, LM.R_KNEE, LM.R_ANKLE],
 };
 
-/** Stage 2: clean the raw landmarks, then derive COM, kinematics, angles and rotation. */
-export function computeAnalysis(track: PoseTrack, options: Partial<AnalysisOptions> = {}): AnalysisResult {
+/**
+ * Stage 2: stabilize the raw landmarks, then derive COM, height, velocity, horizontal position (relative
+ * to the trampoline when calibrated), body orientation, jump cycles and rotation counts.
+ * Pass `stabilized` to reuse an earlier `stabilizePose(track)` (it does not depend on the athlete height
+ * or the calibration).
+ */
+export function computeAnalysis(
+  track: PoseTrack,
+  options: Partial<AnalysisOptions> = {},
+  stabilized?: StabilizedPose,
+): AnalysisResult {
   const opts = { ...DEFAULT_ANALYSIS_OPTIONS, ...options };
   const n = track.frames.length;
   const fps = track.fps;
-  const maxGap = Math.max(1, Math.round(MAX_GAP_S * fps));
-  const lmWindow = oddWindow(LANDMARK_SMOOTH_S, fps);
   const velWindow = oddWindow(VELOCITY_WINDOW_S, fps);
 
-  // 1. Per-landmark x/y series: drop low-visibility points, fill short gaps, smooth.
-  const xs: Float64Array[] = [];
-  const ys: Float64Array[] = [];
-  const rawVis: Float64Array[] = [];
-  for (let k = 0; k < LANDMARK_COUNT; k++) {
-    const x = nanSeries(n);
-    const y = nanSeries(n);
-    const v = new Float64Array(n);
-    for (let i = 0; i < n; i++) {
-      const kp = track.frames[i]?.[k];
-      if (!kp) continue;
-      v[i] = kp.visibility;
-      if (kp.visibility >= opts.minVisibility) {
-        x[i] = kp.x;
-        y[i] = kp.y;
-      }
-    }
-    xs.push(localPolyFit(fillGaps(x, maxGap), lmWindow).value);
-    ys.push(localPolyFit(fillGaps(y, maxGap), lmWindow).value);
-    rawVis.push(v);
-  }
-
-  const landmarks: (Keypoint[] | null)[] = [];
-  const confidence = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
-    let anyFinite = false;
-    const pts: Keypoint[] = [];
-    for (let k = 0; k < LANDMARK_COUNT; k++) {
-      if (Number.isFinite(xs[k][i]) && Number.isFinite(ys[k][i])) anyFinite = true;
-      pts.push({ x: xs[k][i], y: ys[k][i], visibility: rawVis[k][i] });
-    }
-    landmarks.push(anyFinite ? pts : null);
-    confidence[i] = track.frames[i] ? CORE_LANDMARKS.reduce((s, k) => s + rawVis[k][i], 0) / CORE_LANDMARKS.length : 0;
-  }
+  // 1. Clean landmarks: gating, glitch rejection, gap filling, confidence-weighted smoothing.
+  const stab = stabilized ?? stabilizePose(track, { minVisibility: opts.minVisibility });
+  const { landmarks, confidence } = stab;
 
   // 2. Per-frame geometry.
   const comX = nanSeries(n);
   const comY = nanSeries(n);
+  const comCoverage = new Float64Array(n);
   const trunk = nanSeries(n);
   const line = nanSeries(n);
   const skeletonLen = nanSeries(n);
@@ -89,41 +69,79 @@ export function computeAnalysis(track: PoseTrack, options: Partial<AnalysisOptio
     if (!pts) continue;
     const com = estimateCom(pts);
     if (com) {
-      comX[i] = com.x;
-      comY[i] = com.y;
+      comCoverage[i] = com.coverage;
+      if (com.coverage >= MIN_COM_COVERAGE) {
+        comX[i] = com.x;
+        comY[i] = com.y;
+      }
     }
     const shoulders = mid(pts[LM.L_SHOULDER], pts[LM.R_SHOULDER]);
     const hips = mid(pts[LM.L_HIP], pts[LM.R_HIP]);
-    const knees = mid(pts[LM.L_KNEE], pts[LM.R_KNEE]);
     const ankles = mid(pts[LM.L_ANKLE], pts[LM.R_ANKLE]);
     const head = Number.isFinite(pts[LM.L_EAR].x) && Number.isFinite(pts[LM.R_EAR].x) ? mid(pts[LM.L_EAR], pts[LM.R_EAR]) : pts[LM.NOSE];
 
     trunk[i] = angleFromVertical(hips, shoulders);
     line[i] = angleFromVertical(ankles, head);
-    skeletonLen[i] = dist(pts[LM.NOSE], shoulders) + dist(shoulders, hips) + dist(hips, knees) + dist(knees, ankles);
+    skeletonLen[i] = skeletonLength(pts);
     for (const name of JOINT_NAMES) {
       const [a, b, c] = JOINTS[name];
       joints[name][i] = jointAngle(pts[a], pts[b], pts[c]);
     }
   }
 
-  // 3. Scale: pixels per meter from the median skeleton length and the athlete's height.
-  const pixelsPerMeter = median(skeletonLen) / (SKELETON_TO_HEIGHT * opts.athleteHeightM);
+  // 3. Scale. Athlete: skeleton length vs. the height the user entered. Trampoline: the bed size.
+  const athletePixelsPerMeter = median(skeletonLen) / (SKELETON_TO_HEIGHT * opts.athleteHeightM);
+  let calibrationError: string | null = null;
+  let calibration: ReturnType<typeof buildCalibration> | null = null;
+  if (opts.calibration) {
+    calibration = buildCalibration(opts.calibration);
+    if (!calibration.ok) calibrationError = calibration.error;
+  }
+  const model = calibration?.ok ? calibration.model : null;
+  const trampolinePixelsPerMeter = model ? 1 / model.metersPerPixel : NaN;
+  const wanted = opts.scaleSource ?? 'auto';
+  const scaleSource: ScaleSource = model && (wanted === 'auto' || wanted === 'trampoline') ? 'trampoline' : 'athlete';
+  const pixelsPerMeter = scaleSource === 'trampoline' ? trampolinePixelsPerMeter : athletePixelsPerMeter;
 
-  // 4. Vertical position / velocity (up = positive), relative to the lowest COM point.
-  let lowestY = -Infinity;
-  for (let i = 0; i < n; i++) if (Number.isFinite(comY[i])) lowestY = Math.max(lowestY, comY[i]);
+  // 4. Height (up = positive), horizontal position, vertical velocity.
   const height = nanSeries(n);
-  for (let i = 0; i < n; i++) height[i] = (lowestY - comY[i]) / pixelsPerMeter;
+  const x = nanSeries(n);
+  const xNorm = nanSeries(n);
+  if (model) {
+    for (let i = 0; i < n; i++) {
+      height[i] = (model.center.y - comY[i]) / pixelsPerMeter;
+      x[i] = (comX[i] - model.center.x) / pixelsPerMeter;
+      xNorm[i] = (comX[i] - model.center.x) * model.metersPerPixel / model.halfExtentM;
+    }
+  } else {
+    let lowestY = -Infinity;
+    for (let i = 0; i < n; i++) if (Number.isFinite(comY[i])) lowestY = Math.max(lowestY, comY[i]);
+    const firstX = comX.find(Number.isFinite) ?? NaN;
+    for (let i = 0; i < n; i++) {
+      height[i] = (lowestY - comY[i]) / pixelsPerMeter;
+      x[i] = (comX[i] - firstX) / pixelsPerMeter;
+    }
+  }
   const vy = localPolyFit(height, velWindow).slope.map((s) => s * fps);
 
-  // 5. Rotation: unwrap the trunk angle, then differentiate.
-  const rotationAbs = unwrapDegrees(trunk);
-  const first = rotationAbs.find(Number.isFinite) ?? 0;
-  const rotation = rotationAbs.map((r) => r - first);
+  // 5. Orientation: the trunk angle made continuous, then differentiated.
+  const orientation = unwrapDegrees(trunk);
+  const firstOrientation = orientation.find(Number.isFinite) ?? 0;
+  const rotation = orientation.map((r) => r - firstOrientation);
   const angularVelocity = localPolyFit(rotation, velWindow).slope.map((s) => s * fps);
+  let maxRotationStepDeg = 0;
+  let prev = NaN;
+  for (let i = 0; i < n; i++) {
+    if (!Number.isFinite(orientation[i])) continue;
+    if (Number.isFinite(prev) && i > 0 && Number.isFinite(orientation[i - 1])) maxRotationStepDeg = Math.max(maxRotationStepDeg, Math.abs(orientation[i] - prev));
+    prev = orientation[i];
+  }
 
-  // 6. Summary.
+  // 6. Jump cycles: takeoff, apex, landing, phases, rotation counts.
+  const time = Float64Array.from(track.times);
+  const jumps = detectJumps({ fps, time, height, vy, x, orientation });
+
+  // 7. Summary.
   const finite = (a: Float64Array) => Array.from(a).filter(Number.isFinite);
   const heights = finite(height);
   const vels = finite(vy);
@@ -134,6 +152,8 @@ export function computeAnalysis(track: PoseTrack, options: Partial<AnalysisOptio
     peakDownVelocity: vels.length ? Math.min(...vels) : NaN,
     totalRotationDeg: rot.length ? rot[rot.length - 1] : NaN,
     validFraction: n ? finite(comY).length / n : 0,
+    jumpCount: jumps.cycles.length,
+    completedRotations: jumps.cycles.reduce((s, c) => s + Math.abs(c.completedRotations ?? 0), 0),
   };
 
   return {
@@ -146,19 +166,35 @@ export function computeAnalysis(track: PoseTrack, options: Partial<AnalysisOptio
       backend: track.backend,
       athleteHeightM: opts.athleteHeightM,
       pixelsPerMeter,
+      scaleSource,
+      athletePixelsPerMeter,
+      trampolinePixelsPerMeter,
+      heightReference: model ? 'bed' : 'lowest point',
+      calibrated: model !== null,
+      calibrationError,
+      viewAngleDeg: model ? model.viewAngleDeg : NaN,
+      bodyLengthPx: stab.bodyLengthPx,
+      maxRotationStepDeg,
     },
-    time: Float64Array.from(track.times),
+    time,
     landmarks,
+    jointState: stab.state,
+    stabilizeStats: stab.stats,
     confidence,
     comX,
     comY,
+    comCoverage,
     height,
     vy,
+    x,
+    xNorm,
     trunkAngle: trunk,
     lineAngle: line,
+    orientation,
     rotation,
     angularVelocity,
     joints,
+    jumps,
     summary,
   };
 }

@@ -1,5 +1,7 @@
-import { buildWireframe, type Side } from '../pose/skeleton';
+import { JUMP_PHASES } from '../analysis/jumpCycles';
 import type { AnalysisResult } from '../analysis/types';
+import type { Point } from '../pose/types';
+import { buildWireframe, type Side } from '../pose/skeleton';
 
 export interface OverlayOptions {
   skeleton: boolean;
@@ -93,17 +95,34 @@ export function drawOverlay(
   }
 
   if (opts.com && Number.isFinite(result.comX[sample])) {
+    // A solid dot (readable on any background) inside a thin ring.
     const x = result.comX[sample] * sx;
     const y = result.comY[sample] * sy;
     ctx.beginPath();
-    ctx.arc(x, y, 8, 0, Math.PI * 2);
-    stroke(ctx, 3, COM_COLOR);
+    ctx.arc(x, y, 11, 0, Math.PI * 2);
+    stroke(ctx, 1.5, COM_COLOR);
     ctx.beginPath();
-    ctx.moveTo(x - 13, y);
-    ctx.lineTo(x + 13, y);
-    ctx.moveTo(x, y - 13);
-    ctx.lineTo(x, y + 13);
-    stroke(ctx, 2, COM_COLOR);
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = COM_COLOR;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.stroke();
+  }
+
+  // Jump phase label (top left), e.g. "Jump 2 · ascent".
+  const phase = JUMP_PHASES[result.jumps.phase[sample]];
+  if (phase !== 'unknown') {
+    const jump = result.jumps.cycleIndex[sample];
+    const text = jump >= 0 ? `Jump ${jump + 1} · ${phase}` : phase;
+    ctx.font = '600 13px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.lineWidth = 3.5;
+    ctx.strokeText(text, 10, 20);
+    ctx.fillStyle = phase === 'ground' ? '#f4f4f4' : COM_COLOR;
+    ctx.fillText(text, 10, 20);
   }
 
   if (lowConfidence) {
@@ -112,7 +131,84 @@ export function drawOverlay(
     ctx.strokeStyle = 'rgba(0,0,0,0.7)';
     ctx.lineWidth = 3;
     const msg = pose ? 'low pose confidence' : 'no athlete detected';
-    ctx.strokeText(msg, 10, 20);
-    ctx.fillText(msg, 10, 20);
+    ctx.textAlign = 'left';
+    ctx.strokeText(msg, 10, 38);
+    ctx.fillText(msg, 10, 38);
   }
+}
+
+
+// --- Trampoline calibration overlay -------------------------------------------------------------
+
+const CAL_COLOR = '#19d3c5';
+
+export interface CalibrationDraw {
+  /** Clicked corners in video pixels (0 to 4). */
+  corners: Point[];
+  /** Bed center in video pixels once the four corners are valid. */
+  center: Point | null;
+  editing: boolean;
+}
+
+/** Draws the bed outline, corner handles and the vertical line through the bed center. */
+export function drawCalibration(
+  ctx: CanvasRenderingContext2D,
+  cssWidth: number,
+  cssHeight: number,
+  videoWidth: number,
+  videoHeight: number,
+  cal: CalibrationDraw,
+) {
+  const sx = cssWidth / videoWidth;
+  const sy = cssHeight / videoHeight;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const pts = cal.corners.map((p) => ({ x: p.x * sx, y: p.y * sy }));
+
+  if (pts.length >= 2) {
+    ctx.beginPath();
+    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    if (pts.length === 4) ctx.closePath();
+    ctx.setLineDash([8, 5]);
+    stroke(ctx, 2, CAL_COLOR);
+    ctx.setLineDash([]);
+    if (pts.length === 4) {
+      ctx.fillStyle = 'rgba(25, 211, 197, 0.12)';
+      ctx.fill();
+    }
+  }
+
+  if (cal.center) {
+    const cx = cal.center.x * sx;
+    const cy = cal.center.y * sy;
+    ctx.beginPath();
+    ctx.moveTo(cx, 0);
+    ctx.lineTo(cx, cssHeight);
+    ctx.setLineDash([3, 6]);
+    stroke(ctx, 1.5, CAL_COLOR);
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(cx - 9, cy);
+    ctx.lineTo(cx + 9, cy);
+    ctx.moveTo(cx, cy - 9);
+    ctx.lineTo(cx, cy + 9);
+    stroke(ctx, 2, CAL_COLOR);
+  }
+
+  ctx.font = '700 11px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  pts.forEach((p, i) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, cal.editing ? 9 : 6, 0, Math.PI * 2);
+    ctx.fillStyle = CAL_COLOR;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    ctx.stroke();
+    if (cal.editing) {
+      ctx.fillStyle = '#04201d';
+      ctx.fillText(String(i + 1), p.x, p.y + 0.5);
+    }
+  });
 }

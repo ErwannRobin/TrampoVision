@@ -22,7 +22,8 @@ export class Playhead {
     this.listeners.forEach((l) => l());
   }
   seek(t: number) {
-    this.seekHandler?.(t);
+    if (this.seekHandler) this.seekHandler(t);
+    else this.setTime(t); // no video loaded (e.g. data opened from a file): just move the cursor
   }
 }
 
