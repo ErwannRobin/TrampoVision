@@ -128,6 +128,28 @@ describe('temporal classification', () => {
     expect(over.skill).toBe('unclassified');
   });
 
+  it('names a straight jump whose orientation track is noisy, when the apex orientation shows the body never turned', () => {
+    const { track } = mannequinRoutine({ jumps: [{ v0: 4.4, shape: 'straight', facing: 1 }], facing: 1 });
+    const result = computeAnalysis(track, { athleteHeightM: 1.75 });
+    // What the pose model does to an upright jump on some footage: the summed rotation is unreliable (there-and-back swings, flips).
+    const noisy: typeof temporalClassifier = {
+      ...temporalClassifier,
+      classify: (input) =>
+        temporalClassifier.classify({
+          ...input,
+          features: {
+            ...input.features,
+            rotation: {
+              ...input.features.rotation,
+              parts: { ...input.features.rotation.parts, monotonic: 0.2, crossCheck: 0.3, steps: 0.25 },
+            },
+          },
+        }),
+    };
+    const p = analyzeSkills(result, { classifier: noisy }).jumps[0].prediction;
+    expect(p.skill).toBe('straight-jump');
+  });
+
   it('still leaves a quarter rotation unnamed: the closest element is not a fair description', () => {
     const p = run({ v0: 4.6, turns: 1.25, shape: 'straight' }).prediction;
     expect(p.skill).toBe('unclassified');

@@ -145,10 +145,29 @@ interface RotationStage {
   report: StageReport;
 }
 
+/** Quality the apex orientation can restore at most: an agreeing witness is good, not perfect. */
+const CORROBORATED = 0.8;
+/** Tolerance of the trunk angle at the apex, degrees. */
+const APEX_SIGMA_DEG = 60;
+
+/** 0..1: how well the trunk angle at the apex (relative to takeoff) fits the nearest whole number of somersaults of the net rotation. */
+function apexAgreement(f: JumpFeatures, turns: number | null): number {
+  const { apexDeg, takeoffDeg } = f.orientation;
+  if (turns === null || apexDeg === null || takeoffDeg === null) return 0;
+  const expected = Math.round(Math.abs(turns)) * 180;
+  const rel = Math.abs(apexDeg - takeoffDeg);
+  const off = Math.abs(((((rel - expected) % 360) + 540) % 360) - 180);
+  return gauss(off, 0, APEX_SIGMA_DEG);
+}
+
 function rotationStage(f: JumpFeatures, tm: Temporal, cfg: SkillConfig): RotationStage {
   const r = f.rotation;
   const c = cfg.classification;
-  const quality = clamp01(r.parts.coverage * r.parts.steps * r.parts.crossCheck * r.parts.monotonic);
+  const summed = clamp01(r.parts.coverage * r.parts.steps * r.parts.crossCheck * r.parts.monotonic);
+  // A noisy orientation track (there-and-back swings, a pose flip) makes the sum of the rotation doubtful, not the count itself: the
+  // trunk angle at the apex is an independent witness. Half-way through a flight with n whole somersaults the body is n half turns
+  // from where it took off, so agreement there corroborates the count and restores part of the quality the noise took away.
+  const quality = Math.max(summed, CORROBORATED * apexAgreement(f, r.turns));
   const dist = new Map<number, number>();
   const notes: string[] = [];
   if (r.totalDeg === null || r.turns === null) {
