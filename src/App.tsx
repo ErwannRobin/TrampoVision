@@ -17,6 +17,7 @@ import { buildPoseSeries, parsePoseSeries, toSeriesJson } from './analysis/timeS
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo } from './video/frames';
+import { loadSample, samplePath } from './video/sample';
 import { transcodeToH264 } from './video/transcode';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
 import { Chart } from './ui/Chart';
@@ -182,6 +183,16 @@ export default function App() {
         : null,
     [corners, editingCal, calibrationModel],
   );
+
+  async function onSample() {
+    if (!samplePath) return;
+    setStatus({ kind: 'loading', stage: 'reading' });
+    try {
+      await onFile(await loadSample(samplePath));
+    } catch (err) {
+      setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  }
 
   async function onFile(next: File) {
     abort.current?.abort();
@@ -435,6 +446,11 @@ export default function App() {
             onChange={(e) => e.target.files?.[0] && void onFile(e.target.files[0])}
           />
         </label>
+        {samplePath && (
+          <button type="button" onClick={() => void onSample()} disabled={analyzing}>
+            Use sample video
+          </button>
+        )}
         <label>
           Model
           <select value={model} onChange={(e) => setModel(e.target.value as ModelVariant)} disabled={analyzing}>
