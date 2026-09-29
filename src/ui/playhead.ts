@@ -9,6 +9,8 @@ export class Playhead {
   private listeners = new Set<() => void>();
   /** Installed by the player: performs an actual seek on the <video>. */
   seekHandler: ((time: number) => void) | null = null;
+  /** Installed by the player: plays from `from` to `to` seconds, then stops (or loops). */
+  playRangeHandler: ((from: number, to: number, loop: boolean) => void) | null = null;
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -20,6 +22,9 @@ export class Playhead {
     if (t === this.t) return;
     this.t = t;
     this.listeners.forEach((l) => l());
+  }
+  playRange(from: number, to: number, loop = false) {
+    this.playRangeHandler?.(from, to, loop);
   }
   seek(t: number) {
     if (this.seekHandler) this.seekHandler(t);

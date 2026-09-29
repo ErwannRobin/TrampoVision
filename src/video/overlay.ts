@@ -1,5 +1,7 @@
 import { JUMP_PHASES } from '../analysis/jumpCycles';
 import type { AnalysisResult } from '../analysis/types';
+import type { SkillAnalysis } from '../skills/analyzeSkills';
+import { POSITIONS } from '../skills/types';
 import type { Point } from '../pose/types';
 import { buildWireframe, type Side } from '../pose/skeleton';
 
@@ -7,6 +9,8 @@ export interface OverlayOptions {
   skeleton: boolean;
   com: boolean;
   trail: boolean;
+  /** Body position, rotation and predicted skill as text on the video. */
+  hud: boolean;
 }
 
 // Video frames are arbitrary imagery, so overlay colors are fixed and drawn with a dark halo.
@@ -33,6 +37,7 @@ export function drawOverlay(
   result: AnalysisResult,
   sample: number,
   opts: OverlayOptions,
+  skills: SkillAnalysis | null = null,
 ) {
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   const sx = cssWidth / result.meta.width;
@@ -110,31 +115,42 @@ export function drawOverlay(
     ctx.stroke();
   }
 
-  // Jump phase label (top left), e.g. "Jump 2 · ascent".
+  // Text block (top left): jump phase, body position, rotation so far, predicted skill, warnings.
+  const lines: { text: string; color: string }[] = [];
   const phase = JUMP_PHASES[result.jumps.phase[sample]];
+  const flying = result.jumps.cycleIndex[sample];
   if (phase !== 'unknown') {
-    const jump = result.jumps.cycleIndex[sample];
-    const text = jump >= 0 ? `Jump ${jump + 1} · ${phase}` : phase;
-    ctx.font = '600 13px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-    ctx.lineWidth = 3.5;
-    ctx.strokeText(text, 10, 20);
-    ctx.fillStyle = phase === 'ground' ? '#f4f4f4' : COM_COLOR;
-    ctx.fillText(text, 10, 20);
+    lines.push({ text: flying >= 0 ? `Jump ${flying + 1} · ${phase}` : phase, color: phase === 'ground' ? '#f4f4f4' : COM_COLOR });
   }
-
-  if (lowConfidence) {
-    ctx.font = '600 12px system-ui, sans-serif';
-    ctx.fillStyle = '#ffd400';
-    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-    ctx.lineWidth = 3;
-    const msg = pose ? 'low pose confidence' : 'no athlete detected';
-    ctx.textAlign = 'left';
-    ctx.strokeText(msg, 10, 38);
-    ctx.fillText(msg, 10, 38);
+  if (opts.hud && skills) {
+    if (flying >= 0) {
+      lines.push({ text: `Body: ${POSITIONS[skills.frames.position[sample]]}`, color: '#f4f4f4' });
+      const turns = result.jumps.turnsSinceTakeoff[sample];
+      if (Number.isFinite(turns)) lines.push({ text: `Rotation: ${turns.toFixed(2)} turns`, color: '#f4f4f4' });
+    }
+    // The prediction of the jump in the air, or of the last one that took off.
+    let current = flying;
+    if (current < 0) for (const c of result.jumps.cycles) if (c.takeoff !== null && c.takeoff <= sample) current = c.index;
+    const jump = current >= 0 ? skills.jumps[current] : undefined;
+    if (jump) {
+      const p = jump.prediction;
+      lines.push({
+        text: p.skill === 'unclassified' && p.confidence === 0 ? `Jump ${current + 1}: not classified` : `${p.label} · ${Math.round(p.confidence * 100)}%`,
+        color: p.skill === 'unclassified' || p.confidence < 0.6 ? '#ffb15c' : '#7dff8f',
+      });
+    }
   }
+  if (lowConfidence) lines.push({ text: pose ? 'low pose confidence' : 'no athlete detected', color: COM_COLOR });
+  ctx.font = '600 13px system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+  lines.forEach((l, k) => {
+    ctx.strokeText(l.text, 10, 20 + 18 * k);
+    ctx.fillStyle = l.color;
+    ctx.fillText(l.text, 10, 20 + 18 * k);
+  });
 }
 
 

@@ -26,6 +26,16 @@ export interface ChartGuide {
   label?: string;
 }
 
+/** For charts whose x axis is not the video time (e.g. normalized jump time 0..1). */
+export interface ChartAxis {
+  /** Playhead seconds -> x. */
+  toX: (seconds: number) => number;
+  /** x -> playhead seconds (a click on the chart seeks there). */
+  toSeconds: (x: number) => number;
+  /** Tick label for an x value. */
+  tick: (x: number) => string;
+}
+
 interface Props {
   title: string;
   unit: string;
@@ -49,6 +59,8 @@ interface Props {
   bands?: ChartBand[];
   /** Dashed horizontal reference lines; they also widen the y range. */
   guides?: ChartGuide[];
+  /** `time`, `markers` and `bands` are then in x units, not seconds. */
+  axis?: ChartAxis;
 }
 
 const M = { left: 46, right: 12, top: 8, bottom: 20 };
@@ -97,7 +109,7 @@ function indexAt(time: Float64Array, t: number): number {
   return Math.min(Math.max(Math.round((t - time[0]) / dt), 0), time.length - 1);
 }
 
-export function Chart({ title, unit, time, series, playhead, confidence, decimals = 1, zeroLine = false, height = 150, yDomain, minSpan = 1e-6, breakOnJump, markers, bands, guides }: Props) {
+export function Chart({ title, unit, time, series, playhead, confidence, decimals = 1, zeroLine = false, height = 150, yDomain, minSpan = 1e-6, breakOnJump, markers, bands, guides, axis }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLCanvasElement>(null);
@@ -106,6 +118,7 @@ export function Chart({ title, unit, time, series, playhead, confidence, decimal
   const dragging = useRef(false);
   const theme = useThemeVersion();
   const playTime = usePlayheadTime(playhead);
+  const playX = axis ? axis.toX(playTime) : playTime;
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -174,7 +187,7 @@ export function Chart({ title, unit, time, series, playhead, confidence, decimal
     ctx.textBaseline = 'top';
     for (const t of niceTicks(t0, t1, Math.max(3, Math.floor(width / 90)))) {
       ctx.fillStyle = text;
-      ctx.fillText(`${Number(t.toFixed(2))}s`, px(t), height - M.bottom + 5);
+      ctx.fillText(axis ? axis.tick(t) : `${Number(t.toFixed(2))}s`, px(t), height - M.bottom + 5);
     }
 
     ctx.lineWidth = 2;
@@ -240,7 +253,7 @@ export function Chart({ title, unit, time, series, playhead, confidence, decimal
       ctx.restore();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [time, series, confidence, width, height, theme, lo, hi, markers, bands, guides]);
+  }, [time, series, confidence, width, height, theme, lo, hi, markers, bands, guides, axis]);
 
   // Cursor layer: playhead line + markers, and hover crosshair.
   useEffect(() => {
@@ -248,6 +261,7 @@ export function Chart({ title, unit, time, series, playhead, confidence, decimal
     if (!c) return;
     const ctx = setup(c);
     const draw = (t: number, alpha: number, markers: boolean) => {
+      if (axis && (t < t0 || t > t1)) return; // the playhead is outside this chart's range
       const x = Math.round(px(Math.min(Math.max(t, t0), t1))) + 0.5;
       ctx.globalAlpha = alpha;
       ctx.strokeStyle = cssVar('--text-2');
@@ -270,18 +284,19 @@ export function Chart({ title, unit, time, series, playhead, confidence, decimal
         ctx.stroke();
       }
     };
-    draw(playTime, 0.9, hover === null);
+    draw(playX, 0.9, hover === null);
     if (hover !== null) draw(hover, 0.5, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playTime, hover, time, series, width, height, theme, lo, hi]);
+  }, [playX, hover, time, series, width, height, theme, lo, hi]);
 
+  /** x (chart units) under the pointer. */
   const timeFromEvent = (e: React.PointerEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const f = (e.clientX - rect.left - M.left) / (rect.width - M.left - M.right);
     return t0 + Math.min(Math.max(f, 0), 1) * (t1 - t0);
   };
 
-  const readoutTime = hover ?? playTime;
+  const readoutTime = hover ?? playX;
   const ri = indexAt(time, readoutTime);
   const fmt = (v: number) => (Number.isFinite(v) ? v.toFixed(decimals) : '–');
 
@@ -309,12 +324,12 @@ export function Chart({ title, unit, time, series, playhead, confidence, decimal
           onPointerDown={(e) => {
             dragging.current = true;
             e.currentTarget.setPointerCapture(e.pointerId);
-            playhead.seek(timeFromEvent(e));
+            playhead.seek(axis ? axis.toSeconds(timeFromEvent(e)) : timeFromEvent(e));
           }}
           onPointerMove={(e) => {
             const t = timeFromEvent(e);
             setHover(t);
-            if (dragging.current) playhead.seek(t);
+            if (dragging.current) playhead.seek(axis ? axis.toSeconds(t) : t);
           }}
           onPointerUp={() => (dragging.current = false)}
           onPointerLeave={() => setHover(null)}
