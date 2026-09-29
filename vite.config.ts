@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 /**
@@ -16,7 +17,7 @@ const csp = [
   "worker-src 'self' blob:",
 ].join('; ');
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     {
@@ -26,7 +27,23 @@ export default defineConfig({
         { tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: csp }, injectTo: 'head-prepend' },
       ],
     },
+    {
+      // Link previews need absolute URLs. Set SITE_URL (e.g. https://example.org/trampovision/) when building.
+      name: 'open-graph-urls',
+      apply: 'build',
+      transformIndexHtml: () => {
+        const site = loadEnv(mode, '.', '').SITE_URL;
+        if (!site) return [];
+        const base = site.endsWith('/') ? site : `${site}/`;
+        const image = `${base}og-image.png`;
+        return [
+          { tag: 'meta', attrs: { property: 'og:url', content: base }, injectTo: 'head' as const },
+          { tag: 'meta', attrs: { property: 'og:image', content: image }, injectTo: 'head' as const },
+          { tag: 'meta', attrs: { name: 'twitter:image', content: image }, injectTo: 'head' as const },
+        ];
+      },
+    },
   ],
   optimizeDeps: { exclude: ['@ffmpeg/ffmpeg'] },
   test: { environment: 'node', include: ['src/**/*.test.ts'] },
-});
+}));

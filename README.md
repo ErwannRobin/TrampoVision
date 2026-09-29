@@ -31,6 +31,8 @@ npm run build        # production build (adds a strict Content-Security-Policy)
 
 `make help` lists shortcuts (`make dev`, `make check`, `make lint`, `make format`, `make build`, `make clean`). Lint is oxlint rather than ESLint because typescript-eslint does not support TypeScript 7 yet; formatting is Prettier. Node version is pinned in `.nvmrc`; CI (`.github/workflows/ci.yml`) runs `make check` and `make build`.
 
+Link previews (Open Graph / Twitter card) use `public/og-image.png` (source: `scripts/og-image.html`, rendered at 1200×630). Crawlers need absolute URLs, so build with the deployed address: `SITE_URL=https://your.host/path/ make build` adds `og:url` and `og:image`.
+
 `npm install` needs internet once (models come from Google's public MediaPipe bucket). Afterwards the app
 works offline. If the download failed, run `npm run fetch-assets`.
 
