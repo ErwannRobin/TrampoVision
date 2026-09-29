@@ -16,7 +16,14 @@ export interface RecordViews {
   signals: {
     u: number[];
     timeS: number[];
-    comTrajectory: { heightBodyLengths: number[]; xBodyLengths: number[]; xBed: number[]; heightM: number[]; xM: number[]; vyMps: number[] };
+    comTrajectory: {
+      heightBodyLengths: number[];
+      xBodyLengths: number[];
+      xBed: number[];
+      heightM: number[];
+      xM: number[];
+      vyMps: number[];
+    };
     bodyOrientation: { turnsSinceTakeoff: number[]; sin: number[]; cos: number[] };
     angularVelocityTurnsPerS: number[];
     jointAngles: { hipDeg: number[]; kneeDeg: number[]; shoulderHipAxisDeg: number[] };
@@ -57,7 +64,11 @@ export function recordViews(r: JumpRecord): RecordViews {
       },
       bodyOrientation: { turnsSinceTakeoff: col('orient_turns'), sin: col('orient_sin'), cos: col('orient_cos') },
       angularVelocityTurnsPerS: col('angvel_turns_per_s'),
-      jointAngles: { hipDeg: col('hip_angle_deg'), kneeDeg: col('knee_angle_deg'), shoulderHipAxisDeg: col('shoulder_hip_axis_deg') },
+      jointAngles: {
+        hipDeg: col('hip_angle_deg'),
+        kneeDeg: col('knee_angle_deg'),
+        shoulderHipAxisDeg: col('shoulder_hip_axis_deg'),
+      },
       shape: { kneeToTorso: col('knee_torso'), legSeparation: col('leg_separation'), compactness: col('compactness') },
       bodyPosition: col('position').map((p) => POSITIONS[p] ?? 'unknown'),
       poseQuality: col('quality'),
@@ -66,7 +77,8 @@ export function recordViews(r: JumpRecord): RecordViews {
 }
 
 /** NaN and infinity become null; numbers are rounded to 5 decimals. */
-const replacer = (_k: string, v: unknown) => (typeof v === 'number' ? (Number.isFinite(v) ? Math.round(v * 1e5) / 1e5 : null) : v);
+const replacer = (_k: string, v: unknown) =>
+  typeof v === 'number' ? (Number.isFinite(v) ? Math.round(v * 1e5) / 1e5 : null) : v;
 
 export interface DatasetFile {
   schema: typeof DATASET_SCHEMA;
@@ -96,16 +108,29 @@ export function parseDataset(text: string): JumpRecord[] {
     throw new Error('This file is not valid JSON.');
   }
   if (!data || data.schema !== DATASET_SCHEMA) throw new Error('This is not a TrampoVision dataset file.');
-  if (typeof data.version !== 'number' || data.version > DATASET_VERSION) throw new Error(`Unsupported dataset version (${String(data.version)}); this app reads version ${DATASET_VERSION}.`);
+  if (typeof data.version !== 'number' || data.version > DATASET_VERSION)
+    throw new Error(
+      `Unsupported dataset version (${String(data.version)}); this app reads version ${DATASET_VERSION}.`,
+    );
   if (!Array.isArray(data.records)) throw new Error('The dataset has no records.');
   return data.records.map((raw, i) => {
     const r = raw as Partial<JumpRecord> & { views?: unknown };
-    if (r.schema !== RECORD_SCHEMA || r.version !== RECORD_VERSION || typeof r.id !== 'string' || typeof r.videoId !== 'string' || !r.features || !r.prediction || !r.timestamps) {
+    if (
+      r.schema !== RECORD_SCHEMA ||
+      r.version !== RECORD_VERSION ||
+      typeof r.id !== 'string' ||
+      typeof r.videoId !== 'string' ||
+      !r.features ||
+      !r.prediction ||
+      !r.timestamps
+    ) {
       throw new Error(`Record ${i + 1} is not a valid jump record.`);
     }
     const { views: _views, ...rest } = r;
     void _views;
-    const seq = rest.sequence ? { ...rest.sequence, data: rest.sequence.data.map((row) => row.map((v) => (v === null ? NaN : v))) } : null;
+    const seq = rest.sequence
+      ? { ...rest.sequence, data: rest.sequence.data.map((row) => row.map((v) => (v === null ? NaN : v))) }
+      : null;
     return { ...(rest as JumpRecord), sequence: seq, twistTruth: rest.twistTruth ?? null, truth: rest.truth ?? null };
   });
 }
@@ -123,10 +148,13 @@ const DATASET_COLUMNS: Col[] = [
   ['file_name', (r) => r.source.fileName],
   ['truth', (r) => r.truth?.label ?? ''],
   ['predicted', (r) => predictionOf(r)],
-  ['correct', (r) => {
-    const t = labelOf(r);
-    return t === null || t === 'unknown' ? '' : agrees(t, predictionOf(r));
-  }],
+  [
+    'correct',
+    (r) => {
+      const t = labelOf(r);
+      return t === null || t === 'unknown' ? '' : agrees(t, predictionOf(r));
+    },
+  ],
   ...FEATURE_COLUMNS.filter(([name]) => name !== 'jump').map<Col>(([name, get]) => [name, (r) => get(flat(r))]),
   ['twist_available', (r) => r.twist?.estimate.available ?? false],
   ['twist_deg', (r) => r.twist?.estimate.totalDeg ?? null],
@@ -157,12 +185,26 @@ export interface EvaluationReport {
   classifiers: { id: string; version: string }[];
   distinctConfigs: number;
   metrics: Metrics;
-  jumps: { id: string; videoId: string; jumpId: number; truth: string | null; predicted: string; confidence: number; correct: boolean | null }[];
+  jumps: {
+    id: string;
+    videoId: string;
+    jumpId: number;
+    truth: string | null;
+    predicted: string;
+    confidence: number;
+    correct: boolean | null;
+  }[];
   failures: string[];
 }
 
-export function buildEvaluationReport(records: JumpRecord[], scope: { kind: 'all' | 'video'; videoId?: string }, now = new Date()): EvaluationReport {
-  const cls = new Map(records.map((r) => [`${r.analysis.classifier.id}@${r.analysis.classifier.version}`, r.analysis.classifier]));
+export function buildEvaluationReport(
+  records: JumpRecord[],
+  scope: { kind: 'all' | 'video'; videoId?: string },
+  now = new Date(),
+): EvaluationReport {
+  const cls = new Map(
+    records.map((r) => [`${r.analysis.classifier.id}@${r.analysis.classifier.version}`, r.analysis.classifier]),
+  );
   return {
     schema: EVALUATION_SCHEMA,
     version: EVALUATION_VERSION,
@@ -174,7 +216,15 @@ export function buildEvaluationReport(records: JumpRecord[], scope: { kind: 'all
     jumps: records.map((r) => {
       const t = labelOf(r);
       const p = predictionOf(r);
-      return { id: r.id, videoId: r.videoId, jumpId: r.jumpId, truth: t, predicted: p, confidence: r.prediction.confidence, correct: t === null || t === 'unknown' ? null : agrees(t, p) };
+      return {
+        id: r.id,
+        videoId: r.videoId,
+        jumpId: r.jumpId,
+        truth: t,
+        predicted: p,
+        confidence: r.prediction.confidence,
+        correct: t === null || t === 'unknown' ? null : agrees(t, p),
+      };
     }),
     failures: findFailures(records).map((f) => f.record.id),
   };
@@ -187,7 +237,16 @@ export const toEvaluationJson = (report: EvaluationReport): string => JSON.strin
  * matrix (how many of that label were predicted as each column). Precision and accuracy belong to the class, so "unknown" has none.
  */
 export function toEvaluationCsv(m: Metrics): string {
-  const head = ['true_label', 'samples', 'predicted_as_this', 'correct', 'precision', 'recall', 'accuracy_one_vs_rest', ...PREDICTED_COLUMNS.map((c) => `pred_${c}`)];
+  const head = [
+    'true_label',
+    'samples',
+    'predicted_as_this',
+    'correct',
+    'precision',
+    'recall',
+    'accuracy_one_vs_rest',
+    ...PREDICTED_COLUMNS.map((c) => `pred_${c}`),
+  ];
   const rows = [head.join(',')];
   m.matrix.rows.forEach((label, i) => {
     const cls = m.perClass.find((c) => c.label === label);
@@ -225,10 +284,22 @@ export function toEvaluationCsv(m: Metrics): string {
   return rows.join('\n');
 }
 
-
 /** Every extracted feature of a record (and its twist) as name / text pairs, for reading on screen. */
 export function flatRows(r: JumpRecord): [string, string][] {
-  return DATASET_COLUMNS.filter(([name]) => !['video_id', 'jump_id', 'file_name', 'truth', 'predicted', 'correct', 'note', 'labeled_at', 'classifier'].includes(name)).map(([name, get]) => {
+  return DATASET_COLUMNS.filter(
+    ([name]) =>
+      ![
+        'video_id',
+        'jump_id',
+        'file_name',
+        'truth',
+        'predicted',
+        'correct',
+        'note',
+        'labeled_at',
+        'classifier',
+      ].includes(name),
+  ).map(([name, get]) => {
     const v = get(r);
     return [name, v === null || v === '' ? '–' : typeof v === 'number' ? String(Number(v.toFixed(3))) : String(v)];
   });

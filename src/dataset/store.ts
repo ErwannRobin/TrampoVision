@@ -31,7 +31,7 @@ export function createMemoryStore(initial: JumpRecord[] = []): DatasetStore {
 const DB_NAME = 'trampovision';
 const STORE = 'jump-records';
 
-const wrap = <T,>(req: IDBRequest<T>): Promise<T> =>
+const wrap = <T>(req: IDBRequest<T>): Promise<T> =>
   new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error ?? new Error('IndexedDB request failed'));
@@ -92,7 +92,10 @@ export async function openDatasetStore(): Promise<{ store: DatasetStore; warning
 }
 
 /** Records to write when `incoming` is merged into `existing`: a new id is added, a known id is replaced only by a newer copy. */
-export function mergeRecords(existing: JumpRecord[], incoming: JumpRecord[]): { toPut: JumpRecord[]; added: number; updated: number; kept: number } {
+export function mergeRecords(
+  existing: JumpRecord[],
+  incoming: JumpRecord[],
+): { toPut: JumpRecord[]; added: number; updated: number; kept: number } {
   const byId = new Map(existing.map((r) => [r.id, r]));
   const toPut: JumpRecord[] = [];
   let added = 0;

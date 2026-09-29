@@ -77,7 +77,8 @@ describe('detectJumps', () => {
   it('exposes a scale error through the free-fall check', () => {
     const { input } = inputFrom(routine);
     const stretched = { ...input, height: input.height.map((h) => h * 1.2), vy: input.vy.map((v) => v * 1.2) };
-    for (const c of detectJumps(stretched).cycles) expect(Math.abs(c.impliedGravityMps2! / GRAVITY - 1.2)).toBeLessThan(0.04);
+    for (const c of detectJumps(stretched).cycles)
+      expect(Math.abs(c.impliedGravityMps2! / GRAVITY - 1.2)).toBeLessThan(0.04);
   });
 
   it('still works with 1.5 cm of noise on the height', () => {
@@ -143,14 +144,27 @@ describe('detectJumps', () => {
   });
 
   it('measures horizontal displacement between takeoff and landing', () => {
-    const { input } = inputFrom({ jumps: [{ v0: 5, driftM: 0.8 }, { v0: 5, driftM: -0.5 }] });
+    const { input } = inputFrom({
+      jumps: [
+        { v0: 5, driftM: 0.8 },
+        { v0: 5, driftM: -0.5 },
+      ],
+    });
     const { cycles } = detectJumps(input);
     near(cycles[0].horizontalDisplacementM, 0.8, 0.08);
     near(cycles[1].horizontalDisplacementM, -0.5, 0.08);
   });
 
   it('counts somersaults from the continuous orientation, to the nearest quarter turn', () => {
-    const { input } = inputFrom({ jumps: [{ v0: 5, turns: 2 }, { v0: 5, turns: 1.5 }, { v0: 5, turns: -1 }, { v0: 5, turns: 0.9 }, { v0: 5, turns: 0.5 }] });
+    const { input } = inputFrom({
+      jumps: [
+        { v0: 5, turns: 2 },
+        { v0: 5, turns: 1.5 },
+        { v0: 5, turns: -1 },
+        { v0: 5, turns: 0.9 },
+        { v0: 5, turns: 0.5 },
+      ],
+    });
     const { cycles } = detectJumps(input);
     expect(cycles).toHaveLength(5);
     expect(cycles.map((c) => c.quarterTurns)).toEqual([8, 6, -4, 4, 2]);
@@ -159,7 +173,12 @@ describe('detectJumps', () => {
   });
 
   it('runs a live rotation counter that resets at takeoff and freezes at landing', () => {
-    const { input } = inputFrom({ jumps: [{ v0: 5, turns: 1 }, { v0: 5, turns: 2 }] });
+    const { input } = inputFrom({
+      jumps: [
+        { v0: 5, turns: 1 },
+        { v0: 5, turns: 2 },
+      ],
+    });
     const r = detectJumps(input);
     const [a, b] = r.cycles;
     expect(r.turnsSinceTakeoff[a.apex]).toBeGreaterThan(0.4);

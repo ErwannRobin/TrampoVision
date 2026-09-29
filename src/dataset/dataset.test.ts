@@ -5,7 +5,15 @@ import { syntheticTwistJump } from '../pose3d/testTwistMannequin';
 import { analyzeSkills } from '../skills/analyzeSkills';
 import { mannequinRoutine, type MannequinJump } from '../skills/testMannequin';
 import type { SkillId } from '../skills/types';
-import { buildEvaluationReport, parseDataset, recordViews, toDatasetCsv, toDatasetJson, toEvaluationCsv, toEvaluationJson } from './export';
+import {
+  buildEvaluationReport,
+  parseDataset,
+  recordViews,
+  toDatasetCsv,
+  toDatasetJson,
+  toEvaluationCsv,
+  toEvaluationJson,
+} from './export';
 import { checksFor, findFailures } from './failures';
 import { agrees, computeMetrics, predictedClass, wilson } from './metrics';
 import { isStale, matchRecord, syncRecords, withTruth, withTwistTruth, type RecordContext } from './record';
@@ -14,8 +22,19 @@ import { TRUTH_LABELS, type JumpRecord, type TruthLabel } from './types';
 import { videoIdFromTrack, videoIdOf } from './videoId';
 
 /** A record with only what the metrics read. */
-const fake = (truth: TruthLabel | null, skill: SkillId, confidence = 0.8, id = Math.random().toString(36)): JumpRecord =>
-  ({ id, videoId: 'v', jumpId: 1, truth: truth ? { label: truth, labeledAt: 'x' } : null, prediction: { skill, confidence } }) as unknown as JumpRecord;
+const fake = (
+  truth: TruthLabel | null,
+  skill: SkillId,
+  confidence = 0.8,
+  id = Math.random().toString(36),
+): JumpRecord =>
+  ({
+    id,
+    videoId: 'v',
+    jumpId: 1,
+    truth: truth ? { label: truth, labeledAt: 'x' } : null,
+    prediction: { skill, confidence },
+  }) as unknown as JumpRecord;
 
 describe('predictions in the label space', () => {
   it('maps every skill id and treats "unknown" as agreeing only with "not classified"', () => {
@@ -108,7 +127,14 @@ describe('records from a real analysis', () => {
   const result = computeAnalysis(track, { athleteHeightM: 1.75 });
   const build = (skillsConfig?: Parameters<typeof analyzeSkills>[1]): RecordContext => {
     const skills = analyzeSkills(result, skillsConfig);
-    return { videoId: 'v-test', fileName: 'clip.mp4', result, skills, twist: null, now: new Date('2026-01-01T00:00:00Z') };
+    return {
+      videoId: 'v-test',
+      fileName: 'clip.mp4',
+      result,
+      skills,
+      twist: null,
+      now: new Date('2026-01-01T00:00:00Z'),
+    };
   };
   const ctx = build();
   const saved = syncRecords([], ctx);
@@ -134,7 +160,9 @@ describe('records from a real analysis', () => {
     expect(v.skeleton!.joints).toContain('left_hip');
     expect(v.skeleton!.data).toHaveLength(32);
     expect(v.skeleton!.data[0]).toHaveLength(v.skeleton!.joints.length);
-    expect(Object.keys(v.signals!)).toEqual(expect.arrayContaining(['comTrajectory', 'bodyOrientation', 'angularVelocityTurnsPerS', 'jointAngles']));
+    expect(Object.keys(v.signals!)).toEqual(
+      expect.arrayContaining(['comTrajectory', 'bodyOrientation', 'angularVelocityTurnsPerS', 'jointAngles']),
+    );
     expect(v.signals!.bodyOrientation.turnsSinceTakeoff.at(-1)!).toBeGreaterThan(0.8);
     expect(v.signals!.jointAngles.hipDeg).toHaveLength(32);
   });
@@ -178,7 +206,8 @@ describe('records from a real analysis', () => {
     expect(pos.measured).toContain('tuck');
     expect(checks.find((c) => c.signal === 'Rotation')!.status).toBe('ok');
     // The mannequin faces right and turns clockwise: that is a front somersault. Labeled back, the direction check is off; labeled front, ok.
-    const dirOf = (label: 'back' | 'front') => checksFor(withTruth(saved[3], label), label).find((c) => c.signal === 'Somersault direction')!;
+    const dirOf = (label: 'back' | 'front') =>
+      checksFor(withTruth(saved[3], label), label).find((c) => c.signal === 'Somersault direction')!;
     expect(dirOf('back').status).toBe('off');
     expect(dirOf('back').measured).toBe('clockwise, facing right: front');
     expect(dirOf('front').status).toBe('ok');
@@ -186,13 +215,20 @@ describe('records from a real analysis', () => {
   });
 
   it('lists every disagreement, confident wrong answers first, and hides nothing', () => {
-    const wrong = [withTruth(saved[0], 'tuck'), withTruth(saved[1], 'tuck'), withTruth(saved[2], 'straight'), withTruth(saved[3], 'unknown')];
+    const wrong = [
+      withTruth(saved[0], 'tuck'),
+      withTruth(saved[1], 'tuck'),
+      withTruth(saved[2], 'straight'),
+      withTruth(saved[3], 'unknown'),
+    ];
     const failures = findFailures(wrong);
     expect(failures.map((f) => f.record.jumpId).sort()).toEqual([1, 3, 4]); // jump 2 is right
     expect(failures.every((f) => f.checks.length >= 2)).toBe(true); // even an "unknown" label gets the data-quality checks
     const confs = failures.map((f) => f.confidence);
     expect(confs).toEqual([...confs].sort((a, b) => b - a));
-    const low = findFailures([withTruth({ ...saved[0], prediction: { ...saved[0].prediction, confidence: 0.1 } }, 'tuck')]);
+    const low = findFailures([
+      withTruth({ ...saved[0], prediction: { ...saved[0].prediction, confidence: 0.1 } }, 'tuck'),
+    ]);
     expect(low).toHaveLength(1);
     expect(low[0].lowConfidence).toBe(true);
     // A jump labeled Unknown that the classifier named anyway says so in its checks.
@@ -203,7 +239,9 @@ describe('records from a real analysis', () => {
   });
 
   it('exports and re-imports the dataset without loss', () => {
-    const labeled = saved.map((r, k) => withTruth(r, (['straight', 'tuck', 'pike', 'back'] as const)[k], { note: 'a, "quoted" note' }));
+    const labeled = saved.map((r, k) =>
+      withTruth(r, (['straight', 'tuck', 'pike', 'back'] as const)[k], { note: 'a, "quoted" note' }),
+    );
     const json = toDatasetJson(labeled, new Date('2026-01-02T00:00:00Z'));
     expect(json).not.toContain('NaN');
     const back = parseDataset(json);
@@ -218,12 +256,16 @@ describe('records from a real analysis', () => {
   });
 
   it('writes one CSV row per jump with the label, the prediction and whether it was right', () => {
-    const labeled = saved.map((r, k) => withTruth(r, (['straight', 'tuck', 'tuck', 'unknown'] as const)[k], { note: 'a, "b"' }));
+    const labeled = saved.map((r, k) =>
+      withTruth(r, (['straight', 'tuck', 'tuck', 'unknown'] as const)[k], { note: 'a, "b"' }),
+    );
     const rows = toDatasetCsv(labeled).split('\n');
     const head = rows[0].split(',');
     expect(rows).toHaveLength(5);
     expect(head.slice(0, 6)).toEqual(['video_id', 'jump_id', 'file_name', 'truth', 'predicted', 'correct']);
-    expect(head).toEqual(expect.arrayContaining(['hip_angle_at_peak_deg', 'rotation_deg', 'skill_confidence', 'twist_deg']));
+    expect(head).toEqual(
+      expect.arrayContaining(['hip_angle_at_peak_deg', 'rotation_deg', 'skill_confidence', 'twist_deg']),
+    );
     expect(rows[1]).toMatch(/^v-test,1,clip.mp4,straight,straight,1,/);
     expect(rows[3]).toContain(',tuck,pike,0,'); // labeled tuck, predicted pike
     expect(rows[4]).toContain(',unknown,'); // unknown: no correct/incorrect
@@ -250,7 +292,11 @@ describe('records from a real analysis', () => {
     const s = syntheticTwistJump({ somersaultTurns: 1, twistTurns: 1 });
     const twist = analyzeTwist({ ...s.input, cycles: [{ ...s.input.cycles[0] }] });
     // One synthetic jump only: reuse the first record's context but with this twist analysis as jump 0.
-    const rec = syncRecords([], { ...ctx, twist: { ...twist, jumps: [twist.jumps[0], twist.jumps[0], twist.jumps[0], twist.jumps[0]] } }, [0])[0];
+    const rec = syncRecords(
+      [],
+      { ...ctx, twist: { ...twist, jumps: [twist.jumps[0], twist.jumps[0], twist.jumps[0], twist.jumps[0]] } },
+      [0],
+    )[0];
     expect(rec.twist).not.toBeNull();
     const annotated = withTwistTruth(rec, 2);
     expect(annotated.twistTruth?.halfTwists).toBe(2);
@@ -260,7 +306,8 @@ describe('records from a real analysis', () => {
 });
 
 describe('local storage and merging', () => {
-  const rec = (id: string, savedAt: string, label: TruthLabel | null = null) => ({ ...fake(label, 'straight-jump', 0.8, id), savedAt }) as JumpRecord;
+  const rec = (id: string, savedAt: string, label: TruthLabel | null = null) =>
+    ({ ...fake(label, 'straight-jump', 0.8, id), savedAt }) as JumpRecord;
 
   it('keeps records in the store, replaces by id and clears', async () => {
     const store = createMemoryStore([rec('a', '1')]);

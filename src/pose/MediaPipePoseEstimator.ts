@@ -1,11 +1,5 @@
 import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
-import type {
-  BackendInfo,
-  EstimatorOptions,
-  PoseDetection,
-  PoseEstimator,
-  PoseEstimatorFactory,
-} from './types';
+import type { BackendInfo, EstimatorOptions, PoseDetection, PoseEstimator, PoseEstimatorFactory } from './types';
 
 const BASE = import.meta.env.BASE_URL;
 type Fileset = Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>;
@@ -21,11 +15,7 @@ function modelUrl(variant: EstimatorOptions['model']): string {
   return `${BASE}models/pose_landmarker_${variant}.task`;
 }
 
-async function create(
-  fileset: Fileset,
-  options: EstimatorOptions,
-  delegate: 'GPU' | 'CPU',
-): Promise<PoseLandmarker> {
+async function create(fileset: Fileset, options: EstimatorOptions, delegate: 'GPU' | 'CPU'): Promise<PoseLandmarker> {
   const landmarker = await PoseLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: modelUrl(options.model), delegate },
     runningMode: 'VIDEO',

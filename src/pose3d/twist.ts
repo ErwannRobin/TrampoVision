@@ -59,7 +59,15 @@ export interface TwistEstimate {
   confidence: number;
   /** confidence >= the configured minimum. Otherwise the number must not be presented as a measurement. */
   reliable: boolean;
-  parts: { rounding: number; coverage: number; steps: number; monotonic: number; shoulderHip: number; axisDepth: number; depth: number };
+  parts: {
+    rounding: number;
+    coverage: number;
+    steps: number;
+    monotonic: number;
+    shoulderHip: number;
+    axisDepth: number;
+    depth: number;
+  };
   /** The same net twist by other routes: shoulder line only, hip line only, image-plane axis. */
   cross: { shouldersDeg: number | null; hipsDeg: number | null; inPlaneAxisDeg: number | null };
   /** Variation (std / mean) of the 3D shoulder width during the flight. */
@@ -90,7 +98,8 @@ export interface TwistInput {
 }
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
-const ramp = (v: number, ok: number, max: number, floor: number) => (v <= ok ? 1 : v >= max ? floor : 1 - (1 - floor) * ((v - ok) / (max - ok)));
+const ramp = (v: number, ok: number, max: number, floor: number) =>
+  v <= ok ? 1 : v >= max ? floor : 1 - (1 - floor) * ((v - ok) / (max - ok));
 const foldHalf = (d: number) => d - 180 * Math.round(d / 180);
 const wrap180 = (d: number) => d - 360 * Math.round(d / 360);
 
@@ -126,7 +135,8 @@ function stepsOf(t: TorsoFrames, line: 'shoulders' | 'hips', mode: 'full' | 'pla
     const e1 = cross(z, a);
     angle[i] = (Math.atan2(dot(l, z), dot(l, e1)) * 180) / Math.PI;
   }
-  for (let i = 1; i < t.count; i++) if (Number.isFinite(angle[i]) && Number.isFinite(angle[i - 1])) out[i] = wrap180(angle[i] - angle[i - 1]);
+  for (let i = 1; i < t.count; i++)
+    if (Number.isFinite(angle[i]) && Number.isFinite(angle[i - 1])) out[i] = wrap180(angle[i] - angle[i - 1]);
   return out;
 }
 
@@ -144,7 +154,8 @@ function fold(raw: Float64Array, limit: number, flips: Uint8Array): Float64Array
   return out;
 }
 
-const meanOfFinite = (a: number, b: number) => (Number.isFinite(a) && Number.isFinite(b) ? (a + b) / 2 : Number.isFinite(a) ? a : Number.isFinite(b) ? b : NaN);
+const meanOfFinite = (a: number, b: number) =>
+  Number.isFinite(a) && Number.isFinite(b) ? (a + b) / 2 : Number.isFinite(a) ? a : Number.isFinite(b) ? b : NaN;
 
 /** Sum of the steps; where a step is unknown the angle stays where it was. NaN where the torso itself is unknown. */
 function cumulate(step: Float64Array, valid: Uint8Array): Float64Array {
@@ -181,7 +192,8 @@ export function computeTwistFrames(world: (WorldPoint[] | null)[], fps: number, 
     stepPlane[i] = meanOfFinite(sP1[i], sP2[i]);
     const a = rawS[i];
     const b = rawH[i];
-    rawStep[i] = Number.isFinite(a) && Number.isFinite(b) ? (Math.abs(a) >= Math.abs(b) ? a : b) : Number.isFinite(a) ? a : b;
+    rawStep[i] =
+      Number.isFinite(a) && Number.isFinite(b) ? (Math.abs(a) >= Math.abs(b) ? a : b) : Number.isFinite(a) ? a : b;
   }
   const angle = cumulate(step, torso.valid);
   const angleShoulders = cumulate(sS, torso.valid);
@@ -260,10 +272,17 @@ export function estimateTwistForJump(
   cfg: TwistConfig,
 ): TwistEstimate {
   const { torso } = frames;
-  if (!cycle.complete || cycle.takeoff === null || cycle.landing === null || cycle.takeoffTimeS === null || cycle.landingTimeS === null) {
+  if (
+    !cycle.complete ||
+    cycle.takeoff === null ||
+    cycle.landing === null ||
+    cycle.takeoffTimeS === null ||
+    cycle.landingTimeS === null
+  ) {
     return UNAVAILABLE({
       signal: 'Twist',
-      problem: 'This jump is cut off by the start or the end of the clip, so the twist between takeoff and landing cannot be summed.',
+      problem:
+        'This jump is cut off by the start or the end of the clip, so the twist between takeoff and landing cannot be summed.',
       needed: 'A clip that shows the whole flight.',
     });
   }
@@ -361,7 +380,10 @@ export function estimateTwistForJump(
     coverage: clamp01(coverage),
     steps: flips > 0 ? Math.max(0.15, 0.5 ** flips) : maxStep <= half ? 1 : 1 - 0.4 * clamp01((maxStep - half) / half),
     monotonic: ramp(reversal, cfg.reversalOkDeg, cfg.reversalMaxDeg, 0.2),
-    shoulderHip: shouldersDeg !== null && hipsDeg !== null ? ramp(Math.abs(shouldersDeg - hipsDeg), cfg.agreeOkDeg, cfg.agreeMaxDeg, 0.1) : 0.7,
+    shoulderHip:
+      shouldersDeg !== null && hipsDeg !== null
+        ? ramp(Math.abs(shouldersDeg - hipsDeg), cfg.agreeOkDeg, cfg.agreeMaxDeg, 0.1)
+        : 0.7,
     axisDepth: planeDeg !== null ? ramp(Math.abs(totalDeg - planeDeg), cfg.agreeOkDeg, cfg.agreeMaxDeg, 0.1) : 0.7,
     depth: cv !== null ? ramp(cv, cfg.widthCvOk, cfg.widthCvMax, 0.1) : 0.7,
   };
@@ -369,7 +391,11 @@ export function estimateTwistForJump(
 
   const limitations: Limitation[] = [];
   if (parts.coverage < 0.75) {
-    limitations.push({ signal: '3D torso coverage', problem: `The shoulders and hips were measured in only ${pct(coverage)} of the flight; the rest was bridged or missing.`, needed: 'A clearer view of the torso through the whole flight.' });
+    limitations.push({
+      signal: '3D torso coverage',
+      problem: `The shoulders and hips were measured in only ${pct(coverage)} of the flight; the rest was bridged or missing.`,
+      needed: 'A clearer view of the torso through the whole flight.',
+    });
   }
   if (parts.axisDepth < 0.8 && planeDeg !== null) {
     limitations.push({
@@ -379,10 +405,18 @@ export function estimateTwistForJump(
     });
   }
   if (parts.shoulderHip < 0.8 && shouldersDeg !== null && hipsDeg !== null) {
-    limitations.push({ signal: 'Shoulders vs hips', problem: `The shoulder line says ${deg(shouldersDeg)} and the hip line ${deg(hipsDeg)}: they should turn together over a whole flight.`, needed: 'More reliable shoulder and hip landmarks (both are estimated, not measured).' });
+    limitations.push({
+      signal: 'Shoulders vs hips',
+      problem: `The shoulder line says ${deg(shouldersDeg)} and the hip line ${deg(hipsDeg)}: they should turn together over a whole flight.`,
+      needed: 'More reliable shoulder and hip landmarks (both are estimated, not measured).',
+    });
   }
   if (cv !== null && parts.depth < 0.8) {
-    limitations.push({ signal: 'Depth consistency', problem: `The 3D shoulder width varies by ${pct(cv)} during the flight. A rigid body keeps it constant, so the depth values are noisy.`, needed: 'Better depth: a second camera, or a model trained for athletes in the air.' });
+    limitations.push({
+      signal: 'Depth consistency',
+      problem: `The 3D shoulder width varies by ${pct(cv)} during the flight. A rigid body keeps it constant, so the depth values are noisy.`,
+      needed: 'Better depth: a second camera, or a model trained for athletes in the air.',
+    });
   }
   if (flips > 0) {
     limitations.push({
@@ -391,13 +425,25 @@ export function estimateTwistForJump(
       needed: 'A higher frame rate, or a pose model that keeps left and right stable when the athlete turns.',
     });
   } else if (parts.steps < 0.9) {
-    limitations.push({ signal: 'Frame rate', problem: `The largest twist step between two frames is ${deg(maxStep)}; above ${cfg.maxStepDeg}° a twist cannot be told from a swap.`, needed: 'A higher frame rate.' });
+    limitations.push({
+      signal: 'Frame rate',
+      problem: `The largest twist step between two frames is ${deg(maxStep)}; above ${cfg.maxStepDeg}° a twist cannot be told from a swap.`,
+      needed: 'A higher frame rate.',
+    });
   }
   if (parts.monotonic < 0.8) {
-    limitations.push({ signal: 'Twist direction', problem: `The accumulated twist went one way and came back by ${deg(reversal)}: a real twist keeps turning one way, so the pose model probably flipped the body.`, needed: 'A more stable pose estimate.' });
+    limitations.push({
+      signal: 'Twist direction',
+      problem: `The accumulated twist went one way and came back by ${deg(reversal)}: a real twist keeps turning one way, so the pose model probably flipped the body.`,
+      needed: 'A more stable pose estimate.',
+    });
   }
   if (parts.rounding < 0.5) {
-    limitations.push({ signal: 'Rounding', problem: `${deg(Math.abs(totalDeg))} is ${deg(Math.abs(residual))} away from a whole number of half twists.`, needed: 'A cleaner estimate; the true twist is a multiple of 180° at landing.' });
+    limitations.push({
+      signal: 'Rounding',
+      problem: `${deg(Math.abs(totalDeg))} is ${deg(Math.abs(residual))} away from a whole number of half twists.`,
+      needed: 'A cleaner estimate; the true twist is a multiple of 180° at landing.',
+    });
   }
   const depthDominated = nDepth ? depthShare / nDepth : null;
   if (depthDominated !== null && depthDominated > 0.5) {
@@ -450,7 +496,14 @@ export interface TwistSequence {
   data: number[][];
 }
 
-export const TWIST_SEQUENCE_COLUMNS = ['u', 'twist_deg', 'twist_plane_axis_deg', 'twist_velocity_dps', 'axis_tilt_deg', 'shoulder_width_m'];
+export const TWIST_SEQUENCE_COLUMNS = [
+  'u',
+  'twist_deg',
+  'twist_plane_axis_deg',
+  'twist_velocity_dps',
+  'axis_tilt_deg',
+  'shoulder_width_m',
+];
 
 export function twistSequence(
   frames: TwistFrames,

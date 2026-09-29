@@ -135,7 +135,14 @@ export function stabilizePose(track: PoseTrack, options: Partial<StabilizeOption
   const score = Array.from({ length: LANDMARK_COUNT }, () => new Float64Array(n));
   const smoothX: Float64Array[] = [];
   const smoothY: Float64Array[] = [];
-  const stats: StabilizeStats = { measured: 0, interpolated: 0, corrected: 0, missing: 0, spikesRejected: 0, jumpFrames };
+  const stats: StabilizeStats = {
+    measured: 0,
+    interpolated: 0,
+    corrected: 0,
+    missing: 0,
+    spikesRejected: 0,
+    jumpFrames,
+  };
 
   for (let k = 0; k < LANDMARK_COUNT; k++) {
     const x = Float64Array.from(rawX[k]);

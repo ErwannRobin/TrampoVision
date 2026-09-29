@@ -72,7 +72,8 @@ export function niceTicks(min: number, max: number, target = 5): number[] {
   const f = raw / pow;
   const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * pow;
   const out: number[] = [];
-  for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-6; v += step) out.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+  for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-6; v += step)
+    out.push(Math.abs(v) < step * 1e-9 ? 0 : v);
   return out;
 }
 
@@ -109,7 +110,24 @@ function indexAt(time: Float64Array, t: number): number {
   return Math.min(Math.max(Math.round((t - time[0]) / dt), 0), time.length - 1);
 }
 
-export function Chart({ title, unit, time, series, playhead, confidence, decimals = 1, zeroLine = false, height = 150, yDomain, minSpan = 1e-6, breakOnJump, markers, bands, guides, axis }: Props) {
+export function Chart({
+  title,
+  unit,
+  time,
+  series,
+  playhead,
+  confidence,
+  decimals = 1,
+  zeroLine = false,
+  height = 150,
+  yDomain,
+  minSpan = 1e-6,
+  breakOnJump,
+  markers,
+  bands,
+  guides,
+  axis,
+}: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLCanvasElement>(null);
@@ -165,7 +183,7 @@ export function Chart({ title, unit, time, series, playhead, confidence, decimal
 
     if (confidence) {
       ctx.fillStyle = cssVar('--band');
-      const w = ((width - M.left - M.right) / Math.max(1, time.length - 1)) || 1;
+      const w = (width - M.left - M.right) / Math.max(1, time.length - 1) || 1;
       for (let i = 0; i < time.length; i++)
         if (!(confidence[i] >= 0.5)) ctx.fillRect(px(time[i]) - w / 2, M.top, w, height - M.top - M.bottom);
     }
@@ -198,7 +216,10 @@ export function Chart({ title, unit, time, series, playhead, confidence, decimal
       let pen = false;
       for (let i = 0; i < time.length; i++) {
         const v = s.values[i];
-        if (!Number.isFinite(v) || (breakOnJump !== undefined && i > 0 && Math.abs(v - s.values[i - 1]) > breakOnJump)) {
+        if (
+          !Number.isFinite(v) ||
+          (breakOnJump !== undefined && i > 0 && Math.abs(v - s.values[i - 1]) > breakOnJump)
+        ) {
           pen = false;
           if (!Number.isFinite(v)) continue;
         }

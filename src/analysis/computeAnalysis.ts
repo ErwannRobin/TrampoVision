@@ -78,7 +78,10 @@ export function computeAnalysis(
     const shoulders = mid(pts[LM.L_SHOULDER], pts[LM.R_SHOULDER]);
     const hips = mid(pts[LM.L_HIP], pts[LM.R_HIP]);
     const ankles = mid(pts[LM.L_ANKLE], pts[LM.R_ANKLE]);
-    const head = Number.isFinite(pts[LM.L_EAR].x) && Number.isFinite(pts[LM.R_EAR].x) ? mid(pts[LM.L_EAR], pts[LM.R_EAR]) : pts[LM.NOSE];
+    const head =
+      Number.isFinite(pts[LM.L_EAR].x) && Number.isFinite(pts[LM.R_EAR].x)
+        ? mid(pts[LM.L_EAR], pts[LM.R_EAR])
+        : pts[LM.NOSE];
 
     trunk[i] = angleFromVertical(hips, shoulders);
     line[i] = angleFromVertical(ankles, head);
@@ -111,7 +114,7 @@ export function computeAnalysis(
     for (let i = 0; i < n; i++) {
       height[i] = (model.center.y - comY[i]) / pixelsPerMeter;
       x[i] = (comX[i] - model.center.x) / pixelsPerMeter;
-      xNorm[i] = (comX[i] - model.center.x) * model.metersPerPixel / model.halfExtentM;
+      xNorm[i] = ((comX[i] - model.center.x) * model.metersPerPixel) / model.halfExtentM;
     }
   } else {
     let lowestY = -Infinity;
@@ -133,7 +136,8 @@ export function computeAnalysis(
   let prev = NaN;
   for (let i = 0; i < n; i++) {
     if (!Number.isFinite(orientation[i])) continue;
-    if (Number.isFinite(prev) && i > 0 && Number.isFinite(orientation[i - 1])) maxRotationStepDeg = Math.max(maxRotationStepDeg, Math.abs(orientation[i] - prev));
+    if (Number.isFinite(prev) && i > 0 && Number.isFinite(orientation[i - 1]))
+      maxRotationStepDeg = Math.max(maxRotationStepDeg, Math.abs(orientation[i] - prev));
     prev = orientation[i];
   }
 

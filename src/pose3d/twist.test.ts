@@ -143,7 +143,10 @@ describe('what the estimator says when the 3D data is bad', () => {
 
   it('says so for a jump cut off by the clip', () => {
     const s = syntheticTwistJump({ twistTurns: 1 });
-    const a = analyzeTwist({ ...s.input, cycles: [{ ...s.input.cycles[0], takeoff: null, takeoffTimeS: null, complete: false }] });
+    const a = analyzeTwist({
+      ...s.input,
+      cycles: [{ ...s.input.cycles[0], takeoff: null, takeoffTimeS: null, complete: false }],
+    });
     expect(a.jumps[0].available).toBe(false);
     expect(a.jumps[0].limitations[0].signal).toBe('Twist');
   });

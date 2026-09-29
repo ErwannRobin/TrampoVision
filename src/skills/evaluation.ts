@@ -43,7 +43,8 @@ export function yawView(track: PoseTrack, yawDeg: number): PoseTrack {
 }
 
 const range = (rnd: () => number, lo: number, hi: number) => lo + ((rnd() + 1) / 2) * (hi - lo);
-const pick = <T,>(rnd: () => number, items: readonly T[]): T => items[Math.min(items.length - 1, Math.floor(((rnd() + 1) / 2) * items.length))];
+const pick = <T>(rnd: () => number, items: readonly T[]): T =>
+  items[Math.min(items.length - 1, Math.floor(((rnd() + 1) / 2) * items.length))];
 
 /** 'textbook' = clean positions; 'sloppy' = loose tucks, bent-knee pikes, slightly piked layouts, so the classes overlap. */
 export type Execution = 'textbook' | 'sloppy';
@@ -52,8 +53,10 @@ export type Execution = 'textbook' | 'sloppy';
 function randomShape(rnd: () => number, kind: 'straight' | 'tuck' | 'pike', execution: Execution): MannequinShape {
   const arms = { armDeg: range(rnd, 20, 170), elbowDeg: range(rnd, 0, 40), pointedToes: range(rnd, 0.3, 1) };
   const sloppy = execution === 'sloppy';
-  if (kind === 'straight') return { hipFlexDeg: range(rnd, 0, sloppy ? 35 : 15), kneeFlexDeg: range(rnd, 0, sloppy ? 25 : 10), ...arms };
-  if (kind === 'tuck') return { hipFlexDeg: range(rnd, sloppy ? 70 : 100, 150), kneeFlexDeg: range(rnd, sloppy ? 50 : 80, 130), ...arms };
+  if (kind === 'straight')
+    return { hipFlexDeg: range(rnd, 0, sloppy ? 35 : 15), kneeFlexDeg: range(rnd, 0, sloppy ? 25 : 10), ...arms };
+  if (kind === 'tuck')
+    return { hipFlexDeg: range(rnd, sloppy ? 70 : 100, 150), kneeFlexDeg: range(rnd, sloppy ? 50 : 80, 130), ...arms };
   return { hipFlexDeg: range(rnd, sloppy ? 55 : 75, 125), kneeFlexDeg: range(rnd, 0, sloppy ? 35 : 12), ...arms };
 }
 
@@ -71,7 +74,11 @@ export function randomJump(rnd: () => number, truth: TruthClass, execution: Exec
   // Somersault: front = the top of the body moves toward the face. Facing right + clockwise = front.
   const turns = range(rnd, 0.92, 1.08);
   const clockwise = truth === 'front' ? facing > 0 : facing < 0;
-  return { ...base, turns: clockwise ? turns : -turns, shape: randomShape(rnd, pick(rnd, ['straight', 'tuck', 'pike'] as const), execution) };
+  return {
+    ...base,
+    turns: clockwise ? turns : -turns,
+    shape: randomShape(rnd, pick(rnd, ['straight', 'tuck', 'pike'] as const), execution),
+  };
 }
 
 function trunkAngle(f: Keypoint[]): number {
@@ -96,11 +103,7 @@ export function flipInverted(track: PoseTrack, mode: FlipMode): PoseTrack {
       if (!f || Math.abs(trunkAngle(f)) <= 120) return f;
       const hx = (f[LM.L_HIP].x + f[LM.R_HIP].x) / 2;
       const hy = (f[LM.L_HIP].y + f[LM.R_HIP].y) / 2;
-      return f.map((p) =>
-        mode === 'mirror'
-          ? { ...p, y: 2 * hy - p.y }
-          : { ...p, x: 2 * hx - p.x, y: 2 * hy - p.y },
-      );
+      return f.map((p) => (mode === 'mirror' ? { ...p, y: 2 * hy - p.y } : { ...p, x: 2 * hx - p.x, y: 2 * hy - p.y }));
     }),
   };
 }
@@ -133,7 +136,13 @@ export interface EvalSummary {
 
 export function evaluate(
   condition: Condition,
-  options: { routines?: number; seed?: number; config?: DeepPartial<SkillConfig>; fps?: number; execution?: Execution } = {},
+  options: {
+    routines?: number;
+    seed?: number;
+    config?: DeepPartial<SkillConfig>;
+    fps?: number;
+    execution?: Execution;
+  } = {},
 ): EvalSummary {
   const rnd = makeRng(options.seed ?? 11);
   const rows: EvalRow[] = [];
@@ -185,10 +194,29 @@ export function evaluate(
 
 /** A compact text table of one summary, for the README and test logs. */
 export function formatSummary(s: EvalSummary): string {
-  const cols: SkillId[] = ['straight-jump', 'tuck-jump', 'pike-jump', 'back', 'front', 'somersault-direction-unknown', 'unclassified'];
-  const short: Record<string, string> = { 'straight-jump': 'straight', 'tuck-jump': 'tuck', 'pike-jump': 'pike', back: 'back', front: 'front', 'somersault-direction-unknown': 'dir?', unclassified: 'none' };
-  const lines = [`${s.condition.name}: n=${s.n} accuracy ${(s.accuracy * 100).toFixed(0)}%, answered-correct ${(s.accuracyWhenAnswered * 100).toFixed(0)}%, abstained ${s.abstained}, confident-wrong ${s.confidentWrong}, missed jumps ${s.missedJumps}`];
+  const cols: SkillId[] = [
+    'straight-jump',
+    'tuck-jump',
+    'pike-jump',
+    'back',
+    'front',
+    'somersault-direction-unknown',
+    'unclassified',
+  ];
+  const short: Record<string, string> = {
+    'straight-jump': 'straight',
+    'tuck-jump': 'tuck',
+    'pike-jump': 'pike',
+    back: 'back',
+    front: 'front',
+    'somersault-direction-unknown': 'dir?',
+    unclassified: 'none',
+  };
+  const lines = [
+    `${s.condition.name}: n=${s.n} accuracy ${(s.accuracy * 100).toFixed(0)}%, answered-correct ${(s.accuracyWhenAnswered * 100).toFixed(0)}%, abstained ${s.abstained}, confident-wrong ${s.confidentWrong}, missed jumps ${s.missedJumps}`,
+  ];
   lines.push(['truth \\ predicted', ...cols.map((c) => short[c])].map((x) => x.padEnd(10)).join(''));
-  for (const t of TRUTH_CLASSES) lines.push([t, ...cols.map((c) => String(s.matrix[t][c] ?? 0))].map((x) => x.padEnd(10)).join(''));
+  for (const t of TRUTH_CLASSES)
+    lines.push([t, ...cols.map((c) => String(s.matrix[t][c] ?? 0))].map((x) => x.padEnd(10)).join(''));
   return lines.join('\n');
 }

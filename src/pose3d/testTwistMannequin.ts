@@ -138,7 +138,22 @@ const gauss = (rnd: () => number) => {
 
 /** Left/right landmark pairs in the 33-point topology. */
 const PAIRS: [number, number][] = [
-  [1, 4], [2, 5], [3, 6], [7, 8], [9, 10], [11, 12], [13, 14], [15, 16], [17, 18], [19, 20], [21, 22], [23, 24], [25, 26], [27, 28], [29, 30], [31, 32],
+  [1, 4],
+  [2, 5],
+  [3, 6],
+  [7, 8],
+  [9, 10],
+  [11, 12],
+  [13, 14],
+  [15, 16],
+  [17, 18],
+  [19, 20],
+  [21, 22],
+  [23, 24],
+  [25, 26],
+  [27, 28],
+  [29, 30],
+  [31, 32],
 ];
 
 export function degradeWorld(world: WorldPoint[][], opts: WorldDegrade): (WorldPoint[] | null)[] {
@@ -148,7 +163,10 @@ export function degradeWorld(world: WorldPoint[][], opts: WorldDegrade): (WorldP
     let pts = f.map((p) => ({ ...p }));
     if (opts.trunkLeanBias) {
       const hipMid = mid([f[LM.L_HIP].x, f[LM.L_HIP].y, f[LM.L_HIP].z], [f[LM.R_HIP].x, f[LM.R_HIP].y, f[LM.R_HIP].z]);
-      const shMid = mid([f[LM.L_SHOULDER].x, f[LM.L_SHOULDER].y, f[LM.L_SHOULDER].z], [f[LM.R_SHOULDER].x, f[LM.R_SHOULDER].y, f[LM.R_SHOULDER].z]);
+      const shMid = mid(
+        [f[LM.L_SHOULDER].x, f[LM.L_SHOULDER].y, f[LM.L_SHOULDER].z],
+        [f[LM.R_SHOULDER].x, f[LM.R_SHOULDER].y, f[LM.R_SHOULDER].z],
+      );
       const trunk = sub(shMid, hipMid);
       const inPlane = unit([trunk[0], trunk[1], 0]);
       pts = pts.map((p) => ({ ...p, z: p.z + opts.trunkLeanBias! * dot(sub([p.x, p.y, p.z], hipMid), inPlane) }));
@@ -167,4 +185,3 @@ export function degradeWorld(world: WorldPoint[][], opts: WorldDegrade): (WorldP
     return pts;
   });
 }
-

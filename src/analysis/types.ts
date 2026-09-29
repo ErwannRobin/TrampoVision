@@ -51,7 +51,12 @@ export interface AnalysisOptions {
   scaleSource?: ScaleSource | 'auto';
 }
 
-export const DEFAULT_ANALYSIS_OPTIONS: AnalysisOptions = { athleteHeightM: 1.75, minVisibility: 0.4, calibration: null, scaleSource: 'auto' };
+export const DEFAULT_ANALYSIS_OPTIONS: AnalysisOptions = {
+  athleteHeightM: 1.75,
+  minVisibility: 0.4,
+  calibration: null,
+  scaleSource: 'auto',
+};
 
 export interface AnalysisSummary {
   maxHeightM: number;

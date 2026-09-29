@@ -1,5 +1,11 @@
 import type { BodyPositionThresholds } from './config';
-import { POSITION_CODE, type BodyPosition, type KnownPosition, type PositionEstimate, type PositionScores } from './types';
+import {
+  POSITION_CODE,
+  type BodyPosition,
+  type KnownPosition,
+  type PositionEstimate,
+  type PositionScores,
+} from './types';
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 

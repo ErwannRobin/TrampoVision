@@ -6,11 +6,21 @@ import { buildFeatureMatrix, buildPoseSeries, parsePoseSeries, SERIES_SCHEMA, to
 import type { TrampolineCalibration } from './calibration';
 
 const calibration: TrampolineCalibration = {
-  corners: [{ x: 106, y: 640 }, { x: 534, y: 640 }, { x: 534, y: 560 }, { x: 106, y: 560 }],
+  corners: [
+    { x: 106, y: 640 },
+    { x: 534, y: 640 },
+    { x: 534, y: 560 },
+    { x: 106, y: 560 },
+  ],
   firstSideM: 4.28,
   secondSideM: 2.14,
 };
-const info = (cal: TrampolineCalibration | null = null) => ({ fileName: 'clip.mp4', stride: 1, minVisibility: 0.4, calibration: cal });
+const info = (cal: TrampolineCalibration | null = null) => ({
+  fileName: 'clip.mp4',
+  stride: 1,
+  minVisibility: 0.4,
+  calibration: cal,
+});
 
 describe('frame-by-frame store', () => {
   const { track } = syntheticRoutine({ jumps: [{ v0: 4.5, turns: 2, driftM: 0.5 }, { v0: 4.5 }] });
@@ -69,7 +79,10 @@ describe('frame-by-frame store', () => {
     expect(parsed.track.frames).toHaveLength(noisy.frames.length);
     expect(parsed.track.frames[12]).toBeNull();
     expect(Math.abs(parsed.track.frames[40]![23].x - noisy.frames[40]![23].x)).toBeLessThan(0.01);
-    const again = computeAnalysis(parsed.track, { calibration: parsed.calibration, athleteHeightM: parsed.settings.athleteHeightM });
+    const again = computeAnalysis(parsed.track, {
+      calibration: parsed.calibration,
+      athleteHeightM: parsed.settings.athleteHeightM,
+    });
     expect(again.jumps.cycles).toHaveLength(result.jumps.cycles.length);
     again.jumps.cycles.forEach((c, k) => {
       expect(c.flightTimeS!).toBeCloseTo(result.jumps.cycles[k].flightTimeS!, 1);
@@ -81,7 +94,9 @@ describe('frame-by-frame store', () => {
     expect(() => parsePoseSeries('not json')).toThrow(/JSON/);
     expect(() => parsePoseSeries('{"schema":"other"}')).toThrow(/not a TrampoVision/);
     expect(() => parsePoseSeries(JSON.stringify({ schema: SERIES_SCHEMA, version: 99 }))).toThrow(/version/);
-    expect(() => parsePoseSeries(JSON.stringify({ schema: SERIES_SCHEMA, version: 1, source: {}, frames: [], raw: [] }))).toThrow(/no frame data/);
+    expect(() =>
+      parsePoseSeries(JSON.stringify({ schema: SERIES_SCHEMA, version: 1, source: {}, frames: [], raw: [] })),
+    ).toThrow(/no frame data/);
     const bad = JSON.parse(toSeriesJson(series));
     bad.raw[3] = [[1, 2, 3]];
     expect(() => parsePoseSeries(JSON.stringify(bad))).toThrow(/33 landmarks/);
@@ -111,11 +126,15 @@ describe('feature matrix for a future temporal model', () => {
   });
 
   it('describes pose shape independently of where the athlete is in the image', () => {
-    const shifted = { ...track, frames: track.frames.map((f) => f && f.map((p) => ({ ...p, x: p.x + 57, y: p.y - 31 }))) };
+    const shifted = {
+      ...track,
+      frames: track.frames.map((f) => f && f.map((p) => ({ ...p, x: p.x + 57, y: p.y - 31 }))),
+    };
     const fm2 = buildFeatureMatrix(computeAnalysis(shifted));
     const shapeCols = 2 * LANDMARK_COUNT;
     for (const i of [3, 20, 60]) {
-      for (let c = 0; c < shapeCols; c++) expect(fm2.data[i * fm.features + c]).toBeCloseTo(fm.data[i * fm.features + c], 3);
+      for (let c = 0; c < shapeCols; c++)
+        expect(fm2.data[i * fm.features + c]).toBeCloseTo(fm.data[i * fm.features + c], 3);
     }
   });
 });

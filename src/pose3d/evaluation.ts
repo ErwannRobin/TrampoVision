@@ -30,7 +30,8 @@ export interface TwistEval {
   meanAbsErrDeg: number;
 }
 
-const pick = <T,>(rnd: () => number, items: readonly T[]): T => items[Math.min(items.length - 1, Math.floor(((rnd() + 1) / 2) * items.length))];
+const pick = <T>(rnd: () => number, items: readonly T[]): T =>
+  items[Math.min(items.length - 1, Math.floor(((rnd() + 1) / 2) * items.length))];
 
 export function evaluateTwist(condition: TwistCondition, options: { jumps?: number; seed?: number } = {}): TwistEval {
   const rnd = makeRng(options.seed ?? 5);
@@ -75,7 +76,20 @@ export function evaluateTwist(condition: TwistCondition, options: { jumps?: numb
 export function formatTwistEval(rows: TwistEval[]): string {
   const p = (v: number) => (Number.isFinite(v) ? `${Math.round(v * 100)}%` : '–');
   return [
-    'condition'.padEnd(38) + 'right'.padEnd(8) + 'called reliable'.padEnd(17) + 'right when reliable'.padEnd(21) + 'reliable but wrong'.padEnd(20) + 'mean error',
-    ...rows.map((r) => r.condition.name.padEnd(38) + p(r.exact).padEnd(8) + p(r.reliableShare).padEnd(17) + p(r.reliableExact).padEnd(21) + String(r.reliableWrong).padEnd(20) + `${r.meanAbsErrDeg.toFixed(0)}°`),
+    'condition'.padEnd(38) +
+      'right'.padEnd(8) +
+      'called reliable'.padEnd(17) +
+      'right when reliable'.padEnd(21) +
+      'reliable but wrong'.padEnd(20) +
+      'mean error',
+    ...rows.map(
+      (r) =>
+        r.condition.name.padEnd(38) +
+        p(r.exact).padEnd(8) +
+        p(r.reliableShare).padEnd(17) +
+        p(r.reliableExact).padEnd(21) +
+        String(r.reliableWrong).padEnd(20) +
+        `${r.meanAbsErrDeg.toFixed(0)}°`,
+    ),
   ].join('\n');
 }

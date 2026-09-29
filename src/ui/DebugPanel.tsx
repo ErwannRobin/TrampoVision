@@ -28,16 +28,27 @@ export function analysisWarnings(result: AnalysisResult): string[] {
         `The bed and the athlete give scales ${Math.round(Math.abs(ratio - 1) * 100)}% apart. Check the corners, the bed size, the athlete height, and that the athlete stays over the bed.`,
       );
     }
-    if (meta.viewAngleDeg > 60) out.push('The camera looks along the long side of the bed: horizontal displacement is measured across the bed only.');
+    if (meta.viewAngleDeg > 60)
+      out.push(
+        'The camera looks along the long side of the bed: horizontal displacement is measured across the bed only.',
+      );
   }
   const g = jumps.cycles.map((c) => c.impliedGravityMps2).filter((v): v is number => v !== null && Number.isFinite(v));
   if (g.length) {
     const mean = g.reduce((s, v) => s + v, 0) / g.length;
-    if (Math.abs(mean / GRAVITY - 1) > 0.15) out.push(`Free-fall check: ${mean.toFixed(1)} m/s² instead of 9.81, so meters and m/s may be about ${Math.round(Math.abs(mean / GRAVITY - 1) * 100)}% off.`);
+    if (Math.abs(mean / GRAVITY - 1) > 0.15)
+      out.push(
+        `Free-fall check: ${mean.toFixed(1)} m/s² instead of 9.81, so meters and m/s may be about ${Math.round(Math.abs(mean / GRAVITY - 1) * 100)}% off.`,
+      );
   }
-  if (meta.maxRotationStepDeg > 120) out.push('Body orientation changes by more than 120° between two samples: rotations may be undercounted. Analyze every frame.');
-  if (summary.validFraction < 0.8) out.push(`The center of mass is missing in ${Math.round((1 - summary.validFraction) * 100)}% of the frames.`);
-  if (jumps.cycles.some((c) => !c.complete)) out.push('A jump is cut off at the start or end of the clip: its takeoff or landing is unknown.');
+  if (meta.maxRotationStepDeg > 120)
+    out.push(
+      'Body orientation changes by more than 120° between two samples: rotations may be undercounted. Analyze every frame.',
+    );
+  if (summary.validFraction < 0.8)
+    out.push(`The center of mass is missing in ${Math.round((1 - summary.validFraction) * 100)}% of the frames.`);
+  if (jumps.cycles.some((c) => !c.complete))
+    out.push('A jump is cut off at the start or end of the clip: its takeoff or landing is unknown.');
   return out;
 }
 
@@ -65,25 +76,47 @@ export function DebugPanel({ result, playhead }: { result: AnalysisResult; playh
   return (
     <div className="metrics debug">
       <h3>
-        Analysis panel <span className="muted mono">#{i + 1} · {f(result.time[i], 3)} s</span>
+        Analysis panel{' '}
+        <span className="muted mono">
+          #{i + 1} · {f(result.time[i], 3)} s
+        </span>
       </h3>
       <dl className="mono">
         <dt>Jump phase</dt>
-        <dd><span className={`phase phase-${phase}`}>{phase}</span>{jump >= 0 && <span className="muted"> · jump {jump + 1}</span>}</dd>
-        <dt>Center of mass (px)</dt><dd>{f(result.comX[i], 0)}, {f(result.comY[i], 0)}</dd>
-        <dt>Height {meta.heightReference === 'bed' ? 'above bed' : 'above lowest point'}</dt><dd>{f(result.height[i], 2)} m</dd>
-        <dt>Vertical velocity</dt><dd>{signed(result.vy[i])} m/s</dd>
+        <dd>
+          <span className={`phase phase-${phase}`}>{phase}</span>
+          {jump >= 0 && <span className="muted"> · jump {jump + 1}</span>}
+        </dd>
+        <dt>Center of mass (px)</dt>
+        <dd>
+          {f(result.comX[i], 0)}, {f(result.comY[i], 0)}
+        </dd>
+        <dt>Height {meta.heightReference === 'bed' ? 'above bed' : 'above lowest point'}</dt>
+        <dd>{f(result.height[i], 2)} m</dd>
+        <dt>Vertical velocity</dt>
+        <dd>{signed(result.vy[i])} m/s</dd>
         <dt title="Horizontal, along the on-screen horizontal; + = right in the image">{displacement}</dt>
         <dd>
           {signed(result.x[i])} m
-          {meta.calibrated && <span className="muted" title="Percent of the half-size of the bed"> ({signed(result.xNorm[i] * 100, 0)}%)</span>}
+          {meta.calibrated && (
+            <span className="muted" title="Percent of the half-size of the bed">
+              {' '}
+              ({signed(result.xNorm[i] * 100, 0)}%)
+            </span>
+          )}
         </dd>
-        <dt title="Trunk angle from vertical-up, wrapped to ±180°, + = clockwise">Body angle</dt><dd>{f(result.trunkAngle[i])}°</dd>
-        <dt title="The same angle made continuous: it keeps counting past 360°">Orientation (continuous)</dt><dd>{f(result.orientation[i])}°</dd>
+        <dt title="Trunk angle from vertical-up, wrapped to ±180°, + = clockwise">Body angle</dt>
+        <dd>{f(result.trunkAngle[i])}°</dd>
+        <dt title="The same angle made continuous: it keeps counting past 360°">Orientation (continuous)</dt>
+        <dd>{f(result.orientation[i])}°</dd>
         <dt>Rotation count</dt>
-        <dd>{f(turns, 2)} turns · {jumps.completedRotations[i]} done</dd>
-        <dt>Angular velocity</dt><dd>{f(result.angularVelocity[i], 0)}°/s</dd>
-        <dt>Pose confidence</dt><dd>{f(result.confidence[i] * 100, 0)}%</dd>
+        <dd>
+          {f(turns, 2)} turns · {jumps.completedRotations[i]} done
+        </dd>
+        <dt>Angular velocity</dt>
+        <dd>{f(result.angularVelocity[i], 0)}°/s</dd>
+        <dt>Pose confidence</dt>
+        <dd>{f(result.confidence[i] * 100, 0)}%</dd>
         <dt>Joints this frame</dt>
         <dd title="measured / interpolated / corrected (glitch replaced) / missing">
           {counts[1]} / {counts[2]} / {counts[3]} / {counts[0]}
@@ -123,7 +156,10 @@ export function DebugPanel({ result, playhead }: { result: AnalysisResult; playh
                 onClick={() => playhead.seek(c.takeoffTimeS ?? c.apexTimeS)}
                 title="Click to jump to the takeoff"
               >
-                <td>{c.index + 1}{!c.complete && '*'}</td>
+                <td>
+                  {c.index + 1}
+                  {!c.complete && '*'}
+                </td>
                 <td>{f(c.flightTimeS, 2)}</td>
                 <td>{f(c.timeToApexS, 2)}</td>
                 <td>{f(c.apexHeightM, 2)}</td>
@@ -136,34 +172,54 @@ export function DebugPanel({ result, playhead }: { result: AnalysisResult; playh
           </tbody>
         </table>
       )}
-      {jumps.cycles.some((c) => !c.complete) && <p className="muted small">* cut off at the start or end of the clip</p>}
+      {jumps.cycles.some((c) => !c.complete) && (
+        <p className="muted small">* cut off at the start or end of the clip</p>
+      )}
 
       <h3>Data quality</h3>
       <dl className="mono">
         <dt>Scale</dt>
-        <dd>{f(meta.pixelsPerMeter, 0)} px/m · {meta.scaleSource === 'trampoline' ? 'from the bed' : 'from athlete height'}</dd>
+        <dd>
+          {f(meta.pixelsPerMeter, 0)} px/m ·{' '}
+          {meta.scaleSource === 'trampoline' ? 'from the bed' : 'from athlete height'}
+        </dd>
         {meta.calibrated && (
           <>
             <dt>Bed vs. athlete scale</dt>
-            <dd>{f(meta.trampolinePixelsPerMeter, 0)} vs {f(meta.athletePixelsPerMeter, 0)} px/m</dd>
+            <dd>
+              {f(meta.trampolinePixelsPerMeter, 0)} vs {f(meta.athletePixelsPerMeter, 0)} px/m
+            </dd>
           </>
         )}
         <dt>Free-fall check</dt>
         <dd title="Acceleration fitted to the middle of each flight. It should be 9.81 m/s².">
           {gs.length ? `${f(gs.reduce((s, v) => s + v, 0) / gs.length, 2)} m/s²` : '–'}
         </dd>
-        <dt>Frames with a center of mass</dt><dd>{f(summary.validFraction * 100, 0)}%</dd>
-        <dt>Glitches removed</dt><dd>{stats.spikesRejected} joint samples · {stats.jumpFrames} frames</dd>
-        <dt>Joint samples filled in</dt><dd>{f(((stats.interpolated + stats.corrected) / Math.max(1, total)) * 100, 1)}%</dd>
-        <dt>Joint samples missing</dt><dd>{f((stats.missing / Math.max(1, total)) * 100, 1)}%</dd>
-        <dt>Net rotation of the clip</dt><dd>{f(summary.totalRotationDeg, 0)}° ({f(summary.totalRotationDeg / 360, 2)} turns)</dd>
+        <dt>Frames with a center of mass</dt>
+        <dd>{f(summary.validFraction * 100, 0)}%</dd>
+        <dt>Glitches removed</dt>
+        <dd>
+          {stats.spikesRejected} joint samples · {stats.jumpFrames} frames
+        </dd>
+        <dt>Joint samples filled in</dt>
+        <dd>{f(((stats.interpolated + stats.corrected) / Math.max(1, total)) * 100, 1)}%</dd>
+        <dt>Joint samples missing</dt>
+        <dd>{f((stats.missing / Math.max(1, total)) * 100, 1)}%</dd>
+        <dt>Net rotation of the clip</dt>
+        <dd>
+          {f(summary.totalRotationDeg, 0)}° ({f(summary.totalRotationDeg / 360, 2)} turns)
+        </dd>
       </dl>
 
       <details>
         <summary>Joint angles</summary>
         <table className="mono">
           <thead>
-            <tr><th>Joint angle</th><th>Left</th><th>Right</th></tr>
+            <tr>
+              <th>Joint angle</th>
+              <th>Left</th>
+              <th>Right</th>
+            </tr>
           </thead>
           <tbody>
             {jointRows.map(([name, l, r]) => (

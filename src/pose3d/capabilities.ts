@@ -15,10 +15,13 @@ export interface Capabilities {
 }
 
 /** The smallest WebAssembly module that uses a SIMD instruction (the check used by wasm-feature-detect). */
-const SIMD_MODULE = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]);
+const SIMD_MODULE = new Uint8Array([
+  0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11,
+]);
 
 export async function probeCapabilities(): Promise<Capabilities> {
-  const nav = (typeof navigator !== 'undefined' ? navigator : undefined) as (Navigator & { gpu?: { requestAdapter(): Promise<unknown> }; deviceMemory?: number }) | undefined;
+  const nav = (typeof navigator !== 'undefined' ? navigator : undefined) as
+    (Navigator & { gpu?: { requestAdapter(): Promise<unknown> }; deviceMemory?: number }) | undefined;
   let webgpu: Capabilities['webgpu'] = 'unsupported';
   if (nav?.gpu) {
     try {
@@ -45,7 +48,8 @@ export async function probeCapabilities(): Promise<Capabilities> {
     webgl2,
     wasm,
     wasmSimd,
-    wasmThreads: typeof SharedArrayBuffer !== 'undefined' && typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated,
+    wasmThreads:
+      typeof SharedArrayBuffer !== 'undefined' && typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated,
     cores: nav?.hardwareConcurrency ?? null,
     deviceMemoryGb: nav?.deviceMemory ?? null,
   };
@@ -61,13 +65,22 @@ export interface SupportVerdict {
 export function describeSupport(c: Capabilities, hasWorld: boolean): SupportVerdict {
   const runtime = c.webgl2 ? 'WebGL (GPU delegate)' : c.wasm ? 'WebAssembly (CPU delegate)' : 'no supported runtime';
   const current = hasWorld
-    ? { ok: true, text: `Available. The MediaPipe pose model already returns 3D landmarks (BlazePose GHUM, in meters) with every frame, so no second model is loaded. It runs on ${runtime}${c.wasmSimd ? ', WASM SIMD on' : ''}.` }
+    ? {
+        ok: true,
+        text: `Available. The MediaPipe pose model already returns 3D landmarks (BlazePose GHUM, in meters) with every frame, so no second model is loaded. It runs on ${runtime}${c.wasmSimd ? ', WASM SIMD on' : ''}.`,
+      }
     : { ok: false, text: 'This analysis has no 3D landmarks (data saved before 3D support). Analyze the video again.' };
   const dedicated =
     c.webgpu === 'available'
-      ? { ok: true, text: 'A dedicated 3D model could run on WebGPU (through onnxruntime-web) in this browser. Not built: it needs a model file, and I have not tested any.' }
+      ? {
+          ok: true,
+          text: 'A dedicated 3D model could run on WebGPU (through onnxruntime-web) in this browser. Not built: it needs a model file, and I have not tested any.',
+        }
       : c.wasm
-        ? { ok: true, text: `WebGPU is ${c.webgpu === 'no-adapter' ? 'present but has no GPU adapter' : 'not available'}, so a dedicated 3D model would fall back to WebAssembly${c.wasmThreads ? ' with threads' : ' without threads (the page is not cross-origin isolated), which is slow'}. Not built, not tested.` }
+        ? {
+            ok: true,
+            text: `WebGPU is ${c.webgpu === 'no-adapter' ? 'present but has no GPU adapter' : 'not available'}, so a dedicated 3D model would fall back to WebAssembly${c.wasmThreads ? ' with threads' : ' without threads (the page is not cross-origin isolated), which is slow'}. Not built, not tested.`,
+          }
         : { ok: false, text: 'Neither WebGPU nor WebAssembly is available: no 3D model can run here.' };
   return { current, dedicated };
 }

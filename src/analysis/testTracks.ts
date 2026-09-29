@@ -98,8 +98,15 @@ export function syntheticRoutine(o: RoutineOptions): { track: PoseTrack; truth: 
   };
   const pieces: Piece[] = [];
   const truth: RoutineTruth = {
-    takeoff: [], apex: [], landing: [], flight: [], rise: [], turns: [],
-    hipHeightM: new Float64Array(0), angleDeg: new Float64Array(0), hipX: new Float64Array(0),
+    takeoff: [],
+    apex: [],
+    landing: [],
+    flight: [],
+    rise: [],
+    turns: [],
+    hipHeightM: new Float64Array(0),
+    angleDeg: new Float64Array(0),
+    hipX: new Float64Array(0),
   };
   let t = 0;
   let angle = 0;
@@ -120,16 +127,35 @@ export function syntheticRoutine(o: RoutineOptions): { track: PoseTrack; truth: 
     const xa = x;
     if (k === 0) {
       // h'(0) = 0, h(T) = 0, h'(T) = v0  ->  h = v0 τ² (τ - T) / T²
-      pieces.push({ t0: t, t1: t + contact, kind: 'contact', jump: k, h: (tau) => (v0 * tau * tau * (tau - contact)) / (contact * contact), a: () => a0, x: () => xa });
+      pieces.push({
+        t0: t,
+        t1: t + contact,
+        kind: 'contact',
+        jump: k,
+        h: (tau) => (v0 * tau * tau * (tau - contact)) / (contact * contact),
+        a: () => a0,
+        x: () => xa,
+      });
     } else {
       // h'(0) = -vPrev, h(T) = 0, h'(T) = v0: a cubic h = b τ + c τ² + d τ³ with h(T) = 0.
       const T = contact;
-      const A = [[T * T, T * T * T], [2 * T, 3 * T * T]];
+      const A = [
+        [T * T, T * T * T],
+        [2 * T, 3 * T * T],
+      ];
       const rhs = [vPrev * T, v0 + vPrev];
       const det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
       const c = (rhs[0] * A[1][1] - A[0][1] * rhs[1]) / det;
       const d = (A[0][0] * rhs[1] - rhs[0] * A[1][0]) / det;
-      pieces.push({ t0: t, t1: t + T, kind: 'contact', jump: k, h: (tau) => -vPrev * tau + c * tau * tau + d * tau ** 3, a: () => a0, x: () => xa });
+      pieces.push({
+        t0: t,
+        t1: t + T,
+        kind: 'contact',
+        jump: k,
+        h: (tau) => -vPrev * tau + c * tau * tau + d * tau ** 3,
+        a: () => a0,
+        x: () => xa,
+      });
     }
     t += contact;
     truth.takeoff.push(t);
@@ -163,7 +189,15 @@ export function syntheticRoutine(o: RoutineOptions): { track: PoseTrack; truth: 
     const det = T * T * 3 * T * T - T * T * T * 2 * T;
     const c = (vLast * T * 3 * T * T - T * T * T * vLast) / det;
     const d = (T * T * vLast - 2 * T * vLast * T) / det;
-    pieces.push({ t0: t, t1: t + T, kind: 'contact', jump: o.jumps.length, h: (tau) => -vLast * tau + c * tau * tau + d * tau ** 3, a: () => aEnd, x: () => xEnd });
+    pieces.push({
+      t0: t,
+      t1: t + T,
+      kind: 'contact',
+      jump: o.jumps.length,
+      h: (tau) => -vLast * tau + c * tau * tau + d * tau ** 3,
+      a: () => aEnd,
+      x: () => xEnd,
+    });
     t += T;
   }
   pieces.push({ t0: t, t1: t + tail, kind: 'rest', jump: o.jumps.length, h: () => 0, a: () => aEnd, x: () => xEnd });

@@ -6,7 +6,14 @@ import type { SkillConfig } from './config';
 import { estimateFacing } from './facing';
 import { SEQUENCE_JOINTS, type FrameShape } from './frameShape';
 import { estimateRotation, flightRange, valueAt } from './rotation';
-import { POSITIONS, type BodyPosition, type JumpFeatures, type JumpPosition, type JumpSequence, type ShapeStat } from './types';
+import {
+  POSITIONS,
+  type BodyPosition,
+  type JumpFeatures,
+  type JumpPosition,
+  type JumpSequence,
+  type ShapeStat,
+} from './types';
 
 const finite = (v: number): number | null => (Number.isFinite(v) ? v : null);
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
@@ -78,7 +85,15 @@ function jumpPosition(
   if (window.length < 3) {
     timeShare.unknown = 1;
     return {
-      position: { label: 'unknown', scores: { straight: 0, tuck: 0, pike: 0 }, ruleScore: 0, timeShare, peakTimeU: null, stability: 0, confidence: 0 },
+      position: {
+        label: 'unknown',
+        scores: { straight: 0, tuck: 0, pike: 0 },
+        ruleScore: 0,
+        timeShare,
+        peakTimeU: null,
+        stability: 0,
+        confidence: 0,
+      },
       window,
       peak: [],
     };
@@ -89,7 +104,10 @@ function jumpPosition(
   let peak = window.filter((i) => fs.hipAngle[i] <= hipMin + cfg.peakBandDeg);
   if (peak.length < 3) peak = [...window].sort((p, q) => fs.hipAngle[p] - fs.hipAngle[q]).slice(0, 3);
   const at = (arr: Float64Array) => median(peak.map((i) => arr[i]));
-  const estimate = classifyPosition({ hipAngle: at(fs.hipAngle), kneeAngle: at(fs.kneeAngle), kneeTorso: at(fs.kneeTorso) }, cfg.position);
+  const estimate = classifyPosition(
+    { hipAngle: at(fs.hipAngle), kneeAngle: at(fs.kneeAngle), kneeTorso: at(fs.kneeTorso) },
+    cfg.position,
+  );
 
   // A shape counts when it is held: the frames near the most closed one must cover a fair share of the window.
   const stability = clamp01(peak.length / window.length / cfg.minHoldShare);
@@ -127,7 +145,8 @@ export function extractJump(
   const t0 = cycle.takeoffTimeS;
   const t1 = cycle.landingTimeS;
   const pxPerM = meta.pixelsPerMeter;
-  const inBodies = (m: number | null) => (m !== null && Number.isFinite(pxPerM) && Number.isFinite(body) ? (m * pxPerM) / body : null);
+  const inBodies = (m: number | null) =>
+    m !== null && Number.isFinite(pxPerM) && Number.isFinite(body) ? (m * pxPerM) / body : null;
   const at = (series: Float64Array, t: number | null) => (t === null ? null : valueAt(time, series, t));
   const wrapped = (t: number | null) => {
     const v = at(result.orientation, t);
@@ -253,7 +272,10 @@ export function extractJump(
     const comX = v(result.comX);
     const turns = (v(result.orientation) - oT) / 360;
     const rad = turns * 2 * Math.PI;
-    const nearest = Math.min(Math.max(Math.round(((t - time[0]) / (time[time.length - 1] - time[0])) * (time.length - 1)), 0), time.length - 1);
+    const nearest = Math.min(
+      Math.max(Math.round(((t - time[0]) / (time[time.length - 1] - time[0])) * (time.length - 1)), 0),
+      time.length - 1,
+    );
     const row = [
       u,
       t - t0,

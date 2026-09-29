@@ -144,4 +144,3 @@ export function lateralPerp(frames: TorsoFrames, line: 'shoulders' | 'hips', i: 
   const p = unit(perpendicular(l, u));
   return finite3(p) ? p : null;
 }
-

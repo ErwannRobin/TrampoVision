@@ -37,7 +37,11 @@ describe('twist estimator on random synthetic jumps (0 to 3 twists, with and wit
   });
 
   it('never calls a wrong count reliable at a low frame rate or with missing frames', () => {
-    for (const cond of [{ name: '10 fps', fps: 10 }, { name: '15 fps', fps: 15 }, { name: 'gaps', degrade: { dropout: 0.3 } }]) {
+    for (const cond of [
+      { name: '10 fps', fps: 10 },
+      { name: '15 fps', fps: 15 },
+      { name: 'gaps', degrade: { dropout: 0.3 } },
+    ]) {
       expect(evaluateTwist(cond, { jumps: JUMPS }).reliableWrong, cond.name).toBe(0);
     }
   });

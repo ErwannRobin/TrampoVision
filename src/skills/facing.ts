@@ -22,7 +22,8 @@ interface Score {
 function scoreOver(fs: FrameShape, from: number, to: number): Score {
   const collect = (votes: Float64Array) => {
     const v: number[] = [];
-    for (let i = Math.max(0, from); i <= Math.min(to, fs.count - 1); i++) if (Number.isFinite(votes[i])) v.push(votes[i]);
+    for (let i = Math.max(0, from); i <= Math.min(to, fs.count - 1); i++)
+      if (Number.isFinite(votes[i])) v.push(votes[i]);
     return v.length >= 3 ? median(v) : null;
   };
   const cues = { face: collect(fs.faceVote), knee: collect(fs.kneeVote), foot: collect(fs.footVote) };
@@ -68,7 +69,12 @@ function sampleRange(result: AnalysisResult, t0: number, t1: number): [number, n
  * The confidence is the strength of the combined vote times the share of the cues that agree.
  * A manual setting overrides it (confidence 1).
  */
-export function estimateFacing(result: AnalysisResult, fs: FrameShape, cycle: JumpCycle, cfg: FacingConfig): FacingEstimate {
+export function estimateFacing(
+  result: AnalysisResult,
+  fs: FrameShape,
+  cycle: JumpCycle,
+  cfg: FacingConfig,
+): FacingEstimate {
   if (cfg.override !== 'auto') {
     return {
       sign: cfg.override === 'right' ? 1 : -1,
@@ -82,7 +88,14 @@ export function estimateFacing(result: AnalysisResult, fs: FrameShape, cycle: Ju
   const t0 = cycle.takeoffTimeS;
   const t1 = cycle.landingTimeS;
   if (t0 === null || t1 === null) {
-    return { sign: 0, confidence: 0, source: 'auto', cues: { face: null, knee: null, foot: null }, agreement: 0, twistSuspected: false };
+    return {
+      sign: 0,
+      confidence: 0,
+      source: 'auto',
+      cues: { face: null, knee: null, foot: null },
+      agreement: 0,
+      twistSuspected: false,
+    };
   }
   const [from, to] = sampleRange(result, t0 - LEAD_S, t1 + TRAIL_S);
   const all = scoreOver(fs, from, to);
@@ -92,7 +105,8 @@ export function estimateFacing(result: AnalysisResult, fs: FrameShape, cycle: Ju
   const [b0, b1] = sampleRange(result, t1 - 0.15, t1 + TRAIL_S);
   const before = scoreOver(fs, a0, a1);
   const after = scoreOver(fs, b0, b1);
-  const twistSuspected = Math.abs(before.score) > 0.3 && Math.abs(after.score) > 0.3 && Math.sign(before.score) !== Math.sign(after.score);
+  const twistSuspected =
+    Math.abs(before.score) > 0.3 && Math.abs(after.score) > 0.3 && Math.sign(before.score) !== Math.sign(after.score);
 
   let confidence = Math.min(1, Math.abs(all.score) / STRONG_VOTE) * all.agreement;
   if (twistSuspected) confidence *= 0.5;

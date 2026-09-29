@@ -31,8 +31,8 @@ export function standingPose(cx: number, footY: number, heightPx = 175, angleDeg
   at(LM.R_ANKLE, hw, 0.039 * H);
   at(LM.L_HEEL, -hw, 0.02 * H);
   at(LM.R_HEEL, hw, 0.02 * H);
-  at(LM.L_FOOT, -hw + 0.1 * H, 0.0 * H);
-  at(LM.R_FOOT, hw + 0.1 * H, 0.0 * H);
+  at(LM.L_FOOT, -hw + 0.1 * H, 0);
+  at(LM.R_FOOT, hw + 0.1 * H, 0);
   return angleDeg === 0 ? pts : rotateAbout(pts, { x: cx, y: footY - 0.53 * H }, angleDeg);
 }
 

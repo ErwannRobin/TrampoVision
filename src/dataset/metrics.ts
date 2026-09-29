@@ -37,7 +37,8 @@ export function predictedClass(skill: SkillId): PredictedClass {
 export const isAnswer = (p: PredictedClass): p is ClassLabel => p !== 'none' && p !== 'somersault';
 
 /** Truth and prediction agree. "Unknown" agrees with "Not classified": both say the jump cannot be told. */
-export const agrees = (truth: TruthLabel, predicted: PredictedClass): boolean => (truth === 'unknown' ? predicted === 'none' : truth === predicted);
+export const agrees = (truth: TruthLabel, predicted: PredictedClass): boolean =>
+  truth === 'unknown' ? predicted === 'none' : truth === predicted;
 
 export const labelOf = (r: JumpRecord): TruthLabel | null => r.truth?.label ?? null;
 export const predictionOf = (r: JumpRecord): PredictedClass => predictedClass(r.prediction.skill);
@@ -152,7 +153,13 @@ export function computeMetrics(records: JumpRecord[], options: { confidentAt?: n
   const recalls = perClass.filter((c) => c.recall !== null).map((c) => c.recall as number);
 
   return {
-    counts: { records: records.length, labeled, known: n, unknown: samples.unknown, unlabeled: records.length - labeled },
+    counts: {
+      records: records.length,
+      labeled,
+      known: n,
+      unknown: samples.unknown,
+      unlabeled: records.length - labeled,
+    },
     overall: {
       n,
       correct: correct.length,

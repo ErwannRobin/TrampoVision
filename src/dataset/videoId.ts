@@ -29,7 +29,10 @@ export async function videoIdOf(file: Blob): Promise<string> {
   all.set(tail, size.length + head.length);
   const subtle = typeof crypto !== 'undefined' ? crypto.subtle : undefined;
   if (subtle) return `v-${hex(await subtle.digest('SHA-256', all)).slice(0, 12)}`;
-  return `v-${fnv(all).toString(16).padStart(8, '0')}${fnv(all, 0x9747b28c).toString(16).padStart(8, '0')}`.slice(0, 14);
+  return `v-${fnv(all).toString(16).padStart(8, '0')}${fnv(all, 0x9747b28c).toString(16).padStart(8, '0')}`.slice(
+    0,
+    14,
+  );
 }
 
 /**
@@ -41,5 +44,8 @@ export function videoIdFromTrack(fileName: string, track: PoseTrack): string {
   const kp = first >= 0 ? track.frames[first]![0] : null;
   const text = `${fileName}|${track.width}x${track.height}|${track.sourceFps}|${track.frames.length}|${first}|${kp ? `${kp.x.toFixed(1)},${kp.y.toFixed(1)}` : ''}`;
   const bytes = new TextEncoder().encode(text);
-  return `s-${fnv(bytes).toString(16).padStart(8, '0')}${fnv(bytes, 0x9747b28c).toString(16).padStart(8, '0')}`.slice(0, 14);
+  return `s-${fnv(bytes).toString(16).padStart(8, '0')}${fnv(bytes, 0x9747b28c).toString(16).padStart(8, '0')}`.slice(
+    0,
+    14,
+  );
 }

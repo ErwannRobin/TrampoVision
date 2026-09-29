@@ -125,7 +125,9 @@ export function buildPoseSeries(result: AnalysisResult, track: PoseTrack, info: 
       t: rn(result.time[i], 4),
       detected: track.frames[i] !== null,
       confidence: rn(result.confidence[i]),
-      joints: pts ? pts.map((p, k) => [rn(p.x, 2), rn(p.y, 2), rn(p.visibility, 2), result.jointState[k][i]] as JointTuple) : null,
+      joints: pts
+        ? pts.map((p, k) => [rn(p.x, 2), rn(p.y, 2), rn(p.visibility, 2), result.jointState[k][i]] as JointTuple)
+        : null,
       com: hasCom
         ? {
             xPx: rn(result.comX[i], 2),
@@ -165,14 +167,28 @@ export function buildPoseSeries(result: AnalysisResult, track: PoseTrack, info: 
     },
     settings: { athleteHeightM: meta.athleteHeightM, scaleSource: meta.scaleSource, minVisibility: info.minVisibility },
     calibration: info.calibration,
-    scale: { pixelsPerMeter: r(meta.pixelsPerMeter, 3), scaleSource: meta.scaleSource, heightReference: meta.heightReference },
+    scale: {
+      pixelsPerMeter: r(meta.pixelsPerMeter, 3),
+      scaleSource: meta.scaleSource,
+      heightReference: meta.heightReference,
+    },
     landmarkNames: LANDMARK_NAMES,
     stateCodes: [...JOINT_STATE_NAMES],
     frames,
     jumps: result.jumps.cycles,
-    raw: track.frames.map((f) => (f ? f.map((p) => [rn(p.x, 2), rn(p.y, 2), rn(p.visibility, 3)] as [number, number, number]) : null)),
+    raw: track.frames.map((f) =>
+      f ? f.map((p) => [rn(p.x, 2), rn(p.y, 2), rn(p.visibility, 3)] as [number, number, number]) : null,
+    ),
     ...(track.world
-      ? { rawWorld: track.world.map((f) => (f ? f.map((p) => [rn(p.x, 4), rn(p.y, 4), rn(p.z, 4), rn(p.visibility, 3)] as [number, number, number, number]) : null)) }
+      ? {
+          rawWorld: track.world.map((f) =>
+            f
+              ? f.map(
+                  (p) => [rn(p.x, 4), rn(p.y, 4), rn(p.z, 4), rn(p.visibility, 3)] as [number, number, number, number],
+                )
+              : null,
+          ),
+        }
       : {}),
   };
 }
@@ -206,12 +222,14 @@ export function parsePoseSeries(text: string): ParsedSeries {
   }
   const keypoints = (f: [number, number, number][] | null): Keypoint[] | null => {
     if (f === null) return null;
-    if (!Array.isArray(f) || f.length !== LANDMARK_COUNT) throw new Error(`A frame does not have ${LANDMARK_COUNT} landmarks.`);
+    if (!Array.isArray(f) || f.length !== LANDMARK_COUNT)
+      throw new Error(`A frame does not have ${LANDMARK_COUNT} landmarks.`);
     return f.map(([x, y, visibility]) => ({ x, y, visibility }));
   };
   const worldPoints = (f: [number, number, number, number][] | null): WorldPoint[] | null => {
     if (f === null) return null;
-    if (!Array.isArray(f) || f.length !== LANDMARK_COUNT) throw new Error(`A 3D frame does not have ${LANDMARK_COUNT} landmarks.`);
+    if (!Array.isArray(f) || f.length !== LANDMARK_COUNT)
+      throw new Error(`A 3D frame does not have ${LANDMARK_COUNT} landmarks.`);
     return f.map(([x, y, z, visibility]) => ({ x, y, z, visibility }));
   };
   const track: PoseTrack = {
@@ -221,7 +239,9 @@ export function parsePoseSeries(text: string): ParsedSeries {
     sourceFps: source.sourceFps,
     times: frames.map((f) => f.t),
     frames: raw.map(keypoints),
-    ...(Array.isArray(data.rawWorld) && data.rawWorld.length === raw.length ? { world: data.rawWorld.map(worldPoints) } : {}),
+    ...(Array.isArray(data.rawWorld) && data.rawWorld.length === raw.length
+      ? { world: data.rawWorld.map(worldPoints) }
+      : {}),
     backend: source.backend,
   };
   return {
@@ -259,7 +279,16 @@ export function buildFeatureMatrix(result: AnalysisResult): FeatureMatrix {
   const names: string[] = [];
   for (const nm of LANDMARK_NAMES) names.push(`${nm}_dx`, `${nm}_dy`);
   for (const nm of LANDMARK_NAMES) names.push(`${nm}_score`);
-  names.push('com_height_m', 'com_vy_mps', 'com_x_m', 'com_x_norm', 'orient_sin', 'orient_cos', 'orient_turns', 'angular_velocity_turns_per_s');
+  names.push(
+    'com_height_m',
+    'com_vy_mps',
+    'com_x_m',
+    'com_x_norm',
+    'orient_sin',
+    'orient_cos',
+    'orient_turns',
+    'angular_velocity_turns_per_s',
+  );
   const F = names.length;
   const data = new Float32Array(n * F);
   const mask = new Uint8Array(n);

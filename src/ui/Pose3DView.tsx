@@ -15,17 +15,30 @@ interface View {
 }
 const PRESETS: { name: string; view: View; title: string }[] = [
   { name: 'Camera view', view: { yaw: 0, pitch: 0 }, title: 'As the camera sees it: x to the right, y down' },
-  { name: 'From the side', view: { yaw: 90, pitch: 0 }, title: 'Looking along the camera’s x axis: shows the depth the model estimated' },
+  {
+    name: 'From the side',
+    view: { yaw: 90, pitch: 0 },
+    title: 'Looking along the camera’s x axis: shows the depth the model estimated',
+  },
   { name: 'From above', view: { yaw: 0, pitch: 90 }, title: 'Looking down from above the athlete' },
 ];
 
 /** Bones drawn in 3D: [from landmark, to landmark, side]. */
 const BONES: [number, number, 'l' | 'r' | 'c'][] = [
-  [LM.L_SHOULDER, LM.R_SHOULDER, 'c'], [LM.L_HIP, LM.R_HIP, 'c'],
-  [LM.L_SHOULDER, LM.L_HIP, 'l'], [LM.R_SHOULDER, LM.R_HIP, 'r'],
-  [LM.L_SHOULDER, LM.L_ELBOW, 'l'], [LM.L_ELBOW, LM.L_WRIST, 'l'], [LM.R_SHOULDER, LM.R_ELBOW, 'r'], [LM.R_ELBOW, LM.R_WRIST, 'r'],
-  [LM.L_HIP, LM.L_KNEE, 'l'], [LM.L_KNEE, LM.L_ANKLE, 'l'], [LM.L_ANKLE, LM.L_FOOT, 'l'],
-  [LM.R_HIP, LM.R_KNEE, 'r'], [LM.R_KNEE, LM.R_ANKLE, 'r'], [LM.R_ANKLE, LM.R_FOOT, 'r'],
+  [LM.L_SHOULDER, LM.R_SHOULDER, 'c'],
+  [LM.L_HIP, LM.R_HIP, 'c'],
+  [LM.L_SHOULDER, LM.L_HIP, 'l'],
+  [LM.R_SHOULDER, LM.R_HIP, 'r'],
+  [LM.L_SHOULDER, LM.L_ELBOW, 'l'],
+  [LM.L_ELBOW, LM.L_WRIST, 'l'],
+  [LM.R_SHOULDER, LM.R_ELBOW, 'r'],
+  [LM.R_ELBOW, LM.R_WRIST, 'r'],
+  [LM.L_HIP, LM.L_KNEE, 'l'],
+  [LM.L_KNEE, LM.L_ANKLE, 'l'],
+  [LM.L_ANKLE, LM.L_FOOT, 'l'],
+  [LM.R_HIP, LM.R_KNEE, 'r'],
+  [LM.R_KNEE, LM.R_ANKLE, 'r'],
+  [LM.R_ANKLE, LM.R_FOOT, 'r'],
 ];
 const AMBER = '#d9a400';
 const HEIGHT = 320;
@@ -34,7 +47,10 @@ const HEIGHT = 320;
 function projector(view: View, cx: number, cy: number, pxPerM: number) {
   const a = (view.yaw * Math.PI) / 180;
   const b = (view.pitch * Math.PI) / 180;
-  const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+  const ca = Math.cos(a),
+    sa = Math.sin(a),
+    cb = Math.cos(b),
+    sb = Math.sin(b);
   return (p: Vec3): [number, number, number] => {
     const x1 = p[0] * ca + p[2] * sa;
     const z1 = -p[0] * sa + p[2] * ca;
@@ -203,7 +219,8 @@ export function Pose3DView({ track, result, twist, selected, playhead }: Props) 
         // Dial: a ring through the shoulders; grey = where the shoulder line pointed at takeoff (carried along with the axis), amber = now.
         const radius = Math.max(0.16, Math.min(0.26, (frames.torso.shoulderWidthM[i] || 0.36) / 2));
         const center = shMid;
-        const ringPoint = (dirv: Vec3, angleDeg: number, r: number): Vec3 => add(center, scale(rotateAbout(dirv, u, angleDeg), r));
+        const ringPoint = (dirv: Vec3, angleDeg: number, r: number): Vec3 =>
+          add(center, scale(rotateAbout(dirv, u, angleDeg), r));
         ctx.strokeStyle = soft;
         ctx.globalAlpha = 0.6;
         ctx.lineWidth = 1;
@@ -247,7 +264,11 @@ export function Pose3DView({ track, result, twist, selected, playhead }: Props) 
     const g = (v: Vec3) => project(v);
     const o = [30, HEIGHT - 30];
     ctx.textAlign = 'center';
-    for (const [label, v] of [['x', [1, 0, 0]], ['y', [0, 1, 0]], ['z', [0, 0, 1]]] as [string, Vec3][]) {
+    for (const [label, v] of [
+      ['x', [1, 0, 0]],
+      ['y', [0, 1, 0]],
+      ['z', [0, 0, 1]],
+    ] as [string, Vec3][]) {
       const p = g(v);
       const p0 = g([0, 0, 0]);
       const dx = ((p[0] - p0[0]) / pxPerM) * 18;
@@ -279,7 +300,9 @@ export function Pose3DView({ track, result, twist, selected, playhead }: Props) 
         <strong>3D pose</strong> <span className="badge weak">experimental</span>
         <span className="spacer" />
         {PRESETS.map((p) => (
-          <button key={p.name} className="tiny" title={p.title} onClick={() => setView(p.view)}>{p.name}</button>
+          <button key={p.name} className="tiny" title={p.title} onClick={() => setView(p.view)}>
+            {p.name}
+          </button>
         ))}
       </div>
       <div ref={wrapRef} className="pose3d-body" style={{ height: HEIGHT }}>
@@ -294,11 +317,14 @@ export function Pose3DView({ track, result, twist, selected, playhead }: Props) 
           onPointerUp={() => (drag.current = null)}
           aria-label="3D skeleton. Drag to rotate."
         />
-        {estimate && estimate.available && !estimate.reliable && <div className="pose3d-flag">twist not reliable for this jump</div>}
+        {estimate && estimate.available && !estimate.reliable && (
+          <div className="pose3d-flag">twist not reliable for this jump</div>
+        )}
       </div>
       <p className="muted small">
-        Blue = left, orange = right. Dashed amber = the longitudinal axis (hips to shoulders). Black dot = chest direction. The ring is the plane
-        perpendicular to the axis: grey = where the shoulder line pointed at takeoff, amber arc = the twist since then
+        Blue = left, orange = right. Dashed amber = the longitudinal axis (hips to shoulders). Black dot = chest
+        direction. The ring is the plane perpendicular to the axis: grey = where the shoulder line pointed at takeoff,
+        amber arc = the twist since then
         {rel !== null ? ` (now ${rel >= 0 ? '+' : '−'}${Math.abs(Math.round(rel))}°)` : ''}. Drag to rotate.
       </p>
     </div>
@@ -329,7 +355,11 @@ export function Pose3DSection({ track, result, twist, selected, playhead, marker
     const lo = Math.ceil(Math.min(...v) / 180);
     const hi = Math.floor(Math.max(...v) / 180);
     const out: { value: number; label?: string }[] = [];
-    for (let k = lo; k <= hi && out.length < 30; k++) out.push({ value: k * 180, label: k === 0 ? undefined : `${Math.abs(k) / 2} twist${Math.abs(k) === 2 ? '' : 's'}` });
+    for (let k = lo; k <= hi && out.length < 30; k++)
+      out.push({
+        value: k * 180,
+        label: k === 0 ? undefined : `${Math.abs(k) / 2} twist${Math.abs(k) === 2 ? '' : 's'}`,
+      });
     return out;
   }, [f]);
   return (
@@ -337,25 +367,70 @@ export function Pose3DSection({ track, result, twist, selected, playhead, marker
       <Pose3DView track={track} result={result} twist={twist} selected={selected} playhead={playhead} />
       {f && (
         <div className="jumpcharts">
-          <Chart title="Twist angle (accumulated)" unit="°, + = counter-clockwise seen from above the head" time={result.time} playhead={playhead} confidence={f.torso.visibility} decimals={0} zeroLine minSpan={200}
-            guides={guides} markers={markers} bands={bands}
+          <Chart
+            title="Twist angle (accumulated)"
+            unit="°, + = counter-clockwise seen from above the head"
+            time={result.time}
+            playhead={playhead}
+            confidence={f.torso.visibility}
+            decimals={0}
+            zeroLine
+            minSpan={200}
+            guides={guides}
+            markers={markers}
+            bands={bands}
             series={[
               { label: 'Full 3D axis', values: f.angle, color: '--series-1' },
               { label: 'Axis in the image plane', values: f.anglePlane, color: '--series-2' },
-            ]} height={150} />
-          <Chart title="Twist angular velocity" unit="°/s" time={result.time} playhead={playhead} confidence={f.torso.visibility} decimals={0} zeroLine minSpan={200} markers={markers} bands={bands}
-            series={[{ label: 'ω twist', values: f.angularVelocity, color: '--series-1' }]} height={150} />
-          <Chart title="Trunk axis out of the image plane" unit="°: 0 = in the plane, large = pointing at the camera" time={result.time} playhead={playhead} decimals={0} minSpan={30} markers={markers} bands={bands}
-            series={[{ label: 'Tilt', values: f.torso.axisTiltDeg, color: '--series-1' }]} height={150} />
-          <Chart title="Shoulder width in 3D" unit="m: a rigid body keeps it constant; changes are depth error" time={result.time} playhead={playhead} decimals={2} minSpan={0.1} markers={markers} bands={bands}
+            ]}
+            height={150}
+          />
+          <Chart
+            title="Twist angular velocity"
+            unit="°/s"
+            time={result.time}
+            playhead={playhead}
+            confidence={f.torso.visibility}
+            decimals={0}
+            zeroLine
+            minSpan={200}
+            markers={markers}
+            bands={bands}
+            series={[{ label: 'ω twist', values: f.angularVelocity, color: '--series-1' }]}
+            height={150}
+          />
+          <Chart
+            title="Trunk axis out of the image plane"
+            unit="°: 0 = in the plane, large = pointing at the camera"
+            time={result.time}
+            playhead={playhead}
+            decimals={0}
+            minSpan={30}
+            markers={markers}
+            bands={bands}
+            series={[{ label: 'Tilt', values: f.torso.axisTiltDeg, color: '--series-1' }]}
+            height={150}
+          />
+          <Chart
+            title="Shoulder width in 3D"
+            unit="m: a rigid body keeps it constant; changes are depth error"
+            time={result.time}
+            playhead={playhead}
+            decimals={2}
+            minSpan={0.1}
+            markers={markers}
+            bands={bands}
             series={[
               { label: 'Shoulders', values: f.torso.shoulderWidthM, color: '--series-1' },
               { label: 'Hips', values: f.torso.hipWidthM, color: '--series-2' },
-            ]} height={150} />
+            ]}
+            height={150}
+          />
         </div>
       )}
-      <p className="hint muted">Shaded = a jump. The faded parts of a curve are frames where the model was not sure of the shoulders and hips.</p>
+      <p className="hint muted">
+        Shaded = a jump. The faded parts of a curve are frames where the model was not sure of the shoulders and hips.
+      </p>
     </section>
   );
 }
-

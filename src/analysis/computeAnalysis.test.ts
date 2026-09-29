@@ -122,7 +122,8 @@ describe('full pipeline on a synthetic routine', () => {
   it('keeps the body orientation continuous through a double somersault (never wraps back)', () => {
     const { track, truth } = syntheticRoutine({ jumps: [{ v0: 5, turns: 2 }] });
     const r = computeAnalysis(track);
-    for (let i = 1; i < r.orientation.length; i++) expect(Math.abs(r.orientation[i] - r.orientation[i - 1])).toBeLessThan(45);
+    for (let i = 1; i < r.orientation.length; i++)
+      expect(Math.abs(r.orientation[i] - r.orientation[i - 1])).toBeLessThan(45);
     const i0 = Math.round(truth.takeoff[0] * 30) - 3;
     const i1 = Math.round(truth.landing[0] * 30) + 3;
     expect(r.orientation[i1] - r.orientation[i0]).toBeGreaterThan(680);
@@ -181,7 +182,10 @@ describe('full pipeline on a synthetic routine', () => {
       expect(plain.meta.calibrated).toBe(false);
       expect(plain.meta.heightReference).toBe('lowest point');
       expect(Number.isNaN(plain.xNorm[5])).toBe(true);
-      const bowTie = { ...calibration, corners: [corners[0], corners[2], corners[1], corners[3]] as TrampolineCalibration['corners'] };
+      const bowTie = {
+        ...calibration,
+        corners: [corners[0], corners[2], corners[1], corners[3]] as TrampolineCalibration['corners'],
+      };
       const r = computeAnalysis(track, { calibration: bowTie });
       expect(r.meta.calibrated).toBe(false);
       expect(r.meta.calibrationError).toMatch(/order/);

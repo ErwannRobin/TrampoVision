@@ -26,7 +26,13 @@ const HIPS = [LM.L_HIP, LM.R_HIP];
  * finger/toe points don't match the anthropometric end points.
  */
 export const SEGMENTS: Segment[] = [
-  { name: 'head', mass: 0.0694, from: [[LM.L_EAR, LM.R_EAR], [LM.NOSE]], to: [[LM.L_EAR, LM.R_EAR], [LM.NOSE]], ratio: 0 },
+  {
+    name: 'head',
+    mass: 0.0694,
+    from: [[LM.L_EAR, LM.R_EAR], [LM.NOSE]],
+    to: [[LM.L_EAR, LM.R_EAR], [LM.NOSE]],
+    ratio: 0,
+  },
   { name: 'trunk', mass: 0.4346, from: [SHOULDERS], to: [HIPS], ratio: 0.5 },
   { name: 'upperArmL', mass: 0.0271, from: [[LM.L_SHOULDER]], to: [[LM.L_ELBOW]], ratio: 0.5772 },
   { name: 'upperArmR', mass: 0.0271, from: [[LM.R_SHOULDER]], to: [[LM.R_ELBOW]], ratio: 0.5772 },

@@ -63,7 +63,12 @@ const NONE: RotationEstimate = {
  *                (largest move against the net rotation, `reversalDeg`), the athlete did not do that, the
  *                pose model most likely flipped the body, and the net rotation cannot be trusted.
  */
-export function estimateRotation(result: AnalysisResult, fs: FrameShape, cycle: JumpCycle, cfg: RotationConfig): RotationEstimate {
+export function estimateRotation(
+  result: AnalysisResult,
+  fs: FrameShape,
+  cycle: JumpCycle,
+  cfg: RotationConfig,
+): RotationEstimate {
   const range = flightRange(result, cycle);
   if (!range || cycle.takeoffTimeS === null || cycle.landingTimeS === null) return NONE;
   const [from, to] = range;
@@ -116,7 +121,11 @@ export function estimateRotation(result: AnalysisResult, fs: FrameShape, cycle: 
 
   const reversal = Math.min(drawdownUp, drawdownDown);
   const monotonic =
-    reversal <= cfg.reversalOkDeg ? 1 : reversal >= cfg.reversalMaxDeg ? 0.2 : 1 - 0.8 * ((reversal - cfg.reversalOkDeg) / (cfg.reversalMaxDeg - cfg.reversalOkDeg));
+    reversal <= cfg.reversalOkDeg
+      ? 1
+      : reversal >= cfg.reversalMaxDeg
+        ? 0.2
+        : 1 - 0.8 * ((reversal - cfg.reversalOkDeg) / (cfg.reversalMaxDeg - cfg.reversalOkDeg));
 
   const parts = { rounding, coverage, steps, crossCheck, monotonic };
   return {

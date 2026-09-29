@@ -43,11 +43,12 @@ export function TrajectoryPlot({ result, playhead, calibration, height = 330 }: 
 
     const { x: xs, height: h, meta } = result;
     // Half-size of the bed along the on-screen horizontal, in the meters used for x (only when calibrated).
-    const bedHalf = calibration
-      ? calibration.halfExtentM / calibration.metersPerPixel / meta.pixelsPerMeter
-      : NaN;
+    const bedHalf = calibration ? calibration.halfExtentM / calibration.metersPerPixel / meta.pixelsPerMeter : NaN;
 
-    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    let x0 = Infinity,
+      x1 = -Infinity,
+      y0 = Infinity,
+      y1 = -Infinity;
     for (let i = 0; i < meta.count; i++) {
       if (!Number.isFinite(xs[i]) || !Number.isFinite(h[i])) continue;
       x0 = Math.min(x0, xs[i]);
@@ -164,7 +165,11 @@ export function TrajectoryPlot({ result, playhead, calibration, height = 330 }: 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     for (const c of result.jumps.cycles) {
-      for (const [idx, label] of [[c.takeoff, 'T'], [c.apex, 'A'], [c.landing, 'L']] as const) {
+      for (const [idx, label] of [
+        [c.takeoff, 'T'],
+        [c.apex, 'A'],
+        [c.landing, 'L'],
+      ] as const) {
         if (idx === null || !Number.isFinite(xs[idx]) || !Number.isFinite(h[idx])) continue;
         ctx.fillStyle = text;
         ctx.fillText(label, X(xs[idx]), Y(h[idx]) - 5);
@@ -179,7 +184,8 @@ export function TrajectoryPlot({ result, playhead, calibration, height = 330 }: 
     <figure className="chart tall">
       <figcaption>
         <span className="chart-title">
-          Center-of-mass path <span className="muted">(m, x from {result.meta.calibrated ? 'bed center' : 'start'} vs. height)</span>
+          Center-of-mass path{' '}
+          <span className="muted">(m, x from {result.meta.calibrated ? 'bed center' : 'start'} vs. height)</span>
         </span>
       </figcaption>
       <div ref={wrapRef} className="chart-body" style={{ height }}>

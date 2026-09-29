@@ -3,9 +3,22 @@ import { LM } from './landmarks';
 import type { Keypoint, Point } from './types';
 
 export type Side = 'left' | 'right' | 'center';
-export interface Bone { a: Point; b: Point; side: Side }
-export interface Joint { name: string; p: Point; side: Side }
-export interface Wireframe { bones: Bone[]; joints: Joint[]; head: Point | null; headRadius: number }
+export interface Bone {
+  a: Point;
+  b: Point;
+  side: Side;
+}
+export interface Joint {
+  name: string;
+  p: Point;
+  side: Side;
+}
+export interface Wireframe {
+  bones: Bone[];
+  joints: Joint[];
+  head: Point | null;
+  headRadius: number;
+}
 
 const ok = (p: Point | undefined): p is Point => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 

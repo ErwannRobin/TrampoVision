@@ -43,12 +43,31 @@ describe('stabilizePose', () => {
   it('removes one-frame and two-frame glitches and marks them corrected', () => {
     const { track } = oneJump();
     const bad = cloneTrack(track);
-    bad.frames[15]![LM.L_WRIST] = { x: bad.frames[15]![LM.L_WRIST].x + 140, y: bad.frames[15]![LM.L_WRIST].y - 90, visibility: 0.95 };
-    for (const i of [30, 31]) bad.frames[i]![LM.R_KNEE] = { x: bad.frames[i]![LM.R_KNEE].x - 120, y: bad.frames[i]![LM.R_KNEE].y + 100, visibility: 0.9 };
+    bad.frames[15]![LM.L_WRIST] = {
+      x: bad.frames[15]![LM.L_WRIST].x + 140,
+      y: bad.frames[15]![LM.L_WRIST].y - 90,
+      visibility: 0.95,
+    };
+    for (const i of [30, 31])
+      bad.frames[i]![LM.R_KNEE] = {
+        x: bad.frames[i]![LM.R_KNEE].x - 120,
+        y: bad.frames[i]![LM.R_KNEE].y + 100,
+        visibility: 0.9,
+      };
     const s = stabilizePose(bad);
-    expect(Math.hypot(s.landmarks[15]![LM.L_WRIST].x - track.frames[15]![LM.L_WRIST].x, s.landmarks[15]![LM.L_WRIST].y - track.frames[15]![LM.L_WRIST].y)).toBeLessThan(6);
+    expect(
+      Math.hypot(
+        s.landmarks[15]![LM.L_WRIST].x - track.frames[15]![LM.L_WRIST].x,
+        s.landmarks[15]![LM.L_WRIST].y - track.frames[15]![LM.L_WRIST].y,
+      ),
+    ).toBeLessThan(6);
     for (const i of [30, 31]) {
-      expect(Math.hypot(s.landmarks[i]![LM.R_KNEE].x - track.frames[i]![LM.R_KNEE].x, s.landmarks[i]![LM.R_KNEE].y - track.frames[i]![LM.R_KNEE].y)).toBeLessThan(8);
+      expect(
+        Math.hypot(
+          s.landmarks[i]![LM.R_KNEE].x - track.frames[i]![LM.R_KNEE].x,
+          s.landmarks[i]![LM.R_KNEE].y - track.frames[i]![LM.R_KNEE].y,
+        ),
+      ).toBeLessThan(8);
       expect(s.state[LM.R_KNEE][i]).toBe(JOINT_STATE.corrected);
     }
     expect(s.state[LM.L_WRIST][15]).toBe(JOINT_STATE.corrected);
@@ -70,7 +89,12 @@ describe('stabilizePose', () => {
     const s = stabilizePose(bad);
     for (let i = 12; i <= 15; i++) {
       expect(s.state[LM.R_ELBOW][i]).toBe(JOINT_STATE.interpolated);
-      expect(Math.hypot(s.landmarks[i]![LM.R_ELBOW].x - track.frames[i]![LM.R_ELBOW].x, s.landmarks[i]![LM.R_ELBOW].y - track.frames[i]![LM.R_ELBOW].y)).toBeLessThan(4);
+      expect(
+        Math.hypot(
+          s.landmarks[i]![LM.R_ELBOW].x - track.frames[i]![LM.R_ELBOW].x,
+          s.landmarks[i]![LM.R_ELBOW].y - track.frames[i]![LM.R_ELBOW].y,
+        ),
+      ).toBeLessThan(4);
       expect(s.score[LM.R_ELBOW][i]).toBeLessThan(0.6); // filled samples never look as sure as measured ones
     }
     expect(s.state[LM.R_ELBOW][11]).toBe(JOINT_STATE.measured);

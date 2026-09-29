@@ -120,7 +120,10 @@ export function drawOverlay(
   const phase = JUMP_PHASES[result.jumps.phase[sample]];
   const flying = result.jumps.cycleIndex[sample];
   if (phase !== 'unknown') {
-    lines.push({ text: flying >= 0 ? `Jump ${flying + 1} · ${phase}` : phase, color: phase === 'ground' ? '#f4f4f4' : COM_COLOR });
+    lines.push({
+      text: flying >= 0 ? `Jump ${flying + 1} · ${phase}` : phase,
+      color: phase === 'ground' ? '#f4f4f4' : COM_COLOR,
+    });
   }
   if (opts.hud && skills) {
     if (flying >= 0) {
@@ -130,12 +133,16 @@ export function drawOverlay(
     }
     // The prediction of the jump in the air, or of the last one that took off.
     let current = flying;
-    if (current < 0) for (const c of result.jumps.cycles) if (c.takeoff !== null && c.takeoff <= sample) current = c.index;
+    if (current < 0)
+      for (const c of result.jumps.cycles) if (c.takeoff !== null && c.takeoff <= sample) current = c.index;
     const jump = current >= 0 ? skills.jumps[current] : undefined;
     if (jump) {
       const p = jump.prediction;
       lines.push({
-        text: p.skill === 'unclassified' && p.confidence === 0 ? `Jump ${current + 1}: not classified` : `${p.label} · ${Math.round(p.confidence * 100)}%`,
+        text:
+          p.skill === 'unclassified' && p.confidence === 0
+            ? `Jump ${current + 1}: not classified`
+            : `${p.label} · ${Math.round(p.confidence * 100)}%`,
         color: p.skill === 'unclassified' || p.confidence < 0.6 ? '#ffb15c' : '#7dff8f',
       });
     }
@@ -152,7 +159,6 @@ export function drawOverlay(
     ctx.fillText(l.text, 10, 20 + 18 * k);
   });
 }
-
 
 // --- Trampoline calibration overlay -------------------------------------------------------------
 

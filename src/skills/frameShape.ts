@@ -163,7 +163,8 @@ export function computeFrameShape(result: AnalysisResult, cfg: SkillConfig): Fra
       fs.kneeAngle[i] = jointAngle(hips, knees, ankles);
       const legLen = dist(hips, knees) + dist(knees, ankles);
       if (legLen > 1e-6) {
-        if (ok(pts[LM.L_ANKLE]) && ok(pts[LM.R_ANKLE])) fs.legSeparation[i] = dist(pts[LM.L_ANKLE], pts[LM.R_ANKLE]) / legLen;
+        if (ok(pts[LM.L_ANKLE]) && ok(pts[LM.R_ANKLE]))
+          fs.legSeparation[i] = dist(pts[LM.L_ANKLE], pts[LM.R_ANKLE]) / legLen;
       }
     }
     if (knees) fs.kneeTorso[i] = pointSegmentDistance(knees, hips, shoulders) / trunk;
@@ -182,17 +183,24 @@ export function computeFrameShape(result: AnalysisResult, cfg: SkillConfig): Fra
       const chain = [head, shoulders, hips, knees, ankles];
       const path = dist(head, shoulders) + trunk + dist(hips, knees) + dist(knees, ankles);
       let extent = 0;
-      for (let a = 0; a < chain.length; a++) for (let b = a + 1; b < chain.length; b++) extent = Math.max(extent, dist(chain[a], chain[b]));
+      for (let a = 0; a < chain.length; a++)
+        for (let b = a + 1; b < chain.length; b++) extent = Math.max(extent, dist(chain[a], chain[b]));
       if (path > 1e-6) fs.compactness[i] = Math.max(0, 1 - extent / path);
     }
 
-    fs.position[i] = POSITION_CODE[
-      classifyPosition({ hipAngle: fs.hipAngle[i], kneeAngle: fs.kneeAngle[i], kneeTorso: fs.kneeTorso[i] }, cfg.position).label
-    ];
+    fs.position[i] =
+      POSITION_CODE[
+        classifyPosition(
+          { hipAngle: fs.hipAngle[i], kneeAngle: fs.kneeAngle[i], kneeTorso: fs.kneeTorso[i] },
+          cfg.position,
+        ).label
+      ];
 
     // Facing cues, in the body frame (+x = right of the trunk when upright).
     const earMid = pairMid(pts[LM.L_EAR], pts[LM.R_EAR]);
-    const faceBody = FACE_LANDMARKS.map((k) => pts[k]).filter(ok).map(toBody);
+    const faceBody = FACE_LANDMARKS.map((k) => pts[k])
+      .filter(ok)
+      .map(toBody);
     if (earMid && faceBody.length >= 3) {
       const fx = faceBody.reduce((s, p) => s + p.x, 0) / faceBody.length;
       const ex = toBody(earMid).x;

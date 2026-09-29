@@ -11,18 +11,21 @@ import {
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 const pct = (v: number) => `${Math.round(clamp01(v) * 100)}%`;
-const deg = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? '–' : `${Math.round(v)}°`);
+const deg = (v: number | null | undefined) =>
+  v === null || v === undefined || !Number.isFinite(v) ? '–' : `${Math.round(v)}°`;
 
 /** Things this input (a single 2D skeleton from one camera) cannot tell, whatever the pose quality. */
 export const KNOWN_LIMITS: Limitation[] = [
   {
     signal: 'Camera view',
-    problem: 'A somersault turns toward or away from a camera that is in front of or behind the athlete, so the 2D body angle barely changes.',
+    problem:
+      'A somersault turns toward or away from a camera that is in front of or behind the athlete, so the 2D body angle barely changes.',
     needed: 'A side-on, roughly level camera.',
   },
   {
     signal: 'Twists',
-    problem: 'Rotation about the long axis is not measured: the shoulder and hip lines are almost points in a side view.',
+    problem:
+      'Rotation about the long axis is not measured: the shoulder and hip lines are almost points in a side view.',
     needed: '3D pose (or two cameras).',
   },
   {
@@ -32,13 +35,16 @@ export const KNOWN_LIMITS: Limitation[] = [
   },
   {
     signal: 'Quarter turns (drops, 1¼, 1¾ rotations)',
-    problem: 'Rotation is rounded to half turns; landings on back, front or seat are not separated from a measurement error.',
+    problem:
+      'Rotation is rounded to half turns; landings on back, front or seat are not separated from a measurement error.',
     needed: 'A rule or a model for the landing position (torso angle at landing).',
   },
   {
     signal: 'Pose model failures',
-    problem: 'Pose models are trained mostly on upright people. When the athlete is inverted, blurred or overlapped, the skeleton can flip or jump, and the confidence here can only notice it if the orientation jumps.',
-    needed: 'Real trampoline footage to measure how often this happens; a model fine-tuned on trampoline poses if it is frequent.',
+    problem:
+      'Pose models are trained mostly on upright people. When the athlete is inverted, blurred or overlapped, the skeleton can flip or jump, and the confidence here can only notice it if the orientation jumps.',
+    needed:
+      'Real trampoline footage to measure how often this happens; a model fine-tuned on trampoline poses if it is frequent.',
   },
 ];
 
@@ -85,7 +91,8 @@ export const ruleBasedClassifier: SkillClassifier = {
     const tol = cfg.rotation.toleranceDeg;
     const evidence: EvidenceItem[] = [];
     const limitations: Limitation[] = [];
-    const add = (key: string, label: string, text: string, value: number | null, note?: string) => evidence.push({ key, label, text, value, note });
+    const add = (key: string, label: string, text: string, value: number | null, note?: string) =>
+      evidence.push({ key, label, text, value, note });
 
     if (!f.complete || r.totalDeg === null) {
       return {
@@ -99,7 +106,8 @@ export const ruleBasedClassifier: SkillClassifier = {
         limitations: [
           {
             signal: 'Jump boundaries',
-            problem: 'The takeoff or the landing is not in the clip, so the rotation and the shape over the whole flight are unknown.',
+            problem:
+              'The takeoff or the landing is not in the clip, so the rotation and the shape over the whole flight are unknown.',
             needed: 'A clip that starts before the takeoff and ends after the landing.',
           },
         ],
@@ -109,11 +117,35 @@ export const ruleBasedClassifier: SkillClassifier = {
 
     // --- evidence -------------------------------------------------------------------------------
     const s = f.shape;
-    add('hip_angle', 'Hip angle', deg(s.hipAngle.atPeak), s.hipAngle.atPeak, 'shoulder–hip–knee at the most closed moment; 180° = open');
-    add('knee_angle', 'Knee angle', deg(s.kneeAngle.atPeak), s.kneeAngle.atPeak, 'hip–knee–ankle at the same moment; 180° = straight legs');
-    add('body_orientation', 'Body orientation', deg(f.orientation.apexDeg), f.orientation.apexDeg, 'trunk angle from vertical at the apex');
+    add(
+      'hip_angle',
+      'Hip angle',
+      deg(s.hipAngle.atPeak),
+      s.hipAngle.atPeak,
+      'shoulder–hip–knee at the most closed moment; 180° = open',
+    );
+    add(
+      'knee_angle',
+      'Knee angle',
+      deg(s.kneeAngle.atPeak),
+      s.kneeAngle.atPeak,
+      'hip–knee–ankle at the same moment; 180° = straight legs',
+    );
+    add(
+      'body_orientation',
+      'Body orientation',
+      deg(f.orientation.apexDeg),
+      f.orientation.apexDeg,
+      'trunk angle from vertical at the apex',
+    );
     const sep = s.legSeparation.atPeak;
-    add('leg_separation', 'Leg separation', `${levelOf(sep, cfg)}${sep === null ? '' : ` (${sep.toFixed(2)})`}`, sep, 'ankle distance / leg length; barely visible from the side');
+    add(
+      'leg_separation',
+      'Leg separation',
+      `${levelOf(sep, cfg)}${sep === null ? '' : ` (${sep.toFixed(2)})`}`,
+      sep,
+      'ankle distance / leg length; barely visible from the side',
+    );
     add(
       'rotation',
       'Rotation',
@@ -122,8 +154,20 @@ export const ruleBasedClassifier: SkillClassifier = {
       `${r.direction}${r.residualDeg === null ? '' : `, ${Math.round(Math.abs(r.residualDeg))}° from the nearest half turn`}`,
     );
     const kt = s.kneeTorsoDistance.atPeak;
-    add('knee_torso', 'Knees to torso', kt === null ? '–' : `${kt.toFixed(2)} trunk lengths`, kt, 'small = knees drawn in');
-    add('compactness', 'Body compactness', s.compactness.atPeak === null ? '–' : s.compactness.atPeak.toFixed(2), s.compactness.atPeak, '0 = stretched, higher = folded');
+    add(
+      'knee_torso',
+      'Knees to torso',
+      kt === null ? '–' : `${kt.toFixed(2)} trunk lengths`,
+      kt,
+      'small = knees drawn in',
+    );
+    add(
+      'compactness',
+      'Body compactness',
+      s.compactness.atPeak === null ? '–' : s.compactness.atPeak.toFixed(2),
+      s.compactness.atPeak,
+      '0 = stretched, higher = folded',
+    );
     add(
       'position',
       'Body position',
@@ -134,11 +178,21 @@ export const ruleBasedClassifier: SkillClassifier = {
     add(
       'facing',
       'Facing',
-      face.sign === 0 ? `undetermined (${pct(face.confidence)})` : `${face.sign > 0 ? 'right' : 'left'} of the image (${pct(face.confidence)})${face.source === 'manual' ? ', set manually' : ''}`,
+      face.sign === 0
+        ? `undetermined (${pct(face.confidence)})`
+        : `${face.sign > 0 ? 'right' : 'left'} of the image (${pct(face.confidence)})${face.source === 'manual' ? ', set manually' : ''}`,
       face.sign,
-      face.source === 'manual' ? undefined : `face ${face.cues.face?.toFixed(2) ?? '–'}, knee ${face.cues.knee?.toFixed(2) ?? '–'}, foot ${face.cues.foot?.toFixed(2) ?? '–'} (each -1 = left … +1 = right)`,
+      face.source === 'manual'
+        ? undefined
+        : `face ${face.cues.face?.toFixed(2) ?? '–'}, knee ${face.cues.knee?.toFixed(2) ?? '–'}, foot ${face.cues.foot?.toFixed(2) ?? '–'} (each -1 = left … +1 = right)`,
     );
-    add('pose_quality', 'Pose quality in flight', pct(f.quality.pose), f.quality.pose, 'measured joints count 1, interpolated 0.6, corrected 0.4, missing 0');
+    add(
+      'pose_quality',
+      'Pose quality in flight',
+      pct(f.quality.pose),
+      f.quality.pose,
+      'measured joints count 1, interpolated 0.6, corrected 0.4, missing 0',
+    );
 
     // --- candidates -----------------------------------------------------------------------------
     const none = rotationMembership(r.totalDeg, 0, tol);
@@ -157,7 +211,10 @@ export const ruleBasedClassifier: SkillClassifier = {
 
     // A camera that is not side-on shrinks the horizontal extent of the body: the 2D trunk length then changes with the rotation.
     const variation = f.quality.trunkLengthVariation;
-    const viewFactor = variation === null || variation <= cfg.maxTrunkVariation ? 1 : Math.max(0.2, 1 - 0.8 * ((variation - cfg.maxTrunkVariation) / 0.35));
+    const viewFactor =
+      variation === null || variation <= cfg.maxTrunkVariation
+        ? 1
+        : Math.max(0.2, 1 - 0.8 * ((variation - cfg.maxTrunkVariation) / 0.35));
 
     // --- decision -------------------------------------------------------------------------------
     let skill: SkillId = 'unclassified';
@@ -172,7 +229,8 @@ export const ruleBasedClassifier: SkillClassifier = {
         limitations.push({
           signal: 'Body position',
           problem: `Hip ${deg(s.hipAngle.atPeak)} and knee ${deg(s.kneeAngle.atPeak)} fit no definition well (transitional shape, or the pose is noisy).`,
-          needed: 'Adjust the thresholds if this athlete is more or less flexible than the defaults, or a cleaner pose.',
+          needed:
+            'Adjust the thresholds if this athlete is more or less flexible than the defaults, or a cleaner pose.',
         });
       } else {
         skill = `${p.label}-jump` as SkillId;
@@ -248,7 +306,8 @@ export const ruleBasedClassifier: SkillClassifier = {
       limitations.push({
         signal: 'Orientation tracking',
         problem: `The body orientation turned one way and then back by ${deg(r.reversalDeg)}. A real rotation keeps going one way, so the pose model probably flipped or lost the athlete when inverted, and the net rotation is not trustworthy.`,
-        needed: 'Check the skeleton on the inverted frames; a pose model that handles inverted athletes, or a manual correction.',
+        needed:
+          'Check the skeleton on the inverted frames; a pose model that handles inverted athletes, or a manual correction.',
       });
     }
     if (r.crossCheckDiffDeg !== null && Math.abs(r.crossCheckDiffDeg) > 60) {
@@ -268,7 +327,8 @@ export const ruleBasedClassifier: SkillClassifier = {
     if (face.twistSuspected) {
       limitations.push({
         signal: 'Twist',
-        problem: 'The facing before the takeoff differs from the facing at the landing: the athlete may have twisted, or the pose flipped.',
+        problem:
+          'The facing before the takeoff differs from the facing at the landing: the athlete may have twisted, or the pose flipped.',
         needed: '3D pose or a second camera to measure the twist.',
       });
     }
@@ -280,7 +340,17 @@ export const ruleBasedClassifier: SkillClassifier = {
       skill = 'unclassified';
       label = SKILL_LABELS[skill];
     }
-    return { classifier: meta, skill, label, confidence: clamp01(confidence), scores, confidenceParts: parts, evidence, limitations, summary };
+    return {
+      classifier: meta,
+      skill,
+      label,
+      confidence: clamp01(confidence),
+      scores,
+      confidenceParts: parts,
+      evidence,
+      limitations,
+      summary,
+    };
   },
 };
 

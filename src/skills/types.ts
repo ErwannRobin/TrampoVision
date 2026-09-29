@@ -155,13 +155,7 @@ export interface JumpSequence {
 }
 
 export type SkillId =
-  | 'straight-jump'
-  | 'tuck-jump'
-  | 'pike-jump'
-  | 'back'
-  | 'front'
-  | 'somersault-direction-unknown'
-  | 'unclassified';
+  'straight-jump' | 'tuck-jump' | 'pike-jump' | 'back' | 'front' | 'somersault-direction-unknown' | 'unclassified';
 
 export const SKILL_LABELS: Record<SkillId, string> = {
   'straight-jump': 'Straight Jump',

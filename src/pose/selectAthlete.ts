@@ -6,7 +6,10 @@ function hipCenter(kp: Keypoint[]): Point {
 }
 
 function boxArea(kp: Keypoint[]): number {
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  let x0 = Infinity,
+    y0 = Infinity,
+    x1 = -Infinity,
+    y1 = -Infinity;
   for (const p of kp) {
     x0 = Math.min(x0, p.x);
     y0 = Math.min(y0, p.y);

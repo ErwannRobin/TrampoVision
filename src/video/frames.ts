@@ -32,7 +32,13 @@ export function loadVideo(url: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<HTM
     video.preload = 'auto';
     video.setAttribute('aria-hidden', 'true');
     Object.assign(video.style, {
-      position: 'fixed', left: '0', top: '0', width: '1px', height: '1px', opacity: '0', pointerEvents: 'none',
+      position: 'fixed',
+      left: '0',
+      top: '0',
+      width: '1px',
+      height: '1px',
+      opacity: '0',
+      pointerEvents: 'none',
     });
 
     const readyEvents = ['loadedmetadata', 'loadeddata', 'canplay'];
@@ -120,7 +126,10 @@ export async function estimateFps(video: HTMLVideoElement, timeoutMs = 5000): Pr
     video.muted = wasMuted;
     video.currentTime = 0;
   }
-  const deltas = times.slice(1).map((t, i) => t - times[i]).filter((d) => d > 1e-4);
+  const deltas = times
+    .slice(1)
+    .map((t, i) => t - times[i])
+    .filter((d) => d > 1e-4);
   if (deltas.length < 3) return null;
   deltas.sort((a, b) => a - b);
   const measured = 1 / deltas[Math.floor(deltas.length / 2)];

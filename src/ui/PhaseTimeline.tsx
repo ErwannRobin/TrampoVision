@@ -172,14 +172,22 @@ export function PhaseTimeline({ result, skills, playhead, selected, onSelect }: 
   return (
     <div className="timeline">
       <div className="timeline-legend muted">
-        <span><i className="swatch" style={{ background: 'var(--series-1)', opacity: 0.5 }} /> ascent</span>
-        <span><i className="swatch" style={{ background: 'var(--series-2)', opacity: 0.5 }} /> descent</span>
+        <span>
+          <i className="swatch" style={{ background: 'var(--series-1)', opacity: 0.5 }} /> ascent
+        </span>
+        <span>
+          <i className="swatch" style={{ background: 'var(--series-2)', opacity: 0.5 }} /> descent
+        </span>
         <span>T takeoff · A apex · L landing</span>
         <span>line = center-of-mass height</span>
       </div>
       <div ref={wrapRef} className="timeline-body" style={{ height: HEIGHT }}>
         <canvas ref={plotRef} style={{ width, height: HEIGHT }} />
-        <canvas ref={cursorRef} style={{ width, height: HEIGHT, cursor: 'pointer', touchAction: 'none' }} onPointerDown={pick} />
+        <canvas
+          ref={cursorRef}
+          style={{ width, height: HEIGHT, cursor: 'pointer', touchAction: 'none' }}
+          onPointerDown={pick}
+        />
       </div>
     </div>
   );

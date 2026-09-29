@@ -99,7 +99,8 @@ function diagonalCrossing(c: Quad): Point | null {
 export function buildCalibration(input: TrampolineCalibration): CalibrationResult {
   const { corners, firstSideM: a, secondSideM: b } = input;
   if (!(a > 0) || !(b > 0)) return { ok: false, error: 'Bed sizes must be positive.' };
-  if (corners.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return { ok: false, error: 'Invalid corner position.' };
+  if (corners.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y)))
+    return { ok: false, error: 'Invalid corner position.' };
 
   const signs = [0, 1, 2, 3].map((i) => Math.sign(cross(corners[i], corners[(i + 1) % 4], corners[(i + 2) % 4])));
   if (!(signs.every((s) => s > 0) || signs.every((s) => s < 0))) {

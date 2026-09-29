@@ -30,21 +30,33 @@ describe('synthetic evaluation', () => {
   });
 
   it('abstains, instead of guessing, when the positions overlap (loose tucks, bent-knee pikes, piked layouts)', () => {
-    const s = evaluate({ ...base, name: 'sloppy execution, jitter 1%', noise: 0.01 }, { routines: ROUTINES, execution: 'sloppy' });
+    const s = evaluate(
+      { ...base, name: 'sloppy execution, jitter 1%', noise: 0.01 },
+      { routines: ROUTINES, execution: 'sloppy' },
+    );
     log(s);
     expect(s.accuracyWhenAnswered).toBeGreaterThanOrEqual(0.95);
     expect(s.confidentWrong).toBe(0);
   });
 
-  it.each(['mirror', 'rotate180'] as const)('never gives a confident wrong skill when the pose model flips inverted athletes (%s)', (flip) => {
-    const s = evaluate({ ...base, name: `pose flip (${flip}), jitter 1%`, noise: 0.01, flip }, { routines: ROUTINES });
-    log(s);
-    expect(s.confidentWrong).toBe(0);
-    // Jumps that never invert are unaffected.
-    for (const t of ['straight-jump', 'tuck-jump', 'pike-jump'] as const) expect(s.matrix[t][t] ?? 0).toBeGreaterThanOrEqual(ROUTINES * 0.95);
-    // The somersaults are reported as unclassified: the limit is shown, not hidden.
-    expect((s.matrix.back.unclassified ?? 0) + (s.matrix.front.unclassified ?? 0)).toBeGreaterThanOrEqual(ROUTINES * 2 * 0.9);
-  });
+  it.each(['mirror', 'rotate180'] as const)(
+    'never gives a confident wrong skill when the pose model flips inverted athletes (%s)',
+    (flip) => {
+      const s = evaluate(
+        { ...base, name: `pose flip (${flip}), jitter 1%`, noise: 0.01, flip },
+        { routines: ROUTINES },
+      );
+      log(s);
+      expect(s.confidentWrong).toBe(0);
+      // Jumps that never invert are unaffected.
+      for (const t of ['straight-jump', 'tuck-jump', 'pike-jump'] as const)
+        expect(s.matrix[t][t] ?? 0).toBeGreaterThanOrEqual(ROUTINES * 0.95);
+      // The somersaults are reported as unclassified: the limit is shown, not hidden.
+      expect((s.matrix.back.unclassified ?? 0) + (s.matrix.front.unclassified ?? 0)).toBeGreaterThanOrEqual(
+        ROUTINES * 2 * 0.9,
+      );
+    },
+  );
 
   it('does not name a somersault seen from far off side-on (yaw 70°)', () => {
     const s = evaluate({ ...base, name: 'camera yaw 70°, jitter 1%', noise: 0.01, yawDeg: 70 }, { routines: ROUTINES });

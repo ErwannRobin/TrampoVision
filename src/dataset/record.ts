@@ -24,7 +24,10 @@ export function buildJumpRecord(ctx: RecordContext, k: number, jumpId: number, p
   const c = j.cycle;
   const estimate = twist?.jumps[k] ?? null;
   const cycle = result.jumps.cycles[k];
-  const seq = twist?.frames && estimate?.available ? twistSequence(twist.frames, result.time, cycle, j.sequence?.samples ?? skills.config.sequenceSamples) : null;
+  const seq =
+    twist?.frames && estimate?.available
+      ? twistSequence(twist.frames, result.time, cycle, j.sequence?.samples ?? skills.config.sequenceSamples)
+      : null;
   return {
     schema: RECORD_SCHEMA,
     version: RECORD_VERSION,
@@ -51,7 +54,11 @@ export function buildJumpRecord(ctx: RecordContext, k: number, jumpId: number, p
 }
 
 /** The saved record of the same jump: the closest apex within the tolerance that is not already taken. */
-export function matchRecord(saved: JumpRecord[], apexS: number, taken: Set<string> = new Set()): JumpRecord | undefined {
+export function matchRecord(
+  saved: JumpRecord[],
+  apexS: number,
+  taken: Set<string> = new Set(),
+): JumpRecord | undefined {
   let best: JumpRecord | undefined;
   let bestD = MATCH_TOLERANCE_S;
   for (const r of saved) {
@@ -96,9 +103,14 @@ export function analysisFingerprint(r: JumpRecord): string {
 }
 
 /** True when the saved record differs from what the current settings give for the same jump. */
-export const isStale = (saved: JumpRecord, fresh: JumpRecord): boolean => analysisFingerprint(saved) !== analysisFingerprint(fresh);
+export const isStale = (saved: JumpRecord, fresh: JumpRecord): boolean =>
+  analysisFingerprint(saved) !== analysisFingerprint(fresh);
 
-export function withTruth(r: JumpRecord, label: TruthLabel | null, options: { note?: string; now?: Date } = {}): JumpRecord {
+export function withTruth(
+  r: JumpRecord,
+  label: TruthLabel | null,
+  options: { note?: string; now?: Date } = {},
+): JumpRecord {
   const now = (options.now ?? new Date()).toISOString();
   if (label === null) return { ...r, truth: null, savedAt: now };
   const note = options.note ?? r.truth?.note;

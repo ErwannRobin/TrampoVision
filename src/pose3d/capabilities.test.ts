@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { describeSupport, type Capabilities } from './capabilities';
 
-const base: Capabilities = { webgpu: 'available', webgl2: true, wasm: true, wasmSimd: true, wasmThreads: false, cores: 8, deviceMemoryGb: 8 };
+const base: Capabilities = {
+  webgpu: 'available',
+  webgl2: true,
+  wasm: true,
+  wasmSimd: true,
+  wasmThreads: false,
+  cores: 8,
+  deviceMemoryGb: 8,
+};
 
 describe('describeSupport', () => {
   it('says the current model already has 3D and names the runtime it uses', () => {
@@ -20,6 +28,9 @@ describe('describeSupport', () => {
     expect(v.dedicated.text).toContain('without threads');
   });
   it('reports that nothing can run', () => {
-    expect(describeSupport({ ...base, webgpu: 'unsupported', wasm: false, wasmSimd: false, webgl2: false }, true).dedicated.ok).toBe(false);
+    expect(
+      describeSupport({ ...base, webgpu: 'unsupported', wasm: false, wasmSimd: false, webgl2: false }, true).dedicated
+        .ok,
+    ).toBe(false);
   });
 });

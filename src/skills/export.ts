@@ -39,7 +39,10 @@ export function buildSkillReport(analysis: SkillAnalysis, source: SkillReport['s
       index: j.cycle.index,
       features: j.features,
       prediction: j.prediction,
-      sequence: j.sequence && { ...j.sequence, data: j.sequence.data.map((row) => row.map((v) => (Number.isFinite(v) ? round(v) : NaN))) },
+      sequence: j.sequence && {
+        ...j.sequence,
+        data: j.sequence.data.map((row) => row.map((v) => (Number.isFinite(v) ? round(v) : NaN))),
+      },
     })),
   };
 }

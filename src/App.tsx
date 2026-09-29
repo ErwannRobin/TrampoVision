@@ -133,7 +133,10 @@ export default function App() {
 
   // Experimental 3D: twist about the longitudinal axis, from the 3D landmarks of the same frames.
   const twist = useMemo(
-    () => (track && result ? analyzeTwist({ world: track.world, time: result.time, fps: result.meta.fps, cycles: result.jumps.cycles }) : null),
+    () =>
+      track && result
+        ? analyzeTwist({ world: track.world, time: result.time, fps: result.meta.fps, cycles: result.jumps.cycles })
+        : null,
     [track, result],
   );
 
@@ -215,7 +218,10 @@ export default function App() {
       setStatus(
         measured
           ? { kind: 'idle' }
-          : { kind: 'error', message: 'Could not measure the frame rate. Using 30 fps: please set the real value in the settings.' },
+          : {
+              kind: 'error',
+              message: 'Could not measure the frame rate. Using 30 fps: please set the real value in the settings.',
+            },
       );
     } catch (err) {
       if (isCurrent()) setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
@@ -292,7 +298,11 @@ export default function App() {
   const fresh = useMemo(() => (recordCtx ? syncRecords(videoRecords, recordCtx) : []), [recordCtx, videoRecords]);
   const savedIds = useMemo(() => new Set(videoRecords.map((r) => r.id)), [videoRecords]);
   const staleCount = useMemo(
-    () => fresh.filter((r) => { const s = videoRecords.find((v) => v.id === r.id); return !!s && isStale(s, r); }).length,
+    () =>
+      fresh.filter((r) => {
+        const s = videoRecords.find((v) => v.id === r.id);
+        return !!s && isStale(s, r);
+      }).length,
     [fresh, videoRecords],
   );
   const { save: saveRecords } = dataset;
@@ -345,14 +355,18 @@ export default function App() {
         ? calibrationModel.model.halfExtentM / calibrationModel.model.metersPerPixel / result.meta.pixelsPerMeter
         : NaN;
     const bedGuides = Number.isFinite(halfBed)
-      ? [{ value: -halfBed, label: 'bed edge' }, { value: halfBed, label: 'bed edge' }]
+      ? [
+          { value: -halfBed, label: 'bed edge' },
+          { value: halfBed, label: 'bed edge' },
+        ]
       : [];
     const orient = Array.from(result.orientation).filter(Number.isFinite);
     const turnGuides: { value: number; label?: string }[] = [];
     if (orient.length) {
       const lo = Math.ceil(Math.min(...orient) / 360);
       const hi = Math.floor(Math.max(...orient) / 360);
-      for (let k = lo; k <= hi && k - lo < 40; k++) turnGuides.push({ value: k * 360, label: `${k} turn${Math.abs(k) === 1 ? '' : 's'}` });
+      for (let k = lo; k <= hi && k - lo < 40; k++)
+        turnGuides.push({ value: k * 360, label: `${k} turn${Math.abs(k) === 1 ? '' : 's'}` });
     }
     return { markers, bands, bedGuides, turnGuides };
   }, [result, calibrationModel]);
@@ -363,7 +377,8 @@ export default function App() {
         ? `Click corner ${corners.length + 1} of 4 on the video: go around the bed. Scrub the video first if the bed is hidden.`
         : 'Drag a corner to adjust it, then press Done.';
     }
-    if (!calibrationModel) return 'Optional. Marks the bed so positions are measured relative to it. Works best with a level camera facing a side of the bed.';
+    if (!calibrationModel)
+      return 'Optional. Marks the bed so positions are measured relative to it. Works best with a level camera facing a side of the bed.';
     if (!calibrationModel.ok) return calibrationModel.error;
     const m = calibrationModel.model;
     return `Bed scale ${(1 / m.metersPerPixel).toFixed(0)} px/m at the bed center · camera sees the bed ${m.viewAngleDeg.toFixed(0)}° from face-on (0° = a long side)`;
@@ -396,7 +411,14 @@ export default function App() {
         </label>
         <label>
           Athlete height (m)
-          <input type="number" min={1} max={2.3} step={0.01} value={height} onChange={(e) => setHeight(Number(e.target.value) || 1.75)} />
+          <input
+            type="number"
+            min={1}
+            max={2.3}
+            step={0.01}
+            value={height}
+            onChange={(e) => setHeight(Number(e.target.value) || 1.75)}
+          />
         </label>
         <label>
           Video fps
@@ -424,7 +446,9 @@ export default function App() {
                 [4, '4th frame'],
               ] as const
             ).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+              <option key={value} value={value}>
+                {label}
+              </option>
             ))}
           </select>
         </label>
@@ -432,12 +456,19 @@ export default function App() {
           People to look for
           <select value={numPoses} onChange={(e) => setNumPoses(Number(e.target.value))} disabled={analyzing}>
             {[1, 2, 3].map((n) => (
-              <option key={n} value={n}>{n}</option>
+              <option key={n} value={n}>
+                {n}
+              </option>
             ))}
           </select>
         </label>
         <label className="check">
-          <input type="checkbox" checked={preferGpu} onChange={(e) => setPreferGpu(e.target.checked)} disabled={analyzing} />
+          <input
+            type="checkbox"
+            checked={preferGpu}
+            onChange={(e) => setPreferGpu(e.target.checked)}
+            disabled={analyzing}
+          />
           Use GPU if possible
         </label>
         {analyzing ? (
@@ -465,28 +496,46 @@ export default function App() {
       <p className="chips">
         <span className="chip">Runtime: {backend || 'not started'}</span>
         <span className="chip">
-          WebGPU: {webgpu ? 'available in this browser, but MediaPipe uses WebGL (GPU delegate) or WASM (CPU)' : 'not available'}
+          WebGPU:{' '}
+          {webgpu
+            ? 'available in this browser, but MediaPipe uses WebGL (GPU delegate) or WASM (CPU)'
+            : 'not available'}
         </span>
       </p>
 
       {status.kind === 'loading' && (
         <p className="notice">{status.stage === 'reading' ? 'Reading video…' : 'Measuring frame rate…'}</p>
       )}
-      {status.kind === 'error' && <p className="notice error" role="alert">{status.message}</p>}
+      {status.kind === 'error' && (
+        <p className="notice error" role="alert">
+          {status.message}
+        </p>
+      )}
       {notice && status.kind !== 'error' && <p className="notice">{notice}</p>}
       {analyzing && (
         <div className="progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
           <div style={{ width: `${pct}%` }} />
-          <span className="mono">Analyzing frame {status.done} / {status.total} ({pct}%)</span>
+          <span className="mono">
+            Analyzing frame {status.done} / {status.total} ({pct}%)
+          </span>
         </div>
       )}
 
-      {!url && !result && <p className="empty">Choose a trampoline video to start. A side view with a fixed, level camera works best.</p>}
+      {!url && !result && (
+        <p className="empty">Choose a trampoline video to start. A side view with a fixed, level camera works best.</p>
+      )}
       {!url && !result && (dataset.records.length > 0 || dataset.ready) && (
         <section className="panel evaluation">
           <DatasetBar dataset={dataset} baseName="trampovision" />
           {dataset.records.length > 0 && (
-            <EvaluationReport records={dataset.records} videoId={null} scope="all" onScope={() => {}} baseName="trampovision" onGoTo={() => {}} />
+            <EvaluationReport
+              records={dataset.records}
+              videoId={null}
+              scope="all"
+              onScope={() => {}}
+              baseName="trampovision"
+              onGoTo={() => {}}
+            />
           )}
         </section>
       )}
@@ -509,25 +558,66 @@ export default function App() {
                 onCornersChange={setCorners}
               />
             ) : (
-              <p className="notice">No video loaded. Load the clip to see the skeleton on it; the charts and the panel work without it.</p>
+              <p className="notice">
+                No video loaded. Load the clip to see the skeleton on it; the charts and the panel work without it.
+              </p>
             )}
             {result && (
-              <PhaseTimeline result={result} skills={skills} playhead={playhead} selected={jumpCount ? jumpSel : null} onSelect={(k) => setSelectedJump(k)} />
+              <PhaseTimeline
+                result={result}
+                skills={skills}
+                playhead={playhead}
+                selected={jumpCount ? jumpSel : null}
+                onSelect={(k) => setSelectedJump(k)}
+              />
             )}
             <div className="toggles">
               <div className="seg" role="group" aria-label="Pose view">
-                <button className={poseView === '2d' ? 'primary' : ''} aria-pressed={poseView === '2d'} onClick={() => switchPoseView('2d')}>2D pose</button>
-                <button className={poseView === '3d' ? 'primary' : ''} aria-pressed={poseView === '3d'} onClick={() => switchPoseView('3d')} title="Experimental: 3D skeleton and twist from the model's 3D landmarks. The classifier still uses the 2D pose.">3D pose (experimental)</button>
+                <button
+                  className={poseView === '2d' ? 'primary' : ''}
+                  aria-pressed={poseView === '2d'}
+                  onClick={() => switchPoseView('2d')}
+                >
+                  2D pose
+                </button>
+                <button
+                  className={poseView === '3d' ? 'primary' : ''}
+                  aria-pressed={poseView === '3d'}
+                  onClick={() => switchPoseView('3d')}
+                  title="Experimental: 3D skeleton and twist from the model's 3D landmarks. The classifier still uses the 2D pose."
+                >
+                  3D pose (experimental)
+                </button>
               </div>
               {(['skeleton', 'com', 'trail', 'hud'] as const).map((k) => (
                 <label key={k} className="check">
-                  <input type="checkbox" checked={overlay[k]} onChange={(e) => setOverlay({ ...overlay, [k]: e.target.checked })} />
-                  {k === 'skeleton' ? 'Skeleton' : k === 'com' ? 'Center of mass' : k === 'trail' ? 'COM trajectory' : 'Skill labels'}
+                  <input
+                    type="checkbox"
+                    checked={overlay[k]}
+                    onChange={(e) => setOverlay({ ...overlay, [k]: e.target.checked })}
+                  />
+                  {k === 'skeleton'
+                    ? 'Skeleton'
+                    : k === 'com'
+                      ? 'Center of mass'
+                      : k === 'trail'
+                        ? 'COM trajectory'
+                        : 'Skill labels'}
                 </label>
               ))}
               <span className="spacer" />
-              <button disabled={!result} onClick={() => result && download(`${base}-frames.csv`, toCsv(result), 'text/csv')}>Frames CSV</button>
-              <button disabled={!result} onClick={() => result && download(`${base}-jumps.csv`, toJumpsCsv(result), 'text/csv')}>Jumps CSV</button>
+              <button
+                disabled={!result}
+                onClick={() => result && download(`${base}-frames.csv`, toCsv(result), 'text/csv')}
+              >
+                Frames CSV
+              </button>
+              <button
+                disabled={!result}
+                onClick={() => result && download(`${base}-jumps.csv`, toJumpsCsv(result), 'text/csv')}
+              >
+                Jumps CSV
+              </button>
               <button
                 disabled={!result}
                 title="Every frame: all joints with scores, center of mass, orientation, phase, plus the raw model output"
@@ -536,7 +626,15 @@ export default function App() {
                   track &&
                   download(
                     `${base}-pose-series.json`,
-                    toSeriesJson(buildPoseSeries(result, track, { fileName, videoId: videoId ?? undefined, stride, minVisibility: 0.4, calibration })),
+                    toSeriesJson(
+                      buildPoseSeries(result, track, {
+                        fileName,
+                        videoId: videoId ?? undefined,
+                        stride,
+                        minVisibility: 0.4,
+                        calibration,
+                      }),
+                    ),
                     'application/json',
                   )
                 }
@@ -551,39 +649,93 @@ export default function App() {
                   skills &&
                   download(
                     `${base}-skills.json`,
-                    toSkillReportJson(buildSkillReport(skills, { fileName, fps: result.meta.fps, width: result.meta.width, height: result.meta.height })),
+                    toSkillReportJson(
+                      buildSkillReport(skills, {
+                        fileName,
+                        fps: result.meta.fps,
+                        width: result.meta.width,
+                        height: result.meta.height,
+                      }),
+                    ),
                     'application/json',
                   )
                 }
               >
                 Skills JSON
               </button>
-              <button disabled={!skills} title="One row per jump: features and prediction" onClick={() => skills && download(`${base}-skills.csv`, toSkillsCsv(skills), 'text/csv')}>Skills CSV</button>
-              <button disabled={!skills} title="One row per jump and normalized sample" onClick={() => skills && download(`${base}-sequences.csv`, toSequencesCsv(skills), 'text/csv')}>Sequences CSV</button>
+              <button
+                disabled={!skills}
+                title="One row per jump: features and prediction"
+                onClick={() => skills && download(`${base}-skills.csv`, toSkillsCsv(skills), 'text/csv')}
+              >
+                Skills CSV
+              </button>
+              <button
+                disabled={!skills}
+                title="One row per jump and normalized sample"
+                onClick={() => skills && download(`${base}-sequences.csv`, toSequencesCsv(skills), 'text/csv')}
+              >
+                Sequences CSV
+              </button>
             </div>
 
             {poseView === '3d' && result && track && twist && decorations && (
-              <Pose3DSection track={track} result={result} twist={twist} selected={jumpSel} playhead={playhead} markers={decorations.markers} bands={decorations.bands} />
+              <Pose3DSection
+                track={track}
+                result={result}
+                twist={twist}
+                selected={jumpSel}
+                playhead={playhead}
+                markers={decorations.markers}
+                bands={decorations.bands}
+              />
             )}
 
             <div className="panel calibration">
               <strong>Trampoline</strong>
               {editingCal ? (
                 <>
-                  <button className="primary" onClick={() => setEditingCal(false)}>Done</button>
-                  <button disabled={corners.length === 0} onClick={() => setCorners(corners.slice(0, -1))}>Undo last corner</button>
+                  <button className="primary" onClick={() => setEditingCal(false)}>
+                    Done
+                  </button>
+                  <button disabled={corners.length === 0} onClick={() => setCorners(corners.slice(0, -1))}>
+                    Undo last corner
+                  </button>
                 </>
               ) : (
                 <button disabled={!url} onClick={() => setEditingCal(true)}>
                   {corners.length === 4 ? 'Edit corners' : 'Set up calibration'}
                 </button>
               )}
-              {corners.length > 0 && <button onClick={() => { setCorners([]); setEditingCal(true); }}>Clear</button>}
+              {corners.length > 0 && (
+                <button
+                  onClick={() => {
+                    setCorners([]);
+                    setEditingCal(true);
+                  }}
+                >
+                  Clear
+                </button>
+              )}
               <label>
                 Bed
-                <input type="number" min={0.5} max={10} step={0.01} value={bedLong} onChange={(e) => setBedLong(Number(e.target.value) || DEFAULT_BED_M.long)} />
+                <input
+                  type="number"
+                  min={0.5}
+                  max={10}
+                  step={0.01}
+                  value={bedLong}
+                  onChange={(e) => setBedLong(Number(e.target.value) || DEFAULT_BED_M.long)}
+                />
                 ×
-                <input type="number" min={0.5} max={10} step={0.01} value={bedShort} onChange={(e) => setBedShort(Number(e.target.value) || DEFAULT_BED_M.short)} />
+                <input
+                  type="number"
+                  min={0.5}
+                  max={10}
+                  step={0.01}
+                  value={bedShort}
+                  onChange={(e) => setBedShort(Number(e.target.value) || DEFAULT_BED_M.short)}
+                />
                 m
               </label>
               <label>
@@ -601,13 +753,22 @@ export default function App() {
                   <option value="athlete">athlete height</option>
                 </select>
               </label>
-              <span className={`status ${calibrationModel && !calibrationModel.ok ? 'error-text' : 'muted'}`}>{calStatus}</span>
+              <span className={`status ${calibrationModel && !calibrationModel.ok ? 'error-text' : 'muted'}`}>
+                {calStatus}
+              </span>
             </div>
             {result && skills && (
               <JumpView result={result} skills={skills} playhead={playhead} selected={jumpSel} onSelect={chooseJump} />
             )}
             {result && rightTab === 'evaluate' && (
-              <EvaluationReport records={dataset.records} videoId={videoId} scope={evalScope} onScope={setEvalScope} baseName={base} onGoTo={goToApex} />
+              <EvaluationReport
+                records={dataset.records}
+                videoId={videoId}
+                scope={evalScope}
+                onScope={setEvalScope}
+                baseName={base}
+                onGoTo={goToApex}
+              />
             )}
             <p className="hint muted">
               Space: play/pause · ←/→: previous/next frame (Shift: ±10) · click or drag on a chart to seek.
@@ -616,13 +777,49 @@ export default function App() {
           {result && (
             <aside className="right">
               <div className="tabs" role="tablist">
-                <button role="tab" aria-selected={rightTab === 'skill'} className={rightTab === 'skill' ? 'primary' : ''} onClick={() => setRightTab('skill')}>Skill</button>
-                <button role="tab" aria-selected={rightTab === 'evaluate'} className={rightTab === 'evaluate' ? 'primary' : ''} onClick={() => setRightTab('evaluate')}>Evaluate</button>
-                <button role="tab" aria-selected={rightTab === 'twist'} className={rightTab === 'twist' ? 'primary' : ''} onClick={() => setRightTab('twist')}>Twist 3D</button>
-                <button role="tab" aria-selected={rightTab === 'analysis'} className={rightTab === 'analysis' ? 'primary' : ''} onClick={() => setRightTab('analysis')}>Analysis</button>
+                <button
+                  role="tab"
+                  aria-selected={rightTab === 'skill'}
+                  className={rightTab === 'skill' ? 'primary' : ''}
+                  onClick={() => setRightTab('skill')}
+                >
+                  Skill
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={rightTab === 'evaluate'}
+                  className={rightTab === 'evaluate' ? 'primary' : ''}
+                  onClick={() => setRightTab('evaluate')}
+                >
+                  Evaluate
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={rightTab === 'twist'}
+                  className={rightTab === 'twist' ? 'primary' : ''}
+                  onClick={() => setRightTab('twist')}
+                >
+                  Twist 3D
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={rightTab === 'analysis'}
+                  className={rightTab === 'analysis' ? 'primary' : ''}
+                  onClick={() => setRightTab('analysis')}
+                >
+                  Analysis
+                </button>
               </div>
               {rightTab === 'skill' && skills ? (
-                <SkillPanel result={result} skills={skills} selected={jumpSel} playhead={playhead} config={skillConfig} onConfig={setSkillConfig} onSelect={chooseJump} />
+                <SkillPanel
+                  result={result}
+                  skills={skills}
+                  selected={jumpSel}
+                  playhead={playhead}
+                  config={skillConfig}
+                  onConfig={setSkillConfig}
+                  onSelect={chooseJump}
+                />
               ) : rightTab === 'evaluate' && skills ? (
                 <EvaluatePanel
                   skills={skills}
@@ -662,26 +859,88 @@ export default function App() {
 
       {result && decorations && (
         <section className="charts">
-          <Chart title="COM height" unit={`m above ${result.meta.heightReference}`} time={result.time} playhead={playhead} confidence={result.confidence} decimals={2} minSpan={0.5}
-            markers={decorations.markers} bands={decorations.bands}
-            series={[{ label: 'Height', values: result.height, color: '--series-1' }]} />
-          <Chart title="COM vertical velocity" unit="m/s, up = +" time={result.time} playhead={playhead} confidence={result.confidence} decimals={2} zeroLine minSpan={2}
-            markers={decorations.markers} bands={decorations.bands}
-            series={[{ label: 'Vy', values: result.vy, color: '--series-1' }]} />
-          <Chart title="COM horizontal position" unit={`m from ${result.meta.calibrated ? 'bed center' : 'start'}, + = right`} time={result.time} playhead={playhead} confidence={result.confidence} decimals={2} zeroLine minSpan={0.5}
-            guides={decorations.bedGuides} markers={decorations.markers} bands={decorations.bands}
-            series={[{ label: 'x', values: result.x, color: '--series-1' }]} />
-          <TrajectoryPlot result={result} playhead={playhead} calibration={calibrationModel?.ok && result.meta.calibrated ? calibrationModel.model : null} />
-          <Chart title="Body orientation (continuous)" unit="°, keeps counting past 360" time={result.time} playhead={playhead} confidence={result.confidence} decimals={0} minSpan={40}
-            guides={decorations.turnGuides} markers={decorations.markers} bands={decorations.bands}
-            series={[{ label: 'Orientation', values: result.orientation, color: '--series-1' }]} />
-          <Chart title="Body angle (wrapped)" unit="° from vertical, + = clockwise" time={result.time} playhead={playhead} confidence={result.confidence} zeroLine minSpan={20} breakOnJump={180}
+          <Chart
+            title="COM height"
+            unit={`m above ${result.meta.heightReference}`}
+            time={result.time}
+            playhead={playhead}
+            confidence={result.confidence}
+            decimals={2}
+            minSpan={0.5}
+            markers={decorations.markers}
+            bands={decorations.bands}
+            series={[{ label: 'Height', values: result.height, color: '--series-1' }]}
+          />
+          <Chart
+            title="COM vertical velocity"
+            unit="m/s, up = +"
+            time={result.time}
+            playhead={playhead}
+            confidence={result.confidence}
+            decimals={2}
+            zeroLine
+            minSpan={2}
+            markers={decorations.markers}
+            bands={decorations.bands}
+            series={[{ label: 'Vy', values: result.vy, color: '--series-1' }]}
+          />
+          <Chart
+            title="COM horizontal position"
+            unit={`m from ${result.meta.calibrated ? 'bed center' : 'start'}, + = right`}
+            time={result.time}
+            playhead={playhead}
+            confidence={result.confidence}
+            decimals={2}
+            zeroLine
+            minSpan={0.5}
+            guides={decorations.bedGuides}
+            markers={decorations.markers}
+            bands={decorations.bands}
+            series={[{ label: 'x', values: result.x, color: '--series-1' }]}
+          />
+          <TrajectoryPlot
+            result={result}
+            playhead={playhead}
+            calibration={calibrationModel?.ok && result.meta.calibrated ? calibrationModel.model : null}
+          />
+          <Chart
+            title="Body orientation (continuous)"
+            unit="°, keeps counting past 360"
+            time={result.time}
+            playhead={playhead}
+            confidence={result.confidence}
+            decimals={0}
+            minSpan={40}
+            guides={decorations.turnGuides}
+            markers={decorations.markers}
+            bands={decorations.bands}
+            series={[{ label: 'Orientation', values: result.orientation, color: '--series-1' }]}
+          />
+          <Chart
+            title="Body angle (wrapped)"
+            unit="° from vertical, + = clockwise"
+            time={result.time}
+            playhead={playhead}
+            confidence={result.confidence}
+            zeroLine
+            minSpan={20}
+            breakOnJump={180}
             series={[
               { label: 'Trunk', values: result.trunkAngle, color: '--series-1' },
               { label: 'Body line', values: result.lineAngle, color: '--series-2' },
-            ]} />
-          <Chart title="Angular velocity" unit="°/s" time={result.time} playhead={playhead} confidence={result.confidence} decimals={0} zeroLine minSpan={60}
-            series={[{ label: 'ω', values: result.angularVelocity, color: '--series-1' }]} />
+            ]}
+          />
+          <Chart
+            title="Angular velocity"
+            unit="°/s"
+            time={result.time}
+            playhead={playhead}
+            confidence={result.confidence}
+            decimals={0}
+            zeroLine
+            minSpan={60}
+            series={[{ label: 'ω', values: result.angularVelocity, color: '--series-1' }]}
+          />
           {(
             [
               ['Knee angle', 'leftKnee', 'rightKnee'],
@@ -690,14 +949,29 @@ export default function App() {
               ['Elbow angle', 'leftElbow', 'rightElbow'],
             ] as const
           ).map(([title, l, r]) => (
-            <Chart key={title} title={title} unit="°, 180 = straight" time={result.time} playhead={playhead} confidence={result.confidence} minSpan={30}
+            <Chart
+              key={title}
+              title={title}
+              unit="°, 180 = straight"
+              time={result.time}
+              playhead={playhead}
+              confidence={result.confidence}
+              minSpan={30}
               series={[
                 { label: 'Left', values: result.joints[l], color: '--series-1' },
                 { label: 'Right', values: result.joints[r], color: '--series-2' },
-              ]} />
+              ]}
+            />
           ))}
-          <Chart title="Pose confidence" unit="0–1, shaded when < 0.5" time={result.time} playhead={playhead} decimals={2} yDomain={[0, 1]}
-            series={[{ label: 'Confidence', values: result.confidence, color: '--series-1' }]} />
+          <Chart
+            title="Pose confidence"
+            unit="0–1, shaded when < 0.5"
+            time={result.time}
+            playhead={playhead}
+            decimals={2}
+            yDomain={[0, 1]}
+            series={[{ label: 'Confidence', values: result.confidence, color: '--series-1' }]}
+          />
         </section>
       )}
     </div>

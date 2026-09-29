@@ -6,7 +6,11 @@ export const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] +
 export const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 export const scale = (a: Vec3, k: number): Vec3 => [a[0] * k, a[1] * k, a[2] * k];
 export const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-export const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+export const cross = (a: Vec3, b: Vec3): Vec3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
 export const norm = (a: Vec3): number => Math.hypot(a[0], a[1], a[2]);
 export const mid = (a: Vec3, b: Vec3): Vec3 => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
 
@@ -22,7 +26,8 @@ export const finite3 = (a: Vec3): boolean => Number.isFinite(a[0]) && Number.isF
 export const perpendicular = (a: Vec3, axis: Vec3): Vec3 => sub(a, scale(axis, dot(a, axis)));
 
 /** Signed angle from `a` to `b` in degrees, positive counter-clockwise seen from the tip of the unit vector `axis` (right-hand rule). Both inputs must be perpendicular to `axis`. */
-export const signedAngleDeg = (a: Vec3, b: Vec3, axis: Vec3): number => (Math.atan2(dot(axis, cross(a, b)), dot(a, b)) * 180) / Math.PI;
+export const signedAngleDeg = (a: Vec3, b: Vec3, axis: Vec3): number =>
+  (Math.atan2(dot(axis, cross(a, b)), dot(a, b)) * 180) / Math.PI;
 
 /** Rotates `v` about the unit vector `axis` by `deg` (right-hand rule). */
 export function rotateAbout(v: Vec3, axis: Vec3, deg: number): Vec3 {

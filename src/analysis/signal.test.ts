@@ -117,13 +117,15 @@ describe('spikeMask', () => {
   it('flags isolated glitches but not smooth fast motion', () => {
     const n = 60;
     const xs = Array.from({ length: n }, (_, i) => 100 + 6 * i);
-    const ys = Array.from({ length: n }, (_, i) => 300 - 8 * i + 0.5 * i * i / 10);
+    const ys = Array.from({ length: n }, (_, i) => 300 - 8 * i + (0.5 * i * i) / 10);
     xs[20] += 90;
     ys[41] -= 120;
     xs[42] += 100; // two-sample glitch
     ys[42] -= 100;
     const m = spikeMask(xs, ys, 3, 40);
-    const flagged = Array.from(m).map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
+    const flagged = Array.from(m)
+      .map((v, i) => (v ? i : -1))
+      .filter((i) => i >= 0);
     expect(flagged).toEqual([20, 41, 42]);
   });
 
@@ -135,7 +137,10 @@ describe('spikeMask', () => {
 
 describe('findPeaks', () => {
   it('finds prominent maxima, ignores ripples and respects min distance', () => {
-    const y = Array.from({ length: 200 }, (_, i) => Math.max(0, 3 * Math.sin((i / 200) * 6 * Math.PI)) + 0.05 * Math.sin(i * 2.7));
+    const y = Array.from(
+      { length: 200 },
+      (_, i) => Math.max(0, 3 * Math.sin((i / 200) * 6 * Math.PI)) + 0.05 * Math.sin(i * 2.7),
+    );
     const peaks = findPeaks(y, 1, 20);
     expect(peaks.length).toBe(3);
     expect(Math.abs(peaks[0] - 17)).toBeLessThanOrEqual(2);

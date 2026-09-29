@@ -1,7 +1,9 @@
 /** Small signal-processing helpers. All of them tolerate NaN gaps (missing samples). */
 
 export function median(values: ArrayLike<number>): number {
-  const v = Array.from(values).filter(Number.isFinite).sort((a, b) => a - b);
+  const v = Array.from(values)
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
   if (v.length === 0) return NaN;
   const mid = v.length >> 1;
   return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
@@ -22,7 +24,11 @@ export function oddWindow(seconds: number, fps: number, min = 5): number {
  *    gap, nudged so it meets both end samples exactly. A jump or a limb in free flight follows a
  *    parabola, so this does not shave the apex the way a straight line would.
  */
-export function fillGaps(values: ArrayLike<number>, maxGap: number, method: 'linear' | 'quadratic' = 'linear'): Float64Array {
+export function fillGaps(
+  values: ArrayLike<number>,
+  maxGap: number,
+  method: 'linear' | 'quadratic' = 'linear',
+): Float64Array {
   const out = Float64Array.from(values);
   const n = out.length;
   let i = 0;
@@ -194,7 +200,7 @@ function fitRun(
 
 /** Wraps an angle in degrees to (-180, 180]. */
 export function wrapDegrees(a: number): number {
-  let r = ((a + 180) % 360 + 360) % 360 - 180;
+  let r = ((((a + 180) % 360) + 360) % 360) - 180;
   if (r === -180) r = 180;
   return r;
 }
@@ -241,12 +247,7 @@ export function unwrapDegrees(values: ArrayLike<number>): Float64Array {
  * samples within +/- `half` indices. Median-based, so a run of up to `half` bad samples is caught.
  * Samples without a valid neighbour on both sides are never flagged.
  */
-export function spikeMask(
-  xs: ArrayLike<number>,
-  ys: ArrayLike<number>,
-  half: number,
-  threshold: number,
-): Uint8Array {
+export function spikeMask(xs: ArrayLike<number>, ys: ArrayLike<number>, half: number, threshold: number): Uint8Array {
   const n = xs.length;
   const mask = new Uint8Array(n);
   const wx: number[] = [];

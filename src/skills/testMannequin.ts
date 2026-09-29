@@ -205,16 +205,17 @@ export function degradeTrack(
   const drop = o.dropout ?? 0;
   return {
     ...track,
-    frames: track.frames.map((f) =>
-      f &&
-      f.map((p) => {
-        const dropped = drop > 0 && (rnd() + 1) / 2 < drop;
-        return {
-          x: p.x + noise * rnd(),
-          y: p.y + noise * rnd(),
-          visibility: dropped ? 0.1 : o.visibilityJitter ? 0.6 + 0.4 * (rnd() + 1) / 2 : p.visibility,
-        };
-      }),
+    frames: track.frames.map(
+      (f) =>
+        f &&
+        f.map((p) => {
+          const dropped = drop > 0 && (rnd() + 1) / 2 < drop;
+          return {
+            x: p.x + noise * rnd(),
+            y: p.y + noise * rnd(),
+            visibility: dropped ? 0.1 : o.visibilityJitter ? 0.6 + (0.4 * (rnd() + 1)) / 2 : p.visibility,
+          };
+        }),
     ),
   };
 }

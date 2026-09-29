@@ -27,7 +27,19 @@ interface Props {
 
 const PICK_RADIUS_PX = 16;
 
-export function VideoPlayer({ url, fps, result, skills = null, overlay, playhead, speed, onSpeed, onError, calibration, onCornersChange }: Props) {
+export function VideoPlayer({
+  url,
+  fps,
+  result,
+  skills = null,
+  overlay,
+  playhead,
+  speed,
+  onSpeed,
+  onError,
+  calibration,
+  onCornersChange,
+}: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ratio, setRatio] = useState(16 / 9);
@@ -50,7 +62,10 @@ export function VideoPlayer({ url, fps, result, skills = null, overlay, playhead
     if (!v || !v.videoWidth) return null;
     const rect = e.currentTarget.getBoundingClientRect();
     return {
-      p: { x: ((e.clientX - rect.left) / rect.width) * v.videoWidth, y: ((e.clientY - rect.top) / rect.height) * v.videoHeight },
+      p: {
+        x: ((e.clientX - rect.left) / rect.width) * v.videoWidth,
+        y: ((e.clientY - rect.top) / rect.height) * v.videoHeight,
+      },
       cssPerPx: rect.width / v.videoWidth,
     };
   };
@@ -269,16 +284,28 @@ function Transport({ playhead, fps, total, playing, onToggle, onStep, onSeekFram
   const frames = total();
   return (
     <div className="transport">
-      <button onClick={() => onStep(-10)} title="Back 10 frames (Shift+←)">« 10</button>
-      <button onClick={() => onStep(-1)} title="Previous frame (←)">‹ frame</button>
-      <button className="primary" onClick={onToggle} title="Play / pause (Space)">{playing ? '❚❚ Pause' : '▶ Play'}</button>
-      <button onClick={() => onStep(1)} title="Next frame (→)">frame ›</button>
-      <button onClick={() => onStep(10)} title="Forward 10 frames (Shift+→)">10 »</button>
+      <button onClick={() => onStep(-10)} title="Back 10 frames (Shift+←)">
+        « 10
+      </button>
+      <button onClick={() => onStep(-1)} title="Previous frame (←)">
+        ‹ frame
+      </button>
+      <button className="primary" onClick={onToggle} title="Play / pause (Space)">
+        {playing ? '❚❚ Pause' : '▶ Play'}
+      </button>
+      <button onClick={() => onStep(1)} title="Next frame (→)">
+        frame ›
+      </button>
+      <button onClick={() => onStep(10)} title="Forward 10 frames (Shift+→)">
+        10 »
+      </button>
       <label className="inline">
         Speed
         <select value={speed} onChange={(e) => onSpeed(Number(e.target.value))}>
           {SPEEDS.map((s) => (
-            <option key={s} value={s}>{s}×</option>
+            <option key={s} value={s}>
+              {s}×
+            </option>
           ))}
         </select>
       </label>

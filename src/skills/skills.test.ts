@@ -12,7 +12,10 @@ import { degradeTrack, mannequinPoseBuilder, mannequinRoutine, type MannequinJum
 import type { SkillClassifier } from './types';
 
 const V0 = 4.4;
-const run = (jumps: MannequinJump[], extra: Parameters<typeof mannequinRoutine>[0] extends infer T ? Partial<T> : never = {}) => {
+const run = (
+  jumps: MannequinJump[],
+  extra: Parameters<typeof mannequinRoutine>[0] extends infer T ? Partial<T> : never = {},
+) => {
   const { track, truth } = mannequinRoutine({ jumps, facing: 1, ...extra });
   const result = computeAnalysis(track, { athleteHeightM: extra.heightM ?? 1.75 });
   return { track, truth, result, skills: analyzeSkills(result) };
@@ -53,7 +56,9 @@ describe('positions without rotation', () => {
   it('lists evidence in the requested form and keeps the limits honest', () => {
     const pike = skills.jumps[2].prediction;
     const keys = pike.evidence.map((e) => e.key);
-    expect(keys).toEqual(expect.arrayContaining(['hip_angle', 'knee_angle', 'body_orientation', 'leg_separation', 'rotation']));
+    expect(keys).toEqual(
+      expect.arrayContaining(['hip_angle', 'knee_angle', 'body_orientation', 'leg_separation', 'rotation']),
+    );
     expect(pike.evidence.find((e) => e.key === 'hip_angle')!.text).toBe('80°');
     expect(pike.evidence.find((e) => e.key === 'rotation')!.text).toMatch(/^0\.0 turns/);
     expect(pike.summary).toMatch(/hips fold to 80°/);
@@ -120,15 +125,29 @@ describe('front and back', () => {
     const { track } = mannequinRoutine({ jumps: [{ v0: 4.8, turns: 1, facing: 1, shape: 'tuck' }] });
     const blind: PoseTrack = {
       ...track,
-      frames: track.frames.map((f) =>
-        f &&
-        f.map((p, k) => {
-          // Put the face on the ears and the toes on the heels; leave the rest.
-          if ([LM.NOSE, LM.L_EYE_INNER, LM.L_EYE, LM.L_EYE_OUTER, LM.R_EYE_INNER, LM.R_EYE, LM.R_EYE_OUTER, LM.MOUTH_L, LM.MOUTH_R].includes(k as never)) return { ...f[LM.L_EAR] };
-          if (k === LM.L_FOOT) return { ...f[LM.L_HEEL] };
-          if (k === LM.R_FOOT) return { ...f[LM.R_HEEL] };
-          return p;
-        }),
+      frames: track.frames.map(
+        (f) =>
+          f &&
+          f.map((p, k) => {
+            // Put the face on the ears and the toes on the heels; leave the rest.
+            if (
+              [
+                LM.NOSE,
+                LM.L_EYE_INNER,
+                LM.L_EYE,
+                LM.L_EYE_OUTER,
+                LM.R_EYE_INNER,
+                LM.R_EYE,
+                LM.R_EYE_OUTER,
+                LM.MOUTH_L,
+                LM.MOUTH_R,
+              ].includes(k as never)
+            )
+              return { ...f[LM.L_EAR] };
+            if (k === LM.L_FOOT) return { ...f[LM.L_HEEL] };
+            if (k === LM.R_FOOT) return { ...f[LM.R_HEEL] };
+            return p;
+          }),
       ),
     };
     const skills = analyzeSkills(computeAnalysis(blind));
@@ -175,7 +194,9 @@ describe('normalization', () => {
     sa.jumps.forEach((ja, k) => {
       const jb = sb.jumps[k];
       expect(jb.sequence!.columns).toEqual(ja.sequence!.columns);
-      const compare = SEQUENCE_COLUMNS.map((c, col) => ({ c, col })).filter(({ c }) => !['com_h_m', 'com_x_m', 'com_vy_mps', 'com_x_bed'].includes(c));
+      const compare = SEQUENCE_COLUMNS.map((c, col) => ({ c, col })).filter(
+        ({ c }) => !['com_h_m', 'com_x_m', 'com_vy_mps', 'com_x_bed'].includes(c),
+      );
       for (let row = 0; row < ja.sequence!.samples; row++) {
         for (const { c, col } of compare) {
           const x = ja.sequence!.data[row][col];
@@ -190,14 +211,18 @@ describe('normalization', () => {
   it('does not depend on the size of the athlete for the pose columns', () => {
     const tall = mannequinRoutine({ jumps, facing: 1, heightM: 1.95, pxPerM: 70 });
     const st = analyzeSkills(computeAnalysis(tall.track, { athleteHeightM: 1.95 }));
-    const cols = SEQUENCE_COLUMNS.map((c, i) => ({ c, i })).filter(({ c }) => /_(x|y)$/.test(c) && !c.startsWith('com_') || c === 'hip_angle_deg' || c === 'orient_turns');
+    const cols = SEQUENCE_COLUMNS.map((c, i) => ({ c, i })).filter(
+      ({ c }) => (/_(x|y)$/.test(c) && !c.startsWith('com_')) || c === 'hip_angle_deg' || c === 'orient_turns',
+    );
     for (let k = 0; k < sa.jumps.length; k++) {
       for (let row = 0; row < 32; row++) {
         for (const { c, i } of cols) {
           const x = sa.jumps[k].sequence!.data[row][i];
           const y = st.jumps[k].sequence!.data[row][i];
           if (Number.isNaN(x) || Number.isNaN(y)) continue;
-          expect(Math.abs(x - y), `${c} row ${row}`).toBeLessThan(c === 'orient_turns' ? 0.03 : c === 'hip_angle_deg' ? 2 : 0.02);
+          expect(Math.abs(x - y), `${c} row ${row}`).toBeLessThan(
+            c === 'orient_turns' ? 0.03 : c === 'hip_angle_deg' ? 2 : 0.02,
+          );
         }
       }
     }
@@ -239,7 +264,12 @@ describe('failure handling: report the limit instead of a wrong skill', () => {
   });
 
   it('marks a jump that is cut off by the end of the clip', () => {
-    const { track } = mannequinRoutine({ jumps: [{ v0: 4.4, shape: 'tuck' }, { v0: 4.4, shape: 'tuck' }] });
+    const { track } = mannequinRoutine({
+      jumps: [
+        { v0: 4.4, shape: 'tuck' },
+        { v0: 4.4, shape: 'tuck' },
+      ],
+    });
     const cut: PoseTrack = { ...track, times: track.times.slice(0, 85), frames: track.frames.slice(0, 85) }; // ends mid-flight of jump 2, after its apex
     const skills = analyzeSkills(computeAnalysis(cut));
     const last = skills.jumps[skills.jumps.length - 1];
@@ -271,7 +301,10 @@ describe('failure handling: report the limit instead of a wrong skill', () => {
 });
 
 describe('modularity and export', () => {
-  const { skills } = run([{ v0: 4.4, shape: 'tuck' }, { v0: 4.8, shape: 'pike', turns: 1 }]);
+  const { skills } = run([
+    { v0: 4.4, shape: 'tuck' },
+    { v0: 4.8, shape: 'pike', turns: 1 },
+  ]);
 
   it('accepts another classifier that reads the features and the normalized sequence', () => {
     const seen: number[] = [];
@@ -281,7 +314,10 @@ describe('modularity and export', () => {
       description: 'stand-in for a temporal model',
       classify({ features, sequence }) {
         seen.push(sequence ? sequence.samples : -1);
-        return { ...ruleBasedClassifier.classify({ features, sequence, cycle: null as never, config: skills.config }), classifier: { id: 'toy-model', version: '0' } };
+        return {
+          ...ruleBasedClassifier.classify({ features, sequence, cycle: null as never, config: skills.config }),
+          classifier: { id: 'toy-model', version: '0' },
+        };
       },
     };
     const { result } = run([{ v0: 4.4, shape: 'tuck' }]);
@@ -292,7 +328,9 @@ describe('modularity and export', () => {
   });
 
   it('exports JSON with the sequences, features, predictions and thresholds', () => {
-    const report = JSON.parse(toSkillReportJson(buildSkillReport(skills, { fileName: 'x.mp4', fps: 30, width: 640, height: 720 })));
+    const report = JSON.parse(
+      toSkillReportJson(buildSkillReport(skills, { fileName: 'x.mp4', fps: 30, width: 640, height: 720 })),
+    );
     expect(report.schema).toBe('trampovision.jump-skills');
     expect(report.jumps).toHaveLength(2);
     expect(report.config.position.hipFoldedMaxDeg).toBe(125);
@@ -305,7 +343,9 @@ describe('modularity and export', () => {
   it('exports one CSV row per jump and one per normalized sample', () => {
     const jumps = toSkillsCsv(skills).split('\n');
     expect(jumps).toHaveLength(3);
-    expect(jumps[0].split(',')).toEqual(expect.arrayContaining(['skill', 'hip_angle_at_peak_deg', 'rotation_turns', 'facing']));
+    expect(jumps[0].split(',')).toEqual(
+      expect.arrayContaining(['skill', 'hip_angle_at_peak_deg', 'rotation_turns', 'facing']),
+    );
     const long = toSequencesCsv(skills).split('\n');
     expect(long).toHaveLength(1 + 2 * 32);
     expect(long[0].split(',').slice(0, 4)).toEqual(['jump', 'sample', 'u', 'time_s']);
@@ -324,7 +364,10 @@ describe('the mannequin itself', () => {
   });
 
   it('is usable as a plain pose builder', () => {
-    const { track } = syntheticRoutine({ jumps: [{ v0: 4 }], pose: mannequinPoseBuilder({ jumps: [{ v0: 4, shape: 'pike' }] }) });
+    const { track } = syntheticRoutine({
+      jumps: [{ v0: 4 }],
+      pose: mannequinPoseBuilder({ jumps: [{ v0: 4, shape: 'pike' }] }),
+    });
     expect(track.frames.every((f) => f && f.length === 33)).toBe(true);
   });
 });

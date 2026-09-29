@@ -210,7 +210,10 @@ function interpolateAt(time: Float64Array, series: Float64Array, t: number): num
 }
 
 const nearestIndex = (time: Float64Array, t: number) =>
-  Math.min(Math.max(Math.round(((t - time[0]) / (time[time.length - 1] - time[0])) * (time.length - 1)), 0), time.length - 1);
+  Math.min(
+    Math.max(Math.round(((t - time[0]) / (time[time.length - 1] - time[0])) * (time.length - 1)), 0),
+    time.length - 1,
+  );
 
 /**
  * Finds the jumps in a clip from the center-of-mass motion alone (no skill knowledge).
@@ -233,7 +236,11 @@ export function detectJumps(input: JumpInput, options: Partial<JumpOptions> = {}
   const firstFinite = height.findIndex(Number.isFinite);
 
   // Pass 1: coarse events from the velocity extremes.
-  interface Coarse { apex: number; takeoff: number | null; landing: number | null }
+  interface Coarse {
+    apex: number;
+    takeoff: number | null;
+    landing: number | null;
+  }
   const coarse: Coarse[] = apexes.map((a, k) => {
     const from = k === 0 ? Math.max(0, firstFinite) : apexes[k - 1];
     const to = k === apexes.length - 1 ? n - 1 : apexes[k + 1];
@@ -241,7 +248,11 @@ export function detectJumps(input: JumpInput, options: Partial<JumpOptions> = {}
     const valleyAfter = argExtreme(height, a, to, 'min');
     const tk = argExtreme(vy, valleyBefore, a, 'max');
     const ld = argExtreme(vy, a, valleyAfter, 'min');
-    return { apex: a, takeoff: tk >= 0 && tk !== valleyBefore ? tk : null, landing: ld >= 0 && ld !== valleyAfter ? ld : null };
+    return {
+      apex: a,
+      takeoff: tk >= 0 && tk !== valleyBefore ? tk : null,
+      landing: ld >= 0 && ld !== valleyAfter ? ld : null,
+    };
   });
 
   // Pass 2: free-fall fit, refined events and metrics.
@@ -263,19 +274,45 @@ export function detectJumps(input: JumpInput, options: Partial<JumpOptions> = {}
     const take =
       c.takeoff === null
         ? null
-        : refineBoundary(time, height, time[c.takeoff], 'takeoff', g, Math.min(0.3, 0.5 * toTakeoff), Math.min(0.3, 0.8 * gapBefore), dt);
+        : refineBoundary(
+            time,
+            height,
+            time[c.takeoff],
+            'takeoff',
+            g,
+            Math.min(0.3, 0.5 * toTakeoff),
+            Math.min(0.3, 0.8 * gapBefore),
+            dt,
+          );
     const land =
       c.landing === null
         ? null
-        : refineBoundary(time, height, time[c.landing], 'landing', g, Math.min(0.3, 0.5 * toLanding), Math.min(0.3, 0.8 * gapAfter), dt);
+        : refineBoundary(
+            time,
+            height,
+            time[c.landing],
+            'landing',
+            g,
+            Math.min(0.3, 0.5 * toLanding),
+            Math.min(0.3, 0.8 * gapAfter),
+            dt,
+          );
 
     // Fall back to the coarse estimate when the refinement had too little data.
     const takeoffTimeS = c.takeoff === null ? null : take ? take.time : time[c.takeoff];
     const landingTimeS = c.landing === null ? null : land ? land.time : time[c.landing];
     const takeoff = takeoffTimeS === null ? null : Math.min(nearestIndex(time, takeoffTimeS), a - 1);
     const landing = landingTimeS === null ? null : Math.max(nearestIndex(time, landingTimeS), a + 1);
-    const takeoffHeightM = take ? take.height : takeoff === null || !Number.isFinite(height[takeoff]) ? null : height[takeoff];
-    const landingHeightM = land ? land.height : landing === null || !Number.isFinite(height[landing]) ? null : height[landing];
+    const takeoffHeightM = take
+      ? take.height
+      : takeoff === null || !Number.isFinite(height[takeoff])
+        ? null
+        : height[takeoff];
+    const landingHeightM = land
+      ? land.height
+      : landing === null || !Number.isFinite(height[landing])
+        ? null
+        : height[landing];
     const both = takeoffTimeS !== null && landingTimeS !== null;
 
     const rotAt = (t: number | null) => (t === null ? null : interpolateAt(time, orientation, t));
