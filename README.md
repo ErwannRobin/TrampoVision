@@ -1,0 +1,392 @@
+# TrampoVision (prototype)
+
+Browser-only prototype that turns a trampoline video into a **clean, normalized time series**: skeleton, center of
+mass (COM), trajectory, body orientation and rotation, plus the jump cycle (takeoff, apex, landing). **No backend,
+no database, no LLM: the video never leaves the browser and every number comes from simple, explainable math.**
+
+It does **not** score routines (FIG), use an LLM or coach. Stage 1 asks:
+
+> Can we reliably turn a trampoline video into a clean, normalized time series of skeleton + center of mass +
+> trajectory + body rotation?
+
+Stage 2 (this version) is a first **skill-recognition prototype** for five basic skills, built to answer a different question:
+
+> Do the extracted skeleton and temporal features contain enough information to reliably distinguish trampoline movements?
+
+Where the answer is "not from this signal", the app says so and names the missing signal instead of guessing
+(see *Skill recognition* below).
+
+Stage 3 (this version) is about **validating that scientifically**: you label jumps, the app saves them locally with everything it measured, and computes
+accuracy, precision, recall and a confusion matrix, with a list of the failures and the numbers behind each one. It also adds an **experimental 3D pose view
+and twist estimate** that is honest about when it cannot be trusted (see *Validation workflow* and *3D pose and twist* below).
+
+## Run
+
+```bash
+npm install          # also copies the MediaPipe WASM runtime + downloads the pose models into public/
+npm run dev          # http://localhost:5173
+npm test             # unit tests for the math and the skill logic (synthetic ground truth)
+npm run build        # production build (adds a strict Content-Security-Policy)
+```
+
+`npm install` needs internet once (models come from Google's public MediaPipe bucket). Afterwards the app
+works offline. If the download failed, run `npm run fetch-assets`.
+
+## Use
+
+1. Choose an MP4/MOV. The frame rate is measured automatically (editable).
+2. Pick a model (Full is a good default; Heavy is the most accurate/slowest) and enter the athlete height.
+3. *(Optional, recommended)* **Trampoline → Set up calibration**: scrub to a frame where the bed is visible and click its
+   four corners, going around it. Drag a corner to adjust, then **Done**. Enter the bed size if it is not 4.28 × 2.14 m and
+   say whether side 1→2 is the long or the short side. The calibration is remembered for that file (browser storage only).
+4. **Analyze video**. It seeks frame by frame, so the result does not depend on machine speed.
+5. Play, slow down (0.1×–2×), step frame by frame (`←` `→`, `Shift` = 10 frames, `Space` = play/pause), or click/drag
+   on any chart to seek. The video shows the skeleton, a solid COM dot with its trajectory, the bed outline and the current
+   jump phase. The **analysis panel** shows, for the current frame: COM, height, vertical velocity, horizontal displacement
+   from the bed center, body angle (wrapped and continuous), rotation count and jump phase, plus a table of all jumps and
+   data-quality warnings. Click a jump row to go to its takeoff.
+6. **Frames CSV**, **Jumps CSV**, or **Save data (JSON)**. The JSON is the complete frame-by-frame store (below). Use
+   *open saved data* later to get the same results without running the pose model again (the file now also holds the 3D landmarks and the video id).
+7. **Validate:** open the *Evaluate* tab, watch each jump and give it a label (keys 1–6). Metrics, the confusion matrix and the failure cases appear under the jump view; everything is stored in this browser and exported as JSON / CSV.
+8. **3D pose (experimental):** the *2D pose / 3D pose* toggle above the video adds the 3D skeleton, the longitudinal axis and the twist estimate.
+
+## Pipeline and code map
+
+```
+video ─► extractPoseTrack ─► PoseTrack ─► stabilizePose ─► computeAnalysis ─► AnalysisResult ─► analyzeSkills ─► per-jump sequence,
+ (seek+detect)   raw landmarks     (clean joints)    (COM, calibration,       arrays per        (src/skills)     features, prediction
+                                                      orientation, jumps)      sample                                 │
+                                                                                  └─► UI / exports (PoseSeries JSON, CSV, skills JSON/CSV)
+```
+
+| Module | Role |
+| --- | --- |
+| `src/pose/types.ts` | `PoseEstimator` interface. Any backend that returns the 33-point BlazePose topology can be plugged in. |
+| `src/pose/MediaPipePoseEstimator.ts` | MediaPipe Pose Landmarker, GPU delegate first, CPU (WASM) fallback. |
+| `src/analysis/stabilize.ts` | Low-confidence gating, glitch rejection, gap filling, confidence-weighted smoothing, per-joint state. |
+| `src/analysis/signal.ts` | Median, spike mask, gap filling (linear / quadratic), weighted Savitzky–Golay-style fits, peak finder, angle unwrapping. |
+| `src/analysis/com.ts` | Segment-based COM (14 segments, de Leva-style mass fractions). |
+| `src/analysis/calibration.ts` | Four bed corners → scale, bed center, position normalized to the trampoline. |
+| `src/analysis/jumpCycles.ts` | Apex / takeoff / landing detection, per-frame phase, jump metrics, rotation counting. |
+| `src/analysis/computeAnalysis.ts` | Orchestrates the above and derives height, velocity, joint angles, body orientation. |
+| `src/analysis/timeSeries.ts` | The frame-by-frame store (`PoseSeries` JSON, import/export) and a numeric feature matrix. |
+| `src/video/overlay.ts`, `src/ui/*` | Canvas overlay, calibration tool, player, charts (custom canvas), analysis panel. |
+| `src/localOnlyGuard.ts` + CSP in `vite.config.ts` | Blocks any cross-origin network request (see below). |
+| `src/analysis/testTracks.ts` | Test-only synthetic routines with analytic ground truth. |
+| `src/skills/frameShape.ts` | Per-sample pose measurements: hip/knee angles, knee-to-torso distance, compactness, leg separation, body-frame joint coordinates, facing cues. |
+| `src/skills/jumpFeatures.ts` | One normalized sequence and one feature object (`JumpFeatures`) per detected jump. |
+| `src/skills/bodyPosition.ts`, `rotation.ts`, `facing.ts` | Rule-based body position, rotation in half turns with confidence, facing direction. |
+| `src/skills/classifier.ts` | `SkillClassifier` interface + the rule-based classifier (evidence, limitations). A learned model can replace it. |
+| `src/skills/config.ts` | Every threshold in one object (editable in the UI, saved in the export). |
+| `src/skills/export.ts` | Skills JSON, per-jump CSV, per-sample sequences CSV. |
+| `src/skills/testMannequin.ts`, `evaluation.ts` | Test-only articulated athlete (known joint angles) and the synthetic evaluation harness. |
+| `src/ui/PhaseTimeline.tsx`, `JumpView.tsx`, `SkillPanel.tsx` | Event timeline, per-jump normalized charts, prediction with evidence. |
+| `src/dataset/record.ts`, `types.ts`, `videoId.ts` | The saved jump record (`JumpRecord`), how records are built, matched and refreshed, and the stable video id. |
+| `src/dataset/store.ts`, `useDataset.ts` | Local storage in the browser (IndexedDB, memory fallback), merge on import. |
+| `src/dataset/metrics.ts`, `failures.ts`, `export.ts` | Accuracy / precision / recall / confusion matrix, label-vs-measurement checks for failures, dataset and evaluation JSON/CSV. |
+| `src/ui/EvaluationView.tsx` | The *Evaluate* tab (review and label), the metrics report and the failure cards. |
+| `src/pose3d/torso.ts`, `twist.ts`, `config.ts`, `vec3.ts` | Experimental 3D: torso frame from the 3D landmarks, twist about the longitudinal axis with reliability checks. |
+| `src/pose3d/capabilities.ts` | Measures what this browser can run (WebGPU, WebGL 2, WASM SIMD / threads). |
+| `src/pose3d/testTwistMannequin.ts`, `evaluation.ts` | Test-only 3D athlete with known somersault and twist, and its degradations. |
+| `src/ui/Pose3DView.tsx`, `TwistPanel.tsx` | 3D skeleton view (torso, axis, twist dial), twist curves, twist numbers and limits. |
+
+## What is computed
+
+### 1. Frame-by-frame store (`PoseSeries`, JSON schema `trampovision.pose-series` v1)
+
+One record per analyzed frame: timestamp `t`, frame number, `detected`, model `confidence`, **all 33 joints** as
+`[x px, y px, score, state]`, the estimated **COM** (px, meters, bed-normalized, height, vertical velocity, mass coverage),
+the **body orientation** (wrapped and continuous, angular velocity), the jump `phase` and jump number, and the running
+rotation count. The header lists `landmarkNames` and `stateCodes` (0 missing, 1 measured, 2 interpolated,
+3 corrected = a glitch was replaced). Next to the cleaned data the file keeps the **raw model output** (`raw`), so the
+analysis can be re-run with other settings, and the calibration and the detected `jumps`.
+
+For a temporal model, `buildFeatureMatrix(result)` returns a `[frames × features]` array (pose shape relative to the COM and
+divided by body length, joint scores, height, vertical speed, bed-normalized position, orientation as sin/cos, turns, angular
+speed) with a validity mask. Nothing in it is learned.
+
+### 2. Pose stability (`stabilize.ts`)
+
+1. Joints with model visibility < 0.4 are treated as missing (their position is not trusted).
+2. **Glitches:** a joint farther than 20% of the body length from the median of its own neighbours in time (± 0.07 s) is
+   rejected. If ≥ 40% of the core joints of a frame are glitches, the whole frame is dropped (the skeleton "jumped").
+3. Gaps up to 0.3 s are bridged (a parabola through the samples on both sides, so a ballistic path is not flattened);
+   longer gaps stay missing rather than invented.
+4. Every joint path is smoothed with a **confidence-weighted local quadratic fit** over 0.15 s, so neighbouring frames are used and
+   doubtful samples pull less.
+
+Each joint sample keeps a state (measured / interpolated / corrected / missing) and a score; filled samples never look as sure as
+measured ones. The COM is only reported when at least 50% of the body mass was visible.
+
+### 3. Center of mass
+
+Weighted average of segment centers (head, trunk, upper arms, forearms, hands, thighs, shanks, feet). Shown as a solid dot on the
+video with its trajectory; charted as height, velocity, horizontal position and path.
+
+### 4. Trampoline calibration (`calibration.ts`)
+
+Four clicked corners + the bed size give the image → bed-plane mapping (a homography). The athlete is in the air, so the
+athlete is **not** mapped through it (the ray through a point high above the bed hits the bed plane far away or behind the
+camera). Instead the camera is assumed to be **level**, so vertical stays vertical in the image:
+
+- `meters per pixel` = the bed's scale at its center along the on-screen horizontal;
+- **horizontal displacement** = image x distance from the bed center × that scale (+ = right); `xNorm` = the same divided by the half-size
+  of the bed along that direction (±1 = the bed edge);
+- **height** = image y distance above the bed center × that scale, so height 0 is the bed surface.
+
+Meters can come from the bed (default when calibrated) or from the athlete height (selectable). The panel compares the two
+scales and warns when they disagree. **Limits, measured on a synthetic pinhole camera** (`calibration.test.ts`): exact for a level camera
+with the athlete over the bed center; an athlete 1 m closer than the bed center to the camera reads about 11% too large; a camera
+tilted down 8° reads within ~7% at 5 m height, 15° within ~13%, 25° within ~20%. Only the on-screen horizontal direction
+can be measured with one camera (depth is invisible), and the panel says which side of the bed the camera sees.
+
+### 5. Jump cycle (`jumpCycles.ts`)
+
+From the COM height and vertical velocity only:
+
+- **Apex:** a peak of the COM height that rises ≥ 0.3 m above its surroundings; height and time come from a parabola fitted to the
+  middle of the flight.
+- **Takeoff / landing:** found roughly as the largest upward / downward COM speed around the apex, then refined to the instant where
+  free fall (a = −g) starts / ends, using a two-piece parabola fit (bed contact has a free acceleration, flight is forced to −g).
+  This avoids the lag you get from reading the event off a smoothed velocity curve.
+- **Phases per frame:** `ground`, `takeoff`, `ascent`, `apex`, `descent`, `landing`. A clip that starts or ends in the air reports
+  the jump with takeoff or landing left empty.
+- **Metrics per jump:** flight time, time to apex, apex height, height gained, vertical velocity at takeoff/landing (and the
+  scale-free `g × time to apex`), horizontal displacement, rotation (see below).
+- **Free-fall check:** the acceleration fitted to the middle of each flight should be 9.81 m/s². If it is not, the meters are off
+  by roughly that ratio (this is the best check of the athlete height and the scale).
+
+### 6. Body orientation and 7. rotations
+
+Orientation = angle of the trunk vector (hips → shoulders) from vertical-up, clockwise = + as seen in the video. It is stored
+wrapped to (−180°, 180°] and **unwrapped** so it keeps counting (350 → 355 → 360 → 365, never back to 0). Each new sample is put on the
+360° branch closest to where the rotation was heading (last value + recent rate), so a dropout of more than half a turn is still
+counted correctly when the rate is steady.
+
+Per jump, `rotation = orientation(landing) − orientation(takeoff)` (interpolated between frames), reported as turns, rounded to the
+nearest **quarter turn**, and `completed rotations = quarter turns / 4` toward zero (a 350° flip counts as 1, 310° as 0). A live
+counter (turns since takeoff, reset at each takeoff, frozen at landing) is shown in the panel. The sign is the direction on screen; it
+does not say forward or backward somersault.
+
+## Skill recognition (prototype)
+
+`video → skeleton time series → jump segmentation → movement features → skill classification`, all in the browser.
+
+**Segmentation.** Takeoff, ascent, apex, descent and landing come from the COM trajectory (section 5). They are drawn on the
+**timeline strip** under the video (ascent and descent shaded, `T` `A` `L` marks, the predicted skill of every jump, the COM height as a faint line).
+Click it to seek and to pick a jump; the jump view follows the playhead.
+
+**Normalized sequence per jump** (`JumpSequence`, 32 samples from takeoff `u=0` to landing `u=1`, 58 columns). Nothing depends on
+resolution, position in the frame, athlete size or pixel coordinates:
+
+- 19 joints in the athlete's own frame: origin at the hip center, y along the trunk (hips → shoulders), x to its right when upright, in body lengths;
+- COM relative to its takeoff position in body lengths, and in **bed coordinates** (±1 = bed edge) when a calibration exists (meters are also included);
+- orientation as turns since takeoff (plus sin/cos) and angular velocity in turns/s;
+- hip angle, knee angle, knee-to-torso distance, leg separation, compactness, shoulder/hip axis, body-position code, pose quality.
+
+**Features** (`JumpFeatures`, a plain object, exported as JSON/CSV): timing (flight time, time to apex), trajectory (max height, rise, takeoff speed, horizontal
+displacement, bed position), orientation (at takeoff / apex / landing, max deviation, peak and mean angular velocity), shape statistics
+(hip, knee, shoulder/hip axis, leg separation, knee-to-torso, compactness; min / max / mean / value at the most closed moment), body position,
+rotation, facing, and data quality.
+
+**Body position** (`bodyPosition.ts`), fuzzy rules on the hip angle (shoulder–hip–knee) and knee angle (hip–knee–ankle), read at the most closed moment of the flight:
+
+| | hips | legs |
+| --- | --- | --- |
+| straight | open (≥ 155°) | straight (≥ 150°) |
+| pike | folded (≤ 125°) | straight |
+| tuck | folded | bent (≤ 115°); knees near the torso add up to 30% |
+
+Between the limits the score falls linearly, and a shape between two definitions is reported as **unknown**, not forced. All thresholds are in `config.ts`
+and editable in the panel (*Thresholds*). **These starting values are my estimates; they have not been tuned on real athletes.**
+
+**Rotation** (`rotation.ts`): net trunk rotation between takeoff and landing, rounded to half turns (0 / 180 / 360 / 540 / 720°), with a confidence that is the
+product of five checks: closeness to a multiple of 180°, how well the trunk joints were measured, no large orientation jump between samples (aliasing / pose flip),
+the body line rotating like the trunk, and the orientation not going one way and back (a sign of a pose flip).
+
+**Facing** (`facing.ts`): where the athlete faces in the body frame, from three cues (face points ahead of the ears, knee in front of the hip-ankle line, toes ahead of heels), read
+over the bed contact and the flight. It can be set manually. Needed for front vs back.
+
+**Classifier** (`classifier.ts`), rules only:
+
+| rotation | rest | result |
+| --- | --- | --- |
+| ~0° | straight / tuck / pike position | Straight Jump / Tuck Jump / Pike Jump |
+| ~360° | facing known | **Front** if the top of the body moved toward the face, **Back** if away |
+| ~360° | facing unknown | *Somersault (front or back undetermined)* |
+| anything else (180°, 540°, 720°, quarter turns) | | Unclassified, with the reason |
+
+I read "Back" and "Front" as **back and front somersaults** (one full rotation). If drops (landing on back or front) were meant, that is not
+implemented; quarter-turn rotations are reported as a limitation.
+
+Each prediction returns the skill, a confidence (a heuristic product of the confidences it rests on, **not a calibrated probability**), the evidence
+(hip angle, knee angle, body orientation, leg separation, rotation, knees to torso, compactness, position, facing, pose quality), a one-line reason, and a list
+of **limitations**: what the data could not settle and what signal would fix it. A static list of what one side view can never tell (twists, straddle, quarter turns, camera view, pose-model failures) is in the panel.
+
+**Swapping in a learned model.** `analyzeSkills(result, { classifier })` takes any `SkillClassifier { id, version, classify({ features, sequence, cycle, config }) }`. The
+normalized sequence and the feature object are the model input; the rule-based classifier stays as the transparent baseline.
+
+**Exports.** *Skills JSON* (`trampovision.jump-skills` v1: config, per jump the features, prediction and sequence), *Skills CSV* (one row per jump),
+*Sequences CSV* (one row per jump and normalized sample).
+
+### What has been checked for the skill stage
+
+Synthetic athlete (`testMannequin.ts`): an articulated 2D body with known hip/knee angles, facing, and a COM on a ballistic path, rotated about the COM;
+random heights, sizes, speeds, rotations (0.92–1.08 turns) and body angles, 60 routines × 5 jumps = 300 jumps per row. Rows are what `src/skills/evaluation.test.ts`
+asserts (with fewer routines). Correct = the right skill; *declined* = unclassified or direction undetermined; *confident wrong* = a wrong skill at ≥ 60% confidence.
+
+| condition | correct | declined | confident wrong |
+| --- | --- | --- | --- |
+| clean | 100% | 0 | 0 |
+| landmark jitter 2% of height / 4% | 100% / 100% | 0 / 0 | 0 / 0 |
+| jitter 2% + 10% of landmarks dropped | 100% | 0 | 0 |
+| loose tucks, bent-knee pikes, piked layouts (jitter 1%) | 99% | 3 | 0 |
+| pose model flips the athlete when inverted (simulated: mirror / rotate 180°) | 60% / 60% | 120 / 120 (all somersaults) | 0 / 0 |
+| camera yaw 50° / 70° away from side-on | 100% / 59% | 0 / 121 | 0 / 1 |
+| jitter 1% at 15 fps instead of 30 | 90% | 31 | 0 |
+
+**How to read this.** It shows that *if* the pose estimator is as accurate as this simulated one, hip angle, knee angle, rotation and facing separate the five skills, and that the failure
+modes I could simulate end in "declined" and a named limitation, not in a confident wrong answer. It does **not** show that a real model is that accurate: the classes were
+generated from the same ideas as the rules (the textbook rows do not overlap), and the flip and yaw failures are my assumptions about how a pose model fails, not something I observed.
+Rotation error grows with rotation speed (about 5% for a full turn) because the takeoff and landing times are known to a few hundredths of a second.
+
+Browser end to end (headless Chromium): (a) a stick-figure video of straight, tuck, pike, back, front, straight (pose loaded from a saved series): all six named correctly at 85–100%,
+timeline, position strip, normalized charts, exports and *Play jump* work, forcing the facing to the other side turns Back into Front; (b) real MediaPipe on the earlier photo video (calibrated, CPU): 4 jumps found; the
+1-turn jump was read as 349° and named **Back** at 96% (the athlete in the photo faces left and turns clockwise: correct); the other three, which never leave a lunge pose, were called
+"Straight Jump" at 88–96%, which shows that the rules only look at hip and knee angles. No network requests.
+
+### Do the features contain enough information? Current answer
+
+- **Yes, in principle, for** rotation amount and direction, and for straight vs tuck vs pike, *from a side-on camera*: hip angle, knee angle and orientation carry it, and the confidence drops when they are unreliable.
+- **Only with an extra signal:** front vs back needs the facing direction (face, knee and toe cues; manual override when they are weak). Skills with half-turns or quarter turns need a landing-position rule.
+- **Not from this signal:** twists (the experimental 3D pose gives a twist estimate, but it is only as good as the model's depth: on the one real test it produced a phantom −94° and the app flagged it as not reliable; see *3D pose and twist*), straddle / leg separation (need a front view), anything seen from the front or back of the athlete.
+- **Unknown until real footage is tested:** how often a real pose model flips, drops or mislocates limbs on inverted, tucked or blurred athletes. This is the biggest risk and it cannot be judged from synthetic data.
+
+## Validation workflow: dataset, evaluation, failure cases
+
+The goal is to find out whether the representation is good enough, with real numbers from real jumps. Everything stays in your browser.
+
+**Saving jumps (local dataset).** In the *Evaluate* tab, choose a label for the jump you are looking at (`Straight`, `Tuck`, `Pike`, `Back`, `Front`, `Unknown`; keys 1–6). The jump is
+saved with everything the app measured. *Save all jumps* stores the whole video without labels. Storage is the browser's own IndexedDB (database `trampovision`); if the browser blocks it, the app says so and keeps the
+dataset in memory only. **Nothing is uploaded and the video is never stored, only numbers.** A record (`JumpRecord`, `src/dataset/types.ts`) holds:
+
+| field | content |
+| --- | --- |
+| `videoId` | `v-` + 12 hex digits of a SHA-256 over the file size and the first and last 256 KiB: the same file gives the same id after a reload or a rename. Saved series files carry it; without it a content-based `s-…` id is used. |
+| `jumpId` | number of the jump on screen (1 = first). A re-analysis keeps the saved id of a jump whose apex is within 0.2 s, so labels survive a change of settings. |
+| `timestamps` | takeoff, apex, landing, flight time |
+| `sequence` | the normalized sequence (32 × 58): skeleton in the body frame, COM path, orientation, angular velocity, joint angles, shape measures (the ML input). The JSON export adds named views (`views.skeleton`, `views.signals`) of the same numbers. |
+| `features` | every extracted feature (`JumpFeatures`) |
+| `prediction` | skill, confidence, evidence, confidence parts, limitations, summary |
+| `analysis` | classifier id and version, the thresholds used, athlete height, scale source, calibration: enough to reproduce or compare a prediction |
+| `twist` | the experimental 3D twist estimate and its curve (below) |
+| `truth`, `twistTruth` | your label (with time and note); your optional count of half twists, kept apart from the skill label |
+
+**Review.** *Evaluate* shows, for the jump on the timeline, the video with skeleton, COM and predicted skill on it (as everywhere), the classifier's answer and confidence, and the label buttons. *Play jump* replays it; *Next unlabeled* (key N) moves on. If
+you change the thresholds or the athlete height after saving, the saved predictions are marked out of date and *Update predictions* refreshes them (labels are kept). Metrics always use the saved predictions, so nothing changes under you.
+
+**Metrics** (`src/dataset/metrics.ts`, tested by hand-computed cases):
+
+- *Accuracy* = right / jumps with one of the five labels. **A jump the classifier did not answer (unclassified, or "somersault, direction unknown") counts as wrong**, and the share it answered is shown separately, with the accuracy when it answered. It comes with a **Wilson 95% interval**, because "3 of 3" is not "certainly 100%".
+- Per class: samples, how often it was predicted, **precision**, **recall** (the class's own accuracy) with its interval, and one-vs-rest accuracy. *Balanced accuracy* = mean recall over classes that have examples.
+- *Confusion matrix*: rows = your label (including Unknown), columns = the five skills, "somersault, direction unknown" and "not classified".
+- *Unknown* means you cannot tell or it is not one of the five. It is shown in the matrix but not counted in accuracy, precision or recall (my choice; it would be wrong to punish the classifier for a jump the labeler cannot name). "Unknown" agrees with "not classified" in the failure list.
+- *Wrong at ≥ 60%*: wrong answers given with high confidence, and the mean confidence when right and when wrong. This is the number that shows whether the confidence can be trusted.
+- The report can cover *this video* or *all saved videos*. It warns when there are few jumps, when a class has no example, and when the predictions come from several threshold sets.
+
+**Failure cases.** Every labeled jump whose prediction differs from the label is listed (low-confidence ones too, marked; wrong answers first, the most confident first). Each card shows a table
+**label against measurement**: the label is turned into numbers (for example Tuck: hip ≤ 125°, knees ≤ 115°, no rotation; Back: about 360°, turning away from the face; with the thresholds the prediction used) and compared with what was measured, with ✓ / ✗ / ?.
+It does not decide who is right (the label or the measurement); it shows where they differ. The card also shows the classifier's evidence and limitations, small plots of hip angle, knee angle, rotation and COM height, and **all extracted features**.
+
+**Exports** (`src/dataset/export.ts`): *Dataset JSON* (`trampovision.jump-dataset` v1, can be imported into another browser; a newer copy of a jump replaces an older one), *Dataset CSV* (one row per jump: ids, label, prediction, whether it was right, all features, twist), *Evaluation JSON*
+(`trampovision.evaluation` v1: metrics, matrix, per-jump results, failure ids) and *Evaluation CSV* (one table: a row per true label with samples, precision, recall and the confusion matrix, then the overall numbers).
+
+**Read the numbers with care.** One labeler, no second opinion. Few jumps give wide intervals. If you tune the thresholds while looking at the same jumps, the accuracy becomes training accuracy and will look better than it is: keep some labeled jumps you never tune on.
+
+## 3D pose and twist (experimental)
+
+The **2D / 3D toggle** above the video adds a 3D view and a twist estimate. It does **not** replace the 2D pipeline, and the classifier still uses the 2D pose only.
+
+**Can this browser run a 3D pose model? (measured, not assumed).** The MediaPipe pose model already in the app returns 3D landmarks (BlazePose GHUM "world" landmarks, meters, hip-centered) with every frame; the app used to throw
+them away and now keeps them, so **no second model is loaded**. MediaPipe Tasks Vision runs them on WebGL ("GPU") or WebAssembly ("CPU"); it does not use WebGPU. The 3D panel probes your browser (WebGPU adapter, WebGL 2, WASM SIMD, threads) and says what it found. In the headless Chromium used here: WebGPU adapter yes (software), WebGL 2 yes, WASM SIMD yes, WASM threads no
+(the page is not cross-origin isolated). A separate dedicated 3D model (a 2D-to-3D lifting network through onnxruntime-web on WebGPU or WASM) could run in such a browser, but **I did not build or test one**: it needs a model file, and you asked for no large model yet.
+
+**What I measured on real model output** (the photo video: a real photo of an athlete moved and turned rigidly in the image plane, so the true twist is exactly 0; CPU delegate):
+
+- The world frame is **camera-aligned**: the trunk angle in the 3D x–y plane follows the image angle within 2° (largest 4.3°) through a full somersault, so the 3D orientation can be used for rotation.
+- It is **right-handed**: the nose is in front of the chest direction `u × (R shoulder − L shoulder)` in 165 of 165 frames. So the sign convention **+ = counter-clockwise seen from above the head** holds on this photo (one photo only).
+- The **3D shoulder width varies by 0.4–1%** over the three non-rotating jumps (a noise floor), but by **6.8%** during the somersault.
+- **Phantom twist:** over the somersault the model gave about **−94° of twist that does not exist**, for the shoulder line and the hip line alike (so they agree with each other). The cause is geometric: the model tilted the trunk axis about 15° out of the image plane (a constant depth error), and a rotation about the camera axis of a body whose axis is tilted by α contains 360° × sin α of spin about that axis: 360° × sin 15° ≈ 93°. Small depth errors turn into large twist errors during a somersault.
+
+**Twist estimate** (`src/pose3d/twist.ts`). Twist = rotation about the longitudinal axis (hips → shoulders), not the somersault. Frame by frame, the shoulder line of the previous frame is carried along with the axis by the smallest rotation (so a somersault adds nothing), the signed angle to the shoulder line
+of this frame about the axis is the step, steps are summed. Hip line and shoulder line are estimated separately and averaged. A **second estimate keeps the axis in the image plane**: it cannot be fooled by the depth error above, but it is blind to a real tilt of the trunk out of the plane. The two disagree exactly when the answer depends on a depth value the model estimates poorly. Steps above 90° between two frames (a left/right label swap or aliasing) are folded back and counted. Twist is reported in half twists; a full twist = 360°.
+
+**Consistency, not probability.** The confidence is the product of seven checks, each shown in the panel: closeness to a whole number of half twists, shoulders and hips found in 3D, no jumps between frames, turns one way only, shoulders and hips agree, the image-plane axis agrees, constant 3D shoulder width. Below the
+threshold (50%, `pose3d/config.ts`) the panel says **"Twist: not reliable"** and shows the raw value only as raw. It has **not** been compared with real twists: the optional *Half twists you counted* selector saves your count with the jump so it can be scored.
+
+**Synthetic check** (`src/pose3d/evaluation.test.ts`; a rigid 3D athlete with known somersault and 0–3 twists, 80 random jumps per row). *Right* = the half-twist count is exactly right; *reliable* = the estimator did not decline.
+
+| condition | right | called reliable | right when reliable | reliable but wrong |
+| --- | --- | --- | --- | --- |
+| perfect 3D landmarks | 100% | 100% | 100% | 0 |
+| depth noise 1 / 2 / 3 cm | 100% / 99% / 95% | 100% / 95% / 91% | 100% | 0 |
+| depth noise 5 cm / 10 cm | 81% / 48% | 21% / 0% | 100% / – | 0 |
+| x/y noise 1 cm + depth 3 cm | 86% | 59% | 100% | 0 |
+| 10% / 30% of frames missing | 98% / 80% | 98% / 80% | 100% | 0 |
+| left/right swap for 8 frames | 100% (folded back) | 0% | – | 0 |
+| trunk depth bias 15° (somersaults, the photo's failure) | 51% | 0% | – | 0 |
+| trunk depth bias 5° (somersaults) | 100% | 99% | 100% | 0 |
+| 15 fps / 10 fps | 70% / 56% | 70% / 55% | 100% | 0 |
+
+**How to read this.** If the model's depth were as good as the simulated one, the twist can be read and the estimator says when it cannot; the failure modes are my simulations of what a single-camera model may do, and the 15° bias is the only one I observed.
+It is **not** evidence about real twisting athletes.
+
+**What the UI shows.** 3D skeleton (blue left, orange right, faded where the model is unsure), the torso plane with the chest direction, the **longitudinal axis**, and a **twist dial**: a ring perpendicular to the axis through the shoulders, grey = where the shoulder line pointed at
+takeoff, amber arc = the twist since. Drag to rotate; presets for the camera view, the side and from above. Curves over the whole clip: accumulated twist (3D axis and image-plane axis), twist angular velocity, trunk-axis tilt out of the image plane, 3D shoulder and hip width. The panel gives the net twist, half twists,
+direction, peak and mean twist speed, the current twist and speed at the playhead, the same twist by three other routes, the checks, and what one camera can never tell. A twist that cannot be measured says why (no 3D data, jump cut off, torso not found) and shows no number.
+
+## Accuracy: what has and has not been checked
+
+Synthetic routines with analytic ground truth (`npm test`), 30 and 60 fps, up to 2 cm of landmark noise, glitches and dropouts:
+
+- takeoff / landing times within ~35 ms, flight time within ~5%, apex within a frame, rotation within ~3% (quarter turns exact);
+- calibration and normalization as described above;
+- glitches, low-confidence joints and dropouts are removed or bridged without flattening the apex;
+- the JSON store round-trips and the analysis can be re-run from it.
+
+Browser end to end (headless Chromium, real MediaPipe on a synthetic video: a photo moved along an exact 4-jump trajectory in front of a
+drawn bed, seen by a level pinhole camera; one jump has a full turn and one drifts 0.7 m): all 4 jumps found, flight times 1–4.5% short,
+0.97 turns counted for a 1.0-turn jump, drift 0.66 m for 0.70 m, free-fall check 9.5 m/s², no network requests, save/open round trip works.
+
+Stage 3, browser end to end (headless Chromium, real MediaPipe on CPU, the same photo video, 4 jumps found as before, no regression): jumps labeled through the buttons and the `1`
+key (one deliberately wrong), the report showed accuracy 67% with its 21–94% interval on the 3 jumps with a known label, per-class precision / recall, a confusion matrix, an Unknown row, one confident wrong answer, and two failure cards with the label-against-measurement checks; the four
+exports downloaded with the expected content (a 162 KB dataset for 4 jumps); after a page reload the dataset and the report were still there (IndexedDB); *Delete all* and *Import dataset* restored them; no network requests. In 3D mode the three
+non-rotating jumps read ≈ 0 twists (consistency 100%) and the somersault read −91° with consistency 0%, **"Twist: not reliable"**, while the image-plane axis said +1°. These labels are test labels on a still photo cut-out, not a validation of the classifier.
+
+**Not yet tested:** real trampoline footage (the most important gap; public footage could not be downloaded here), MP4/MOV files, Safari, a real GPU, several people in the frame, and
+cameras that are not level. Real COM estimates also move with arm and leg motion, so takeoff/landing will be noisier than on the synthetic data.
+
+## Limitations (please read)
+
+- **Skill thresholds and confidence are untuned.** The hip/knee limits, the rotation tolerance and the confidence formulas are my estimates. They need labeled real jumps to tune and to calibrate the confidence.
+- **Front vs back** depends on the facing estimate; in a side view with pointed toes and a turned head the cues can be weak, in which case the app reports it and asks for a manual setting.
+- **The skill analysis is 2D.** Angles and rotation are image-plane projections. They are correct only for a fixed camera looking roughly
+  perpendicular to the plane of the skill, and a somersault seen from an angle is under-counted. Twists come only from the experimental 3D estimate, which depends on a single-camera model's depth (see *3D pose and twist*).
+- **3D pose is experimental and unvalidated on real twisting athletes.** The twist estimator is exact on a simulated 3D athlete and was checked for phantom twist on one still photo; the world frame's alignment and handedness were checked on that photo only.
+  A dedicated 3D model (lifting network) was not built or tested. The confidence is internal consistency, not a probability.
+- **The evaluation is only as good as the labels.** One labeler, no agreement check, and a small dataset gives wide intervals. Labeled jumps are the only way to tune the thresholds honestly: keep some you never tune on.
+- **Scale is approximate.** Meters come from the bed (calibrated) or from the athlete height (skeleton length ≈ 0.9 × height); both assume the
+  athlete stays at the distance of the bed center. Treat meters and m/s as estimates and read the panel warnings.
+- **COM is a model**, not a measurement, and MediaPipe landmarks are noisy for fast, inverted, tucked or occluded poses. Left/right swaps
+  of limbs are not corrected (they do not change the COM or the trunk angle).
+- **Rotation aliasing:** if the body turns more than about 120° between two analyzed frames, the count can be wrong; the panel warns.
+  Analyze every frame for fast skills.
+- **Segment constants** of the COM model (de Leva-style fractions) were written from memory: mass fractions sum to 1 (tested) but
+  verify them before scientific use. The 4.28 × 2.14 m default bed is also from memory: enter the size of your trampoline.
+- **WebGPU is not used.** MediaPipe Tasks Vision only offers `GPU` (WebGL) and `CPU` (WASM) delegates. The estimator sits behind an
+  interface so a real WebGPU backend (e.g. onnxruntime-web) can be added later.
+- **Video codecs depend on the browser.** MP4 (H.264) is safest. HEVC `.mov` from iPhones plays in Safari and recent Chrome/Edge, not everywhere.
+- **Privacy note.** The MediaPipe runtime contains a usage-logging call to `odml.pa.googleapis.com`. The app blocks all cross-origin
+  requests at runtime (`localOnlyGuard.ts`) and the production build enforces `connect-src 'self' blob: data:` via CSP. Video frames are never uploaded.
+  What is stored in the browser: the calibration corners per file name and size (`localStorage`), and the jump dataset you save (IndexedDB `trampovision`: measurements, predictions and labels, never the video). *Delete all* in the Evaluate tab removes the dataset.
+- Multi-person scenes: the athlete is followed by continuity; a coach walking next to the athlete can still steal the track.

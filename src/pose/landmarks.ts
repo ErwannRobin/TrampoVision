@@ -1,0 +1,69 @@
+/** MediaPipe / BlazePose 33-point topology (indices are the model's output order). */
+export const LM = {
+  NOSE: 0,
+  L_EYE_INNER: 1,
+  L_EYE: 2,
+  L_EYE_OUTER: 3,
+  R_EYE_INNER: 4,
+  R_EYE: 5,
+  R_EYE_OUTER: 6,
+  L_EAR: 7,
+  R_EAR: 8,
+  MOUTH_L: 9,
+  MOUTH_R: 10,
+  L_SHOULDER: 11,
+  R_SHOULDER: 12,
+  L_ELBOW: 13,
+  R_ELBOW: 14,
+  L_WRIST: 15,
+  R_WRIST: 16,
+  L_PINKY: 17,
+  R_PINKY: 18,
+  L_INDEX: 19,
+  R_INDEX: 20,
+  L_THUMB: 21,
+  R_THUMB: 22,
+  L_HIP: 23,
+  R_HIP: 24,
+  L_KNEE: 25,
+  R_KNEE: 26,
+  L_ANKLE: 27,
+  R_ANKLE: 28,
+  L_HEEL: 29,
+  R_HEEL: 30,
+  L_FOOT: 31,
+  R_FOOT: 32,
+} as const;
+
+export const LANDMARK_COUNT = 33;
+
+/** Face points (nose, eyes, mouth): in a side view they sit in front of the ears, which tells where the athlete faces. */
+export const FACE_LANDMARKS: number[] = [
+  LM.NOSE, LM.L_EYE_INNER, LM.L_EYE, LM.L_EYE_OUTER, LM.R_EYE_INNER, LM.R_EYE, LM.R_EYE_OUTER, LM.MOUTH_L, LM.MOUTH_R,
+];
+
+/** Landmarks whose visibility defines the frame "confidence" (head, arms, torso, legs). */
+export const CORE_LANDMARKS: number[] = [
+  LM.NOSE,
+  LM.L_SHOULDER,
+  LM.R_SHOULDER,
+  LM.L_ELBOW,
+  LM.R_ELBOW,
+  LM.L_WRIST,
+  LM.R_WRIST,
+  LM.L_HIP,
+  LM.R_HIP,
+  LM.L_KNEE,
+  LM.R_KNEE,
+  LM.L_ANKLE,
+  LM.R_ANKLE,
+];
+
+/** Names of the 33 landmarks in model output order (same order as the arrays everywhere else). */
+export const LANDMARK_NAMES: string[] = [
+  'nose', 'left_eye_inner', 'left_eye', 'left_eye_outer', 'right_eye_inner', 'right_eye', 'right_eye_outer',
+  'left_ear', 'right_ear', 'mouth_left', 'mouth_right', 'left_shoulder', 'right_shoulder', 'left_elbow',
+  'right_elbow', 'left_wrist', 'right_wrist', 'left_pinky', 'right_pinky', 'left_index', 'right_index',
+  'left_thumb', 'right_thumb', 'left_hip', 'right_hip', 'left_knee', 'right_knee', 'left_ankle', 'right_ankle',
+  'left_heel', 'right_heel', 'left_foot_index', 'right_foot_index',
+];
