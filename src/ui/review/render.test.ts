@@ -155,7 +155,7 @@ describe('DatasetBar', () => {
       createElement(DatasetBar, { dataset: api(label(['tuck', 'pike', null, null])), baseName: 'clip' }),
     );
     expect(html).toContain('4 jumps, 2 labeled');
-    expect(html).toContain('Stored in this browser only (IndexedDB). Nothing is uploaded.');
+    expect(html).toContain('Stored in this browser (IndexedDB).');
   });
 
   it('keeps storage warnings and errors visible while it is closed', () => {

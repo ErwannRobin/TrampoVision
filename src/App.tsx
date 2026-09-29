@@ -9,6 +9,7 @@ import { exampleCounts, referencesFromRecords } from './dataset/references';
 import { isStale, syncRecords, withFigure, withTruth, withTwistTruth, type RecordContext } from './dataset/record';
 import type { TruthLabel } from './dataset/types';
 import { useDataset } from './dataset/useDataset';
+import { useReviewedReferences, useReviewUpload, useSyncSetting } from './sync/useReviewSync';
 import { videoIdFromTrack, videoIdOf } from './dataset/videoId';
 import { analyzeTwist } from './pose3d/twist';
 import { analyzeSkills } from './skills/analyzeSkills';
@@ -162,7 +163,14 @@ export default function App() {
 
   // The jumps the person labelled with a figure are reference examples for the classifier. Keyed on what matters, so saving a
   // note or a skill label does not redo the classification.
-  const figureRecords = useMemo(() => dataset.records.filter((r) => r.figure), [dataset.records]);
+  // The jumps the reviewers confirmed or corrected come from the review service; the person's own labels win on the same jump.
+  const sync = useSyncSetting();
+  const reviewedRecords = useReviewedReferences(sync.enabled, videoId);
+  const figureRecords = useMemo(() => {
+    const own = dataset.records.filter((r) => r.figure);
+    const ids = new Set(own.map((r) => r.id));
+    return [...own, ...reviewedRecords.filter((r) => !ids.has(r.id))];
+  }, [dataset.records, reviewedRecords]);
   const figureCounts = useMemo(() => exampleCounts(figureRecords), [figureRecords]);
   const figureKey = figureRecords.map((r) => `${r.id}:${r.figure?.elementId}`).join('|');
   const references = useMemo(() => referencesFromRecords(figureRecords), [figureKey]); // oxlint-disable-line react-hooks/exhaustive-deps
@@ -425,6 +433,7 @@ export default function App() {
   );
   const videoRecords = useMemo(() => dataset.records.filter((r) => r.videoId === videoId), [dataset.records, videoId]);
   const fresh = useMemo(() => (recordCtx ? syncRecords(videoRecords, recordCtx) : []), [recordCtx, videoRecords]);
+  const upload = useReviewUpload(fresh, sync.enabled);
   const savedIds = useMemo(() => new Set(videoRecords.map((r) => r.id)), [videoRecords]);
   const staleCount = useMemo(
     () =>
@@ -677,6 +686,11 @@ export default function App() {
 
   const setup = (
     <SetupPanel
+      review={
+        sync.available
+          ? { enabled: sync.enabled, onEnabled: sync.setEnabled, state: upload.state, posted: upload.posted }
+          : undefined
+      }
       hasVideo={!!url}
       hasResult={!!result}
       busy={analyzing ? 'analyzing' : loading ? 'loading' : 'idle'}
