@@ -611,6 +611,7 @@ export default function App() {
                 onError={(message) => setStatus({ kind: 'error', message })}
                 calibration={calDraw}
                 onCornersChange={setCorners}
+                baseName={base}
               />
             ) : (
               <p className="notice">

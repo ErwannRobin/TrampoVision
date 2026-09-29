@@ -38,8 +38,9 @@ export function drawOverlay(
   sample: number,
   opts: OverlayOptions,
   skills: SkillAnalysis | null = null,
+  clear = true,
 ) {
-  ctx.clearRect(0, 0, cssWidth, cssHeight);
+  if (clear) ctx.clearRect(0, 0, cssWidth, cssHeight);
   const sx = cssWidth / result.meta.width;
   const sy = cssHeight / result.meta.height;
   ctx.lineCap = 'round';

@@ -4,6 +4,7 @@ import type { AnalysisResult } from '../analysis/types';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { frameAtTime, frameSeekTime } from '../video/frames';
 import type { Point } from '../pose/types';
+import { canExportVideo, exportAnnotatedVideo } from '../video/exportVideo';
 import { drawCalibration, drawOverlay, type CalibrationDraw, type OverlayOptions } from '../video/overlay';
 import { Playhead, usePlayheadTime } from './playhead';
 
@@ -23,6 +24,8 @@ interface Props {
   /** Trampoline outline to draw; while `editing`, clicks add corners and corners can be dragged. */
   calibration: CalibrationDraw | null;
   onCornersChange: (corners: Point[]) => void;
+  /** File name (without extension) for the exported video. */
+  baseName?: string;
 }
 
 const PICK_RADIUS_PX = 16;
@@ -39,11 +42,48 @@ export function VideoPlayer({
   onError,
   calibration,
   onCornersChange,
+  baseName = 'trampovision',
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ratio, setRatio] = useState(16 / 9);
   const [playing, setPlaying] = useState(false);
+  const [exporting, setExporting] = useState<{ progress: number } | null>(null);
+  const [exportError, setExportError] = useState('');
+  const exportAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => exportAbort.current?.abort(), []);
+
+  async function onExport() {
+    const ctl = new AbortController();
+    exportAbort.current = ctl;
+    setExportError('');
+    setExporting({ progress: 0 });
+    videoRef.current?.pause();
+    try {
+      const { result: res, skills: sk, overlay: opts, fps: f, calibration: cal } = live.current;
+      const blob = await exportAnnotatedVideo({
+        url,
+        fps: f,
+        result: res,
+        skills: sk,
+        overlay: opts,
+        // Corner handles are an editing aid; the outline itself is exported when it is visible.
+        calibration: cal,
+        signal: ctl.signal,
+        onProgress: (progress) => setExporting({ progress }),
+      });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${baseName}-annotated.mp4`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === 'AbortError'))
+        setExportError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setExporting(null);
+    }
+  }
 
   // Latest props for the rAF loop (avoids restarting the loop on every change).
   const live = useRef({ result, skills, overlay, fps, calibration });
@@ -262,6 +302,25 @@ export function VideoPlayer({
         speed={speed}
         onSpeed={onSpeed}
       />
+      {canExportVideo() && (
+        <div className="transport">
+          {exporting ? (
+            <>
+              <progress value={exporting.progress} max={1} />
+              <span className="readout mono">Exporting {Math.round(exporting.progress * 100)}%</span>
+              <button onClick={() => exportAbort.current?.abort()}>Cancel</button>
+            </>
+          ) : (
+            <button
+              onClick={() => void onExport()}
+              title="Render the video with the skeleton, trajectory, labels and trampoline outline that are visible now"
+            >
+              ⬇ Download annotated video
+            </button>
+          )}
+          {exportError && <span className="readout">{exportError}</span>}
+        </div>
+      )}
     </div>
   );
 }
