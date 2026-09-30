@@ -82,7 +82,8 @@ export const chrome: Translation<typeof en> = {
   'setup.reviewSwitch': 'Envoyer les sauts analysés pour vérification',
   'setup.reviewText':
     'Les mesures, la réponse du classifieur et ce que vous dites de chaque figure, pour qu’une personne puisse les vérifier et que le classifieur apprenne. Aucune vidéo ni aucun nom de fichier ne quitte ce navigateur.',
-  'setup.language': 'Langue',
+  'setup.analyzingNote':
+    'Seuls les réglages qui peuvent encore agir sur cette analyse sont affichés. Les autres reviennent une fois l’analyse terminée.',
   'setup.advanced': 'Avancé',
   'setup.advancedSwitch': 'Afficher les outils avancés',
   'setup.advancedText':

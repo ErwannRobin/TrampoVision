@@ -556,6 +556,10 @@ html:has(.settings[open]) {
   color: var(--text-2);
   font-size: var(--fs-sm);
 }
+/* While an analysis runs there is no action under the clip (Cancel is on the video): keep the hairline off its text. */
+.settings__clip + .settings__block {
+  margin-top: 14px;
+}
 .settings__status {
   color: var(--text-2);
   font-size: var(--fs-sm);

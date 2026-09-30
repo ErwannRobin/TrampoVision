@@ -82,7 +82,8 @@ export const chrome: Translation<typeof en> = {
   'setup.reviewSwitch': 'Analysierte Sprünge zur Prüfung senden',
   'setup.reviewText':
     'Messwerte, die Antwort des Klassifikators und Ihre Angaben zu jedem Element, damit eine Person sie prüfen kann und der Klassifikator dazulernt. Weder Video noch Dateiname verlassen diesen Browser.',
-  'setup.language': 'Sprache',
+  'setup.analyzingNote':
+    'Angezeigt wird nur, was diese Analyse noch beeinflussen kann. Die übrigen Einstellungen sind wieder da, sobald sie fertig ist.',
   'setup.advanced': 'Erweitert',
   'setup.advancedSwitch': 'Erweiterte Werkzeuge anzeigen',
   'setup.advancedText':

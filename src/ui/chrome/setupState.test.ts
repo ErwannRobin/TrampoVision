@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { setupState, type SetupInputs } from './setupState';
 
-const state = (over: Partial<SetupInputs>) => setupState({ busy: 'idle', hasVideo: true, hasResult: false, ...over });
+const state = (over: Partial<SetupInputs>) =>
+  setupState({ busy: 'idle', hasVideo: true, hasResult: false, advanced: false, ...over });
 
 describe('setupState', () => {
   it('offers to analyze a loaded video that has no result yet', () => {
@@ -12,6 +13,7 @@ describe('setupState', () => {
       action: 'analyze',
       actionDisabled: false,
       hint: null,
+      onlyWhatStillApplies: false,
     });
   });
 
@@ -21,13 +23,23 @@ describe('setupState', () => {
     expect(s.actionDisabled).toBe(false);
   });
 
-  it('turns the action into Cancel while analyzing, and locks everything but the live settings', () => {
-    const s = state({ busy: 'analyzing', hasResult: true });
-    expect(s.action).toBe('cancel');
-    expect(s.actionDisabled).toBe(false);
-    expect(s.engineLocked).toBe(true);
-    expect(s.calibrationLocked).toBe(true);
-    expect(s.canMark).toBe(false);
+  it('offers no action while analyzing (the overlay on the video owns Cancel), and locks all but the live settings', () => {
+    for (const advanced of [false, true]) {
+      const s = state({ busy: 'analyzing', hasResult: true, advanced });
+      expect(s.action).toBeNull();
+      expect(s.hint).toBeNull();
+      expect(s.engineLocked).toBe(true);
+      expect(s.calibrationLocked).toBe(true);
+      expect(s.canMark).toBe(false);
+    }
+  });
+
+  it('shrinks the settings to what still applies only in the live view while analyzing', () => {
+    expect(state({ busy: 'analyzing' }).onlyWhatStillApplies).toBe(true);
+    expect(state({ busy: 'analyzing', advanced: true }).onlyWhatStillApplies).toBe(false);
+    expect(state({ busy: 'loading' }).onlyWhatStillApplies).toBe(false);
+    expect(state({ busy: 'idle' }).onlyWhatStillApplies).toBe(false);
+    expect(state({ busy: 'idle', hasResult: true }).onlyWhatStillApplies).toBe(false);
   });
 
   it('keeps the trampoline usable while a video loads, but not the engine or the action', () => {

@@ -80,7 +80,7 @@ export const chrome: Translation<typeof en> = {
   'setup.reviewSwitch': '解析したジャンプを確認用に送信',
   'setup.reviewText':
     '測定値、分類器の判定、各技についてのあなたのコメントを送信します。人が確認でき、分類器の学習にも使われます。動画やファイル名がこのブラウザーの外に出ることはありません。',
-  'setup.language': '言語',
+  'setup.analyzingNote': 'この解析にまだ反映できる設定だけを表示しています。ほかの設定は、解析が終わると表示されます。',
   'setup.advanced': '詳細設定',
   'setup.advancedSwitch': '詳細ツールを表示',
   'setup.advancedText':

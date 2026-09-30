@@ -1,12 +1,11 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import type { ScaleSource } from '../../analysis/types';
 import type { ModelVariant, Point } from '../../pose/types';
-import { LANGUAGE_NAMES, LOCALES, setLocale, t, useLocale } from '../../i18n';
+import { t, useLocale } from '../../i18n';
 import { setupState } from './setupState';
 import { Button, Field, Icon, IconButton, NumberField, Segmented, SelectField, Switch, type IconName } from '../kit';
 import { syncStatusText } from '../../sync/reviewSync';
 import type { SyncState } from '../../sync/useReviewSync';
-import type { Locale } from '../../i18n';
 import type { Appearance } from '../types';
 
 export interface SettingsDialogProps {
@@ -41,8 +40,8 @@ export interface SettingsDialogProps {
   backend: string;
   /** The browser exposes WebGPU (MediaPipe still uses WebGL or WASM). */
   webgpu: boolean;
+  /** Stopping a running analysis belongs to the overlay on the video, the one place that offers Cancel. */
   onAnalyze: () => void;
-  onCancel: () => void;
 
   // Athlete
   height: number;
@@ -105,8 +104,7 @@ const appearances = () =>
     { value: 'dark', label: t('setup.appearanceDark') },
   ] as const;
 
-const actionText = () =>
-  ({ analyze: t('setup.analyze'), again: t('setup.again'), cancel: t('common.cancel') }) as const;
+const actionText = () => ({ analyze: t('setup.analyze'), again: t('setup.again') }) as const;
 
 /** One of the three parts of the dialog: what it is about, who it applies to, then its controls. */
 function Group({ icon, title, text, children }: { icon: IconName; title: string; text: string; children: ReactNode }) {
@@ -147,17 +145,35 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
  *  - this video: the clip that is open, its trampoline and the button that analyzes it (only when a clip is open);
  *  - video analysis: how any video is measured and analyzed (athlete, engine). Height and scale change a finished analysis at
  *    once; the engine settings need a new analysis;
- *  - app: the look, the language and the optional tools. Nothing here changes an analysis.
+ *  - app: the look and the optional tools. Nothing here changes an analysis. (The language is the top bar's menu.)
+ *
+ * While the live view analyzes, the popup shrinks to the height and the review upload, the two settings that can still reach
+ * the running analysis (`onlyWhatStillApplies`): the rest is left out, not disabled.
  */
 export function SettingsDialog(props: SettingsDialogProps) {
   const { calibration: cal, open, onClose } = props;
-  const locale = useLocale();
-  const state = setupState({ busy: props.busy, hasVideo: props.hasVideo, hasResult: props.hasResult });
+  useLocale(); // the dialog is made of messages: it is drawn again when the language changes
+  const state = setupState({
+    busy: props.busy,
+    hasVideo: props.hasVideo,
+    hasResult: props.hasResult,
+    advanced: props.advanced,
+  });
+  const short = state.onlyWhatStillApplies;
   const marked = cal.corners.length === 4;
   const clip = props.hasVideo || props.hasResult;
   const titleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const pressedBackdrop = useRef(false);
+
+  const review = props.review && (
+    <Block title={t('setup.review')}>
+      <Switch checked={props.review.enabled} onChange={props.review.onEnabled} label={t('setup.reviewSwitch')} />
+      <p className="settings__status">
+        {t('setup.reviewText')} {syncStatusText(props.review.state, props.review.posted)}
+      </p>
+    </Block>
+  );
 
   // The native dialog keeps the focus inside, closes on Escape and makes the app behind it inert.
   useEffect(() => {
@@ -195,7 +211,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
           </header>
 
           <div className="settings__body" tabIndex={-1}>
-            {clip && (
+            {clip && !short && (
               <Group icon="video" title={t('setup.groupVideo')} text={t('setup.groupVideoText')}>
                 <div className="settings__clip">
                   <p className="settings__clip-name" title={props.fileName ?? undefined}>
@@ -204,18 +220,20 @@ export function SettingsDialog(props: SettingsDialogProps) {
                   <p className="settings__clip-detail">{props.clipDetail || t('setup.notAnalyzed')}</p>
                 </div>
 
-                <div className="settings__action">
-                  {state.hint && <p className="settings__hint">{state.hint}</p>}
-                  <Button
-                    variant={state.action === 'analyze' ? 'primary' : 'secondary'}
-                    size="lg"
-                    block
-                    disabled={state.actionDisabled}
-                    onClick={state.action === 'cancel' ? props.onCancel : props.onAnalyze}
-                  >
-                    {actionText()[state.action]}
-                  </Button>
-                </div>
+                {state.action && (
+                  <div className="settings__action">
+                    {state.hint && <p className="settings__hint">{state.hint}</p>}
+                    <Button
+                      variant={state.action === 'analyze' ? 'primary' : 'secondary'}
+                      size="lg"
+                      block
+                      disabled={state.actionDisabled}
+                      onClick={props.onAnalyze}
+                    >
+                      {actionText()[state.action]}
+                    </Button>
+                  </div>
+                )}
 
                 {props.advanced && (
                   <>
@@ -314,7 +332,11 @@ export function SettingsDialog(props: SettingsDialogProps) {
               </Group>
             )}
 
-            <Group icon="sliders" title={t('setup.groupAnalysis')} text={t('setup.groupAnalysisText')}>
+            <Group
+              icon="sliders"
+              title={t('setup.groupAnalysis')}
+              text={short ? t('setup.analyzingNote') : t('setup.groupAnalysisText')}
+            >
               <Block title={t('setup.athlete')}>
                 <NumberField
                   label={t('setup.height')}
@@ -368,73 +390,55 @@ export function SettingsDialog(props: SettingsDialogProps) {
                   />
                 </Block>
               )}
+              {short && review}
             </Group>
 
-            <Group icon="gear" title={t('setup.groupApp')} text={t('setup.groupAppText')}>
-              <Block title={t('setup.appearance')}>
-                <Segmented<Appearance>
-                  ariaLabel={t('setup.appearance')}
-                  fill
-                  value={props.appearance}
-                  onChange={props.onAppearance}
-                  options={appearances().map((a) => ({ ...a }))}
-                />
-              </Block>
-
-              <Block title={t('setup.language')}>
-                <Segmented<Locale>
-                  ariaLabel={t('setup.language')}
-                  fill
-                  value={locale}
-                  onChange={setLocale}
-                  options={LOCALES.map((code) => ({ value: code, label: LANGUAGE_NAMES[code] }))}
-                />
-              </Block>
-
-              <Block title={t('setup.advanced')}>
-                <Switch checked={props.advanced} onChange={props.onAdvanced} label={t('setup.advancedSwitch')} />
-                <p className="settings__status">{t('setup.advancedText')}</p>
-              </Block>
-
-              {props.review && (
-                <Block title={t('setup.review')}>
-                  <Switch
-                    checked={props.review.enabled}
-                    onChange={props.review.onEnabled}
-                    label={t('setup.reviewSwitch')}
+            {!short && (
+              <Group icon="gear" title={t('setup.groupApp')} text={t('setup.groupAppText')}>
+                <Block title={t('setup.appearance')}>
+                  <Segmented<Appearance>
+                    ariaLabel={t('setup.appearance')}
+                    fill
+                    value={props.appearance}
+                    onChange={props.onAppearance}
+                    options={appearances().map((a) => ({ ...a }))}
                   />
-                  <p className="settings__status">
-                    {t('setup.reviewText')} {syncStatusText(props.review.state, props.review.posted)}
-                  </p>
                 </Block>
-              )}
 
-              {props.advanced && (
-                <Block title={t('setup.savedData')}>
-                  <Field label={t('setup.skipAnalysis')} hint={t('setup.skipHint')}>
-                    <label className="btn btn--secondary settings__file-btn">
-                      <Icon name="file" size={17} />
-                      {t('setup.openSaved')}
-                      <input
-                        type="file"
-                        accept="application/json,.json"
-                        disabled={props.busy === 'analyzing'}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) props.onOpenSeries(f);
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
-                  </Field>
-                  {props.onSample && (
-                    <Button variant="secondary" icon="film" disabled={state.engineLocked} onClick={props.onSample}>
-                      {t('setup.sample')}
-                    </Button>
-                  )}
+                <Block title={t('setup.advanced')}>
+                  <Switch checked={props.advanced} onChange={props.onAdvanced} label={t('setup.advancedSwitch')} />
+                  <p className="settings__status">{t('setup.advancedText')}</p>
                 </Block>
-              )}
-            </Group>
+
+                {review}
+
+                {props.advanced && (
+                  <Block title={t('setup.savedData')}>
+                    <Field label={t('setup.skipAnalysis')} hint={t('setup.skipHint')}>
+                      <label className="btn btn--secondary settings__file-btn">
+                        <Icon name="file" size={17} />
+                        {t('setup.openSaved')}
+                        <input
+                          type="file"
+                          accept="application/json,.json"
+                          disabled={props.busy === 'analyzing'}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) props.onOpenSeries(f);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    </Field>
+                    {props.onSample && (
+                      <Button variant="secondary" icon="film" disabled={state.engineLocked} onClick={props.onSample}>
+                        {t('setup.sample')}
+                      </Button>
+                    )}
+                  </Block>
+                )}
+              </Group>
+            )}
           </div>
         </div>
       )}
