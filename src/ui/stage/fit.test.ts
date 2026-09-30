@@ -95,6 +95,20 @@ describe('splitLayout', () => {
     expect(layout.pane.y + layout.pane.height).toBe(outer.height);
   });
 
+  it('keeps a near-square viewport side by side, with or without the height the browser toolbars take', () => {
+    // An iPad in landscape: the same width in Safari and in the home-screen app, about 100px more height in the latter.
+    for (const height of [664, 764]) {
+      const layout = splitLayout({ width: 760, height }, 16 / 9, 12);
+      expect(layout.direction).toBe('row');
+      expect(layout.pane.width).toBeGreaterThanOrEqual(220);
+    }
+  });
+
+  it('stacks when the pane beside the video would be too narrow to use, even in a viewport that is not tall', () => {
+    expect(splitLayout({ width: 390, height: 450 }, 16 / 9, 12).direction).toBe('column');
+    expect(splitLayout({ width: 500, height: 520 }, 16 / 9, 12).direction).toBe('column');
+  });
+
   it('never overlaps the two and stays inside the viewport', () => {
     for (const ratio of [9 / 16, 1, 16 / 9, 21 / 9]) {
       for (const outer of [

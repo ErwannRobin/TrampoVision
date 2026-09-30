@@ -41,10 +41,18 @@ export interface SplitLayout {
 
 /** The most of the shared axis the video may take, so the pane always keeps a usable part of the viewport. */
 const VIDEO_SHARE = 0.6;
+/** A pane beside the video is of no use narrower than this (the 3D skeleton needs room to be read). */
+const MIN_SIDE_PANE = 220;
+/**
+ * Stacked only when the viewport is clearly taller than wide. A viewport near square is where a few dozen pixels decide
+ * (the browser's toolbars, the home-screen app having none), so it must not flip between the two.
+ */
+const TALL = 1.25;
 
 /**
- * Shares the viewport between the video and a pane: side by side when the viewport is wide, stacked when it is tall.
- * The video keeps its ratio and takes what it needs (up to its share); the pane gets everything else.
+ * Shares the viewport between the video and a pane: side by side, unless the viewport is clearly tall or the pane would be
+ * too narrow to use beside the video, and then stacked. The video keeps its ratio and takes what it needs (up to its
+ * share); the pane gets everything else.
  */
 export function splitLayout(outer: Size, ratio: number, gap: number): SplitLayout {
   const r = validRatio(ratio);
@@ -55,11 +63,13 @@ export function splitLayout(outer: Size, ratio: number, gap: number): SplitLayou
     return { direction: width >= height ? 'row' : 'column', video: NOTHING, pane: NOTHING };
   }
 
-  if (width >= height) {
+  if (height <= width * TALL) {
     const cell = Math.min(height * r, Math.max(0, width - space) * VIDEO_SHARE);
     const video = fitRatio(r, { width: cell, height });
     const x = video.width + space;
-    return { direction: 'row', video, pane: { x, y: 0, width: Math.max(0, width - x), height } };
+    if (width - x >= MIN_SIDE_PANE) {
+      return { direction: 'row', video, pane: { x, y: 0, width: Math.max(0, width - x), height } };
+    }
   }
 
   const cell = Math.min(width / r, Math.max(0, height - space) * VIDEO_SHARE);
