@@ -1,3 +1,4 @@
+import type { MovementLabel } from './movementLabel';
 import type { TwistEstimate, TwistSequence } from '../pose3d/twist';
 import type { SkillConfig } from '../skills/config';
 import type { JumpFeatures, JumpSequence, SkillPrediction } from '../skills/types';
@@ -26,6 +27,8 @@ export interface GroundTruth {
   /** ISO time of the last change. */
   labeledAt: string;
   note?: string;
+  /** The choices `label` was derived from (position, direction, somersaults, half twists); absent in files saved before them. */
+  movement?: MovementLabel;
 }
 
 /** What the annotator counted, in half twists (0, 1, 2, ...). Separate from the skill label: it only serves to check the experimental twist estimate. */

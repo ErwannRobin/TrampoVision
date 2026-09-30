@@ -27,7 +27,7 @@ export interface StageProps {
   /** The user picked or dropped the clip that goes with the saved data. */
   onPickVideo: (file: File) => void;
   view: StageView;
-  /** Undefined = no view switcher (the athlete's interface only has the video). */
+  /** Undefined = no view switcher. Without a video (saved data only) the views that show it are disabled. */
   onView?: (view: StageView) => void;
   /** The 3D skeleton, shown next to the video (split) or instead of it (3d). */
   pane?: ReactNode;
@@ -324,8 +324,27 @@ export function Stage({
             size="sm"
             value={view}
             onChange={onView}
-            options={VIEW_OPTIONS.map((o) => ({ ...o }))}
+            options={VIEW_OPTIONS.map((o) =>
+              url || o.value === '3d'
+                ? { ...o }
+                : { ...o, disabled: true, title: 'Add the video to see it: only the saved data is open' },
+            )}
           />
+          {!url && (
+            <label className="btn btn--secondary btn--sm stage__pick">
+              <Icon name="upload" size={15} />
+              Add video
+              <input
+                type="file"
+                accept="video/mp4,video/quicktime,.mp4,.mov"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) onPickVideo(f);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          )}
         </div>
       )}
 

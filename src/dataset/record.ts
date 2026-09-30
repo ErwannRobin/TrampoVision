@@ -1,6 +1,7 @@
 import type { AnalysisResult } from '../analysis/types';
 import { twistSequence, type TwistAnalysis } from '../pose3d/twist';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
+import { figureOf, legacyLabel, normalizeMovement, type MovementLabel } from './movementLabel';
 import { RECORD_SCHEMA, RECORD_VERSION, type JumpRecord, type TruthLabel } from './types';
 
 /** Two jump records of the same video are the same jump when their apexes are closer than this (jumps are at least 0.3 s apart). */
@@ -128,4 +129,24 @@ export function withTwistTruth(r: JumpRecord, halfTwists: number | null, now = n
 export function withFigure(r: JumpRecord, elementId: string | null, now = new Date()): JumpRecord {
   const iso = now.toISOString();
   return { ...r, figure: elementId === null ? null : { elementId, labeledAt: iso }, savedAt: iso };
+}
+
+/**
+ * Says what the jump was as independent choices. Everything else that describes the jump is derived from them: the five-way label
+ * the metrics use, the figure that makes the jump a reference example (only when the choices name one element of the table), and
+ * the half-twist count that checks the 3D twist. A null movement removes all three.
+ */
+export function withMovement(r: JumpRecord, movement: MovementLabel | null, now = new Date()): JumpRecord {
+  const iso = now.toISOString();
+  if (movement === null) return { ...r, truth: null, figure: null, twistTruth: null, savedAt: iso };
+  const m = normalizeMovement(movement);
+  const figure = figureOf(m);
+  const note = r.truth?.note;
+  return {
+    ...r,
+    truth: { label: legacyLabel(m), labeledAt: iso, movement: m, ...(note ? { note } : {}) },
+    figure: figure ? { elementId: figure, labeledAt: iso } : null,
+    twistTruth: { halfTwists: m.halfTwists, annotatedAt: iso },
+    savedAt: iso,
+  };
 }
