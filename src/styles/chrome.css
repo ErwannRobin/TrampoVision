@@ -642,18 +642,18 @@ html:has(.settings[open]) {
 }
 
 /* The rail before there is an analysis. */
-.ready {
+.rail-ready {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
 }
-.ready__title {
+.rail-ready__title {
   font-size: 30px;
   letter-spacing: -0.025em;
   line-height: 1.05;
 }
-.ready__file {
+.rail-ready__file {
   max-width: 100%;
   overflow: hidden;
   color: var(--text-2);
@@ -661,7 +661,7 @@ html:has(.settings[open]) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ready__text {
+.rail-ready__text {
   color: var(--text-2);
   line-height: 1.5;
 }
