@@ -289,16 +289,76 @@
 .landing__art {
   min-width: 0;
 }
+.arcs {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.arcs__bed {
+  stroke: var(--line-2);
+  stroke-width: 2;
+}
+.arcs__path {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: arc-draw 560ms var(--ease) var(--delay, 0ms) both;
+}
+.arcs__path--lift {
+  stroke: var(--lift);
+}
+.arcs__path--drop {
+  stroke: var(--drop);
+}
+.arcs__apex {
+  fill: var(--gold-fill);
+  stroke: var(--bg);
+  stroke-width: 3;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: arc-pop 320ms var(--ease) var(--delay, 0ms) both;
+}
+.arcs__marks polygon {
+  fill: var(--text);
+  stroke: var(--bg);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.arcs__marks {
+  animation: fade-in 420ms var(--ease) var(--delay, 0ms) both;
+}
+@keyframes arc-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes arc-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arcs__path,
+  .arcs__apex,
+  .arcs__marks {
+    animation-delay: 0s !important;
+  }
+}
+
 .demo3d {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
-  max-height: min(640px, calc(100dvh - var(--topbar-h) - 96px));
-  margin: 0 auto;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sheet);
-  background: var(--panel);
+  aspect-ratio: 4 / 3;
+  max-height: 34dvh;
+  margin: 0 auto 8px;
 }
 .demo3d__canvas {
   position: absolute;
@@ -309,17 +369,6 @@
 }
 .demo3d__canvas:active {
   cursor: grabbing;
-}
-.demo3d__caption {
-  position: absolute;
-  bottom: 12px;
-  left: 0;
-  right: 0;
-  margin: 0;
-  color: var(--text-3);
-  font-size: var(--fs-sm);
-  text-align: center;
-  pointer-events: none;
 }
 
 .landing__dataset {
@@ -337,10 +386,6 @@
     gap: 32px;
     min-height: 0;
     padding: 16px 8px 24px;
-  }
-  .demo3d {
-    aspect-ratio: 4 / 3;
-    max-height: 60dvh;
   }
 }
 @media (max-width: 520px) {

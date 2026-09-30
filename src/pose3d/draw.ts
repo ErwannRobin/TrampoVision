@@ -88,10 +88,12 @@ export function drawPose3D(ctx: CanvasRenderingContext2D, width: number, height:
   const HEIGHT = height;
   ctx.font = '11px system-ui, sans-serif';
   const frames = twist.frames;
-  ctx.fillStyle = grid;
-  ctx.globalAlpha = 0.35;
-  ctx.fillRect(0, 0, width, HEIGHT);
-  ctx.globalAlpha = 1;
+  if (!scene.minimal) {
+    ctx.fillStyle = grid;
+    ctx.globalAlpha = 0.35;
+    ctx.fillRect(0, 0, width, HEIGHT);
+    ctx.globalAlpha = 1;
+  }
   if (!world || !frames) {
     ctx.fillStyle = soft;
     ctx.textAlign = 'center';
