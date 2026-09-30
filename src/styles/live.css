@@ -536,14 +536,207 @@
   }
 }
 
-/* On a phone the video stays in view while the list scrolls under it: tap a skill, and it is there to watch. */
-@media (max-width: 1099px) {
-  .app[data-mode='live'] .workspace__stage {
+/* Stacked layout (below 1100px): the page scrolls, so once there are results the video and its controls stay in view while the results
+   scroll past them, and a coach can watch a skill while reading it. Nothing moves in the DOM: the stage and the transport are sticky,
+   the dock gives up its box (display: contents) so that the timeline can scroll on its own, and the list of skills comes before
+   "Work on next". Upright, the video is a mini-player pinned above the results; a phone on its side puts it in a column of its own.
+   Before there are results (:has(.tl)) nothing is pinned: reading and analyzing need the whole stage. A browser without :has keeps the
+   plain stack. */
+@media (max-width: 1099px) and (min-height: 521px),
+  (max-width: 1099px) and (max-height: 520px) and (orientation: landscape) {
+  :root:has(.app[data-mode='live'] .tl) {
+    --pin-pad: var(--gutter);
+    --pin-top: env(safe-area-inset-top, 0px);
+    --pin-stage: clamp(200px, 34dvh, 440px);
+    /* What is pinned above the transport (nothing, when the video has a column of its own) and the transport's height. */
+    --pin-above: var(--pin-stage);
+    --pin-bar: 52px;
+    /* Whatever the page scrolls to (a row that was tapped, a control that has the focus) goes below what is pinned: scroll-padding is
+       the room it takes, scroll-margin the air around the target. */
+    --pin: calc(var(--pin-top) + var(--pin-above) + var(--pin-bar));
+    scroll-padding-top: var(--pin);
+  }
+  .app[data-mode='live'] .workspace:has(.tl) {
+    gap: 0;
+  }
+
+  .app[data-mode='live'] .workspace:has(.tl) .workspace__stage {
     position: sticky;
-    top: 0;
+    top: var(--pin-top);
     z-index: 6;
-    height: clamp(210px, 38dvh, 460px);
-    padding: env(safe-area-inset-top, 0px) 0 6px;
+    height: var(--pin-stage);
+  }
+  /* Under a notch or the status bar of a home screen app the page must not show through. */
+  .app[data-mode='live'] .workspace:has(.tl) .workspace__stage::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    left: 0;
+    height: var(--pin-top);
     background: var(--bg);
+  }
+
+  .app[data-mode='live'] .workspace:has(.tl) .workspace__dock {
+    display: contents;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .transport {
+    position: sticky;
+    top: calc(var(--pin-top) + var(--pin-above));
+    z-index: 5;
+    flex-wrap: nowrap;
+    gap: 0 12px;
+    height: var(--pin-bar);
+    margin-inline: calc(var(--pin-pad) * -1);
+    padding: 0 calc(var(--pin-pad) + 6px);
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .transport__tools {
+    flex-wrap: nowrap;
+    gap: 0 8px;
+    width: auto;
+    margin-left: auto;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .transport__code {
+    font-size: 22px;
+  }
+
+  /* The timeline keeps the surface the dock gave it. */
+  .app[data-mode='live'] .workspace:has(.tl) .tl {
+    margin-top: 8px;
+    padding: 8px 12px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sheet);
+    background: var(--panel);
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .workspace__rail {
+    margin-top: 8px;
+  }
+
+  .app[data-mode='live'] .workspace:has(.tl) .live-list {
+    order: 1;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .live-focus {
+    order: 2;
+    padding-top: 6px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .ins-folds {
+    order: 3;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .live-foot {
+    order: 4;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .live-row {
+    scroll-margin-top: 8px;
+  }
+}
+
+/* On its side a phone is too short for a player above the results: the video gets the left column, as tall as the screen, and the
+   transport, the timeline and the skills scroll in the right one. */
+@media (max-width: 1099px) and (max-height: 520px) and (orientation: landscape) {
+  :root:has(.app[data-mode='live'] .tl) {
+    --pin-stage: calc(100dvh - var(--topbar-h) - var(--pin-top) - 12px);
+    --pin-above: 0px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) {
+    display: grid;
+    grid-template-columns: minmax(0, 11fr) minmax(0, 12fr);
+    grid-template-rows: auto auto;
+    column-gap: 12px;
+    align-items: start;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .workspace__stage {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  /* The transport spans both rows so that it can stay pinned for the whole list; the timeline starts below it. */
+  .app[data-mode='live'] .workspace:has(.tl) .transport {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: start;
+    margin-inline: 0 calc(var(--gutter) * -1);
+    padding-inline: 6px var(--gutter);
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .tl {
+    grid-column: 2;
+    grid-row: 1;
+    margin-top: calc(var(--pin-bar) + 8px);
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .workspace__rail {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+/* Everything above the first skill is as tight as a finger allows, so that the set and the first skill fit under the video. */
+@media (max-width: 640px) and (min-height: 521px),
+  (max-width: 1099px) and (max-height: 520px) and (orientation: landscape) {
+  :root:has(.app[data-mode='live'] .tl) {
+    --pin-bar: 48px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .tl {
+    padding: 2px 8px 8px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .tl__head {
+    gap: 0;
+    padding: 0 0 2px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .tl__nav,
+  .app[data-mode='live'] .workspace:has(.tl) .tl__actions {
+    gap: 0;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .tl__actions .btn {
+    padding-inline: 9px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .tl__title {
+    min-width: 0;
+    padding: 0 2px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .workspace__rail {
+    padding: 12px 16px 24px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .live-summary {
+    gap: 12px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .live-summary--more {
+    padding-bottom: 12px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .live-list {
+    padding-top: 12px;
+  }
+}
+@media (max-width: 640px) and (min-height: 521px) {
+  :root:has(.app[data-mode='live'] .tl) {
+    --pin-pad: 8px;
+    --pin-stage: clamp(180px, 28dvh, 420px);
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .transport {
+    padding-inline: calc(var(--pin-pad) + 4px);
+  }
+}
+/* The timeline's "Clip / Jump" zoom would need a row of its own in a column this narrow: the skills are worth more there. */
+@media (max-width: 559px) and (min-height: 521px),
+  (max-width: 1099px) and (max-height: 520px) and (orientation: landscape) {
+  .app[data-mode='live'] .workspace:has(.tl) .tl__zoom {
+    display: none;
+  }
+}
+@media (max-width: 340px) and (min-height: 521px) {
+  /* The narrowest phones: the controls give up their air. */
+  .app[data-mode='live'] .workspace:has(.tl) .transport {
+    gap: 0 4px;
+    padding-inline: var(--pin-pad);
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .transport__play {
+    margin: 0 2px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .transport__code {
+    font-size: 18px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .transport__speed {
+    padding-right: 26px;
+    padding-left: 10px;
+    background-position: right 8px center;
   }
 }

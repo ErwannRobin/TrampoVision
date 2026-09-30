@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../../i18n';
 import type { LiveJump, Session } from '../../coaching/session';
+import { useReducedMotion } from '../hooks';
 import { Button, cx } from '../kit';
 import { EmptyState } from '../rail/insights/EmptyState';
 import { DataChecks, Folds } from '../rail/insights/WorthKnowing';
@@ -63,6 +64,21 @@ function scrollParent(el: HTMLElement): HTMLElement | null {
   return null;
 }
 
+/**
+ * Where the page itself scrolls (a narrow screen), the video and its controls are pinned at the top and the row belongs below them:
+ * the page's scroll-padding-top says how much room they take (styles/live.css). Nothing is pinned on a short screen (0): there the page
+ * stays where it is.
+ */
+function revealInPage(list: HTMLElement, row: HTMLElement, smooth: boolean) {
+  const pinned = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+  if (pinned === 0) return;
+  const box = list.getBoundingClientRect();
+  if (box.bottom <= pinned || box.top >= window.innerHeight) return;
+  const at = row.getBoundingClientRect();
+  if (at.top >= pinned && at.bottom <= window.innerHeight) return;
+  row.scrollIntoView({ block: 'start', behavior: smooth ? 'smooth' : 'auto' });
+}
+
 function Bounces({
   jumps,
   selected,
@@ -118,21 +134,30 @@ export function LiveRail(props: LiveRailProps) {
   const skillIndexes = useMemo(() => items.flatMap((i) => (i.kind === 'skill' ? [i.jump.index] : [])), [items]);
 
   // When the selection moves from elsewhere (the timeline, the video playing), keep the row in view inside the rail, only while the list
-  // is on screen. Never the page: on a narrow screen the video would scroll away.
+  // is on screen. On a narrow screen the page scrolls and the video stays pinned above the results: there a row that was tapped goes below
+  // the video; the page never moves for the timeline, which a finger may be dragging.
   const previous = useRef(selected);
+  const tapped = useRef(-1);
+  const reduced = useReducedMotion();
   useEffect(() => {
     if (previous.current === selected) return;
     previous.current = selected;
+    const fromTap = tapped.current === selected;
+    tapped.current = -1;
     const list = listRef.current;
     const row = rows.current[selected];
-    const scroller = list && row ? scrollParent(list) : null;
-    if (!list || !row || !scroller) return;
+    if (!list || !row) return;
+    const scroller = scrollParent(list);
+    if (!scroller) {
+      if (fromTap) revealInPage(list, row, !reduced);
+      return;
+    }
     const view = scroller.getBoundingClientRect();
     const box = list.getBoundingClientRect();
     if (box.bottom <= view.top || box.top >= view.bottom) return;
     const top = scrollTopToReveal(view, row.getBoundingClientRect(), scroller.scrollTop, 8);
     if (top !== null) scroller.scrollTo({ top, behavior: 'smooth' });
-  }, [selected]);
+  }, [selected, reduced]);
 
   if (session.jumps.length === 0) return <EmptyState notes={props.notes} onOpenSetup={props.onOpenSetup} />;
 
@@ -166,7 +191,10 @@ export function LiveRail(props: LiveRailProps) {
                 <SkillRow
                   jump={item.jump}
                   selected={item.jump.index === selected}
-                  onSelect={() => onSelect(item.jump.index)}
+                  onSelect={() => {
+                    if (item.jump.index !== selected) tapped.current = item.jump.index;
+                    onSelect(item.jump.index);
+                  }}
                   buttonRef={(el) => {
                     rows.current[item.jump.index] = el;
                   }}

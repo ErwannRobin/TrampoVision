@@ -35,7 +35,8 @@ analysis, and biomechanics that can be trusted because the interface is honest a
 5. **Motion answers the user.** Menus open, selections slide, bars grow when they appear, the timeline draws in once
    when an analysis arrives. No decorative entrances, no hover animations on content. Everything respects
    `prefers-reduced-motion` (base.css already zeroes durations; canvas animation must check it too).
-6. **The video never moves.** Banners float over the workspace; the stage and dock stay put while the rail scrolls.
+6. **The video never moves.** Banners float over the workspace; the stage and dock stay put while the rail scrolls. On a narrow
+   screen, where the page scrolls, the stage and the transport are pinned above the results instead.
 
 ### Things to avoid (this is a brief, not a taste)
 
@@ -94,20 +95,31 @@ timeline drive a video they do not own, and how charts follow playback at frame 
 ### Layout (`styles/shell.css`)
 
 ```
-wide (>= 1100px)                      narrow
-+-------------------+----------+      +-------------------+
-| stage (video)     | rail     |      | stage             |
+wide (>= 1100px)                      narrow, live view with results
++-------------------+----------+      +-------------------+  pinned
+| stage (video)     | rail     |      | stage             |  (sticky)
 |                   | (scrolls)|      +-------------------+
-+-------------------+----------+      | dock              |
++-------------------+----------+      | transport         |  (sticky)
 | dock: transport + timeline   |      +-------------------+
-+------------------------------+      | rail              |
-| technical data (coach)       |      | technical data    |
++------------------------------+      | timeline          |  scrolls
+| technical data (coach)       |      | rail              |
+                                      | technical data    |
 ```
 
 - `.workspace__stage` is transparent and gives the stage a definite size. The stage draws its own black rounded viewport.
 - `.workspace__dock` and `.workspace__rail` are `.sheet`s (the shell adds the surface and the padding).
 - The workspace is exactly one viewport tall on wide screens (the video, the timeline and the transport are always
   visible; the rail scrolls). Below 1100px the page scrolls; the stage is 58dvh tall, full-bleed on phones.
+- Narrow, live view, once there is a result: the video stays in view while the results scroll past it. Upright (at least 521px
+  tall) it is a mini-player: the stage (28dvh on a phone, 34dvh wider; `--pin-stage`) and the transport (one slim row: play, frame
+  steps, time, speed; `--pin-bar`) are `position: sticky` at the top. On its side (landscape, at most 520px tall) the stage is the
+  left column, as tall as the screen, and the transport, the timeline and the skills scroll in the right one. Nothing moves in the
+  DOM (the `<video>` is never remounted): the dock gives up its box (`display: contents`) so that the timeline scrolls on its own,
+  and the `.sheet` surface moves to the timeline. What is pinned is also the `scroll-padding-top` of the page, so a tapped skill
+  row (`LiveRail`), a focused control and anchors land clear of it. Below 560px the timeline's Clip / Jump zoom is left out to
+  keep the set and the first skill in the first screen, and on a phone the list of skills comes before "Work on next". Before there
+  is a result nothing is pinned (analyzing needs the whole stage), and the advanced tools keep the plain stack. All of it is in
+  `styles/live.css`, scoped with `:has(.tl)`.
 - The sample clip is a 1080x1920 portrait video, so a portrait video in a wide stage is the normal case: it is fitted
   by height and centered, and the black stage is the letterbox.
 
