@@ -171,7 +171,7 @@ export default {
 
       return reply({ error: 'not found' }, 404);
     } catch (e) {
-      console.error(e);
+      console.error(`${req.method} ${path} failed: ${e instanceof Error ? e.message : String(e)}`);
       return reply({ error: 'internal error' }, 500);
     }
   },
