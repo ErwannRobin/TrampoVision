@@ -333,7 +333,7 @@ Verdicts: `confirm`, `correct` (a figure of the table), `unknown`, `bad-data`. O
 examples; the same video's own jumps are never used as references for itself.
 
 Set up: `cd worker && npx wrangler d1 create trampovision-review` (put the id in `wrangler.toml`), `npx wrangler secret put INGEST_TOKEN`,
-`npx wrangler secret put REVIEW_TOKEN`, then `make worker-deploy`. Build the app with `VITE_REVIEW_API_URL` and `VITE_REVIEW_INGEST_TOKEN`
+`npx wrangler secret put REVIEW_TOKEN`, then `make worker-schema` (again only when `worker/schema.sql` changes) and `make worker-deploy`. Build the app with `VITE_REVIEW_API_URL` and `VITE_REVIEW_INGEST_TOKEN`
 (see `.env.example`). Locally: put both tokens in `worker/.dev.vars` and run `make worker-dev`. The ingest token ships in the bundle, so it
 is not a secret: it keeps strangers from writing by accident. Everyone who uses the app may review: the reviewer page (`/review.html`, part of the app build) uses the
 same token, so it asks for nothing. `REVIEW_TOKEN` is optional. For real access control, put Cloudflare Access in front of the worker. A _Send analyzed jumps for review_ switch in the settings turns the upload off.

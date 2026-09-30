@@ -61,8 +61,8 @@ worker-check: node_modules ## Typecheck the review Worker (worker/)
 worker-dev: node_modules ## Run the review Worker locally on :8799 (needs worker/.dev.vars with INGEST_TOKEN and REVIEW_TOKEN)
 	cd worker && npx wrangler d1 execute trampovision-review --local --file=schema.sql && npx wrangler dev --local --port 8799
 
-worker-deploy: node_modules ## Deploy the review Worker (after wrangler d1 create, and wrangler secret put INGEST_TOKEN / REVIEW_TOKEN)
-	cd worker && npx wrangler d1 execute trampovision-review --remote --file=schema.sql && npx wrangler deploy
+worker-deploy: node_modules ## Deploy the review Worker (run worker-schema first, and only when schema.sql changes; needs d1 create + wrangler secret put INGEST_TOKEN / REVIEW_TOKEN)
+	cd worker && npx wrangler deploy
 
 eval: node_modules ## Score the classifier on reviewed jumps: FILE=eval/export.ndjson [BASELINE=eval/baseline.json | SAVE=eval/baseline.json]
 	@test -n "$(FILE)" || { echo "usage: make eval FILE=eval/export.ndjson [BASELINE=f.json | SAVE=f.json]  (get the file with: make eval-fetch)"; exit 1; }
