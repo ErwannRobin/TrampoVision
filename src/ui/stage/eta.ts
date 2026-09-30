@@ -21,3 +21,12 @@ export function formatRemaining(seconds: number): string {
   const rest = seconds % 60;
   return rest ? t('eta.minutesSeconds', { m: minutes, s: rest }) : t('eta.minutes', { m: minutes });
 }
+
+export type Milestone = 'start' | 'half' | 'almost';
+
+/** Where a screen reader is told about the progress: when it starts, at the half and when it is nearly done, not at every percent. */
+export function progressMilestone(progress: number): Milestone {
+  if (progress >= 0.9) return 'almost';
+  if (progress >= 0.5) return 'half';
+  return 'start';
+}
