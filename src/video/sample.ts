@@ -1,13 +1,17 @@
 import { t } from '../i18n/core';
 /**
- * Bundled sample videos (video-sample/). Vite emits them as same-origin assets and only fetches one when
- * requested. The browser gets the file it decodes natively: the iPhone .mov in Safari, the H.264 .mp4 elsewhere
- * (desktop Chrome cannot decode the HEVC .mov without a slow in-browser conversion).
+ * The sample videos are not part of the build (they would be copied into every deployment). They live at
+ * VITE_SAMPLE_BASE_URL (for example a public Vercel Blob store), and only one is fetched, when requested.
+ * Without that variable there is no sample and the button is hidden. The browser gets the file it decodes natively:
+ * the iPhone .mov in Safari, the H.264 .mp4 elsewhere (desktop Chrome cannot decode the HEVC .mov without a slow
+ * in-browser conversion).
  */
-const samples = import.meta.glob<string>('../../video-sample/*.{mp4,MOV,mov}', {
-  query: '?url',
-  import: 'default',
-});
+const SAMPLE_FILES = ['IMG_8368.mp4', 'IMG_8368.MOV'];
+
+const sampleBase = (() => {
+  const url = (import.meta.env.VITE_SAMPLE_BASE_URL as string | undefined)?.trim();
+  return url ? `${url.replace(/\/+$/, '')}/` : null;
+})();
 
 /**
  * Desktop Safari decodes the HEVC .mov natively. Chromium browsers and Firefox do not reliably, and on iPhone/iPad
@@ -31,12 +35,11 @@ export function pickSample(paths: string[], userAgent?: string, maxTouchPoints?:
   return sorted.find((p) => extensionOf(p) === preferred) ?? sorted.find((p) => extensionOf(p) === 'mp4') ?? null;
 }
 
-export const samplePath = pickSample(Object.keys(samples));
+export const samplePath = sampleBase ? pickSample(SAMPLE_FILES.map((file) => sampleBase + file)) : null;
 
 /** Downloads the sample into a File, so it goes through the same path as a user-selected file. */
 export async function loadSample(path: string, onProgress?: (fraction: number) => void): Promise<File> {
-  const url = await samples[path]();
-  const response = await fetch(url);
+  const response = await fetch(path);
   if (!response.ok) throw new Error(t('err.sampleHttp', { status: response.status }));
   const size = Number(response.headers.get('content-length'));
   let blob: Blob;
