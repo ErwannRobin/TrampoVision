@@ -1,5 +1,4 @@
 import { FIG_ELEMENTS } from '../../src/skills/fig/elements';
-import reviewPage from './review.html';
 import { parseIngest, parseReview, tokenMatches, STATUSES, type JumpRow } from './logic';
 
 export interface Env {
@@ -73,18 +72,7 @@ export default {
     try {
       if (path === '/' && req.method === 'GET') return reply({ service: 'trampovision-review', ok: true });
 
-      // The reviewer page and the element table it offers as figures. Both are public: the data behind them needs the reviewer token.
-      if (path === '/review' && req.method === 'GET') {
-        return new Response(reviewPage, {
-          headers: {
-            'content-type': 'text/html; charset=utf-8',
-            'content-security-policy':
-              "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'",
-            'x-content-type-options': 'nosniff',
-            'cache-control': 'no-store',
-          },
-        });
-      }
+      // The element table the reviewer page offers as figures: public, like the page itself (served by the app, /review.html).
       if (path === '/elements' && req.method === 'GET') {
         return reply({ elements: FIG_ELEMENTS.map((e) => ({ id: e.id, name: e.name })) });
       }

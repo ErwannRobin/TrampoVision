@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>TrampoVision review</title>
+    <style>
+      :root {
+        --bg: #f6f6f4;
+        --panel: #fff;
+        --ink: #1a1a1a;
+        --muted: #6b6b66;
+        --line: #dcdcd6;
+        --accent: #1f5eff;
+        --ok: #12833b;
+        --warn: #b26b00;
+        --bad: #b3261e;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141414;
+          --panel: #1e1e1e;
+          --ink: #ececea;
+          --muted: #9a9a94;
+          --line: #333;
+          --accent: #6f9bff;
+          --ok: #4cc27a;
+          --warn: #e0a24a;
+          --bad: #ff7b72;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          15px/1.4 system-ui,
+          sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      header {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+        flex-wrap: wrap;
+      }
+      header h1 {
+        font-size: 16px;
+        margin: 0;
+        margin-right: auto;
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(240px, 320px) 1fr;
+        gap: 16px;
+        padding: 16px;
+      }
+      @media (max-width: 800px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+      }
+      h2 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        margin: 0 0 8px;
+      }
+      ul.queue {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        max-height: 70vh;
+        overflow: auto;
+      }
+      ul.queue li button {
+        width: 100%;
+        text-align: left;
+        padding: 8px;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        background: none;
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+      }
+      ul.queue li button[aria-current='true'] {
+        background: color-mix(in srgb, var(--accent) 14%, transparent);
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      button.act,
+      select,
+      input[type='text'] {
+        font: inherit;
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink);
+      }
+      button.act {
+        cursor: pointer;
+      }
+      button.act:hover {
+        border-color: var(--accent);
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      button.danger:hover {
+        border-color: var(--bad);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 1000px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      canvas {
+        width: 100%;
+        height: auto;
+        display: block;
+        background: var(--bg);
+        border-radius: 8px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 14px;
+      }
+      td,
+      th {
+        text-align: left;
+        padding: 4px 6px;
+        border-bottom: 1px solid var(--line);
+      }
+      .tag {
+        font-size: 12px;
+        padding: 1px 8px;
+        border-radius: 99px;
+        border: 1px solid var(--line);
+      }
+      .tag.confident {
+        color: var(--ok);
+      }
+      .tag.probable {
+        color: var(--accent);
+      }
+      .tag.tentative {
+        color: var(--warn);
+      }
+      .tag.unclassified {
+        color: var(--bad);
+      }
+      #err {
+        color: var(--bad);
+      }
+      pre {
+        white-space: pre-wrap;
+        font-size: 12px;
+        margin: 0;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      body.out #mode,
+      body.out #who,
+      body.out #counts {
+        display: none;
+      }
+    </style>
+  </head>
+  <body class="out">
+    <header id="bar">
+      <h1>TrampoVision review</h1>
+      <span id="counts" class="muted"></span>
+      <select id="mode" aria-label="List">
+        <option value="queue">To review</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="corrected">Corrected</option>
+        <option value="unknown">Unknown</option>
+        <option value="bad-data">Bad data</option>
+      </select>
+      <input id="who" type="text" placeholder="Your name" size="12" aria-label="Your name" />
+    </header>
+
+    <section id="login" class="panel" style="margin: 16px; max-width: 420px">
+      <h2>Review unavailable</h2>
+      <p id="loginerr" class="muted"></p>
+    </section>
+
+    <main id="app" hidden>
+      <div class="panel">
+        <h2 id="listtitle">To review</h2>
+        <ul class="queue" id="queue"></ul>
+        <p id="empty" class="muted" hidden>Nothing here.</p>
+      </div>
+
+      <div id="detail" class="panel" hidden>
+        <div class="row" style="justify-content: space-between">
+          <div>
+            <h2 style="margin: 0">Automatic answer</h2>
+            <div style="font-size: 20px; font-weight: 600" id="autoname"></div>
+            <div class="row">
+              <span id="autotag" class="tag"></span><span id="autoconf" class="muted"></span
+              ><span id="autoclf" class="muted"></span>
+            </div>
+          </div>
+          <div class="muted" id="ident"></div>
+        </div>
+        <p id="summary" class="muted"></p>
+
+        <div class="grid">
+          <div>
+            <canvas id="skel" width="280" height="320" aria-label="Skeleton replay"></canvas>
+            <div class="row" style="margin-top: 8px">
+              <button class="act" id="play" type="button">Play</button>
+              <input
+                id="scrub"
+                type="range"
+                min="0"
+                max="1"
+                step="0.001"
+                value="0"
+                style="flex: 1"
+                aria-label="Position in the jump"
+              />
+            </div>
+            <p class="muted">
+              The body is drawn upright in its own frame, so the shape (tuck, pike, twist) reads clearly. The rotation
+              is in the curves.
+            </p>
+          </div>
+          <div>
+            <canvas id="curves" width="560" height="320" aria-label="Measured curves"></canvas>
+            <table id="measured" style="margin-top: 8px"></table>
+          </div>
+        </div>
+
+        <h2 style="margin-top: 16px">Candidates</h2>
+        <table id="cands"></table>
+
+        <h2 style="margin-top: 16px">Your verdict</h2>
+        <div class="row">
+          <button class="act primary" id="confirm" type="button">Confirm the automatic answer (Enter)</button>
+          <select id="figure" aria-label="Figure"></select>
+          <button class="act" id="correct" type="button">It was this figure</button>
+          <button class="act" id="unknown" type="button">Cannot tell</button>
+          <button class="act danger" id="baddata" type="button">Bad data</button>
+        </div>
+        <div class="row" style="margin-top: 8px">
+          <input id="note" type="text" placeholder="Note (optional)" style="flex: 1" aria-label="Note" />
+          <button class="act" id="skip" type="button">Skip (N)</button>
+        </div>
+        <p id="err" role="alert"></p>
+        <details style="margin-top: 8px">
+          <summary class="muted">Debug</summary>
+          <pre id="debug"></pre>
+        </details>
+      </div>
+    </main>
+
+    <script type="module" src="/src/reviewPage/main.js"></script>
+  </body>
+</html>

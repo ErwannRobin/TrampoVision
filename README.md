@@ -322,12 +322,12 @@ It does not decide who is right (the label or the measurement); it shows where t
 delaying it, the app posts each jump (measurements, the prediction with its candidates, the pose sequence) to the Worker. A person then
 confirms or corrects the answer. Nothing is classified on the server, and no video and no file name are ever sent.
 
-| Route                                                                                        | Token       | Does                                                                                                               |
-| -------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------ |
-| `POST /jumps`                                                                                | ingest      | Stores jumps (max 25 per call). A re-post replaces the automatic answer and keeps the review.                      |
-| `GET /references`                                                                            | ingest      | Confirmed and corrected jumps, as records with a figure: the app loads them as reference examples.                 |
-| `GET /review`                                                                                | none (page) | The reviewer page: queue (unclassified first, then least confident), skeleton replay, candidates, curves, verdict. |
-| `GET /jumps?queue=1`, `GET /jumps/:id`, `PUT /jumps/:id/review`, `GET /stats`, `GET /export` | review      | The review workflow and an NDJSON export for tuning.                                                               |
+| Route                                                                                        | Token            | Does                                                                                               |
+| -------------------------------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
+| `POST /jumps`                                                                                | ingest           | Stores jumps (max 25 per call). A re-post replaces the automatic answer and keeps the review.      |
+| `GET /references`                                                                            | ingest           | Confirmed and corrected jumps, as records with a figure: the app loads them as reference examples. |
+| `GET /elements`                                                                              | none             | The figure table, for the reviewer page (served by the app at `/review.html`, see below).          |
+| `GET /jumps?queue=1`, `GET /jumps/:id`, `PUT /jumps/:id/review`, `GET /stats`, `GET /export` | ingest or review | The review workflow and an NDJSON export for tuning.                                               |
 
 Verdicts: `confirm`, `correct` (a figure of the table), `unknown`, `bad-data`. Only confirmed and corrected jumps become reference
 examples; the same video's own jumps are never used as references for itself.
@@ -335,8 +335,8 @@ examples; the same video's own jumps are never used as references for itself.
 Set up: `cd worker && npx wrangler d1 create trampovision-review` (put the id in `wrangler.toml`), `npx wrangler secret put INGEST_TOKEN`,
 `npx wrangler secret put REVIEW_TOKEN`, then `make worker-deploy`. Build the app with `VITE_REVIEW_API_URL` and `VITE_REVIEW_INGEST_TOKEN`
 (see `.env.example`). Locally: put both tokens in `worker/.dev.vars` and run `make worker-dev`. The ingest token ships in the bundle, so it
-is not a secret: it keeps strangers from writing by accident. Put Cloudflare Access in front of `/review` and the review routes for real
-access control. A _Send analyzed jumps for review_ switch in the settings turns the upload off.
+is not a secret: it keeps strangers from writing by accident. Everyone who uses the app may review: the reviewer page (`/review.html`, part of the app build) uses the
+same token, so it asks for nothing. `REVIEW_TOKEN` is optional. For real access control, put Cloudflare Access in front of the worker. A _Send analyzed jumps for review_ switch in the settings turns the upload off.
 
 ### Scoring the classifier on reviewed jumps
 
