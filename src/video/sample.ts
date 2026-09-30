@@ -33,11 +33,27 @@ export function pickSample(paths: string[], userAgent?: string, maxTouchPoints?:
 export const samplePath = pickSample(Object.keys(samples));
 
 /** Downloads the sample into a File, so it goes through the same path as a user-selected file. */
-export async function loadSample(path: string): Promise<File> {
+export async function loadSample(path: string, onProgress?: (fraction: number) => void): Promise<File> {
   const url = await samples[path]();
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Could not load the sample video (HTTP ${response.status}).`);
-  const blob = await response.blob();
+  const size = Number(response.headers.get('content-length'));
+  let blob: Blob;
+  if (response.body && size > 0 && onProgress) {
+    const reader = response.body.getReader();
+    const chunks: Uint8Array<ArrayBuffer>[] = [];
+    let received = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value as Uint8Array<ArrayBuffer>);
+      received += value.length;
+      onProgress(Math.min(received / size, 1));
+    }
+    blob = new Blob(chunks);
+  } else {
+    blob = await response.blob();
+  }
   const name = path.slice(path.lastIndexOf('/') + 1);
   return new File([blob], name, { type: extensionOf(path) === 'mov' ? 'video/quicktime' : 'video/mp4' });
 }
