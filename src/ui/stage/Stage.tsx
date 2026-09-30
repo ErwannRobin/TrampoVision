@@ -325,26 +325,9 @@ export function Stage({
             value={view}
             onChange={onView}
             options={VIEW_OPTIONS.map((o) =>
-              url || o.value === '3d'
-                ? { ...o }
-                : { ...o, disabled: true, title: 'Add the video to see it: only the saved data is open' },
+              url || o.value === '3d' ? { ...o } : { ...o, disabled: true, title: 'A saved analysis has no video' },
             )}
           />
-          {!url && (
-            <label className="btn btn--secondary btn--sm stage__pick">
-              <Icon name="upload" size={15} />
-              Add video
-              <input
-                type="file"
-                accept="video/mp4,video/quicktime,.mp4,.mov"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) onPickVideo(f);
-                  e.target.value = '';
-                }}
-              />
-            </label>
-          )}
         </div>
       )}
 

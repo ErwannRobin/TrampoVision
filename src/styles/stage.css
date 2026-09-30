@@ -55,9 +55,6 @@
   align-items: center;
   gap: 8px;
 }
-.stage__views .stage__pick {
-  margin-top: 0;
-}
 .stage__views .seg {
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(12, 13, 15, 0.6);
