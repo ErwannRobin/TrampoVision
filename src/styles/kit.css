@@ -630,7 +630,6 @@
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
-  transition: stroke-dashoffset var(--t-med) linear;
 }
 .ring--indeterminate svg {
   animation: spin 1.1s linear infinite;
