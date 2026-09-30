@@ -1003,7 +1003,7 @@ export default function App() {
               </div>
 
               <div className="workspace__dock sheet">
-                {url && (
+                {(url || result) && (
                   <Transport
                     playhead={playhead}
                     fps={fps}
