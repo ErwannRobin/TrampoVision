@@ -4,6 +4,7 @@ import type { DatasetApi } from '../dataset/useDataset';
 import { HeroArcs } from './chrome/HeroArcs';
 import { DemoSkeleton } from './DemoSkeleton';
 import { DatasetBar, EvaluationReport } from './EvaluationView';
+import { useMediaQuery } from './hooks';
 import { Button, Icon } from './kit';
 
 export interface LandingProps {
@@ -15,6 +16,8 @@ export interface LandingProps {
   dataset: DatasetApi;
   /** A file is being read. */
   busy: boolean;
+  /** The advanced tools are on: saved analyses, the reviewer page and the saved dataset. */
+  advanced: boolean;
 }
 
 /** A link to the reviewer page, with the number of jumps waiting. Only when the build has a review service. */
@@ -38,37 +41,65 @@ function ReviewLink() {
   );
 }
 
-/** The first screen: what the app does, how to start, and the dataset saved on this computer. */
-export function Landing({ onFile, onSample, onOpenSeries, dataset, busy }: LandingProps) {
-  const hasDataset = dataset.records.length > 0;
+/** Picks a video from a button; `capture` opens the camera of a phone or a tablet instead of the library. */
+function VideoButton({
+  label,
+  icon,
+  primary,
+  capture,
+  busy,
+  onFile,
+}: {
+  label: string;
+  icon: 'upload' | 'video';
+  primary: boolean;
+  capture?: boolean;
+  busy: boolean;
+  onFile: (file: File) => void;
+}) {
+  const kind = primary ? 'btn btn--primary btn--lg landing__pick' : 'btn btn--secondary btn--lg landing__pick';
+  return (
+    <label className={busy ? `${kind} is-busy` : kind}>
+      <Icon name={icon} size={20} />
+      {label}
+      <input
+        type="file"
+        accept={capture ? 'video/*' : 'video/mp4,video/quicktime,.mp4,.mov'}
+        capture={capture ? 'environment' : undefined}
+        disabled={busy}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onFile(f);
+          e.target.value = '';
+        }}
+      />
+    </label>
+  );
+}
+
+/** The first screen: what the app does and how to start. The advanced tools add the saved analyses and the dataset kept in this browser. */
+export function Landing({ onFile, onSample, onOpenSeries, dataset, busy, advanced }: LandingProps) {
+  const hasDataset = advanced && dataset.records.length > 0;
+  // A phone or a tablet can film right away; a computer picks a file.
+  const touch = useMediaQuery('(pointer: coarse)');
   return (
     <div className="landing">
       <section className="landing__hero">
         <div className="landing__copy">
-          <h1 className="landing__title t-brand">Measure every jump.</h1>
+          <h1 className="landing__title t-brand">Score every skill.</h1>
           <p className="landing__lead">
-            Drop a trampoline video. TrampoVision finds each jump and reports height, time in the air, rotation and
-            skill, on your device.
+            Film a set. TrampoVision names each skill, works out its difficulty, proposes an execution score and tells
+            you what to fix. It runs on your device.
           </p>
           <div className="landing__actions">
-            <label
-              className={
-                busy ? 'btn btn--primary btn--lg landing__pick is-busy' : 'btn btn--primary btn--lg landing__pick'
-              }
-            >
-              <Icon name="upload" size={20} />
-              Choose video
-              <input
-                type="file"
-                accept="video/mp4,video/quicktime,.mp4,.mov"
-                disabled={busy}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) onFile(f);
-                  e.target.value = '';
-                }}
-              />
-            </label>
+            {touch ? (
+              <>
+                <VideoButton label="Film a set" icon="video" primary capture busy={busy} onFile={onFile} />
+                <VideoButton label="Choose a video" icon="upload" primary={false} busy={busy} onFile={onFile} />
+              </>
+            ) : (
+              <VideoButton label="Choose a video" icon="upload" primary busy={busy} onFile={onFile} />
+            )}
             {onSample && (
               <Button variant="secondary" size="lg" disabled={busy} onClick={onSample}>
                 Use the sample video
@@ -76,23 +107,26 @@ export function Landing({ onFile, onSample, onOpenSeries, dataset, busy }: Landi
             )}
           </div>
           <p className="landing__hint">or drop a video anywhere on this page</p>
-          <label className="landing__link">
-            Open a saved analysis
-            <input
-              type="file"
-              accept="application/json,.json"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) onOpenSeries(f);
-                e.target.value = '';
-              }}
-            />
-          </label>
-          {REVIEW_API_URL && <ReviewLink />}
+          {advanced && (
+            <label className="landing__link">
+              Open a saved analysis
+              <input
+                type="file"
+                accept="application/json,.json"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) onOpenSeries(f);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          )}
+          {advanced && REVIEW_API_URL && <ReviewLink />}
           <ul className="landing__notes">
             <li>
               <Icon name="video" size={17} />
-              Best results come from a fixed, level camera at the side, with the whole trampoline in frame.
+              Best results come from a fixed, level camera at the side, with the whole trampoline in frame and the
+              athlete in view from the takeoff of the first skill to the landing of the last.
             </li>
             <li>
               <Icon name="shield" size={17} />

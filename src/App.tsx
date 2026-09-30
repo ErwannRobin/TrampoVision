@@ -3,14 +3,28 @@ import { buildCalibration, DEFAULT_BED_M, type Quad, type TrampolineCalibration 
 import { computeAnalysis } from './analysis/computeAnalysis';
 import { download, toCsv, toJumpsCsv } from './analysis/export';
 import { extractPoseTrack } from './analysis/extractPoseTrack';
+import { analysisStride } from './analysis/stride';
 import { stabilizePose } from './analysis/stabilize';
 import { sampleIndexAt } from './analysis/lookup';
 import { exampleCounts, referencesFromRecords } from './dataset/references';
-import type { MovementLabel } from './dataset/movementLabel';
-import { isStale, syncRecords, withMovement, withTruth, withTwistTruth, type RecordContext } from './dataset/record';
+import { movementOfElement, type MovementLabel } from './dataset/movementLabel';
+import {
+  isStale,
+  syncRecords,
+  withExecution,
+  withMovement,
+  withTruth,
+  withTwistTruth,
+  type RecordContext,
+} from './dataset/record';
 import { useDataset } from './dataset/useDataset';
-import { useReviewedReferences, useReviewUpload, useSyncSetting } from './sync/useReviewSync';
+import { useReviewedReferences, useReviewUpload, useSyncSetting, useVerdictOutbox } from './sync/useReviewSync';
+import { EXECUTION_RULESET } from './coaching/config';
+import { withCalls } from './coaching/display';
+import { buildSession, labelOf } from './coaching/session';
+import { elementById } from './skills/fig/elements';
 import { videoIdFromTrack, videoIdOf } from './dataset/videoId';
+import type { JumpRecord } from './dataset/types';
 import { analyzeTwist } from './pose3d/twist';
 import { analyzeSkills } from './skills/analyzeSkills';
 import { DEFAULT_SKILL_CONFIG, type SkillConfig } from './skills/config';
@@ -36,6 +50,7 @@ import { useLocalStorage, useReducedMotion } from './ui/hooks';
 import { analysisWarnings } from './ui/quality';
 import { AthleteInsights } from './ui/rail/AthleteInsights';
 import { CoachRail } from './ui/rail/CoachRail';
+import { LiveRail } from './ui/live/LiveRail';
 import { SetupPanel } from './ui/rail/SetupPanel';
 import { CalibrationBar } from './ui/stage/CalibrationBar';
 import { ProcessingOverlay } from './ui/stage/ProcessingOverlay';
@@ -48,6 +63,7 @@ import { plural } from './ui/format';
 const webgpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
 
 const AUDIENCES = ['athlete', 'coach'] as const;
+const ADVANCED = ['on', 'off'] as const;
 const APPEARANCES = ['system', 'light', 'dark'] as const;
 
 interface SavedCalibration {
@@ -105,6 +121,10 @@ export default function App() {
 
   // How the interface presents itself. Athlete and coach see the same analysis; only the depth differs.
   const [audience, setAudience] = useLocalStorage<Audience>('trampovision.audience', 'athlete', AUDIENCES);
+  // The default is the live view: what a coach needs on the trampoline. The advanced tools bring back the two audiences, the
+  // trampoline outline, the engine settings, the exports and the saved analyses.
+  const [advancedFlag, setAdvancedFlag] = useLocalStorage<'on' | 'off'>('trampovision.advanced', 'off', ADVANCED);
+  const advanced = advancedFlag === 'on';
   const [appearance, setAppearance] = useLocalStorage<Appearance>('trampovision.appearance', 'system', APPEARANCES);
   const [railView, setRailView] = useState<RailView>('setup');
   const railRef = useRef<HTMLElement>(null);
@@ -125,6 +145,8 @@ export default function App() {
   const [stageView, setStageView] = useState<StageView>('video');
   const openedSeries = useRef(false);
   const [loop, setLoop] = useState(false);
+  // The video whose analysis starts by itself once it is ready (the live view).
+  const [autoUrl, setAutoUrl] = useState<string | null>(null);
 
   // Evaluation: which video the labels belong to, and whether the report covers this video or every saved one.
   const [videoId, setVideoId] = useState<string | null>(null);
@@ -202,7 +224,9 @@ export default function App() {
   useEffect(() => () => abort.current?.abort(), []);
 
   // A new analysis starts at the first jump and shows its insights; no analysis shows the setup.
+  const firstSkillPending = useRef(false);
   useEffect(() => {
+    firstSkillPending.current = true;
     setSelectedJump(0);
     setRailView(track ? 'insights' : 'setup');
     // Saved data opens on the 3D skeleton: it is what there is to show until the clip is added.
@@ -309,6 +333,7 @@ export default function App() {
     const isCurrent = () => fileRef.current === next;
     const ctl = new AbortController();
     abort.current = ctl;
+    let finalUrl = nextUrl;
     try {
       // Metadata may fail to load, or load even though the codec cannot be decoded (iPhone HEVC in
       // desktop Chrome). Either way convert to H.264 in the browser and use the converted video from here on.
@@ -333,6 +358,7 @@ export default function App() {
         if (!isCurrent()) return;
         const convertedUrl = URL.createObjectURL(blob);
         URL.revokeObjectURL(nextUrl);
+        finalUrl = convertedUrl;
         setUrl(convertedUrl);
         probe = await loadVideo(convertedUrl);
         setNotice(
@@ -345,6 +371,13 @@ export default function App() {
       disposeVideo(probe);
       if (!isCurrent()) return;
       setFps(measured ?? 30);
+      if (!advanced) {
+        // The live view goes straight to the analysis: a coach on the trampoline has nothing to set up first.
+        if (!measured) setNotice('Could not measure the frame rate, so 30 fps is assumed.');
+        setStatus({ kind: 'idle' });
+        setAutoUrl(finalUrl);
+        return;
+      }
       setStatus(
         measured
           ? { kind: 'idle' }
@@ -369,13 +402,16 @@ export default function App() {
     setTrack(null);
     setNotice('');
     setStatus({ kind: 'analyzing', done: 0, total: 1 });
+    // The live view analyzes about 30 frames a second, so a phone film at 60 or 120 fps does not make the wait longer.
+    const strideNow = advanced ? stride : analysisStride(fps);
+    if (strideNow !== stride) setStride(strideNow);
     try {
       const t = await extractPoseTrack(url, {
         model,
         numPoses,
         preferGpu,
         sourceFps: fps,
-        stride,
+        stride: strideNow,
         signal: ctl.signal,
         onBackend: setBackend,
         onProgress: (done, total) => setStatus({ kind: 'analyzing', done, total }),
@@ -392,6 +428,12 @@ export default function App() {
       setStatus({ kind: 'error', message: `${msg}${hint}` });
     }
   }
+
+  useEffect(() => {
+    if (!autoUrl || autoUrl !== url || status.kind !== 'idle') return;
+    setAutoUrl(null);
+    void analyze();
+  }, [autoUrl, url, status.kind]); // oxlint-disable-line react-hooks/exhaustive-deps
 
   /** Opens a saved analysis (JSON): no need to run the pose model again. */
   async function openSeries(saved: File) {
@@ -485,6 +527,60 @@ export default function App() {
   const annotateTwist = (halfTwists: number | null) => {
     if (fresh[jumpSel]) void saveRecords([withTwistTruth(fresh[jumpSel], halfTwists)]);
   };
+
+  // The live view: what each skill was, its difficulty and execution. The coach's label wins over the classifier's guess.
+  const labels = useMemo(() => fresh.map(labelOf), [fresh]);
+  const session = useMemo(
+    () => (result && skills ? buildSession({ skills, result, twist, labels }) : null),
+    [result, skills, twist, labels],
+  );
+  // A new analysis of the live view opens on its first skill, not on a warm-up bounce.
+  useEffect(() => {
+    if (!firstSkillPending.current || !session) return;
+    firstSkillPending.current = false;
+    if (advanced) return;
+    const first = session.jumps.findIndex((j) => j.isSkill);
+    if (first > 0) chooseJump(first);
+  }, [session]); // oxlint-disable-line react-hooks/exhaustive-deps
+
+  // The video and the timeline say what the session says, so a correction shows at once.
+  const shownSkills = useMemo(() => (skills && session ? withCalls(skills, session) : skills), [skills, session]);
+
+  // What the coach says (the element, that it is none of them, the deduction they give) is saved in the local dataset, where a labelled skill
+  // becomes a reference example for the classifier at once, and is sent to the review service, so that every device learns from it.
+  const outbox = useVerdictOutbox(dataset.records, sync.enabled);
+  const addToOutbox = outbox.add;
+  const syncOn = sync.enabled;
+  const say = useCallback(
+    (record: JumpRecord | undefined) => {
+      if (!record) return;
+      void saveRecords([record]);
+      // With the upload off nothing waits to be sent: turning it on later does not send what was said before.
+      if (syncOn) addToOutbox(record.id);
+    },
+    [saveRecords, addToOutbox, syncOn],
+  );
+  const sayElement = (k: number, elementId: string) => {
+    const element = elementById(elementId);
+    if (element && fresh[k]) say(withMovement(fresh[k], movementOfElement(element)));
+  };
+  const sayConfirm = (k: number) => {
+    const element = session?.jumps[k]?.element;
+    if (element) sayElement(k, element.id);
+  };
+  const sayOther = (k: number) => {
+    if (fresh[k]) say(withTruth(withMovement(fresh[k], null), 'unknown'));
+  };
+  const sayClear = (k: number) => {
+    if (fresh[k]) void saveRecords([withMovement(fresh[k], null)]);
+  };
+  const sayDeduction = (k: number, deduction: number | null) => {
+    const record = fresh[k];
+    if (!record) return;
+    const next = withExecution(record, deduction, session?.jumps[k]?.proposed ?? null, EXECUTION_RULESET);
+    if (deduction === null) void saveRecords([next]);
+    else say(next);
+  };
   /** Jump of the current video that has this apex time (a failure card asks to see it). */
   const goToApex = (apexS: number) => {
     const k = result?.jumps.cycles.findIndex((c) => Math.abs(c.apexTimeS - apexS) <= 0.2) ?? -1;
@@ -564,8 +660,8 @@ export default function App() {
 
   // Labels on the video say more to a coach than to an athlete.
   const overlayOpts = useMemo<OverlayOptions>(
-    () => ({ ...overlay, detail: audience === 'coach' ? 'full' : 'simple' }),
-    [overlay, audience],
+    () => ({ ...overlay, detail: advanced && audience === 'coach' ? 'full' : 'simple' }),
+    [overlay, audience, advanced],
   );
 
   const annotated = useAnnotatedExport({
@@ -685,8 +781,8 @@ export default function App() {
   }, [result, skills, track, url, base, fileName, videoId, stride, calibration, annotated]);
 
   const hasClip = !!url || !!result;
-  // Both audiences can pick the view. Without a clip only the 3D skeleton has anything to show.
-  const view: StageView = !url && twist ? '3d' : stageView;
+  // Both audiences of the advanced tools can pick the view. Without a clip only the 3D skeleton has anything to show. The live view is the video.
+  const view: StageView = !advanced ? 'video' : !url && twist ? '3d' : stageView;
   const clipDetail = result
     ? `${jumpCount} ${plural(jumpCount, 'jump')}, ${(result.time[result.time.length - 1] ?? 0).toFixed(1)} s`
     : '';
@@ -707,6 +803,8 @@ export default function App() {
 
   const setup = (
     <SetupPanel
+      advanced={advanced}
+      onAdvanced={(on) => setAdvancedFlag(on ? 'on' : 'off')}
       review={
         sync.available
           ? { enabled: sync.enabled, onEnabled: sync.setEnabled, state: upload.state, posted: upload.posted }
@@ -787,7 +885,7 @@ export default function App() {
     ) : null;
 
   return (
-    <div className="app" data-audience={audience}>
+    <div className="app" data-audience={audience} data-mode={advanced ? 'advanced' : 'live'}>
       {dragging && (
         <div className="dropzone" role="presentation">
           <Icon name="upload" size={40} strokeWidth={1.5} />
@@ -800,8 +898,8 @@ export default function App() {
         clip={hasClip ? { name: fileName, detail: clipDetail } : null}
         audience={audience}
         onAudience={setAudience}
-        showAudience={!!result}
-        exportGroups={exportGroups}
+        showAudience={!!result && advanced}
+        exportGroups={advanced ? exportGroups : null}
         setupOpen={!!result && railView === 'setup'}
         onToggleSetup={() => (railView === 'setup' ? setRailView('insights') : openSetup())}
         onFile={hasClip && !analyzing ? (f) => void onFile(f) : null}
@@ -839,6 +937,7 @@ export default function App() {
               onOpenSeries={(f) => void openSeries(f)}
               dataset={dataset}
               busy={loading}
+              advanced={advanced}
             />
           </>
         ) : (
@@ -849,7 +948,7 @@ export default function App() {
                   url={url}
                   fps={fps}
                   result={result}
-                  skills={skills}
+                  skills={shownSkills}
                   overlay={overlayOpts}
                   playhead={playhead}
                   speed={speed}
@@ -858,7 +957,7 @@ export default function App() {
                   onError={(message) => setStatus({ kind: 'error', message })}
                   onPickVideo={(f) => void onFile(f)}
                   view={view}
-                  onView={result && twist ? switchStageView : undefined}
+                  onView={advanced && result && twist ? switchStageView : undefined}
                   pane={pane}
                 >
                   {editingCal && (
@@ -871,7 +970,7 @@ export default function App() {
                   )}
                   <ProcessingOverlay
                     status={status}
-                    ready={!!url && !result && !editingCal}
+                    ready={!!url && !result && !editingCal && !autoUrl}
                     fileName={file?.name ?? ''}
                     backend={backend}
                     onAnalyze={() => void analyze()}
@@ -891,12 +990,13 @@ export default function App() {
                     onOverlay={setOverlay}
                     hasVideo
                     hasResult={!!result}
+                    simple={!advanced}
                   />
                 )}
                 {result && (
                   <Timeline
                     result={result}
-                    skills={skills}
+                    skills={shownSkills}
                     playhead={playhead}
                     selected={jumpCount ? jumpSel : null}
                     onSelect={setSelectedJump}
@@ -915,10 +1015,30 @@ export default function App() {
               >
                 {!result || !skills || railView === 'setup' ? (
                   setup
+                ) : !advanced && session ? (
+                  <LiveRail
+                    session={session}
+                    selected={jumpSel}
+                    onSelect={chooseJump}
+                    onPlayJump={playJump}
+                    onConfirm={sayConfirm}
+                    onPick={sayElement}
+                    onOther={sayOther}
+                    onClear={sayClear}
+                    onDeduction={sayDeduction}
+                    canLabel={!!videoId}
+                    onOpenSetup={openSetup}
+                    onShowAdvanced={() => {
+                      setAdvancedFlag('on');
+                      setAudience('coach');
+                    }}
+                    notes={notes}
+                    title={base}
+                  />
                 ) : audience === 'athlete' ? (
                   <AthleteInsights
                     result={result}
-                    skills={skills}
+                    skills={shownSkills ?? skills}
                     selected={jumpSel}
                     onSelect={chooseJump}
                     onPlayJump={playJump}
@@ -949,7 +1069,7 @@ export default function App() {
               </aside>
             </div>
 
-            {result && audience === 'coach' && (
+            {result && advanced && audience === 'coach' && (
               <div className="app__technical">
                 <TechnicalData
                   result={result}

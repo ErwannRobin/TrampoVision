@@ -126,7 +126,9 @@ describe('temporal classification', () => {
     expect(under.skill).not.toBe('unclassified');
     expect(under.movement?.somersaults).toBe(1);
     const over = run({ v0: 4.6, turns: -1.3, facing: 1, shape: 'tuck' }).prediction;
-    expect(over.skill).toBe('unclassified');
+    // Past the whole turn it is only a flagged guess (it declines when it is not asked to guess).
+    expect(over.guess?.closest).toBe(true);
+    expect(over.certainty).toBe('tentative');
   });
 
   it('names a straight jump whose orientation track is noisy, when the apex orientation shows the body never turned', () => {
@@ -183,10 +185,17 @@ describe('temporal classification', () => {
     expect(pike(laterFold)).toBeLessThan(0.3);
   });
 
-  it('still leaves a quarter rotation unnamed: the closest element is not a fair description', () => {
-    const p = run({ v0: 4.6, turns: 1.25, shape: 'straight' }).prediction;
-    expect(p.skill).toBe('unclassified');
-    expect(p.failure?.kind).toBe('rotation-off-grid');
+  it('names a quarter rotation only as a flagged guess: the closest element is not a fair description', () => {
+    const { track } = mannequinRoutine({ jumps: [{ v0: 4.6, turns: 1.25, shape: 'straight' }], facing: 1 });
+    const result = computeAnalysis(track, { athleteHeightM: 1.75 });
+    const guessed = analyzeSkills(result).jumps[0].prediction;
+    expect(guessed.skill).not.toBe('unclassified');
+    expect(guessed.guess).toEqual({ closest: true, direction: false });
+    expect(guessed.certainty).toBe('tentative');
+    expect(guessed.failure?.kind).toBe('rotation-off-grid');
+    const declined = analyzeSkills(result, { config: { forceGuess: false } }).jumps[0].prediction;
+    expect(declined.skill).toBe('unclassified');
+    expect(declined.failure?.kind).toBe('rotation-off-grid');
   });
 });
 
@@ -203,8 +212,10 @@ describe('temporal against hierarchical, on the synthetic jumps', () => {
     [{ name: 'camera yaw 40°, jitter 1%', noise: 0.01, dropout: 0, flip: 'none', yawDeg: 40 }, {}],
   ];
   it.each(conditions)('%o', (condition, extra) => {
-    const old = evaluate(condition, { routines: 20, classifier: hierarchicalClassifier, ...extra });
-    const now = evaluate(condition, { routines: 20, classifier: temporalClassifier, ...extra });
+    // Both classifiers decline when unsure here, so that "firm" and "unclassified" mean the same for both.
+    const config = { forceGuess: false };
+    const old = evaluate(condition, { routines: 20, classifier: hierarchicalClassifier, config, ...extra });
+    const now = evaluate(condition, { routines: 20, classifier: temporalClassifier, config, ...extra });
     const firm = (s: typeof now) => s.rows.filter((r) => r.predicted !== 'unclassified' && r.certainty !== 'tentative');
     const unclassified = (s: typeof now) => s.rows.filter((r) => r.predicted === 'unclassified').length;
     console.log(

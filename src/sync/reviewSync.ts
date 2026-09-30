@@ -67,6 +67,33 @@ export async function postRecords(records: readonly JumpRecord[]): Promise<void>
   await call('/jumps', { method: 'POST', body: JSON.stringify({ records: records.map(forUpload) }) });
 }
 
+/** What the person says about a jump: it was the figure the classifier named, it was another one, or it cannot be told. */
+export type Verdict = { verdict: 'confirm' } | { verdict: 'correct'; elementId: string } | { verdict: 'unknown' };
+
+/** The verdict a saved record carries, or null when the person only gave an execution score (or nothing). */
+export function verdictOf(r: JumpRecord): Verdict | null {
+  if (r.figure) {
+    return r.figure.elementId === r.prediction.elementId
+      ? { verdict: 'confirm' }
+      : { verdict: 'correct', elementId: r.figure.elementId };
+  }
+  return r.truth?.label === 'unknown' ? { verdict: 'unknown' } : null;
+}
+
+/** Who says it: the live view of the app, as opposed to a person on the reviewer page. */
+const REVIEWER = 'live';
+
+/** Sends what the person said about a jump: the record first (the service may not have it yet, and it carries the execution score), then the verdict. */
+export async function sendVerdict(record: JumpRecord): Promise<void> {
+  await postRecords([record]);
+  const v = verdictOf(record);
+  if (v)
+    await call(`/jumps/${encodeURIComponent(record.id)}/review`, {
+      method: 'PUT',
+      body: JSON.stringify({ ...v, reviewer: REVIEWER }),
+    });
+}
+
 /** The jumps the reviewers confirmed or corrected, as records with a figure (reference examples). */
 export async function fetchReferenceRecords(): Promise<JumpRecord[]> {
   const body = (await (await call('/references')).json()) as { records?: JumpRecord[] };
@@ -80,6 +107,26 @@ export async function fetchQueueCount(): Promise<number | null> {
     return body.stats?.find((s) => s.status === 'auto')?.n ?? 0;
   } catch {
     return null;
+  }
+}
+
+const OUTBOX_KEY = 'trampovision.verdictOutbox';
+/** Records that wait to be sent are remembered by id (the record itself is in the local dataset). The oldest go first if there are too many. */
+export const OUTBOX_MAX = 200;
+
+export function readOutbox(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]') as unknown;
+    return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string').slice(-OUTBOX_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+export function writeOutbox(ids: readonly string[]) {
+  try {
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify(ids.slice(-OUTBOX_MAX)));
+  } catch {
+    /* they are sent while the page stays open, and lost when it closes */
   }
 }
 

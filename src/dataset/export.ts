@@ -137,6 +137,7 @@ export function parseDataset(text: string): JumpRecord[] {
       twistTruth: rest.twistTruth ?? null,
       truth: rest.truth ?? null,
       figure: rest.figure ?? null,
+      execution: rest.execution ?? null,
     };
   });
 }
@@ -170,6 +171,8 @@ const DATASET_COLUMNS: Col[] = [
   ['twist_plane_axis_deg', (r) => r.twist?.estimate.cross.inPlaneAxisDeg ?? null],
   ['twist_truth_half_twists', (r) => r.twistTruth?.halfTwists ?? null],
   ['figure', (r) => r.figure?.elementId ?? ''],
+  ['execution_deduction', (r) => r.execution?.deduction ?? null],
+  ['execution_proposed', (r) => r.execution?.proposed ?? null],
   ['classifier', (r) => `${r.analysis.classifier.id} v${r.analysis.classifier.version}`],
   ['note', (r) => r.truth?.note ?? ''],
   ['labeled_at', (r) => r.truth?.labeledAt ?? ''],

@@ -9,8 +9,9 @@ A real product an elite coach would open every day: Apple-level simplicity, the 
 analysis, and biomechanics that can be trusted because the interface is honest about what it does not know.
 
 - **The video is the product.** Everything else is arranged around it and earns its place.
-- **Simple first, technical on demand.** The athlete sees a few plain answers. The coach sees every measurement. Same
-  analysis, different depth, one switch in the top bar.
+- **Live first, technical on demand.** The default screen is a tool for the trampoline: what each skill was, how hard it is,
+  what execution the pose earns, what to fix. The **Advanced** switch in the settings brings back the athlete (a few plain
+  answers) and the coach (every measurement) views, with their own switch in the top bar. Same analysis, different depth.
 - **Honest.** No metric is invented. Comparisons stay inside the clip that was analyzed. Uncertainty is shown, not hidden.
 
 ## Design rules
@@ -110,9 +111,16 @@ wide (>= 1100px)                      narrow
 - The sample clip is a 1080x1920 portrait video, so a portrait video in a wide stage is the normal case: it is fitted
   by height and centered, and the black stage is the letterbox.
 
-### The audience switch
+### Live and advanced
 
-`Audience` is `'athlete' | 'coach'`, kept in localStorage, default athlete.
+The interface has two levels, kept in localStorage: `trampovision.advanced` (`on` or `off`, default off) and, with the advanced
+tools on, `Audience`, `'athlete' | 'coach'` (default athlete). Off is the **live view**: the stage shows the video only (no
+view switcher), the transport keeps play, the frame steps and the speed (`simple`), the top bar has no audience switch and no
+export menu, the rail is the live rail (below), the settings show the athlete, the review upload, the switch and the appearance,
+and the first screen only asks for a video (a phone opens its camera). A video that is loaded starts its analysis by itself, at
+about 30 analyzed frames a second.
+
+With the advanced tools on:
 
 | Region     | Athlete                                                                        | Coach                                                                                                        |
 | ---------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
@@ -120,11 +128,40 @@ wide (>= 1100px)                      narrow
 | Rail       | `AthleteInsights`: the answer, four figures, landing on the bed, the jump list | `CoachRail`: skill, metrics, twist, review, data                                                             |
 | Below fold | nothing                                                                        | `TechnicalData`: every chart                                                                                 |
 
+### Live rail (`ui/live/*`, `styles/live.css`)
+
+Contract: `LiveRailProps`. It reads a `Session` (`coaching/session.ts`): the same analysis, with each jump named by the coach's
+label, else the classifier's guess. Top to bottom:
+
+1. **The set**: "6 skills" with a "Copy summary" button (the share sheet on a phone, the clipboard elsewhere); three figures in
+   a row (difficulty, execution as an estimate out of 10, time in the air); the warnings that make the numbers less sure (an
+   oblique camera, a pose that was hard to see) with a dashed warn border; **Work on next**: at most two numbered items, each with
+   how often and how many points, and the cue.
+2. **Skills**: a header with the two columns, then one row per jump: number, name (two lines at most; a dashed dot and a "?" when
+   it is a guess), a line under it in words (best guess, your label, direction assumed, repeat, filmed only in part), the
+   difficulty and the execution deduction (0.0 in `--ok`, 0.3 or more in `--warn`). A guess the classifier would not have named
+   says "Best guess, not counted yet" and shows en dashes: it is left out of the totals until the coach checks it (the header says
+   how many wait). Straight jumps that follow each other are one
+   folded line ("2 straight jumps, 1 to 2") that opens when one of them is selected.
+3. **The selected skill**, in the same surface as its row: whether the guess is right (**Yes, that is it**, **Change**, **Play**;
+   or the coach's label with **Undo**); _It could be_ (the three closest other elements with their difficulty, one tap each),
+   _Another skill_ (somersaults, direction, twists and position chips: every choice names an element of the table) and _It is none
+   of these_; **Difficulty** with its parts (each with its article of the Code as a tooltip), the note when the body was easier than
+   the name, and the difference between front and back when the direction was assumed; **Execution** with each deduction and what
+   was measured, the six chips of the deduction the coach gives (the app's proposal stays visible when they differ), and _Not
+   checked_ as a disclosure; **What to fix**, one item per deduction, with the cue.
+4. A text button "Show technical details" that turns the advanced tools on and opens the coach's view.
+
+The list follows the playhead like the timeline does. Nothing in it is a measurement the pipeline did not make; the execution is
+always called a proposal or an estimate.
+
 ### Rail and settings
 
-The rail shows the insights of the selected jump or the settings (`RailView`). Before an analysis exists it always shows
-the settings (that is where a new video is set up and analyzed). The settings icon in the top bar toggles them.
-Height and calibration change the result live; the model, frame rate, stride and people need a new analysis.
+The rail shows the insights of the selected jump (the live rail, or the athlete's or coach's view) or the settings (`RailView`).
+Before an analysis exists it always shows the settings (in the live view that is only the athlete height, the switch and the
+appearance, while the video is read and analyzed). The settings icon in the top bar toggles them. Height and calibration change
+the result live; the model, frame rate, stride and people need a new analysis. Without the advanced switch the settings hide the
+trampoline, the analysis engine and the saved data.
 
 ## Parts
 

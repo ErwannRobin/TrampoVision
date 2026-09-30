@@ -52,6 +52,7 @@ export function buildJumpRecord(ctx: RecordContext, k: number, jumpId: number, p
     truth: prior?.truth ?? null,
     twistTruth: prior?.twistTruth ?? null,
     figure: prior?.figure ?? null,
+    execution: prior?.execution ?? null,
   };
 }
 
@@ -129,6 +130,20 @@ export function withTwistTruth(r: JumpRecord, halfTwists: number | null, now = n
 export function withFigure(r: JumpRecord, elementId: string | null, now = new Date()): JumpRecord {
   const iso = now.toISOString();
   return { ...r, figure: elementId === null ? null : { elementId, labeledAt: iso }, savedAt: iso };
+}
+
+/** The deduction a person gives the skill (0 to 0.5, in tenths), with the one the app proposed; null removes it. */
+export function withExecution(
+  r: JumpRecord,
+  deduction: number | null,
+  proposed: number | null,
+  ruleset: string,
+  now = new Date(),
+): JumpRecord {
+  const iso = now.toISOString();
+  if (deduction === null) return { ...r, execution: null, savedAt: iso };
+  const value = Math.min(Math.max(Math.round(deduction * 10) / 10, 0), 0.5);
+  return { ...r, execution: { deduction: value, proposed, labeledAt: iso, ruleset }, savedAt: iso };
 }
 
 /**

@@ -4,7 +4,10 @@ import { analyzeSkills } from '../skills/analyzeSkills';
 import { computeAnalysis } from '../analysis/computeAnalysis';
 import { mannequinRoutine } from '../skills/testMannequin';
 import { analysisFingerprint } from '../dataset/record';
-import { chunk, forUpload, pendingRecords, syncStatusText } from './reviewSync';
+import { withExecution, withMovement, withTruth } from '../dataset/record';
+import { movementOfElement } from '../dataset/movementLabel';
+import { elementById } from '../skills/fig/elements';
+import { chunk, forUpload, pendingRecords, syncStatusText, verdictOf } from './reviewSync';
 
 const { track } = mannequinRoutine({
   jumps: [
@@ -47,5 +50,27 @@ describe('review upload', () => {
     expect(syncStatusText('sent', 3)).toBe('3 jumps sent.');
     expect(syncStatusText('off', 0)).toContain('Nothing is uploaded');
     expect(syncStatusText('failed', 0)).toContain('Could not reach');
+  });
+});
+
+describe('what the person says reaches the service as a verdict', () => {
+  const tuck = records[1];
+  const predicted = tuck.prediction.elementId!;
+
+  it('confirms the figure the classifier named, and corrects to another one', () => {
+    expect(predicted).toBe('none-0s-0t-tuck');
+    const same = withMovement(tuck, movementOfElement(elementById(predicted)!));
+    expect(verdictOf(same)).toEqual({ verdict: 'confirm' });
+    const other = withMovement(tuck, movementOfElement(elementById('none-0s-0t-pike')!));
+    expect(verdictOf(other)).toEqual({ verdict: 'correct', elementId: 'none-0s-0t-pike' });
+  });
+
+  it('says cannot tell when the person says it is none of the elements', () => {
+    expect(verdictOf(withTruth(tuck, 'unknown'))).toEqual({ verdict: 'unknown' });
+  });
+
+  it('has no verdict for a record that only carries an execution score, or nothing', () => {
+    expect(verdictOf(tuck)).toBeNull();
+    expect(verdictOf(withExecution(tuck, 0.2, 0.1, 'test'))).toBeNull();
   });
 });

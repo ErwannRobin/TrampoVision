@@ -134,7 +134,8 @@ export function diagnoseUnclassified(skills: Pick<SkillAnalysis, 'jumps'>): Uncl
   const jumps: UnclassifiedReport[] = [];
   for (const j of skills.jumps) {
     const p = j.prediction;
-    if (p.skill !== 'unclassified' || !p.failure) continue;
+    // Jumps the classifier could not name, and the ones it named only because it was asked to guess.
+    if ((p.skill !== 'unclassified' && !p.guess?.closest) || !p.failure) continue;
     jumps.push({
       jump: j.cycle.index,
       confidence: p.confidence,

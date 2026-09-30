@@ -1,15 +1,14 @@
 import type { KnownPosition } from '../types';
-import { OFFICIAL_VALUES } from './difficulty';
+import { OFFICIAL_EXAMPLES, difficultyValue, exampleMovement } from './difficulty';
 
 /**
- * The element table: the ONLY place where an element, its name, its FIG code and its difficulty live. The classifier never
- * predicts a code or a value; it produces a `Movement` and `movementToElement` looks it up here, deterministically.
+ * The element table: the ONLY place where an element, its name and its difficulty live. The classifier never predicts a value;
+ * it produces a `Movement` and `movementToElement` looks it up here, deterministically.
  *
  * The rows are generated from the movement space below (direction x somersaults x twists x position), so every reachable
- * movement has exactly one row. What is NOT in this file yet, on purpose:
- *  - `code` and `difficulty` are `null` until they are filled from the official FIG Code of Points (see `difficulty.ts`).
- *    Nothing in the app may invent them.
- *  - `inCode: false` marks a row whose existence as a scored FIG element has not been checked against the Code of Points.
+ * movement has exactly one row. The difficulty of each row is the FIG rule of `difficulty.ts` applied to the movement, and
+ * `inCode` marks the rows that the Code of Points itself lists with a value (Part II, appendix C): the rest follow the same rule
+ * but are not written out in the Code.
  */
 
 export type Direction = 'front' | 'back';
@@ -29,11 +28,9 @@ export interface FigElement extends Movement {
   /** Stable key, derived from the movement: `back-1s-1t-straight`. */
   id: string;
   name: string;
-  /** Official FIG code; null until filled from the Code of Points. */
-  code: string | null;
-  /** Official difficulty value; null until filled from the Code of Points. */
-  difficulty: number | null;
-  /** Whether this row was checked against the Code of Points. */
+  /** Difficulty value by the FIG rule (`difficulty.ts`). */
+  difficulty: number;
+  /** The Code of Points lists this movement, with this value, in its table of examples. */
   inCode: boolean;
 }
 
@@ -64,29 +61,24 @@ export function movementName(m: Movement): string {
   return `${parts.join(', ')} (${m.position})`;
 }
 
+/** The movements the Code lists in its table of examples (whole somersaults only: the table below has no quarter rotations). */
+const LISTED = new Set(OFFICIAL_EXAMPLES.map((e) => movementKey(exampleMovement(e))));
+
 function build(): FigElement[] {
   const out: FigElement[] = [];
-  const add = (m: Movement, inCode: boolean) => {
+  const add = (m: Movement) => {
     const id = `${m.direction ?? 'none'}-${m.somersaults}s-${m.twists}t-${m.position}`;
-    const official = OFFICIAL_VALUES[id];
-    out.push({
-      ...m,
-      id,
-      name: movementName(m),
-      code: official?.code ?? null,
-      difficulty: official?.difficulty ?? null,
-      inCode: inCode || official !== undefined,
-    });
+    out.push({ ...m, id, name: movementName(m), difficulty: difficultyValue(m), inCode: LISTED.has(movementKey(m)) });
   };
   // No somersault: the three basic jumps, and straight jumps with twists.
-  for (const position of POSITIONS) add({ direction: null, somersaults: 0, twists: 0, position }, false);
+  for (const position of POSITIONS) add({ direction: null, somersaults: 0, twists: 0, position });
   for (let h = 1; h <= MAX_HALF_TWISTS[0]; h++)
-    add({ direction: null, somersaults: 0, twists: h / 2, position: 'straight' }, false);
+    add({ direction: null, somersaults: 0, twists: h / 2, position: 'straight' });
   // Somersaults: twisting elements are straight or piked/tucked in the same way as plain ones.
   for (let s = 1; s <= SOMERSAULT_MAX; s++)
     for (const direction of ['front', 'back'] as const)
       for (let h = 0; h <= MAX_HALF_TWISTS[s]; h++)
-        for (const position of POSITIONS) add({ direction, somersaults: s, twists: h / 2, position }, false);
+        for (const position of POSITIONS) add({ direction, somersaults: s, twists: h / 2, position });
   return out;
 }
 

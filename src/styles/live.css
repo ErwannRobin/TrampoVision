@@ -1,0 +1,536 @@
+/* Live: the whole tool for the trampoline. The set at a glance, then every skill with what it was, how hard it is,
+   what execution the pose earns and what to fix. Same grammar as the insights: hairlines, condensed figures, no boxes. */
+
+.live {
+  display: flex;
+  flex-direction: column;
+}
+.live-h {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.live-quiet {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+/* A note that changes how a number reads: dashed, like the other things the data could not settle. */
+.live-quiet--note {
+  padding-left: 12px;
+  border-left: 2px dashed var(--warn);
+}
+
+/* The set --------------------------------------------------------------------------------------------------- */
+
+.live-summary {
+  display: grid;
+  gap: 18px;
+  padding-bottom: 22px;
+}
+.live-summary__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.live-summary__share {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.live-summary__note {
+  min-width: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.live-figs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.live-fig {
+  gap: 4px;
+  padding: 2px 0;
+}
+.live-fig + .live-fig {
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+}
+.live-fig .stat__value {
+  font-size: 40px;
+}
+.live-fig .stat__label {
+  font-weight: 600;
+}
+.live-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 2px dashed var(--warn);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.live-warn .icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warn);
+}
+.live-focus {
+  display: grid;
+  gap: 12px;
+}
+.live-focus__list {
+  display: grid;
+  gap: 14px;
+  padding-left: 0;
+  list-style: none;
+  counter-reset: focus;
+}
+.live-focus__list li {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding-left: 30px;
+  counter-increment: focus;
+}
+.live-focus__list li::before {
+  content: counter(focus);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--inverse);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  line-height: 22px;
+  text-align: center;
+}
+.live-focus__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 10px;
+  font-weight: 600;
+}
+.live-focus__summary {
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.live-focus__text {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+/* The skills ------------------------------------------------------------------------------------------------- */
+
+.live-list {
+  padding: 20px 0 8px;
+  border-top: 1px solid var(--line);
+}
+.live-list__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 60px 60px;
+  column-gap: 8px;
+  align-items: baseline;
+  padding: 0 0 8px;
+}
+.live-list__head .live-h {
+  margin: 0;
+}
+.live-list__col {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  text-align: right;
+}
+.live-list__body {
+  display: grid;
+  gap: 2px;
+  margin: 0 -10px;
+}
+.live-item {
+  border-radius: 14px;
+}
+.live-item--on {
+  background: var(--panel-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.live-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 60px 60px;
+  column-gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  transition: background var(--t-fast);
+}
+.live-row:hover {
+  background: color-mix(in srgb, var(--panel-2) 55%, transparent);
+}
+.live-item--on .live-row:hover {
+  background: transparent;
+}
+.live-row__num {
+  color: var(--text-2);
+  font-size: 19px;
+  font-weight: 600;
+}
+.live-row__num--on {
+  color: var(--text);
+}
+.live-row__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.live-row__name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.live-row__label {
+  display: -webkit-box;
+  overflow: hidden;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.live-row__unsure {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 1.5px dashed var(--text-2);
+  border-radius: 50%;
+}
+.live-row__sub {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-row__fig {
+  font-size: 19px;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+.live-row__fig--ok {
+  color: var(--ok);
+}
+.live-row__fig--warn {
+  color: var(--warn);
+}
+
+/* Bounces between the skills: folded, so the skills stand out. */
+.live-bounces {
+  padding: 0 10px;
+}
+.live-bounces__toggle {
+  display: block;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  text-align: left;
+}
+.live-bounces__toggle:hover {
+  color: var(--text-2);
+}
+.live-bounces__list {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 6px;
+}
+.live-bounce {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  text-align: left;
+}
+.live-bounce[aria-current='true'] {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+/* The selected skill ---------------------------------------------------------------------------------------- */
+
+.live-detail {
+  display: grid;
+  gap: 4px;
+  padding: 0 12px 16px;
+}
+.live-block {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.live-block--call {
+  border-top: 0;
+  padding-top: 4px;
+}
+.live-block__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.live-block__head .live-h {
+  margin: 0;
+}
+.live-block__val {
+  font-size: 26px;
+  font-weight: 600;
+}
+.live-say {
+  line-height: 1.5;
+}
+.live-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.live-actions__play {
+  margin-left: auto;
+}
+.live-change {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 12px 0 2px;
+}
+.live-change > .live-alts,
+.live-change > .disclosure {
+  justify-self: stretch;
+}
+.live-change .live-h {
+  margin: 0;
+  font-size: var(--fs-base);
+}
+.live-alts {
+  display: grid;
+  gap: 6px;
+}
+.live-alt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-input);
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 550;
+  text-align: left;
+  transition: background var(--t-fast);
+}
+.live-alt:hover {
+  background: var(--panel-3);
+}
+.live-alt__d {
+  color: var(--text-2);
+  font-size: 17px;
+}
+
+/* Parts of the difficulty, deductions of the execution: dense rows, label left and figure right. */
+.live-parts {
+  display: grid;
+  gap: 6px;
+}
+.live-parts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.live-parts dd {
+  color: var(--text);
+  font-weight: 600;
+}
+.live-deductions {
+  display: grid;
+  gap: 12px;
+}
+.live-deductions li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+.live-deductions__label {
+  font-weight: 600;
+}
+.live-deductions__val {
+  color: var(--warn);
+  font-weight: 650;
+}
+.live-deductions__detail {
+  grid-column: 1 / -1;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.live-unchecked {
+  display: grid;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.live-unchecked strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.live-yours {
+  display: grid;
+  gap: 6px;
+}
+.live-yours__name {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+
+/* What to fix. */
+.live-tips {
+  display: grid;
+  gap: 16px;
+}
+.live-tip {
+  display: grid;
+  gap: 2px;
+  padding-left: 14px;
+  border-left: 2px dashed var(--line-2);
+}
+.live-tip__title {
+  font-weight: 600;
+}
+.live-tip__text {
+  line-height: 1.5;
+}
+.live-tip__detail {
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+/* Choosing a skill part by part, and the chips of the deduction. */
+.live-picker {
+  display: grid;
+  gap: 12px;
+  padding-top: 6px;
+}
+.live-facet {
+  display: grid;
+  gap: 6px;
+}
+.live-facet__name {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+.live-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.live-chip {
+  min-width: 44px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-input);
+  background: var(--panel);
+  color: var(--text);
+  font-size: var(--fs-base);
+  font-weight: 550;
+  transition:
+    background var(--t-fast),
+    border-color var(--t-fast),
+    color var(--t-fast);
+}
+.live-chip--num {
+  flex: 1 1 0;
+  min-width: 40px;
+  padding: 0 6px;
+  font-size: 16px;
+}
+.live-chip:hover:not(:disabled):not([aria-pressed='true']) {
+  background: var(--panel-3);
+}
+.live-chip[aria-pressed='true'] {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--inverse);
+}
+.live-chip:disabled {
+  opacity: 0.5;
+}
+@media (pointer: coarse) {
+  .live-chip {
+    height: 44px;
+  }
+}
+
+.live-foot {
+  margin-top: 8px;
+}
+
+@media (max-width: 420px) {
+  .live-fig .stat__value {
+    font-size: 32px;
+  }
+  .live-fig + .live-fig {
+    padding-left: 12px;
+  }
+  .live-row,
+  .live-list__head {
+    grid-template-columns: 22px minmax(0, 1fr) 52px 52px;
+  }
+  .live-list__head {
+    grid-template-columns: minmax(0, 1fr) 52px 52px;
+  }
+  .live-detail {
+    padding-inline: 10px;
+  }
+}
+
+/* On a phone the video stays in view while the list scrolls under it: tap a skill, and it is there to watch. */
+@media (max-width: 1099px) {
+  .app[data-mode='live'] .workspace__stage {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    height: clamp(210px, 38dvh, 460px);
+    padding: env(safe-area-inset-top, 0px) 0 6px;
+    background: var(--bg);
+  }
+}

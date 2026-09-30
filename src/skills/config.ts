@@ -116,8 +116,13 @@ export interface SkillConfig {
   legSeparation: LegSeparationConfig;
   classification: ClassificationConfig;
   temporal: TemporalConfig;
-  /** Predictions below this confidence are reported as unclassified. */
+  /** Predictions below this confidence are reported as unclassified (unless `forceGuess`). */
   minConfidence: number;
+  /**
+   * Always name a complete jump. The closest element of the table is given as a tentative guess (with the reason it is weak) instead of
+   * "unclassified", and a somersault whose direction cannot be told is named with the likelier direction. Off: the classifier declines.
+   */
+  forceGuess: boolean;
   /** Trunk length changing by more than this share during a flight means the camera is not side-on. */
   maxTrunkVariation: number;
 }
@@ -185,6 +190,7 @@ export const DEFAULT_SKILL_CONFIG: SkillConfig = {
     confidentAt: 0.6,
   },
   minConfidence: 0.3,
+  forceGuess: true,
   maxTrunkVariation: 0.25,
 };
 
