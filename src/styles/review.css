@@ -650,3 +650,32 @@
   color: var(--text-3);
   font-size: var(--fs-xs);
 }
+
+/* The label as parts: a row of choices for each. */
+.review-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.review-facet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.review-facet__name {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+.review-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.review-chips .review-label {
+  justify-content: center;
+  min-width: 48px;
+  padding: 0 14px;
+}

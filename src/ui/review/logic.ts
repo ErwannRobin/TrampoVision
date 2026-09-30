@@ -1,12 +1,7 @@
 import type { JumpCycle } from '../../analysis/jumpCycles';
 import type { Metrics } from '../../dataset/metrics';
-import { TRUTH_LABELS, type JumpRecord, type TruthLabel } from '../../dataset/types';
+import type { JumpRecord } from '../../dataset/types';
 import { plural } from '../format';
-
-/** Keys 1 to 6 label the jump on screen, in the order the labels are listed. */
-export function labelForKey(key: string): TruthLabel | null {
-  return /^[1-9]$/.test(key) ? (TRUTH_LABELS[Number(key) - 1] ?? null) : null;
-}
 
 /**
  * Where "Next unlabeled" goes: the first jump after `from` without a label, wrapping around the clip. It is `from`

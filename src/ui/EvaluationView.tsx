@@ -4,17 +4,19 @@ import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { buildEvaluationReport, toEvaluationCsv, toEvaluationJson } from '../dataset/export';
 import { findFailures } from '../dataset/failures';
 import { agrees, computeMetrics, predictionOf } from '../dataset/metrics';
-import { TRUTH_TEXT, type JumpRecord, type TruthLabel } from '../dataset/types';
+import { movementFromPrediction, movementOfRecord, type MovementLabel } from '../dataset/movementLabel';
+import { TRUTH_TEXT, type JumpRecord } from '../dataset/types';
+import { elementById } from '../skills/fig/elements';
 import type { DatasetApi } from '../dataset/useDataset';
 import { pct, plural } from './format';
 import { confidenceTier, TIER_TEXT } from './insights';
-import { Badge, Button, ConfidenceMeter, Field, Icon, Segmented } from './kit';
+import { Badge, Button, ConfidenceMeter, Field, Segmented } from './kit';
 import type { Playhead } from './playhead';
 import { DatasetBar } from './review/DatasetBar';
 import { FailureCase } from './review/FailureCase';
-import { FigurePicker } from './review/FigurePicker';
-import { Keycap, LabelPicker } from './review/LabelPicker';
-import { describeCounts, jumpPlayRange, labelForKey, labelStatus, nextUnlabeled, reportCaveats } from './review/logic';
+import { Keycap } from './review/Keycap';
+import { MovementPicker } from './review/MovementPicker';
+import { describeCounts, jumpPlayRange, labelStatus, nextUnlabeled, reportCaveats } from './review/logic';
 import { ReportCaveats, ReportFigures } from './review/ReportFigures';
 import { ConfusionMatrix, PerClassTable } from './review/ReportTables';
 
@@ -34,9 +36,10 @@ export interface EvaluatePanelProps {
   staleCount: number;
   dataset: DatasetApi;
   baseName: string;
-  onLabel: (jump: number, label: TruthLabel | null) => void;
-  /** Sets the figure of a jump (an element id) and so saves it as a reference example, or clears it. */
-  onFigure: (jump: number, elementId: string | null) => void;
+  /** Saves what the jump was (its parts), which also makes it a reference example when they name one element; null removes the label. */
+  onMovement: (jump: number, movement: MovementLabel | null) => void;
+  /** The person cannot tell what the jump was. */
+  onUnknown: (jump: number) => void;
   /** Labelled examples per element, over the whole dataset. */
   exampleCounts: ReadonlyMap<string, number>;
   onNote: (jump: number, note: string) => void;
@@ -59,8 +62,8 @@ export function EvaluatePanel({
   staleCount,
   dataset,
   baseName,
-  onLabel,
-  onFigure,
+  onMovement,
+  onUnknown,
   exampleCounts,
   onNote,
   onSaveAll,
@@ -73,6 +76,9 @@ export function EvaluatePanel({
   const truth = rec?.truth?.label ?? null;
   const predicted = rec ? predictionOf(rec) : null;
   const canLabel = !!videoId && !!rec;
+  const movement = rec ? movementOfRecord(rec) : null;
+  const cannotTell = truth === 'unknown' && !rec?.truth?.movement && !rec?.figure;
+  const figureId = rec?.figure?.elementId ?? null;
   const labeled = useMemo(() => skills.jumps.map((_, j) => !!fresh[j]?.truth), [skills.jumps, fresh]);
   const labeledCount = labeled.filter(Boolean).length;
 
@@ -81,22 +87,20 @@ export function EvaluatePanel({
     if (next !== null) onSelect(next);
   };
 
-  // Keys 1-6 label the jump on screen, N goes to the next unlabeled one.
+  // N goes to the next unlabeled jump.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || (t && /INPUT|TEXTAREA|SELECT/.test(t.tagName))) return;
-      const label = labelForKey(e.key);
-      if (label) {
-        if (canLabel) onLabel(k, label);
-      } else if (e.key === 'n' || e.key === 'N') {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || (t && /INPUT|TEXTAREA|SELECT|BUTTON/.test(t.tagName)))
+        return;
+      if (e.key === 'n' || e.key === 'N') {
         const next = nextUnlabeled(labeled, k);
         if (next !== null) onSelect(next);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [k, canLabel, labeled, onLabel, onSelect]);
+  }, [labeled, k, onSelect]);
 
   if (n === 0) {
     return (
@@ -164,17 +168,21 @@ export function EvaluatePanel({
             )}
           </span>
         </div>
-        <LabelPicker truth={truth} disabled={!canLabel} onPick={(label) => onLabel(k, label)} />
-        <div className="review-label-foot">
+        <MovementPicker
+          key={rec?.id}
+          movement={movement}
+          predicted={movementFromPrediction(jump.prediction)}
+          cannotTell={cannotTell}
+          disabled={!canLabel}
+          onChange={(m) => onMovement(k, m)}
+          onUnknown={() => onUnknown(k)}
+          onClear={() => onMovement(k, null)}
+        />
+        {(truth || !canLabel) && (
           <p className="review-hint" role="status">
-            {saved && truth && <Icon name="check" size={14} strokeWidth={2.2} className="review-hint__ok" />}
             {status}
           </p>
-          <Button variant="ghost" size="sm" disabled={!canLabel || !truth} onClick={() => onLabel(k, null)}>
-            Clear
-          </Button>
-        </div>
-        <p className="review-note">Unknown means you cannot tell, or it is not one of these five.</p>
+        )}
         <Field label="Note (optional)" hint={canLabel && !truth ? 'Choose a label to add a note.' : undefined}>
           <input
             key={noteKey}
@@ -193,17 +201,12 @@ export function EvaluatePanel({
         </Field>
       </div>
 
-      <div className="review-section">
-        <h3 className="review-heading">Reference example</h3>
-        <FigurePicker
-          key={rec?.id}
-          figure={rec?.figure?.elementId ?? null}
-          predicted={jump.prediction.elementId ?? null}
-          counts={exampleCounts}
-          disabled={!canLabel}
-          onPick={(id) => onFigure(k, id)}
-        />
-      </div>
+      {figureId && (
+        <p className="review-note">
+          Saved as a reference example of {elementById(figureId)?.name ?? figureId} ({exampleCounts.get(figureId) ?? 0}{' '}
+          saved): the classifier compares later jumps with it.
+        </p>
+      )}
 
       {staleCount > 0 && (
         <div className="review-stale" role="status">
