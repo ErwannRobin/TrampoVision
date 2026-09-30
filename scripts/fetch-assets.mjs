@@ -10,6 +10,9 @@ const wasmSrc = join(root, 'node_modules/@mediapipe/tasks-vision/wasm');
 const wasmDst = join(root, 'public/mediapipe/wasm');
 const modelDir = join(root, 'public/models');
 
+// When the build reads the big files from an asset host, only the small loader scripts are needed here.
+const hosted = Boolean(process.env.VITE_ASSET_BASE_URL);
+
 const MODEL_BASE = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker';
 const MODELS = ['lite', 'full', 'heavy'];
 
@@ -17,7 +20,10 @@ if (existsSync(wasmSrc)) {
   mkdirSync(wasmDst, { recursive: true });
   // The "module" runtime (~11 MB) is only used by forVisionTasks(path, true); the app never asks for it, so it
   // would only add to every deployment.
-  cpSync(wasmSrc, wasmDst, { recursive: true, filter: (src) => !src.includes('_module_') });
+  cpSync(wasmSrc, wasmDst, {
+    recursive: true,
+    filter: (src) => !src.includes('_module_') && !(hosted && src.endsWith('.wasm')),
+  });
   for (const stale of ['vision_wasm_module_internal.js', 'vision_wasm_module_internal.wasm']) {
     rmSync(join(wasmDst, stale), { force: true });
   }
@@ -26,6 +32,10 @@ if (existsSync(wasmSrc)) {
   console.warn('[assets] node_modules/@mediapipe/tasks-vision not found; run npm install first');
 }
 
+if (hosted) {
+  console.log('[assets] VITE_ASSET_BASE_URL is set: models and wasm are read from there, not downloaded');
+  process.exit(0);
+}
 mkdirSync(modelDir, { recursive: true });
 for (const variant of MODELS) {
   const file = join(modelDir, `pose_landmarker_${variant}.task`);

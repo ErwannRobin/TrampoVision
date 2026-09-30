@@ -1,18 +1,26 @@
 import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
+import { assetBase, MEDIAPIPE_VERSION } from '../assets';
 import type { BackendInfo, EstimatorOptions, PoseDetection, PoseEstimator, PoseEstimatorFactory } from './types';
 
 const BASE = import.meta.env.BASE_URL;
 type Fileset = Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>;
 let filesetPromise: Promise<Fileset> | null = null;
 
-/** Wasm runtime is served from /mediapipe/wasm (copied there by scripts/fetch-assets.mjs). */
+/**
+ * The small loader scripts are always served from this origin (/mediapipe/wasm, copied there by
+ * scripts/fetch-assets.mjs). The wasm binary (~11 MB) comes from the asset host when there is one.
+ */
 function loadFileset(): Promise<Fileset> {
-  filesetPromise ??= FilesetResolver.forVisionTasks(`${BASE}mediapipe/wasm`);
+  filesetPromise ??= FilesetResolver.forVisionTasks(`${BASE}mediapipe/wasm`).then((local) => {
+    if (!assetBase) return local;
+    const file = local.wasmBinaryPath.slice(local.wasmBinaryPath.lastIndexOf('/') + 1);
+    return { ...local, wasmBinaryPath: `${assetBase}mediapipe/${MEDIAPIPE_VERSION}/${file}` };
+  });
   return filesetPromise;
 }
 
 function modelUrl(variant: EstimatorOptions['model']): string {
-  return `${BASE}models/pose_landmarker_${variant}.task`;
+  return `${assetBase ?? BASE}models/pose_landmarker_${variant}.task`;
 }
 
 async function create(fileset: Fileset, options: EstimatorOptions, delegate: 'GPU' | 'CPU'): Promise<PoseLandmarker> {

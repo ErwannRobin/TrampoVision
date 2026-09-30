@@ -484,7 +484,17 @@ cameras that are not level. Real COM estimates also move with arm and leg motion
 - **Video codecs depend on the browser.** MP4 (H.264) is safest. HEVC `.mov` from iPhones plays in Safari and recent Chrome/Edge, not everywhere.
 - **Privacy note.** The MediaPipe runtime contains a usage-logging call to `odml.pa.googleapis.com`. The app blocks all cross-origin
   requests at runtime (`localOnlyGuard.ts`) and the production build enforces `connect-src 'self' blob: data:` via CSP. Video frames are never uploaded.
-  The exceptions are the review service, when the build is configured with `VITE_REVIEW_API_URL` (see _Review service_), and the sample video host, when it has `VITE_SAMPLE_BASE_URL` (read only: the sample file is downloaded, nothing is sent). Only those origins are then let through. Without those variables the app is local-only as described here.
-  The sample videos are not in the repo or in the build (they would be copied into every deployment): upload `IMG_8368.mp4` and `IMG_8368.MOV` to a public folder (for example a Vercel Blob store) and set `VITE_SAMPLE_BASE_URL` to its URL. Without it, the sample button is hidden.
+  The exceptions are the review service, when the build is configured with `VITE_REVIEW_API_URL` (see _Review service_), and the asset host, when it has `VITE_ASSET_BASE_URL` (see _Asset host_; read only: models, wasm and the sample are downloaded, nothing is sent). Only those origins are then let through. Without those variables the app is local-only as described here.
   What is stored in the browser: the calibration corners per file name and size (`localStorage`), and the jump dataset you save (IndexedDB `trampovision`: measurements, predictions and labels, never the video). _Delete all_ in the Review tab (_Dataset on this computer_) removes the dataset.
 - Multi-person scenes: the athlete is followed by continuity; a coach walking next to the athlete can still steal the track.
+
+## Asset host
+
+Every deployment stores a copy of the build output, and the big files were most of it (about 144 MB of 146). With `VITE_ASSET_BASE_URL` set, the build leaves them out (2 MB) and the app reads them from a public folder at runtime: the pose models (`models/`), the MediaPipe and ffmpeg wasm (`mediapipe/<version>/`, `ffmpeg/<version>/`) and the sample videos (`samples/`). The small loader scripts stay in the build, so the host only ever serves data. Without the variable, everything is served from this origin as before (`npm run fetch-assets`; no sample button), which is what `npm run dev` uses.
+
+1. Create a public Vercel Blob store. The browser needs CORS headers on the wasm and model downloads; Blob should send `Access-Control-Allow-Origin: *` (**not checked on a real Blob store yet**).
+2. `BLOB_READ_WRITE_TOKEN=... npm run upload-assets` (add `-- --dry-run` to list the files, `-- --samples <folder>` for the folder with `IMG_8368.mp4` and `IMG_8368.MOV`). It prints the value for `VITE_ASSET_BASE_URL`.
+3. Set `VITE_ASSET_BASE_URL` in the Vercel project (Production and Preview) and redeploy.
+4. After upgrading `@mediapipe/tasks-vision` or `@ffmpeg/core`, run the upload again: each version gets its own folder, and a missing folder fails to load instead of mixing versions.
+
+The trade-off: the app now needs the network for its first analysis (the browser caches the files after that). The cross-origin loading was tested with a local second-origin host in Chromium (wasm, model, sample and ffmpeg wasm all loaded); the upload script is untested against a real store.
