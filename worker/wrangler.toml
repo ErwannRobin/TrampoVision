@@ -3,9 +3,12 @@ main = "src/index.ts"
 compatibility_date = "2026-01-01"
 
 [[d1_databases]]
-binding = "trampovision_review"
+binding = "DB"
 database_name = "trampovision-review"
 database_id = "2a8180dc-5ef3-4013-8764-dcb15c614282"
+
+[observability]
+enabled = true
 
 [vars]
 # The origin of the app: the only one the browser may call from.
