@@ -88,8 +88,19 @@ describe('rotation', () => {
     const r = skills.jumps[0].features.rotation;
     expect(r.direction).toBe('counterclockwise');
     expect(r.confidence).toBeLessThan(0.3);
-    expect(skills.jumps[0].prediction.skill).toBe('unclassified');
-    expect(skills.jumps[0].prediction.limitations.map((l) => l.signal)).toContain('Rotation granularity');
+    // The jump is named all the same, as a flagged guess that says why it is weak.
+    const p = skills.jumps[0].prediction;
+    expect(p.certainty).toBe('tentative');
+    expect(p.guess?.closest).toBe(true);
+    expect(p.confidence).toBeLessThan(0.3);
+    expect(p.limitations.map((l) => l.signal)).toContain('Rotation granularity');
+  });
+
+  it('declines a quarter turn when it is not asked to guess', () => {
+    const { result } = run([{ v0: 4.6, turns: -0.25, shape: 'straight' }]);
+    const p = analyzeSkills(result, { config: { forceGuess: false } }).jumps[0].prediction;
+    expect(p.skill).toBe('unclassified');
+    expect(p.limitations.map((l) => l.signal)).toContain('Rotation granularity');
   });
 
   it('names a double somersault from the element table', () => {
@@ -155,7 +166,13 @@ describe('front and back', () => {
     expect(f.cues.face ?? 0).toBeCloseTo(0, 1);
     const p = skills.jumps[0].prediction;
     if (f.sign === 0) {
-      expect(p.skill).toBe('somersault-direction-unknown');
+      // Asked to guess, it names the likelier direction (back) and says it assumed it; otherwise it says the direction is unknown.
+      expect(p.guess?.direction).toBe(true);
+      expect(p.movement?.somersaults).toBe(1);
+      expect(p.movement?.direction).toBe('back');
+      expect(p.summary).toMatch(/direction \(front or back\) was assumed/);
+      const declined = analyzeSkills(computeAnalysis(blind), { config: { forceGuess: false } }).jumps[0].prediction;
+      expect(declined.skill).toBe('somersault-direction-unknown');
       expect(p.limitations.map((l) => l.signal)).toContain('Facing direction');
       expect(p.limitations.find((l) => l.signal === 'Facing direction')!.needed).toMatch(/manually/);
     } else {
@@ -248,17 +265,24 @@ describe('failure handling: report the limit instead of a wrong skill', () => {
   it('does not answer when the pose model flips the inverted athlete', () => {
     for (const mode of ['mirror', 'rotate180'] as const) {
       const { track } = mannequinRoutine({ jumps: somersault });
-      const p = analyzeSkills(computeAnalysis(flipInverted(track, mode))).jumps[0].prediction;
-      expect(['front', 'back']).not.toContain(p.skill);
-      expect(p.skill === 'unclassified' || p.confidence < 0.5).toBe(true);
+      const result = computeAnalysis(flipInverted(track, mode));
+      const declined = analyzeSkills(result, { config: { forceGuess: false } }).jumps[0].prediction;
+      expect(['front', 'back']).not.toContain(declined.skill);
+      // Asked to guess, it may name something, but never firmly.
+      const p = analyzeSkills(result).jumps[0].prediction;
+      expect(p.skill === 'unclassified' || p.certainty === 'tentative' || p.confidence < 0.5).toBe(true);
       expect(p.limitations.map((l) => l.signal)).toContain('Orientation tracking');
     }
   });
 
   it('does not answer a somersault seen from nearly the front', () => {
     const { track } = mannequinRoutine({ jumps: somersault });
-    const p = analyzeSkills(computeAnalysis(yawView(track, 75))).jumps[0];
-    expect(['front', 'back']).not.toContain(p.prediction.skill);
+    const view = computeAnalysis(yawView(track, 75));
+    const p = analyzeSkills(view).jumps[0];
+    expect(['front', 'back']).not.toContain(
+      analyzeSkills(view, { config: { forceGuess: false } }).jumps[0].prediction.skill,
+    );
+    expect(p.prediction.skill === 'unclassified' || p.prediction.certainty === 'tentative').toBe(true);
     expect(p.features.quality.trunkLengthVariation!).toBeGreaterThan(0.25);
     expect(p.prediction.limitations.map((l) => l.signal)).toContain('Camera view');
   });

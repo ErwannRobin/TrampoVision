@@ -4,7 +4,7 @@ Browser-only prototype that turns a trampoline video into a **clean, normalized 
 mass (COM), trajectory, body orientation and rotation, plus the jump cycle (takeoff, apex, landing). **No backend,
 no database, no LLM: the video never leaves the browser and every number comes from simple, explainable math.**
 
-It does **not** score routines (FIG), use an LLM or coach. Stage 1 asks:
+Stage 1 asks:
 
 > Can we reliably turn a trampoline video into a clean, normalized time series of skeleton + center of mass +
 > trajectory + body rotation?
@@ -15,6 +15,8 @@ Stage 2 (this version) is a first **skill-recognition prototype** for five basic
 
 Where the answer is "not from this signal", the app says so and names the missing signal instead of guessing
 (see _Skill recognition_ below).
+
+The **live view** (the default screen, described in _Live view_ below) turns that into a tool for a coach or an athlete on the trampoline: film a set, and it names each skill (always a best guess), works out its **difficulty** by the FIG rule, proposes an **execution** score, and says what to fix. The coach can correct any guess in one tap, and the app learns from it. Everything else is behind an **Advanced** switch in the settings.
 
 Stage 3 (this version) is about **validating that scientifically**: you label jumps, the app saves them locally with everything it measured, and computes
 accuracy, precision, recall and a confusion matrix, with a list of the failures and the numbers behind each one. It also adds an **experimental 3D pose view
@@ -40,9 +42,30 @@ works offline. If the download failed, run `npm run fetch-assets`.
 
 Videos the browser cannot decode (iPhone HEVC `.mov` in desktop Chrome) are converted to H.264 (max 720p) in the browser with ffmpeg.wasm; expect it to take about as long as the video or longer. `make convert VIDEO=file.MOV` does the same with a local ffmpeg.
 
-## Use
+## Live view (the default)
 
-1. Choose an MP4/MOV, drop one anywhere on the page, or use the sample. The frame rate is measured automatically (editable).
+Open the app, film a set (a phone opens its camera; a computer picks a file) or drop a video, and wait for the analysis: it starts by itself and needs nothing set up. Then:
+
+- **The set at a glance**: number of skills, the **difficulty** (sum of the skills, a repeat counted once), the **execution** the pose earns (an estimate, out of 10 for ten skills like these, one judge's scale), the time in the air, and **what to work on next** (the two things that cost the most points, most often).
+- **One row per skill**: its name, difficulty and execution deduction. Straight jumps between the skills are bounces and are folded into one line. **Copy summary** puts the set, the scores and the focus into a message.
+- **Tap a skill** to see it on the video and to open it: what it was (with a **Yes, that is it** and a **Change** button), how its difficulty is made of parts, which deductions its execution has and how they were measured, what to fix, and the deduction you would give.
+- **The names are always a guess**: a jump the classifier is not sure of carries a dashed mark and a "?", with what it is (best guess, direction assumed) written under it. A somersault whose direction cannot be told is named a back (the commoner one) and says so, with what the front would be worth. **A guess the classifier would not have named** (the pose could not be trusted, or the rotation is a quarter turn off a whole somersault) is marked _not counted yet_ and stays out of the totals until you check it with one tap; when the pose looks untrustworthy, the same shape without rotation is the first thing offered (a straight jump that the pose model made look like a somersault).
+
+**Difficulty** is the published rule of the FIG Code of Points 2025-2028 (Trampoline, Part I §17.1): a somersault, each quarter, each half twist, the pike or straight position, the backward multiple somersault and the twisting doubles and triples all have their value (`src/skills/fig/difficulty.ts`). It is not decided by any model: the recognized movement goes in and the rule gives the value. The test suite reproduces every one of the 139 values listed in the Code's own table of examples (Part II, appendix C). Not modelled: the exercise bonus of §17.1.7 and the limits of junior and age-group competitions. A twist counts by its total, whatever the phase. A skill whose body looked easier than its name (a "pike" that was a tuck) says what a judge would give.
+
+**Execution** is a proposal, not a judge: the deductions of §20.2 that one side-on camera can see, measured on the same pose the classifier reads (`src/coaching/execution.ts`, `src/coaching/config.ts`): bent knees in a pike or a layout (0.1 to 0.2), a late opening (0.1, 0.2) or none before 3 o'clock (0.3), piking down after the opening (0.1, 0.2), a bent body line in a layout (0.1, 0.2), arms away from the body or bent (0.1), and, only when the 3D twist is reliable, a twist that finishes late (0.3). Nothing is judged after 3 o'clock, when the athlete prepares the landing, and a skill loses at most 0.5. Feet and knees together and pointed toes need a view from the front and are listed as **not checked**, never guessed. **The angles that decide whether a deduction applies are my estimates**, more lenient than the Code's because a 2D pose model reads a straight body a few degrees short; they have not been tuned on footage judged by FIG judges. The deduction you give a skill is saved next to the one the app proposed (`execution` in the record), which is what would tune them.
+
+**Tips** come with the deductions (one cue for each thing that cost points, with what was measured), plus a note when a skill landed far from the center of the bed. The **focus** of a set groups them across the skills and ranks them by the points they cost. A long set whose last skills fly clearly lower than the first ones gets a note about keeping the height.
+
+**Learning.** _Yes, that is it_, _Change_ and _It is none of these_ are saved in the local dataset (the skill becomes a reference example for the classifier at once, so the other skills of the clip and the next clips profit from it) and, when the review service is on, sent to it as a verdict (`confirm` or `correct`, reviewer `live`), so that every device learns from it. Verdicts wait in an outbox in the browser until they are delivered. Opening the same video again brings the labels back. With the upload off in the settings nothing is sent.
+
+**The classifier always names a complete jump** (`SkillConfig.forceGuess`, on by default): the closest element of the table, flagged, with the reason it is weak. The synthetic evaluation checks that such guesses are never confidently wrong. A jump cut off by the clip is still not named.
+
+**Advanced** (settings, off by default) brings back everything below: the athlete and coach views, the stage views and layer toggles, the trampoline outline, the engine settings, the exports and the saved analyses.
+
+## Use (advanced)
+
+1. Choose an MP4/MOV, drop one anywhere on the page, or use the sample. The frame rate is measured automatically (editable). With the advanced tools off the analysis then starts by itself, at about 30 analyzed frames a second whatever the video's rate.
 2. The rail shows the **Settings** of the clip. Enter the athlete height. Pick a model if you like (Full is a good default; Heavy is the most accurate and the slowest) under _Analysis_.
 3. _(Optional, recommended)_ **Trampoline → Mark the trampoline**: scrub to a frame where the bed is visible and click its
    four corners, going around it. Drag a corner to adjust, then **Done**. Enter the bed size if it is not 4.28 × 2.14 m and
@@ -53,7 +76,7 @@ Videos the browser cannot decode (iPhone HEVC `.mov` in desktop Chrome) are conv
    flight to select that jump, zoom to one jump, or play it with a loop. `[` and `]` go to the previous and next jump.
    Play, slow down (0.1×–2×), step frame by frame (`←` `→`, `Shift` = 10 frames, `Space` = play/pause) or click/drag on any chart to seek.
    The video shows the skeleton, the center of mass with its trajectory, the bed outline and labels; the layers can be toggled.
-6. The top bar switches the interface between **Athlete** and **Coach**:
+6. With the advanced tools on, the top bar switches the interface between **Athlete** and **Coach**:
    - _Athlete_: the plain answers for the selected jump (skill and how sure the classifier is, peak height, time in the air, rotation, body shape, where it landed on the bed) and every jump of the clip compared with the others of that clip.
    - _Coach_: the same analysis in depth. Tabs for the **Skill** (evidence, confidence parts, limitations, thresholds), **Metrics** (values at the playhead, every measurement, table of all jumps), **Twist** (experimental), **Review** (labels) and **Data** (warnings, data quality, joint angles), the stage view (video, split with the 3D skeleton, or 3D) and, below, all the charts (**Technical data**).
 7. **Export** (top bar): the annotated video, **Frames CSV**, **Jumps CSV**, **Save analysis (JSON)** (the complete frame-by-frame store, below), and the skills JSON / CSV files. **Settings → Open saved analysis** later gives the same results without running the pose model again (the file also holds the 3D landmarks and the video id).
@@ -94,6 +117,10 @@ video ─► extractPoseTrack ─► PoseTrack ─► stabilizePose ─► compu
 | `src/skills/export.ts`                                    | Skills JSON, per-jump CSV, per-sample sequences CSV.                                                                                           |
 | `src/skills/testMannequin.ts`, `evaluation.ts`            | Test-only articulated athlete (known joint angles) and the synthetic evaluation harness.                                                       |
 | `src/ui/Timeline.tsx`, `JumpView.tsx`, `rail/*`           | Event timeline, per-jump normalized charts, the athlete's insights and the coach's tabs (prediction with evidence).                            |
+| `src/skills/fig/difficulty.ts`, `elements.ts`             | The FIG difficulty rule (§17.1), the table of examples it is checked against, and the element table it fills.                                  |
+| `src/coaching/guess.ts`, `session.ts`, `display.ts`       | The call for every jump (the coach's label, else the classifier's guess), the set with its totals, and the names shown on the video.           |
+| `src/coaching/execution.ts`, `config.ts`, `tips.ts`       | The proposed execution (FIG §20.2 deductions from the pose), its thresholds, and the tips and the focus of a set.                              |
+| `src/ui/live/*`, `styles/live.css`                        | The live rail: the set, one row per skill, the opened skill, the correction picker.                                                            |
 | `src/dataset/record.ts`, `types.ts`, `videoId.ts`         | The saved jump record (`JumpRecord`), how records are built, matched and refreshed, and the stable video id.                                   |
 | `src/dataset/store.ts`, `useDataset.ts`                   | Local storage in the browser (IndexedDB, memory fallback), merge on import.                                                                    |
 | `src/dataset/metrics.ts`, `failures.ts`, `export.ts`      | Accuracy / precision / recall / confusion matrix, label-vs-measurement checks for failures, dataset and evaluation JSON/CSV.                   |
@@ -329,7 +356,7 @@ confirms or corrects the answer. Nothing is classified on the server, and no vid
 | `GET /elements`                                                                              | none             | The figure table, for the reviewer page (served by the app at `/review.html`, see below).          |
 | `GET /jumps?queue=1`, `GET /jumps/:id`, `PUT /jumps/:id/review`, `GET /stats`, `GET /export` | ingest or review | The review workflow and an NDJSON export for tuning.                                               |
 
-Verdicts: `confirm`, `correct` (a figure of the table), `unknown`, `bad-data`. Only confirmed and corrected jumps become reference
+Verdicts: `confirm`, `correct` (a figure of the table), `unknown`, `bad-data`. The live view sends the coach's answers as `confirm` or `correct` (reviewer `live`) and posts the record again with their execution score. Only confirmed and corrected jumps become reference
 examples; the same video's own jumps are never used as references for itself.
 
 Set up: `cd worker && npx wrangler d1 create trampovision-review` (put the id in `wrangler.toml`), `npx wrangler secret put INGEST_TOKEN`,
@@ -418,6 +445,9 @@ non-rotating jumps read ≈ 0 twists (consistency 100%) and the somersault read 
 cameras that are not level. Real COM estimates also move with arm and leg motion, so takeoff/landing will be noisier than on the synthetic data.
 
 ## Limitations (please read)
+
+- **The execution score is a proposal.** Only the deductions one side-on camera can see are checked, with estimated angles (see _Live view_); the FIG Code also judges feet, knees and toes, the landing and the stability after the last skill, and the horizontal displacement and time of flight are scored separately. Treat it as a way to see what to fix, not as a judge's score.
+- **The classifier's guesses are only as good as the pose.** There is no set of real athletes' jumps to score them on yet: the 17 reviewed jumps available to `make eval` when this was written come from the synthetic athlete, so the accuracy on real footage is not known. Quarter-turn skills (a Cody, a ¾ somersault, drops) are not in the element table: they are named after the closest whole element, flagged as a guess.
 
 - **Skill thresholds and confidence are untuned.** The hip/knee limits, the rotation tolerance and the confidence formulas are my estimates. They need labeled real jumps to tune and to calibrate the confidence.
 - **Front vs back** depends on the facing estimate; in a side view with pointed toes and a turned head the cues can be weak, in which case the app reports it and asks for a manual setting.

@@ -9,6 +9,9 @@ import type { Appearance } from '../types';
 export interface SetupPanelProps {
   /** Present when the app has a review service to send the analyzed jumps to. */
   review?: { enabled: boolean; onEnabled: (on: boolean) => void; state: SyncState; posted: number };
+  /** The advanced tools are on: the trampoline outline, the analysis engine and the saved data. Off, only what a coach needs on the trampoline. */
+  advanced: boolean;
+  onAdvanced: (on: boolean) => void;
   hasVideo: boolean;
   hasResult: boolean;
   /** What the app is doing now; controls are locked while it works. */
@@ -152,141 +155,157 @@ export function SetupPanel(props: SetupPanelProps) {
             label="Send analyzed jumps for review"
           />
           <p className="setup__status">
-            Measurements and the answer of the classifier, so a person can check it. No video and no file name leave
-            this browser. {syncStatusText(props.review.state, props.review.posted)}
+            Measurements, the answer of the classifier and what you say about each skill, so a person can check it and
+            the classifier can learn. No video and no file name leave this browser.{' '}
+            {syncStatusText(props.review.state, props.review.posted)}
           </p>
         </section>
       )}
 
-      <section className="setup__section" aria-labelledby="setup-bed">
-        <h3 className="setup__label" id="setup-bed">
-          Trampoline
+      <section className="setup__section" aria-labelledby="setup-advanced">
+        <h3 className="setup__label" id="setup-advanced">
+          Advanced
         </h3>
-        <p className={cal.error ? 'setup__status setup__status--error' : 'setup__status'}>{cal.status}</p>
-        <div className="setup__buttons">
-          {cal.editing ? (
-            <>
-              <Button variant="primary" size="sm" onClick={() => props.onEditCalibration(false)}>
-                Done marking
-              </Button>
-              <Button size="sm" disabled={cal.corners.length === 0} onClick={props.onUndoCorner}>
-                Undo last corner
-              </Button>
-            </>
-          ) : (
-            <Button
-              size="sm"
-              icon="bed"
-              disabled={!state.canMark}
-              title={state.canMark ? undefined : 'Choose a video first.'}
-              onClick={() => props.onEditCalibration(true)}
-            >
-              {marked ? 'Edit corners' : 'Mark the trampoline'}
-            </Button>
-          )}
-          {cal.corners.length > 0 && (
-            <Button variant="ghost" size="sm" disabled={!state.canMark} onClick={props.onClearCalibration}>
-              Clear
-            </Button>
-          )}
-        </div>
-        <div className="setup__grid">
-          <NumberField
-            label="Long side"
-            unit="m"
-            min={0.5}
-            max={10}
-            step={0.01}
-            value={cal.bedLong}
-            disabled={state.calibrationLocked}
-            onChange={props.onBedLong}
-          />
-          <NumberField
-            label="Short side"
-            unit="m"
-            min={0.5}
-            max={10}
-            step={0.01}
-            value={cal.bedShort}
-            disabled={state.calibrationLocked}
-            onChange={props.onBedShort}
-          />
-        </div>
-        <SelectField
-          label="Side 1 to 2 is the"
-          value={cal.firstSide}
-          options={SIDES}
-          disabled={state.calibrationLocked}
-          onChange={props.onFirstSide}
-        />
-        <SelectField
-          label="Meters from"
-          value={cal.scaleSource}
-          options={SCALES}
-          disabled={state.calibrationLocked}
-          onChange={props.onScaleSource}
-        />
+        <Switch checked={props.advanced} onChange={props.onAdvanced} label="Show the advanced tools" />
+        <p className="setup__status">
+          Adds the athlete and coach views with every measurement and chart, the trampoline outline, the pose model
+          settings, exports and saved analyses.
+        </p>
       </section>
 
-      <section className="setup__section" aria-labelledby="setup-engine">
-        <h3 className="setup__label" id="setup-engine">
-          Analysis
-        </h3>
-        <SelectField
-          label="Model"
-          value={props.model}
-          options={MODELS}
-          disabled={state.engineLocked}
-          onChange={props.onModel}
-        />
-        <div className="setup__grid">
-          <NumberField
-            label="Video frame rate"
-            unit="fps"
-            min={1}
-            max={480}
-            step={0.001}
-            value={props.fps}
-            disabled={state.engineLocked}
-            onChange={props.onFps}
-            hint="Measured from the video. Changing it clears the analysis."
-          />
-          <SelectField
-            label="Analyze"
-            value={props.stride}
-            options={STRIDES}
-            disabled={state.engineLocked}
-            onChange={props.onStride}
-          />
-        </div>
-        <SelectField
-          label="People to look for"
-          value={props.numPoses}
-          options={PEOPLE}
-          disabled={state.engineLocked}
-          onChange={props.onNumPoses}
-        />
-        <Switch
-          checked={props.preferGpu}
-          onChange={props.onPreferGpu}
-          disabled={state.engineLocked}
-          label="Use the GPU if possible"
-        />
-        <dl className="setup__runtime">
-          <div>
-            <dt>Runtime</dt>
-            <dd>{props.backend || 'not started'}</dd>
-          </div>
-          <div>
-            <dt>WebGPU</dt>
-            <dd>
-              {props.webgpu
-                ? 'available in this browser, but MediaPipe uses WebGL (GPU delegate) or WASM (CPU)'
-                : 'not available'}
-            </dd>
-          </div>
-        </dl>
-      </section>
+      {props.advanced && (
+        <>
+          <section className="setup__section" aria-labelledby="setup-bed">
+            <h3 className="setup__label" id="setup-bed">
+              Trampoline
+            </h3>
+            <p className={cal.error ? 'setup__status setup__status--error' : 'setup__status'}>{cal.status}</p>
+            <div className="setup__buttons">
+              {cal.editing ? (
+                <>
+                  <Button variant="primary" size="sm" onClick={() => props.onEditCalibration(false)}>
+                    Done marking
+                  </Button>
+                  <Button size="sm" disabled={cal.corners.length === 0} onClick={props.onUndoCorner}>
+                    Undo last corner
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  icon="bed"
+                  disabled={!state.canMark}
+                  title={state.canMark ? undefined : 'Choose a video first.'}
+                  onClick={() => props.onEditCalibration(true)}
+                >
+                  {marked ? 'Edit corners' : 'Mark the trampoline'}
+                </Button>
+              )}
+              {cal.corners.length > 0 && (
+                <Button variant="ghost" size="sm" disabled={!state.canMark} onClick={props.onClearCalibration}>
+                  Clear
+                </Button>
+              )}
+            </div>
+            <div className="setup__grid">
+              <NumberField
+                label="Long side"
+                unit="m"
+                min={0.5}
+                max={10}
+                step={0.01}
+                value={cal.bedLong}
+                disabled={state.calibrationLocked}
+                onChange={props.onBedLong}
+              />
+              <NumberField
+                label="Short side"
+                unit="m"
+                min={0.5}
+                max={10}
+                step={0.01}
+                value={cal.bedShort}
+                disabled={state.calibrationLocked}
+                onChange={props.onBedShort}
+              />
+            </div>
+            <SelectField
+              label="Side 1 to 2 is the"
+              value={cal.firstSide}
+              options={SIDES}
+              disabled={state.calibrationLocked}
+              onChange={props.onFirstSide}
+            />
+            <SelectField
+              label="Meters from"
+              value={cal.scaleSource}
+              options={SCALES}
+              disabled={state.calibrationLocked}
+              onChange={props.onScaleSource}
+            />
+          </section>
+
+          <section className="setup__section" aria-labelledby="setup-engine">
+            <h3 className="setup__label" id="setup-engine">
+              Analysis
+            </h3>
+            <SelectField
+              label="Model"
+              value={props.model}
+              options={MODELS}
+              disabled={state.engineLocked}
+              onChange={props.onModel}
+            />
+            <div className="setup__grid">
+              <NumberField
+                label="Video frame rate"
+                unit="fps"
+                min={1}
+                max={480}
+                step={0.001}
+                value={props.fps}
+                disabled={state.engineLocked}
+                onChange={props.onFps}
+                hint="Measured from the video. Changing it clears the analysis."
+              />
+              <SelectField
+                label="Analyze"
+                value={props.stride}
+                options={STRIDES}
+                disabled={state.engineLocked}
+                onChange={props.onStride}
+              />
+            </div>
+            <SelectField
+              label="People to look for"
+              value={props.numPoses}
+              options={PEOPLE}
+              disabled={state.engineLocked}
+              onChange={props.onNumPoses}
+            />
+            <Switch
+              checked={props.preferGpu}
+              onChange={props.onPreferGpu}
+              disabled={state.engineLocked}
+              label="Use the GPU if possible"
+            />
+            <dl className="setup__runtime">
+              <div>
+                <dt>Runtime</dt>
+                <dd>{props.backend || 'not started'}</dd>
+              </div>
+              <div>
+                <dt>WebGPU</dt>
+                <dd>
+                  {props.webgpu
+                    ? 'available in this browser, but MediaPipe uses WebGL (GPU delegate) or WASM (CPU)'
+                    : 'not available'}
+                </dd>
+              </div>
+            </dl>
+          </section>
+        </>
+      )}
 
       <section className="setup__section" aria-labelledby="setup-look">
         <h3 className="setup__label" id="setup-look">
@@ -301,35 +320,37 @@ export function SetupPanel(props: SetupPanelProps) {
         />
       </section>
 
-      <section className="setup__section" aria-labelledby="setup-data">
-        <h3 className="setup__label" id="setup-data">
-          Saved data
-        </h3>
-        <Field
-          label="Skip the analysis"
-          hint="Open a saved analysis (JSON) to see its results without running the pose model again."
-        >
-          <label className="btn btn--secondary setup__file-btn">
-            <Icon name="file" size={17} />
-            Open saved analysis
-            <input
-              type="file"
-              accept="application/json,.json"
-              disabled={props.busy === 'analyzing'}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) props.onOpenSeries(f);
-                e.target.value = '';
-              }}
-            />
-          </label>
-        </Field>
-        {props.onSample && (
-          <Button variant="secondary" icon="film" disabled={state.engineLocked} onClick={props.onSample}>
-            Use the sample video
-          </Button>
-        )}
-      </section>
+      {props.advanced && (
+        <section className="setup__section" aria-labelledby="setup-data">
+          <h3 className="setup__label" id="setup-data">
+            Saved data
+          </h3>
+          <Field
+            label="Skip the analysis"
+            hint="Open a saved analysis (JSON) to see its results without running the pose model again."
+          >
+            <label className="btn btn--secondary setup__file-btn">
+              <Icon name="file" size={17} />
+              Open saved analysis
+              <input
+                type="file"
+                accept="application/json,.json"
+                disabled={props.busy === 'analyzing'}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) props.onOpenSeries(f);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          </Field>
+          {props.onSample && (
+            <Button variant="secondary" icon="film" disabled={state.engineLocked} onClick={props.onSample}>
+              Use the sample video
+            </Button>
+          )}
+        </section>
+      )}
 
       <div className="setup__action">
         {state.hint && <p className="setup__hint">{state.hint}</p>}

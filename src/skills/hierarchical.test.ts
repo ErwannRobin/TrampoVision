@@ -4,7 +4,7 @@ import type { TwistEstimate } from '../pose3d/twist';
 import { analyzeSkills } from './analyzeSkills';
 import { mergeSkillConfig } from './config';
 import { describeClassification, diagnoseUnclassified, formatClassificationDebug, formatUnclassified } from './debug';
-import { OFFICIAL_VALUES } from './fig/difficulty';
+import { difficultyValue } from './fig/difficulty';
 import { FIG_ELEMENTS, elementById, movementToElement } from './fig/elements';
 import { hierarchicalClassifier } from './hierarchical';
 import { mannequinRoutine, type MannequinJump } from './testMannequin';
@@ -31,13 +31,17 @@ function twistOf(deg: number, confidence = 0.9, reliable = true): TwistContext {
   };
 }
 
-const classifyWith = (j: JumpSkillResult, twist: TwistContext | null) =>
+const classifyWith = (
+  j: JumpSkillResult,
+  twist: TwistContext | null,
+  config: Parameters<typeof mergeSkillConfig>[0] = {},
+) =>
   hierarchicalClassifier.classify({
     cycle: j.cycle,
     features: j.features,
     sequence: j.sequence,
     twist,
-    config: mergeSkillConfig(),
+    config: mergeSkillConfig(config),
   });
 
 describe('element table', () => {
@@ -55,13 +59,18 @@ describe('element table', () => {
     );
   });
 
-  it('carries no code or difficulty that was not taken from the official values', () => {
-    for (const e of FIG_ELEMENTS) {
-      const official = OFFICIAL_VALUES[e.id];
-      expect(e.difficulty).toBe(official ? official.difficulty : null);
-      expect(e.code).toBe(official ? official.code : null);
-    }
-    for (const id of Object.keys(OFFICIAL_VALUES)) expect(elementById(id)).toBeDefined();
+  it('gives every element the difficulty of the FIG rule and nothing else', () => {
+    for (const e of FIG_ELEMENTS) expect(e.difficulty).toBe(difficultyValue(e));
+    expect(elementById('back-1s-0t-tuck')?.difficulty).toBe(0.5);
+    expect(elementById('back-2s-0t-pike')?.difficulty).toBe(1.3);
+    expect(elementById('none-0s-0t-straight')?.difficulty).toBe(0);
+  });
+
+  it('marks the elements the Code of Points lists itself', () => {
+    expect(elementById('back-2s-0t-tuck')?.inCode).toBe(true);
+    expect(elementById('front-1s-0.5t-tuck')?.inCode).toBe(true); // Barani
+    expect(elementById('front-1s-1.5t-straight')?.inCode).toBe(true); // Rudolph
+    expect(elementById('front-3s-1t-tuck')?.inCode).toBe(false);
   });
 });
 
@@ -112,12 +121,23 @@ describe('hierarchical classification', () => {
 
   it('explains a quarter rotation: closest element, criterion, distances, and what would fix it', () => {
     const j = run({ v0: 4.6, turns: 1.25, shape: 'straight' });
-    const p = j.prediction;
+    const p = classifyWith(j, null, { forceGuess: false });
     expect(p.skill).toBe('unclassified');
     expect(p.failure?.criterion).toBe('rotation');
     expect(p.failure?.closest).not.toBeNull();
     expect(p.failure?.distances.map((d) => d.stage)).toContain('rotation');
     expect(p.failure?.message).toMatch(/from the nearest whole somersault/);
+  });
+
+  it('names the closest element anyway when it is asked to guess, and keeps the reason it is weak', () => {
+    const j = run({ v0: 4.6, turns: 1.25, shape: 'straight' });
+    const p = classifyWith(j, null);
+    expect(p.skill).not.toBe('unclassified');
+    expect(p.elementId).toBe(p.failure?.closest?.elementId);
+    expect(p.guess).toEqual({ closest: true, direction: false });
+    expect(p.confidence).toBeLessThan(0.3);
+    expect(p.failure?.criterion).toBe('rotation');
+    expect(p.summary).toMatch(/^Best guess/);
   });
 
   it('never gives a confident answer when the threshold is not met, whatever it is lowered to', () => {

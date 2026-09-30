@@ -220,20 +220,35 @@ export const temporalClassifier: SkillClassifier = {
         : `${f.position.label} (hips ${Math.round(f.shape.hipAngle.atPeak ?? NaN)}°, knees ${Math.round(f.shape.kneeAngle.atPeak ?? NaN)}°)`,
     ].join(', ');
 
-    if (certainty && directionOnly && twin) {
+    const forced = cfg.forceGuess;
+    let guess: SkillPrediction['guess'];
+    if (certainty && directionOnly && twin && !forced) {
       skill = 'somersault-direction-unknown';
       label = SKILL_LABELS[skill];
       outConfidence = clamp01((best.blend + twin.blend) * quality);
       outCertainty = outConfidence >= cfg.minConfidence ? 'probable' : 'tentative';
       movement = { ...movementOf(e), direction: null };
       summary = `${e.somersaults} somersault(s), ${twistLabel(Math.round(e.twists * 2))}, ${e.position}: the direction (front or back) cannot be told (${stages.dir.report.notes[0]}).`;
-    } else if (certainty) {
+    } else if (certainty || forced) {
+      // A name is always given when `forceGuess` is on. Without the direction there are two elements that differ only by it: the likelier
+      // one is named, with the confidence of the movement (both directions together), and the other stays among the candidates.
+      const assumedDirection = forced && directionOnly && twin !== undefined;
+      if (assumedDirection) {
+        outConfidence = clamp01((best.blend + twin.blend) * quality);
+        outCertainty =
+          outConfidence >= t.confidentAt ? 'confident' : outConfidence >= cfg.minConfidence ? 'probable' : 'tentative';
+      } else outCertainty = certainty ?? 'tentative';
       skill = legacyId(e);
       label = e.name;
-      outCertainty = certainty;
       movement = movementOf(e);
       elementId = e.id;
-      summary = `${e.name} (${certaintyWord[certainty]}, ${pct(confidence)}): measured ${measuredText}; ${pct(best.sim)} match to the expected trajectory.`;
+      if (certainty === null) {
+        failure = diagnose(f, stages, best.sc, outOfTable, quality, viewFactorOf(f, cfg));
+        summary = `Best guess ${e.name} (${pct(best.sim)} trajectory match, ${pct(best.sc.posterior)} structural). ${failure.message}`;
+      } else
+        summary = `${e.name} (${certaintyWord[outCertainty]}, ${pct(outConfidence)}): measured ${measuredText}; ${pct(best.sim)} match to the expected trajectory.`;
+      if (assumedDirection) summary += ` The direction (front or back) was assumed: ${stages.dir.report.notes[0]}.`;
+      if (certainty === null || assumedDirection) guess = { closest: certainty === null, direction: assumedDirection };
     } else {
       failure = diagnose(f, stages, best.sc, outOfTable, quality, viewFactorOf(f, cfg));
       summary = `No plausible candidate: the closest is ${e.name} (${pct(best.sim)} trajectory match, ${pct(best.sc.posterior)} structural). ${failure.message}`;
@@ -267,6 +282,7 @@ export const temporalClassifier: SkillClassifier = {
       dataQuality: quality,
       failure,
       certainty: outCertainty,
+      guess,
       measured,
       comparison,
     };

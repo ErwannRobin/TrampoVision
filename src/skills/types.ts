@@ -310,6 +310,12 @@ export interface SkillPrediction {
   failure?: FailureDiagnosis;
   /** Temporal classifier: how firmly the name is given. */
   certainty?: Certainty;
+  /**
+   * Set when the name is a guess the classifier would not have given firmly (see `SkillConfig.forceGuess`): `closest` = no candidate was
+   * plausible and the closest element of the table is named anyway (the reason stays in `failure`); `direction` = front and back could
+   * not be told apart and the likelier direction is named (the other one is among the candidates).
+   */
+  guess?: { closest: boolean; direction: boolean };
   /** Temporal classifier: what was measured (continuous counts) and the trajectories it comes from. */
   measured?: MeasuredMovement;
   /** Temporal classifier: the trajectories of the jump against those of the closest reference. */

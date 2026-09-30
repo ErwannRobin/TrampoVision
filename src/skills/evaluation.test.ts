@@ -60,9 +60,38 @@ describe('synthetic evaluation', () => {
   );
 
   it('does not name a somersault seen from far off side-on (yaw 70°)', () => {
-    const s = evaluate({ ...base, name: 'camera yaw 70°, jitter 1%', noise: 0.01, yawDeg: 70 }, { routines: ROUTINES });
+    const s = evaluate(
+      { ...base, name: 'camera yaw 70°, jitter 1%', noise: 0.01, yawDeg: 70 },
+      { routines: ROUTINES, config: { forceGuess: false } },
+    );
     log(s);
     expect(s.confidentWrong).toBe(0);
     expect((s.matrix.back.back ?? 0) + (s.matrix.front.front ?? 0)).toBeLessThan(ROUTINES * 2 * 0.2);
+  });
+});
+
+/** The app asks the classifier to guess. A guess must stay honest: named every time, and never a confident wrong one. */
+describe('synthetic evaluation with forced guesses', () => {
+  const hard: Condition[] = [
+    { ...base, name: 'pose flip (mirror), jitter 1%', noise: 0.01, flip: 'mirror' },
+    { ...base, name: 'camera yaw 70°, jitter 1%', noise: 0.01, yawDeg: 70 },
+    { ...base, name: 'jitter 4% + dropout 10%', noise: 0.04, dropout: 0.1 },
+  ];
+  it.each(hard)('names every jump and is never confidently wrong: %o', (condition) => {
+    const s = evaluate(condition, { routines: ROUTINES });
+    log(s);
+    expect(s.rows.every((r) => r.predicted !== 'unclassified' && r.predicted !== 'somersault-direction-unknown')).toBe(
+      true,
+    );
+    expect(s.confidentWrong).toBe(0);
+    // Whatever it says without being sure is flagged as a tentative guess: the wrong answers are the unsure ones.
+    const wrong = s.rows.filter((r) => !r.correct);
+    expect(wrong.every((r) => r.certainty === 'tentative' || r.confidence < 0.6)).toBe(true);
+  });
+
+  it('gets the easy conditions as right as before', () => {
+    const declined = evaluate(base, { routines: ROUTINES, config: { forceGuess: false } });
+    const guessed = evaluate(base, { routines: ROUTINES });
+    expect(guessed.accuracy).toBeGreaterThanOrEqual(declined.accuracy);
   });
 });

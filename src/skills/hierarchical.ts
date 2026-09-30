@@ -229,13 +229,16 @@ interface DirectionStage {
   report: StageReport;
 }
 
+/** Share of front somersaults when the direction cannot be measured: back somersaults are the commoner ones, so a tie goes to back. */
+const UNMEASURED_FRONT = 0.4;
+
 function directionStage(f: JumpFeatures): DirectionStage {
   const r = f.rotation;
   const face = f.facing;
   const dirSign = r.direction === 'clockwise' ? 1 : r.direction === 'counterclockwise' ? -1 : 0;
   const forward = dirSign * face.sign; // +1 front, -1 back
   const measured = forward !== 0;
-  const pFront = measured ? 0.5 + 0.5 * face.confidence * forward : 0.5;
+  const pFront = measured ? 0.5 + 0.5 * face.confidence * forward : UNMEASURED_FRONT;
   const dist = new Map<Direction, number>([
     ['front', pFront],
     ['back', 1 - pFront],
@@ -694,8 +697,9 @@ export const hierarchicalClassifier: SkillClassifier = {
     let failure: FailureDiagnosis | undefined;
     let outConfidence = confidence;
     let summary: string;
+    let guess: SkillPrediction['guess'];
 
-    if (directionOnly && twin) {
+    if (directionOnly && twin && !cfg.forceGuess) {
       const merged = clamp01((best.posterior + twin.posterior) * quality);
       if (merged >= cfg.minConfidence) {
         skill = 'somersault-direction-unknown';
@@ -706,13 +710,8 @@ export const hierarchicalClassifier: SkillClassifier = {
       } else summary = '';
     } else summary = '';
 
-    if (skill === 'unclassified' && confidence >= cfg.minConfidence) {
-      const e = best.element;
-      skill = legacyId(e);
-      label = e.name;
-      movement = movementOf(e);
-      elementId = e.id;
-      summary = `${e.name}: ${[
+    const namedSummary = (e: FigElement) =>
+      `${e.name}: ${[
         stages.rot.report.observed,
         e.somersaults > 0 ? stages.dir.report.observed : null,
         stages.tw.report.observed,
@@ -720,10 +719,35 @@ export const hierarchicalClassifier: SkillClassifier = {
       ]
         .filter(Boolean)
         .join(', ')}.`;
+
+    if (skill === 'unclassified' && confidence >= cfg.minConfidence) {
+      const e = best.element;
+      skill = legacyId(e);
+      label = e.name;
+      movement = movementOf(e);
+      elementId = e.id;
+      summary = namedSummary(e);
+      if (directionOnly && twin) {
+        // The direction was not measured: the likelier one is named and the other stays among the candidates.
+        outConfidence = clamp01((best.posterior + twin.posterior) * quality);
+        guess = { closest: false, direction: true };
+        summary = `${namedSummary(e)} The direction (front or back) was assumed: ${stages.dir.report.notes[0]}.`;
+      }
     }
     if (skill === 'unclassified') {
       failure = diagnose(f, stages, best, outOfTable, quality, viewFactorOf(f, cfg));
-      summary = `Best guess ${best.element.name} at ${pct(confidence)}, below the minimum of ${pct(cfg.minConfidence)}. ${failure.message}`;
+      if (cfg.forceGuess) {
+        // Not sure enough to name it, but a guess is more useful than nothing: the closest element, with the reason it is weak.
+        const e = best.element;
+        skill = legacyId(e);
+        label = e.name;
+        movement = movementOf(e);
+        elementId = e.id;
+        guess = { closest: true, direction: directionOnly && !!twin };
+        summary = `Best guess ${e.name} at ${pct(confidence)}, below the minimum of ${pct(cfg.minConfidence)}. ${failure.message}`;
+      } else {
+        summary = `Best guess ${best.element.name} at ${pct(confidence)}, below the minimum of ${pct(cfg.minConfidence)}. ${failure.message}`;
+      }
     }
 
     // The measurements and the data problems of this jump come from the rule set (same numbers, same wording); the stages add theirs.
@@ -773,6 +797,7 @@ export const hierarchicalClassifier: SkillClassifier = {
       outOfTable,
       dataQuality: quality,
       failure,
+      guess,
     };
   },
 };

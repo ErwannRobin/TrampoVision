@@ -3,12 +3,16 @@ import { analysisFingerprint } from '../dataset/record';
 import type { JumpRecord } from '../dataset/types';
 import {
   BATCH,
+  OUTBOX_MAX,
   REVIEW_API_URL,
   chunk,
   fetchReferenceRecords,
   pendingRecords,
   postRecords,
+  readOutbox,
   readSyncSetting,
+  sendVerdict,
+  writeOutbox,
   writeSyncSetting,
 } from './reviewSync';
 
@@ -91,4 +95,57 @@ export function useReviewedReferences(enabled: boolean, videoId: string | null):
     };
   }, [enabled, videoId]);
   return enabled ? remote : [];
+}
+
+/**
+ * What the person says about a jump (its element, that it is none of them, the execution score they give) reaches the review service,
+ * so the classifier learns from it on every device. The ids of the records to send are kept in the browser until they are delivered, and
+ * a delivery that fails is tried again, so a practice hall with a poor connection loses nothing while the page stays open (and the
+ * label itself is in the local dataset either way). Nothing is sent when the upload is off.
+ */
+export function useVerdictOutbox(records: readonly JumpRecord[], enabled: boolean) {
+  const [ids, setIds] = useState<string[]>(readOutbox);
+  const [retry, setRetry] = useState(0);
+  const latest = useRef(records);
+  latest.current = records;
+  const inFlight = useRef(new Set<string>());
+  const add = useCallback(
+    (id: string) => setIds((prev) => (prev.includes(id) ? prev : [...prev, id].slice(-OUTBOX_MAX))),
+    [],
+  );
+
+  useEffect(() => writeOutbox(ids), [ids]);
+
+  useEffect(() => {
+    if (!enabled || ids.length === 0) return;
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const timer = setTimeout(async () => {
+      for (const id of ids) {
+        // A record that is not saved yet (the label is on its way to the dataset) stays in the outbox for the next round.
+        const record = records.find((r) => r.id === id);
+        if (!record || inFlight.current.has(id)) continue;
+        inFlight.current.add(id);
+        try {
+          await sendVerdict(record);
+          // Changed again while it was on its way: it stays, and goes again.
+          const current = latest.current.find((r) => r.id === id);
+          if (!cancelled && (!current || current.savedAt === record.savedAt))
+            setIds((prev) => prev.filter((x) => x !== id));
+        } catch {
+          if (!cancelled) retryTimer = setTimeout(() => setRetry((n) => n + 1), RETRY_MS);
+          return;
+        } finally {
+          inFlight.current.delete(id);
+        }
+      }
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      clearTimeout(retryTimer);
+    };
+  }, [ids, records, enabled, retry]);
+
+  return { add, waiting: ids.length };
 }

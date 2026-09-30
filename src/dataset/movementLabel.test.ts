@@ -7,10 +7,12 @@ import {
   legacyLabel,
   maxHalfTwists,
   movementFromPrediction,
+  movementOfElement,
   movementOfRecord,
   normalizeMovement,
   type MovementLabel,
 } from './movementLabel';
+import { elementById } from '../skills/fig/elements';
 import { withMovement } from './record';
 import type { JumpRecord } from './types';
 
@@ -97,5 +99,22 @@ describe('saving a movement', () => {
   it('keeps the note', () => {
     const r = record({ truth: { label: 'tuck', labeledAt: '', note: 'camera moved' } });
     expect(withMovement(r, label({ position: 'pike' })).truth?.note).toBe('camera moved');
+  });
+});
+
+describe('the label of an element of the table', () => {
+  it('says the same thing as the element, and names it back', () => {
+    for (const id of ['back-1s-0t-tuck', 'front-2s-1t-pike', 'none-0s-0t-pike', 'none-0s-1.5t-straight']) {
+      const e = elementById(id)!;
+      const m = movementOfElement(e);
+      expect(figureOf(m)).toBe(id);
+    }
+    expect(movementOfElement(elementById('front-2s-1t-pike')!)).toEqual({
+      position: 'pike',
+      direction: 'front',
+      somersaults: 2,
+      halfTwists: 2,
+    });
+    expect(movementOfElement(elementById('none-0s-0t-tuck')!).direction).toBeNull();
   });
 });

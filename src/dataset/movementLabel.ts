@@ -4,6 +4,7 @@ import {
   elementById,
   movementToElement,
   type Direction,
+  type FigElement,
 } from '../skills/fig/elements';
 import type { SkillPrediction } from '../skills/types';
 import type { JumpRecord, TruthLabel } from './types';
@@ -78,6 +79,17 @@ export function figureOf(m: MovementLabel): string | null {
     })?.id ?? null
   );
 }
+
+/** The label that says an element of the table was done. */
+export const movementOfElement = (
+  e: Pick<FigElement, 'position' | 'direction' | 'somersaults' | 'twists'>,
+): MovementLabel =>
+  normalizeMovement({
+    position: e.position,
+    direction: e.direction,
+    somersaults: e.somersaults,
+    halfTwists: Math.round(e.twists * 2),
+  });
 
 /** The label that says what the classifier predicted; null when it named no movement. */
 export function movementFromPrediction(p: Pick<SkillPrediction, 'movement'>): MovementLabel | null {

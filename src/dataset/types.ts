@@ -45,6 +45,20 @@ export interface FigureLabel {
 }
 
 /**
+ * The execution deduction a person gives a skill, in points (0 to 0.5), kept with what the app proposed at that moment: the
+ * difference between the two is what would tune the thresholds of the execution check.
+ */
+export interface ExecutionLabel {
+  deduction: number;
+  /** The deduction the app proposed, or null when it could not judge the skill. */
+  proposed: number | null;
+  /** ISO time of the last change. */
+  labeledAt: string;
+  /** The rules the proposal followed (see `coaching/config.ts`). */
+  ruleset: string;
+}
+
+/**
  * One detected jump with everything the app measured, the prediction, and the person's label.
  * The video itself is never stored: only numbers, so the dataset stays small and stays in this browser.
  */
@@ -78,4 +92,6 @@ export interface JumpRecord {
   twistTruth: TwistTruth | null;
   /** Full figure label; absent in files saved before it existed. */
   figure?: FigureLabel | null;
+  /** The execution deduction a person gave; absent in files saved before it existed. */
+  execution?: ExecutionLabel | null;
 }
