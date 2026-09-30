@@ -63,6 +63,21 @@ describe('the live rail', () => {
     expect(html).toContain('repeat, does not count');
   });
 
+  it('keeps "Work on next" a section of its own after the set, so that a phone can put the skills between them', () => {
+    const html = rail();
+    const set = html.indexOf('class="live-summary');
+    const focus = html.indexOf('class="live-focus"');
+    const list = html.indexOf('class="live-list"');
+    expect(set).toBeGreaterThanOrEqual(0);
+    expect(focus).toBeGreaterThan(set);
+    expect(list).toBeGreaterThan(focus);
+    // It is named by its own heading, and is not inside the set's section.
+    expect(html).toMatch(
+      /<section class="live-focus" aria-labelledby="([^"]+)"><h3 class="live-h" id="\1">Work on next<\/h3>/,
+    );
+    expect(html.slice(set, focus)).toContain('</section>');
+  });
+
   it('folds the bounces into one line', () => {
     const html = rail();
     expect(html).toContain('2 straight jumps, 1 to 2');
