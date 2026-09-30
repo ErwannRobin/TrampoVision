@@ -1,4 +1,5 @@
 import type { Dictionary } from '..';
+import { about } from './about';
 import { chrome } from './chrome';
 import { classifier } from './classifier';
 import { coach } from './coach';
@@ -24,4 +25,5 @@ export const ja: Dictionary = {
   ...review,
   ...errors,
   ...reviewer,
+  ...about,
 };

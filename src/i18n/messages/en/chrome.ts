@@ -31,6 +31,7 @@ export const chrome = {
   'topbar.export': 'Export',
   'topbar.settings': 'Settings',
   'topbar.openAnother': 'Open another video',
+  'topbar.about': 'About TrampoVision',
 
   // Keyboard shortcuts
   'shortcuts.title': 'Keyboard shortcuts',
@@ -58,6 +59,7 @@ export const chrome = {
   'landing.noteCamera':
     'Best results come from a fixed, level camera at the side, with the whole trampoline in frame and the athlete in view from the takeoff of the first skill to the landing of the last.',
   'landing.notePrivacy': 'Runs in your browser. The video never leaves your device.',
+  'landing.about': 'About TrampoVision',
   'landing.savedDataset': 'Saved dataset',
 
   // Banners

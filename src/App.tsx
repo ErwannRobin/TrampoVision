@@ -51,6 +51,8 @@ import { StatusBanners } from './ui/StatusBanners';
 import { TechnicalData } from './ui/TechnicalData';
 import { Timeline } from './ui/Timeline';
 import { TopBar } from './ui/TopBar';
+import { About } from './ui/About';
+import { useAbout } from './ui/chrome/aboutRoute';
 import { Icon, ActivityToast, type MenuGroupDef } from './ui/kit';
 import { useLocalStorage } from './ui/hooks';
 import { analysisWarnings } from './ui/quality';
@@ -138,6 +140,7 @@ export default function App() {
   const [appearance, setAppearance] = useLocalStorage<Appearance>('trampovision.appearance', 'system', APPEARANCES);
   // The settings are a popup over the app: from the first screen as well as from an open clip.
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useAbout();
   const openSetup = useCallback(() => setSettingsOpen(true), []);
   const closeSetup = useCallback(() => setSettingsOpen(false), []);
   const [coachTab, setCoachTab] = useState<CoachTab>('skill');
@@ -919,8 +922,10 @@ export default function App() {
         exportGroups={advanced ? exportGroups : null}
         setupOpen={settingsOpen}
         onOpenSetup={openSetup}
+        aboutOpen={aboutOpen}
+        onAbout={() => setAboutOpen(!aboutOpen)}
         onFile={hasClip && !analyzing ? (f) => void onFile(f) : null}
-        onHome={hasClip && !analyzing ? goHome : null}
+        onHome={aboutOpen ? () => setAboutOpen(false) : hasClip && !analyzing ? goHome : null}
       />
 
       {settings}
@@ -934,7 +939,14 @@ export default function App() {
         onDismissExportError={annotated.clearError}
       />
 
-      <main className="app__main">
+      {aboutOpen && (
+        <main className="app__main">
+          <About onClose={() => setAboutOpen(false)} />
+        </main>
+      )}
+
+      {/* Kept mounted while the About page is open, so a clip and its analysis are still there on return. */}
+      <main className="app__main" hidden={aboutOpen}>
         {hasClip && (
           <h1 className="sr-only">
             {result ? t('app.analysisOf', { name: fileName }) : t('app.setUp', { name: fileName })}
