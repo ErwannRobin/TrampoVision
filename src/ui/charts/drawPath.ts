@@ -1,4 +1,5 @@
 import type { JumpCycle } from '../../analysis/jumpCycles';
+import { t } from '../../i18n/core';
 import { drawGlyph, figureFont, segment, type ChartColors } from './draw';
 import { clamp, tickLabel } from './geometry';
 import { FALLING, RISING, type TrajectoryLayout } from './trajectory';
@@ -101,7 +102,7 @@ export function drawPathStill(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.fillStyle = c.text3;
-      ctx.fillText('Bed', X(0), y + 14);
+      ctx.fillText(t('path.bed'), X(0), y + 14);
     }
   }
 

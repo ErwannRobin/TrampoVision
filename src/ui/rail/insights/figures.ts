@@ -1,3 +1,4 @@
+import { t } from '../../../i18n/core';
 import type { BodyPosition, RotationDirection } from '../../../skills/types';
 import { DASH, fmt } from '../../format';
 import type { JumpHeadline } from '../../insights';
@@ -15,28 +16,21 @@ export interface Figure {
   missing: boolean;
 }
 
-const CUT_OFF = 'cut off by the clip';
-const UNKNOWN = 'could not be measured';
+const cutOff = () => t('fig.cutOff');
+const unknown = () => t('fig.unknown');
 
-export const SHAPE_WORD: Record<BodyPosition, string> = {
-  straight: 'Straight',
-  tuck: 'Tuck',
-  pike: 'Pike',
-  unknown: 'Between shapes',
-};
+/** The body shape as a word of the language in use. */
+export const shapeWord = (p: BodyPosition): string => (p === 'unknown' ? t('fig.between') : t(`pos.${p}`));
 
-const DIRECTION_HINT: Record<RotationDirection, string> = {
-  clockwise: 'clockwise on screen',
-  counterclockwise: 'counterclockwise on screen',
-  none: 'no rotation',
-};
+const directionHint = (d: RotationDirection): string =>
+  t(d === 'clockwise' ? 'fig.clockwise' : d === 'counterclockwise' ? 'fig.counterclockwise' : 'fig.noRotation');
 
 /**
  * The four figures an athlete looks for, read from the jump headline (so the coach's numbers can never differ). A value
  * the analysis does not have is a dash, and a hint says why: the jump is cut off by the clip, or it was not measurable.
  */
 export function jumpFigures(h: JumpHeadline): Figure[] {
-  const missingWhy = h.complete ? UNKNOWN : CUT_OFF;
+  const missingWhy = h.complete ? unknown() : cutOff();
   const figure = (
     key: Figure['key'],
     label: string,
@@ -55,18 +49,24 @@ export function jumpFigures(h: JumpHeadline): Figure[] {
   return [
     figure(
       'height',
-      'Peak height',
+      t('fig.height'),
       height,
-      height === DASH ? UNKNOWN : h.heightReference === 'bed' ? 'above the bed' : 'above the lowest point',
+      height === DASH ? unknown() : t(h.heightReference === 'bed' ? 'fig.aboveBed' : 'fig.aboveLowest'),
       'm',
     ),
-    figure('air', 'Time in the air', air, air === DASH ? missingWhy : 'takeoff to landing', 's'),
-    figure('rotation', 'Rotation', turns, turns === DASH ? missingWhy : DIRECTION_HINT[h.rotation.direction], 'turns'),
+    figure('air', t('fig.air'), air, air === DASH ? missingWhy : t('fig.takeoffToLanding'), 's'),
+    figure(
+      'rotation',
+      t('fig.rotation'),
+      turns,
+      turns === DASH ? missingWhy : directionHint(h.rotation.direction),
+      t('unit.turns'),
+    ),
     figure(
       'shape',
-      'Body shape',
-      noShape ? DASH : SHAPE_WORD[h.bodyShape],
-      noShape ? CUT_OFF : h.bodyShape === 'unknown' ? 'fits no shape well' : 'at its most closed moment',
+      t('fig.shape'),
+      noShape ? DASH : shapeWord(h.bodyShape),
+      noShape ? cutOff() : h.bodyShape === 'unknown' ? t('fig.noShape') : t('fig.mostClosed'),
       undefined,
       !noShape,
     ),

@@ -1,4 +1,5 @@
 import type { JumpCycle } from '../analysis/jumpCycles';
+import { formatPercent, t, tp } from '../i18n/core';
 import type { WorldPoint } from '../pose/types';
 import type { Limitation } from '../skills/types';
 import { mergeTwistConfig, type TwistConfig } from './config';
@@ -255,13 +256,15 @@ const UNAVAILABLE = (why: Limitation): TwistEstimate => ({
   limitations: [why],
 });
 
-export const NO_3D: Limitation = {
-  signal: '3D pose',
-  problem: 'This analysis has no 3D landmarks (data saved before 3D support, or a pose backend that gives 2D only).',
-  needed: 'Analyze the video again with the MediaPipe backend, which returns 3D landmarks with every frame.',
-};
+/** What is missing when there are no 3D landmarks, in the language in use. */
+export const no3d = (): Limitation => ({
+  id: 'no-3d',
+  signal: t('tw.signal.pose3d'),
+  problem: t('tw.no3d.problem'),
+  needed: t('tw.no3d.needed'),
+});
 
-const pct = (v: number) => `${Math.round(v * 100)}%`;
+const pct = (v: number) => formatPercent(v);
 const deg = (v: number | null) => (v === null ? '–' : `${Math.round(v)}°`);
 
 /** Net twist of one flight with the checks that say how far it can be trusted. */
@@ -280,10 +283,10 @@ export function estimateTwistForJump(
     cycle.landingTimeS === null
   ) {
     return UNAVAILABLE({
-      signal: 'Twist',
-      problem:
-        'This jump is cut off by the start or the end of the clip, so the twist between takeoff and landing cannot be summed.',
-      needed: 'A clip that shows the whole flight.',
+      id: 'cut-off',
+      signal: t('tw.signal.twist'),
+      problem: t('tw.cutOff.problem'),
+      needed: t('tw.cutOff.needed'),
     });
   }
   const from = cycle.takeoff;
@@ -292,9 +295,10 @@ export function estimateTwistForJump(
   for (let i = from; i <= to; i++) if (torso.valid[i]) anyValid = true;
   if (!anyValid) {
     return UNAVAILABLE({
-      signal: '3D pose',
-      problem: 'The shoulders and hips were not found in 3D during this flight.',
-      needed: 'A clip where the athlete is visible and large enough for the pose model.',
+      id: 'torso-not-found',
+      signal: t('tw.signal.pose3d'),
+      problem: t('tw.notFound.problem'),
+      needed: t('tw.notFound.needed'),
     });
   }
 
@@ -309,9 +313,10 @@ export function estimateTwistForJump(
   const planeDeg = total(frames.anglePlane);
   if (totalDeg === null) {
     return UNAVAILABLE({
-      signal: 'Twist',
-      problem: 'The torso is not known at takeoff or at landing, so no net twist can be computed.',
-      needed: 'Visible shoulders and hips at both events.',
+      id: 'torso-unknown',
+      signal: t('tw.signal.twist'),
+      problem: t('tw.torsoUnknown.problem'),
+      needed: t('tw.torsoUnknown.needed'),
     });
   }
 
@@ -392,65 +397,74 @@ export function estimateTwistForJump(
   const limitations: Limitation[] = [];
   if (parts.coverage < 0.75) {
     limitations.push({
-      signal: '3D torso coverage',
-      problem: `The shoulders and hips were measured in only ${pct(coverage)} of the flight; the rest was bridged or missing.`,
-      needed: 'A clearer view of the torso through the whole flight.',
+      id: 'coverage',
+      signal: t('tw.coverage.signal'),
+      problem: t('tw.coverage.problem', { share: pct(coverage) }),
+      needed: t('tw.coverage.needed'),
     });
   }
   if (parts.axisDepth < 0.8 && planeDeg !== null) {
     limitations.push({
-      signal: 'Axis depth',
-      problem: `The twist depends on how far the trunk axis leans out of the image plane: ${deg(totalDeg)} with the 3D axis, ${deg(planeDeg)} with the axis kept in the image plane. A small constant depth error turns a somersault into a phantom twist.`,
-      needed: 'Depth that is measured (a second camera or a depth sensor) instead of guessed by a single-camera model.',
+      id: 'axis-depth',
+      signal: t('tw.axis.signal'),
+      problem: t('tw.axis.problem', { total: deg(totalDeg), plane: deg(planeDeg) }),
+      needed: t('tw.axis.needed'),
     });
   }
   if (parts.shoulderHip < 0.8 && shouldersDeg !== null && hipsDeg !== null) {
     limitations.push({
-      signal: 'Shoulders vs hips',
-      problem: `The shoulder line says ${deg(shouldersDeg)} and the hip line ${deg(hipsDeg)}: they should turn together over a whole flight.`,
-      needed: 'More reliable shoulder and hip landmarks (both are estimated, not measured).',
+      id: 'shoulders-hips',
+      signal: t('tw.shoulderHip.signal'),
+      problem: t('tw.shoulderHip.problem', { shoulders: deg(shouldersDeg), hips: deg(hipsDeg) }),
+      needed: t('tw.shoulderHip.needed'),
     });
   }
   if (cv !== null && parts.depth < 0.8) {
     limitations.push({
-      signal: 'Depth consistency',
-      problem: `The 3D shoulder width varies by ${pct(cv)} during the flight. A rigid body keeps it constant, so the depth values are noisy.`,
-      needed: 'Better depth: a second camera, or a model trained for athletes in the air.',
+      id: 'depth-consistency',
+      signal: t('tw.depth.signal'),
+      problem: t('tw.depth.problem', { cv: pct(cv) }),
+      needed: t('tw.depth.needed'),
     });
   }
   if (flips > 0) {
     limitations.push({
-      signal: 'Left/right swaps',
-      problem: `${flips} step${flips > 1 ? 's' : ''} larger than ${cfg.maxStepDeg}° between two frames (largest ${deg(maxStep)}) were treated as left/right swaps and folded back. The number of half twists can be off by one.`,
-      needed: 'A higher frame rate, or a pose model that keeps left and right stable when the athlete turns.',
+      id: 'swaps',
+      signal: t('tw.swaps.signal'),
+      problem: tp('tw.swaps.problem', flips, { max: cfg.maxStepDeg, largest: deg(maxStep) }),
+      needed: t('tw.swaps.needed'),
     });
   } else if (parts.steps < 0.9) {
     limitations.push({
-      signal: 'Frame rate',
-      problem: `The largest twist step between two frames is ${deg(maxStep)}; above ${cfg.maxStepDeg}° a twist cannot be told from a swap.`,
-      needed: 'A higher frame rate.',
+      id: 'frame-rate',
+      signal: t('tw.rate.signal'),
+      problem: t('tw.rate.problem', { largest: deg(maxStep), max: cfg.maxStepDeg }),
+      needed: t('tw.rate.needed'),
     });
   }
   if (parts.monotonic < 0.8) {
     limitations.push({
-      signal: 'Twist direction',
-      problem: `The accumulated twist went one way and came back by ${deg(reversal)}: a real twist keeps turning one way, so the pose model probably flipped the body.`,
-      needed: 'A more stable pose estimate.',
+      id: 'direction',
+      signal: t('tw.direction.signal'),
+      problem: t('tw.direction.problem', { reversal: deg(reversal) }),
+      needed: t('tw.direction.needed'),
     });
   }
   if (parts.rounding < 0.5) {
     limitations.push({
-      signal: 'Rounding',
-      problem: `${deg(Math.abs(totalDeg))} is ${deg(Math.abs(residual))} away from a whole number of half twists.`,
-      needed: 'A cleaner estimate; the true twist is a multiple of 180° at landing.',
+      id: 'rounding',
+      signal: t('tw.rounding.signal'),
+      problem: t('tw.rounding.problem', { total: deg(Math.abs(totalDeg)), off: deg(Math.abs(residual)) }),
+      needed: t('tw.rounding.needed'),
     });
   }
   const depthDominated = nDepth ? depthShare / nDepth : null;
   if (depthDominated !== null && depthDominated > 0.5) {
     limitations.push({
-      signal: 'Side view',
-      problem: `In ${pct(depthDominated)} of the flight the shoulder line points along the viewing direction. Then the twist shows only as which shoulder is nearer to the camera, the weakest signal of a single-camera model.`,
-      needed: 'A second camera, or a view from the front or the back.',
+      id: 'side-view',
+      signal: t('tw.side.signal'),
+      problem: t('tw.side.problem', { share: pct(depthDominated) }),
+      needed: t('tw.side.needed'),
     });
   }
 
@@ -482,7 +496,7 @@ export function estimateTwistForJump(
 export function analyzeTwist(input: TwistInput, options: { config?: Partial<TwistConfig> } = {}): TwistAnalysis {
   const config = mergeTwistConfig(options.config);
   if (!input.world || input.world.length === 0 || input.world.every((f) => f === null)) {
-    return { config, frames: null, jumps: input.cycles.map(() => UNAVAILABLE(NO_3D)) };
+    return { config, frames: null, jumps: input.cycles.map(() => UNAVAILABLE(no3d())) };
   }
   const frames = computeTwistFrames(input.world, input.fps, config);
   return { config, frames, jumps: input.cycles.map((c) => estimateTwistForJump(frames, input.time, c, config)) };

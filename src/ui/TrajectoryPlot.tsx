@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, type PointerEvent } from 'reac
 import type { CalibrationModel } from '../analysis/calibration';
 import { sampleIndexAt } from '../analysis/lookup';
 import type { AnalysisResult } from '../analysis/types';
+import { t, useLocale } from '../i18n';
 import { drawPathLive, drawPathStill, type PathData } from './charts/drawPath';
 import { fitCanvas, readColors, type ChartColors } from './charts/draw';
 import { layoutTrajectory, nearestSample, pathDirections, pathPixels, trajectoryExtent } from './charts/trajectory';
@@ -30,6 +31,7 @@ export function TrajectoryPlot({ result, playhead, calibration = null, height = 
   const liveRef = useRef<HTMLCanvasElement>(null);
   const { width } = useElementSize(wrapRef);
   const theme = useThemeVersion();
+  const locale = useLocale();
   const { meta } = result;
 
   // Half of the bed along the on-screen horizontal, in the meters used for x (only when calibrated).
@@ -59,7 +61,7 @@ export function TrajectoryPlot({ result, playhead, calibration = null, height = 
     if (!canvas || width === 0) return;
     const ctx = fitCanvas(canvas, width, height);
     if (ctx && layout && path) drawPathStill(ctx, layout, path, result.jumps.cycles, bedHalf, colors);
-  }, [layout, path, result.jumps.cycles, bedHalf, colors, width, height]);
+  }, [layout, path, result.jumps.cycles, bedHalf, colors, width, height, locale]);
 
   const paintLive = useCallback(() => {
     const canvas = liveRef.current;
@@ -84,8 +86,8 @@ export function TrajectoryPlot({ result, playhead, calibration = null, height = 
     <figure className="chart chart--path">
       <figcaption className="chart__head">
         <span className="chart__title">
-          Center of mass path
-          <span className="chart__unit">m, x from {meta.calibrated ? 'bed center' : 'start'} against height</span>
+          {t('path.title')}
+          <span className="chart__unit">{t(meta.calibrated ? 'path.unitBed' : 'path.unitStart')}</span>
         </span>
       </figcaption>
       <div ref={wrapRef} className="chart__body" style={{ height }}>
@@ -97,12 +99,12 @@ export function TrajectoryPlot({ result, playhead, calibration = null, height = 
               className="chart__canvas chart__cursor"
               style={{ width, height }}
               role="img"
-              aria-label="Center of mass path: press on the path to move the video to that moment"
+              aria-label={t('path.aria')}
               onPointerDown={pick}
             />
           </>
         ) : (
-          <p className="chart__empty">No path: the scale could not be estimated.</p>
+          <p className="chart__empty">{t('path.empty')}</p>
         )}
       </div>
     </figure>

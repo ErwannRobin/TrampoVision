@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import { Button } from '../kit';
 
 export interface CalibrationBarProps {
@@ -12,26 +13,22 @@ export interface CalibrationBarProps {
 export function CalibrationBar({ corners, onUndo, onClear, onDone }: CalibrationBarProps) {
   const complete = corners >= 4;
   return (
-    <div className="calbar" role="group" aria-label="Mark the trampoline">
+    <div className="calbar" role="group" aria-label={t('calibration.group')}>
       <div className="calbar__steps" aria-hidden="true">
         {[0, 1, 2, 3].map((i) => (
           <span key={i} className={i < corners ? 'calbar__dot calbar__dot--set' : 'calbar__dot'} />
         ))}
       </div>
-      <p className="calbar__text">
-        {complete
-          ? 'Drag a corner to adjust it, then press Done.'
-          : `Click corner ${corners + 1} of 4, going around the bed. Scrub the video first if the bed is hidden.`}
-      </p>
+      <p className="calbar__text">{complete ? t('calibration.adjust') : t('calibration.click', { n: corners + 1 })}</p>
       <div className="calbar__actions">
         <Button variant="ghost" size="sm" disabled={corners === 0} onClick={onUndo}>
-          Undo
+          {t('common.undo')}
         </Button>
         <Button variant="ghost" size="sm" disabled={corners === 0} onClick={onClear}>
-          Clear
+          {t('common.clear')}
         </Button>
         <Button variant="primary" size="sm" onClick={onDone}>
-          Done
+          {t('common.done')}
         </Button>
       </div>
     </div>

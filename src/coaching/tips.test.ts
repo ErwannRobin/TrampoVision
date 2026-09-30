@@ -3,12 +3,13 @@ import type { JumpFeatures } from '../skills/types';
 import type { Deduction, Execution } from './execution';
 import { DRIFT_BED, DRIFT_M, focusOf, tipsForJump, type Tip } from './tips';
 
-const d = (id: Deduction['id'], value: number, label = 'x'): Deduction => ({
+/** `measured` null = the event never happened (an opening that did not come). */
+const d = (id: Deduction['id'], value: number, label = 'x', measured: number | null = 1): Deduction => ({
   id,
   label,
   value,
   detail: `detail of ${id}`,
-  measure: { name: 'm', value: 1, limit: 2, unit: 'deg' },
+  measure: { name: 'm', value: measured, limit: 2, unit: 'deg' },
   rule: '20.2',
 });
 const exec = (items: Deduction[]): Execution => ({
@@ -28,7 +29,11 @@ const features = (over: Partial<JumpFeatures['trajectory']> = {}, complete = tru
 
 describe('tips of a skill', () => {
   it('gives one tip per deduction, the ones worth the most first, each with what was measured', () => {
-    const tips = tipsForJump(2, exec([d('knees', 0.1), d('opening', 0.3, 'No opening'), d('arms', 0.1)]), features());
+    const tips = tipsForJump(
+      2,
+      exec([d('knees', 0.1), d('opening', 0.3, 'No opening', null), d('arms', 0.1)]),
+      features(),
+    );
     expect(tips.map((t) => t.id)).toEqual(['opening', 'knees', 'arms']);
     expect(tips[0]).toMatchObject({ jump: 2, gain: 0.3, title: 'Open before you land', detail: 'detail of opening' });
     expect(tips[1].text.length).toBeGreaterThan(10);

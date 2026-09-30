@@ -1,4 +1,5 @@
 import type { AnalysisResult } from '../../analysis/types';
+import { t } from '../../i18n/core';
 import type { TwistFrames } from '../../pose3d/twist';
 import { jumpTurnGuides, twistGuides, type Decorations, type SequenceColumns } from './decorations';
 import type { ChartAxis, ChartMarker, ChartProps } from './types';
@@ -27,17 +28,17 @@ export function motionSpecs(result: AnalysisResult, deco: Decorations): ChartSpe
   return [
     {
       id: 'height',
-      title: 'Center of mass height',
-      unit: `m above the ${result.meta.heightReference}`,
+      title: t('chart.height'),
+      unit: t(result.meta.heightReference === 'bed' ? 'chart.heightUnitBed' : 'chart.heightUnitLowest'),
       ...clip(result, deco),
       decimals: 2,
       minSpan: 0.5,
-      series: [{ label: 'Height', values: result.height, color: ONE }],
+      series: [{ label: t('chart.heightSeries'), values: result.height, color: ONE }],
     },
     {
       id: 'vy',
-      title: 'Center of mass vertical velocity',
-      unit: 'm/s, up = +',
+      title: t('chart.vy'),
+      unit: t('chart.vyUnit'),
       ...clip(result, deco),
       decimals: 2,
       zeroLine: true,
@@ -46,8 +47,8 @@ export function motionSpecs(result: AnalysisResult, deco: Decorations): ChartSpe
     },
     {
       id: 'x',
-      title: 'Center of mass horizontal position',
-      unit: `m from ${result.meta.calibrated ? 'bed center' : 'start'}, + = right`,
+      title: t('chart.x'),
+      unit: t(result.meta.calibrated ? 'chart.xUnitBed' : 'chart.xUnitStart'),
       ...clip(result, deco),
       decimals: 2,
       zeroLine: true,
@@ -62,31 +63,31 @@ export function rotationSpecs(result: AnalysisResult, deco: Decorations): ChartS
   return [
     {
       id: 'orientation',
-      title: 'Body orientation (continuous)',
-      unit: '°, keeps counting past 360',
+      title: t('chart.orientation'),
+      unit: t('chart.orientationUnit'),
       ...clip(result, deco),
       decimals: 0,
       minSpan: 40,
       guides: deco.turnGuides,
-      series: [{ label: 'Orientation', values: result.orientation, color: ONE }],
+      series: [{ label: t('chart.orientationSeries'), values: result.orientation, color: ONE }],
     },
     {
       id: 'angle',
-      title: 'Body angle (wrapped)',
-      unit: '° from vertical, + = clockwise',
+      title: t('chart.angle'),
+      unit: t('chart.angleUnit'),
       ...clip(result, deco),
       zeroLine: true,
       minSpan: 20,
       breakOnJump: 180,
-      note: 'The trunk runs from the hips to the shoulders, the body line from the ankles to the head.',
+      note: t('chart.angleNote'),
       series: [
-        { label: 'Trunk', values: result.trunkAngle, color: LIFT },
-        { label: 'Body line', values: result.lineAngle, color: DROP },
+        { label: t('chart.trunk'), values: result.trunkAngle, color: LIFT },
+        { label: t('chart.bodyLine'), values: result.lineAngle, color: DROP },
       ],
     },
     {
       id: 'angular-velocity',
-      title: 'Angular velocity',
+      title: t('chart.omega'),
       unit: '°/s',
       ...clip(result, deco),
       decimals: 0,
@@ -98,22 +99,22 @@ export function rotationSpecs(result: AnalysisResult, deco: Decorations): ChartS
 }
 
 const JOINTS = [
-  ['knee', 'Knee angle', 'leftKnee', 'rightKnee'],
-  ['hip', 'Hip angle', 'leftHip', 'rightHip'],
-  ['shoulder', 'Shoulder angle', 'leftShoulder', 'rightShoulder'],
-  ['elbow', 'Elbow angle', 'leftElbow', 'rightElbow'],
+  ['knee', 'chart.joint.knee', 'leftKnee', 'rightKnee'],
+  ['hip', 'chart.joint.hip', 'leftHip', 'rightHip'],
+  ['shoulder', 'chart.joint.shoulder', 'leftShoulder', 'rightShoulder'],
+  ['elbow', 'chart.joint.elbow', 'leftElbow', 'rightElbow'],
 ] as const;
 
 export function jointSpecs(result: AnalysisResult, deco: Decorations): ChartSpec[] {
   return JOINTS.map(([id, title, left, right]) => ({
     id,
-    title,
-    unit: '°, 180 = straight',
+    title: t(title),
+    unit: t('chart.jointUnit'),
     ...clip(result, deco),
     minSpan: 30,
     series: [
-      { label: 'Left', values: result.joints[left], color: LIFT },
-      { label: 'Right', values: result.joints[right], color: DROP },
+      { label: t('coach.left'), values: result.joints[left], color: LIFT },
+      { label: t('coach.right'), values: result.joints[right], color: DROP },
     ],
   }));
 }
@@ -121,13 +122,13 @@ export function jointSpecs(result: AnalysisResult, deco: Decorations): ChartSpec
 export function confidenceSpec(result: AnalysisResult, deco: Decorations): ChartSpec {
   return {
     id: 'confidence',
-    title: 'Pose confidence',
-    unit: '0–1, hatched below 0.5',
+    title: t('chart.confidenceTitle'),
+    unit: t('chart.confidenceUnit'),
     ...clip(result, deco),
     decimals: 2,
     yDomain: [0, 1],
-    guides: [{ value: 0.5, label: 'Unclear below' }],
-    series: [{ label: 'Confidence', values: result.confidence, color: ONE }],
+    guides: [{ value: 0.5, label: t('chart.unclearBelow') }],
+    series: [{ label: t('chart.confidenceSeries'), values: result.confidence, color: ONE }],
   };
 }
 
@@ -137,8 +138,8 @@ export function twistSpecs(result: AnalysisResult, frames: TwistFrames, deco: De
   return [
     {
       id: 'twist-angle',
-      title: 'Twist angle (accumulated)',
-      unit: '°, + = counter-clockwise seen from above the head',
+      title: t('chart.twistAngle'),
+      unit: t('chart.twistAngleUnit'),
       ...base,
       confidence: frames.torso.visibility,
       decimals: 0,
@@ -146,40 +147,40 @@ export function twistSpecs(result: AnalysisResult, frames: TwistFrames, deco: De
       minSpan: 200,
       guides: twistGuides(frames.angle),
       series: [
-        { label: 'Full 3D axis', values: frames.angle, color: LIFT },
-        { label: 'Axis in the image plane', values: frames.anglePlane, color: DROP },
+        { label: t('chart.axis3d'), values: frames.angle, color: LIFT },
+        { label: t('chart.axisPlane'), values: frames.anglePlane, color: DROP },
       ],
     },
     {
       id: 'twist-velocity',
-      title: 'Twist angular velocity',
+      title: t('chart.twistVelocity'),
       unit: '°/s',
       ...base,
       confidence: frames.torso.visibility,
       decimals: 0,
       zeroLine: true,
       minSpan: 200,
-      series: [{ label: 'ω twist', values: frames.angularVelocity, color: ONE }],
+      series: [{ label: t('chart.twistOmega'), values: frames.angularVelocity, color: ONE }],
     },
     {
       id: 'twist-tilt',
-      title: 'Trunk axis out of the image plane',
-      unit: '°: 0 = in the plane, large = pointing at the camera',
+      title: t('chart.tilt'),
+      unit: t('chart.tiltUnit'),
       ...base,
       decimals: 0,
       minSpan: 30,
-      series: [{ label: 'Tilt', values: frames.torso.axisTiltDeg, color: ONE }],
+      series: [{ label: t('chart.tiltSeries'), values: frames.torso.axisTiltDeg, color: ONE }],
     },
     {
       id: 'twist-width',
-      title: 'Shoulder width in 3D',
-      unit: 'm: a rigid body keeps it constant; changes are depth error',
+      title: t('chart.width'),
+      unit: t('chart.widthUnit'),
       ...base,
       decimals: 2,
       minSpan: 0.1,
       series: [
-        { label: 'Shoulders', values: frames.torso.shoulderWidthM, color: LIFT },
-        { label: 'Hips', values: frames.torso.hipWidthM, color: DROP },
+        { label: t('chart.shoulders'), values: frames.torso.shoulderWidthM, color: LIFT },
+        { label: t('chart.hips'), values: frames.torso.hipWidthM, color: DROP },
       ],
     },
   ];
@@ -197,16 +198,16 @@ export function jumpSpecs(
   return [
     {
       id: 'jump-height',
-      title: 'Center of mass height',
-      unit: 'body lengths above the takeoff position',
+      title: t('jump.height'),
+      unit: t('jump.heightUnit'),
       ...base,
       minSpan: 0.5,
-      series: [{ label: 'Height', values: cols.height, color: ONE }],
+      series: [{ label: t('chart.heightSeries'), values: cols.height, color: ONE }],
     },
     {
       id: 'jump-x',
-      title: 'Center of mass horizontal',
-      unit: useBed ? 'bed coordinates: ±1 = bed edge' : 'body lengths from the takeoff position',
+      title: t('jump.x'),
+      unit: t(useBed ? 'jump.xUnitBed' : 'jump.xUnitBody'),
       ...base,
       zeroLine: true,
       minSpan: 0.4,
@@ -214,28 +215,28 @@ export function jumpSpecs(
     },
     {
       id: 'jump-turns',
-      title: 'Body orientation',
-      unit: 'turns since takeoff, + = clockwise',
+      title: t('jump.turns'),
+      unit: t('jump.turnsUnit'),
       ...base,
       zeroLine: true,
       minSpan: 0.5,
       guides: jumpTurnGuides(cols.turns),
-      series: [{ label: 'Turns', values: cols.turns, color: ONE }],
+      series: [{ label: t('jump.turnsSeries'), values: cols.turns, color: ONE }],
     },
     {
       id: 'jump-shape',
-      title: 'Hip and knee angle',
-      unit: '°, 180 = straight',
+      title: t('jump.shape'),
+      unit: t('chart.jointUnit'),
       ...base,
       decimals: 0,
       minSpan: 60,
       guides: [
-        { value: position.hipFoldedMaxDeg, label: 'Hip folded' },
-        { value: position.kneeStraightMinDeg, label: 'Legs straight' },
+        { value: position.hipFoldedMaxDeg, label: t('jump.hipFolded') },
+        { value: position.kneeStraightMinDeg, label: t('jump.legsStraight') },
       ],
       series: [
-        { label: 'Hip', values: cols.hip, color: LIFT },
-        { label: 'Knee', values: cols.knee, color: DROP },
+        { label: t('jump.hip'), values: cols.hip, color: LIFT },
+        { label: t('jump.knee'), values: cols.knee, color: DROP },
       ],
     },
   ];

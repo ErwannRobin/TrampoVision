@@ -1,0 +1,55 @@
+import type { Translation } from '..';
+import type { names as en } from '../en/names';
+
+export const names: Translation<typeof en> = {
+  'list.separator': ', ',
+
+  'pos.straight': 'Tendu',
+  'pos.tuck': 'Groupé',
+  'pos.pike': 'Carpé',
+  'pos.straddle': 'Écart',
+  'pos.unknown': 'Inconnue',
+  'dir.front': 'Avant',
+  'dir.back': 'Arrière',
+
+  'truth.back': 'Salto arrière',
+  'truth.front': 'Salto avant',
+  'truth.unknown': 'Inconnu',
+
+  'skill.straight-jump': 'Saut droit',
+  'skill.tuck-jump': 'Saut groupé',
+  'skill.pike-jump': 'Saut carpé',
+  'skill.back': 'Salto arrière',
+  'skill.front': 'Salto avant',
+  'skill.fig-element': 'Élément',
+  'skill.somersault-direction-unknown': 'Salto (avant ou arrière indéterminé)',
+  'skill.unclassified': 'Non classé',
+
+  'name.somersault.1': 'salto {direction}',
+  'name.somersault.2': 'double salto {direction}',
+  'name.somersault.3': 'triple salto {direction}',
+  'name.somersault.1.any': 'salto',
+  'name.somersault.2.any': 'double salto',
+  'name.somersault.3.any': 'triple salto',
+  'name.twist.half': '½ vrille',
+  'name.twist.full': '1 vrille',
+  'name.twist.many': { one: '{n} vrille', other: '{n} vrilles' },
+  'name.twist.manyHalf': { one: '{n}½ vrille', other: '{n}½ vrilles' },
+  'name.withTwist': '{name}, {twist}',
+  'name.withPosition': '{name} ({position})',
+  'name.jump.straight': 'saut droit',
+  'name.jump.tuck': 'saut groupé',
+  'name.jump.pike': 'saut carpé',
+  'name.jump.straddle': 'saut écart',
+  'name.jumpTwist': 'saut avec {twist}',
+
+  'difficulty.jump': 'Saut',
+  'difficulty.twists': 'Vrilles',
+  'difficulty.somersaultsQuarters': 'Saltos et quarts de salto',
+  'difficulty.somersaults': 'Saltos',
+  'difficulty.quarters': 'Quarts de salto',
+  'difficulty.twistingMultiple': 'Salto multiple avec vrilles',
+  'difficulty.backwardMultiple': 'Salto multiple arrière',
+  'difficulty.pike': 'Position carpée',
+  'difficulty.straight': 'Position tendue',
+};

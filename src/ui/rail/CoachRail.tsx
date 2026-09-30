@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { AnalysisResult } from '../../analysis/types';
+import { t } from '../../i18n';
 import type { TwistAnalysis } from '../../pose3d/twist';
 import type { SkillAnalysis } from '../../skills/analyzeSkills';
 import type { SkillConfig } from '../../skills/config';
@@ -36,12 +37,12 @@ export interface CoachRailProps {
   notes: string[];
 }
 
-const TABS: TabDef<CoachTab>[] = [
-  { value: 'skill', label: 'Skill' },
-  { value: 'metrics', label: 'Metrics' },
-  { value: 'twist', label: 'Twist' },
-  { value: 'review', label: 'Review' },
-  { value: 'data', label: 'Data' },
+const tabs = (): TabDef<CoachTab>[] => [
+  { value: 'skill', label: t('coach.tab.skill') },
+  { value: 'metrics', label: t('coach.tab.metrics') },
+  { value: 'twist', label: t('coach.tab.twist') },
+  { value: 'review', label: t('coach.tab.review') },
+  { value: 'data', label: t('coach.tab.data') },
 ];
 
 const ID = 'coach';
@@ -67,6 +68,7 @@ export function CoachRail({
 }: CoachRailProps) {
   const total = skills.jumps.length;
   const k = Math.min(Math.max(selected, 0), Math.max(total - 1, 0));
+  const TABS = tabs();
 
   return (
     <div className="coach">
@@ -75,25 +77,27 @@ export function CoachRail({
           <div className="coach__nav">
             <IconButton
               icon="chevron-left"
-              label="Previous jump"
+              label={t('coach.previous')}
               size="sm"
               disabled={total === 0 || k === 0}
               onClick={() => onSelect(k - 1)}
             />
-            <span className="coach__jump num">{total > 0 ? `Jump ${k + 1} of ${total}` : 'No jumps found'}</span>
+            <span className="coach__jump num">
+              {total > 0 ? t('ins.jumpOf', { n: k + 1, total }) : t('coach.noJumps')}
+            </span>
             <IconButton
               icon="chevron-right"
-              label="Next jump"
+              label={t('coach.next')}
               size="sm"
               disabled={total === 0 || k >= total - 1}
               onClick={() => onSelect(k + 1)}
             />
           </div>
           <Button size="sm" icon="play" disabled={total === 0} onClick={onPlayJump}>
-            Play jump
+            {t('ins.playJump')}
           </Button>
         </header>
-        <Tabs idPrefix={ID} ariaLabel="Coach sections" value={tab} onChange={onTab} tabs={TABS} />
+        <Tabs idPrefix={ID} ariaLabel={t('coach.sections')} value={tab} onChange={onTab} tabs={TABS} />
       </div>
 
       <div

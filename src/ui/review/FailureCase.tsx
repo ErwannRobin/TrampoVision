@@ -2,17 +2,15 @@ import { flatRows } from '../../dataset/export';
 import type { CheckStatus, Failure } from '../../dataset/failures';
 import { PREDICTED_TEXT } from '../../dataset/metrics';
 import { TRUTH_TEXT } from '../../dataset/types';
+import { t, tx } from '../../i18n';
 import { pct } from '../format';
 import { Badge, Button, cx, Disclosure, Icon, type IconName } from '../kit';
 import { checkCount } from './logic';
 import { Sparks } from './Sparks';
 
 const STATUS_ICON: Record<CheckStatus, IconName> = { ok: 'check', off: 'close', unknown: 'info' };
-const STATUS_TEXT: Record<CheckStatus, string> = {
-  ok: 'agrees with the label',
-  off: 'differs from what the label needs',
-  unknown: 'no data',
-};
+const statusText = (s: CheckStatus): string =>
+  t(s === 'ok' ? 'fail.statusOk' : s === 'off' ? 'fail.statusOff' : 'fail.statusUnknown');
 
 interface FailureCaseProps {
   failure: Failure;
@@ -37,15 +35,21 @@ export function FailureCase({ failure: f, open, canGoTo, onGoTo }: FailureCasePr
         <span className="review-fail__title">
           <span className="review-fail__head">
             <span className="review-fail__file">{r.source.fileName}</span>
-            <span className="review-fail__jump">Jump {r.jumpId}</span>
+            <span className="review-fail__jump">{t('fail.jump', { id: r.jumpId })}</span>
           </span>
           <span className="review-fail__what">
             <span>
-              Labeled <span className="review-fail__value">{TRUTH_TEXT[f.truth]}</span>, predicted{' '}
-              <span className="review-fail__value">{PREDICTED_TEXT[f.predicted]}</span> at{' '}
-              <span className="num review-fail__value">{pct(f.confidence)}</span>
+              {tx('fail.labeledPredicted', {
+                truth: <span className="review-fail__value">{TRUTH_TEXT[f.truth]}</span>,
+                predicted: <span className="review-fail__value">{PREDICTED_TEXT[f.predicted]}</span>,
+                conf: <span className="num review-fail__value">{pct(f.confidence)}</span>,
+              })}
             </span>
-            {f.lowConfidence ? <Badge tone="warn">Low confidence</Badge> : <Badge tone="danger">Confident</Badge>}
+            {f.lowConfidence ? (
+              <Badge tone="warn">{t('fail.lowConfidence')}</Badge>
+            ) : (
+              <Badge tone="danger">{t('fail.confident')}</Badge>
+            )}
           </span>
         </span>
       }
@@ -54,29 +58,29 @@ export function FailureCase({ failure: f, open, canGoTo, onGoTo }: FailureCasePr
         {canGoTo && (
           <div>
             <Button size="sm" icon="video" onClick={() => onGoTo(r.timestamps.apexS)}>
-              Show this jump in the video
+              {t('fail.show')}
             </Button>
           </div>
         )}
 
         <div className="review-fail__grid">
           <section className="review-fail__part">
-            <h5 className="review-subhead">Label against measurement</h5>
-            <div className="review-scroll" role="region" aria-label="Label against measurement" tabIndex={0}>
+            <h5 className="review-subhead">{t('fail.against')}</h5>
+            <div className="review-scroll" role="region" aria-label={t('fail.against')} tabIndex={0}>
               <table className="review-table review-table--checks">
                 <thead>
                   <tr>
                     <th scope="col" className="review-cell review-cell--head review-cell--icon">
-                      <span className="sr-only">Status</span>
+                      <span className="sr-only">{t('fail.status')}</span>
                     </th>
                     <th scope="col" className="review-cell review-cell--head">
-                      Signal
+                      {t('fail.signal')}
                     </th>
                     <th scope="col" className="review-cell review-cell--head">
-                      The label needs
+                      {t('fail.needs')}
                     </th>
                     <th scope="col" className="review-cell review-cell--head">
-                      Measured
+                      {t('fail.measured')}
                     </th>
                   </tr>
                 </thead>
@@ -85,10 +89,10 @@ export function FailureCase({ failure: f, open, canGoTo, onGoTo }: FailureCasePr
                     <tr key={c.signal} className={cx(c.status === 'off' && 'review-check--differs')}>
                       <td
                         className={cx('review-cell review-cell--icon', `review-status--${c.status}`)}
-                        title={STATUS_TEXT[c.status]}
+                        title={statusText(c.status)}
                       >
                         <Icon name={STATUS_ICON[c.status]} size={15} strokeWidth={2.2} />
-                        <span className="sr-only">{STATUS_TEXT[c.status]}</span>
+                        <span className="sr-only">{statusText(c.status)}</span>
                       </td>
                       <th scope="row" className="review-cell review-cell--row">
                         {c.signal}
@@ -100,14 +104,11 @@ export function FailureCase({ failure: f, open, canGoTo, onGoTo }: FailureCasePr
                 </tbody>
               </table>
             </div>
-            <p className="review-note">
-              A cross marks where the measurement differs from what the label needs. It does not say which one is right:
-              check the video.
-            </p>
+            <p className="review-note">{t('fail.crossNote')}</p>
           </section>
 
           <section className="review-fail__part">
-            <h5 className="review-subhead">What the classifier saw</h5>
+            <h5 className="review-subhead">{t('fail.saw')}</h5>
             <p className="review-fail__summary">{p.summary}</p>
             <ul className="review-rows">
               {p.evidence.map((e) => (
@@ -121,7 +122,8 @@ export function FailureCase({ failure: f, open, canGoTo, onGoTo }: FailureCasePr
               <ul className="review-limits">
                 {p.limitations.map((l) => (
                   <li key={l.signal + l.problem}>
-                    <span className="review-fail__value">{l.signal}.</span> {l.problem} <em>Needed:</em> {l.needed}
+                    <span className="review-fail__value">{l.signal}.</span> {l.problem} <em>{t('coach.needed')}</em>{' '}
+                    {l.needed}
                   </li>
                 ))}
               </ul>
@@ -131,7 +133,7 @@ export function FailureCase({ failure: f, open, canGoTo, onGoTo }: FailureCasePr
 
         <Sparks record={r} />
 
-        <Disclosure title="All extracted features" meta={features.length}>
+        <Disclosure title={t('fail.allFeatures')} meta={features.length}>
           <dl className="review-features">
             {features.map(([k, v]) => (
               <div key={k} className="review-row">

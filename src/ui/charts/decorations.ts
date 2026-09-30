@@ -1,6 +1,7 @@
 import type { CalibrationModel } from '../../analysis/calibration';
 import type { JumpCycle } from '../../analysis/jumpCycles';
 import type { AnalysisResult } from '../../analysis/types';
+import { formatDecimal, t, tp } from '../../i18n/core';
 import { POSITIONS, type BodyPosition, type JumpSequence } from '../../skills/types';
 import { finiteExtent } from './geometry';
 import type { ChartAxis, ChartBand, ChartGuide, ChartMarker } from './types';
@@ -14,7 +15,7 @@ export interface Decorations {
   turnGuides: ChartGuide[];
 }
 
-const turns = (n: number) => `${n} turn${Math.abs(n) === 1 ? '' : 's'}`;
+const turns = (n: number) => tp('chart.turns', Math.abs(n), { n: formatDecimal(n) });
 
 /** Events, flights, bed edges and whole turns of a clip, in seconds and in the units of the whole-clip charts. */
 export function clipDecorations(
@@ -34,8 +35,8 @@ export function clipDecorations(
     calibration && meta.calibrated ? calibration.halfExtentM / calibration.metersPerPixel / meta.pixelsPerMeter : NaN;
   const bedGuides = Number.isFinite(halfBed)
     ? [
-        { value: -halfBed, label: 'Bed edge' },
-        { value: halfBed, label: 'Bed edge' },
+        { value: -halfBed, label: t('chart.bedEdge') },
+        { value: halfBed, label: t('chart.bedEdge') },
       ]
     : [];
   const turnGuides: ChartGuide[] = [];
@@ -58,7 +59,7 @@ export function twistGuides(angle: Float64Array): ChartGuide[] {
   for (let k = lo; k <= hi && out.length < 30; k++)
     out.push({
       value: k * 180,
-      label: k === 0 ? undefined : `${Math.abs(k) / 2} twist${Math.abs(k) === 2 ? '' : 's'}`,
+      label: k === 0 ? undefined : tp('chart.twists', Math.abs(k) / 2, { n: formatDecimal(Math.abs(k) / 2) }),
     });
   return out;
 }
@@ -122,7 +123,8 @@ export function sequenceAxis(seq: Pick<JumpSequence, 'takeoffTimeS' | 'durationS
   return {
     toX: (s) => (s - seq.takeoffTimeS) / seq.durationS,
     toSeconds: (x) => seq.takeoffTimeS + x * seq.durationS,
-    tick: (x) => (x === 0 ? 'takeoff' : x === 1 ? 'landing' : x.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')),
+    tick: (x) =>
+      x === 0 ? t('jump.takeoffTick') : x === 1 ? t('jump.landingTick') : formatDecimal(Number(x.toFixed(2))),
   };
 }
 

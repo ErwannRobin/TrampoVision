@@ -1,5 +1,6 @@
 import type { AnalysisResult } from '../../analysis/types';
 import type { SkillAnalysis } from '../../skills/analyzeSkills';
+import { formatDecimal } from '../../i18n/core';
 import { fmt } from '../format';
 import { confidenceTier } from '../insights';
 import { cssVar } from '../theme';
@@ -386,7 +387,7 @@ export function drawStatic(ctx: CanvasRenderingContext2D, w: number, h: number, 
     ctx.moveTo(px, lane.bottom + 1);
     ctx.lineTo(px, lane.bottom + 5);
     ctx.stroke();
-    ctx.fillText(`${Number(t.toFixed(2))} s`, px, lane.bottom + 8);
+    ctx.fillText(`${formatDecimal(Number(t.toFixed(2)), 2)} s`, px, lane.bottom + 8);
   }
   ctx.restore();
 }

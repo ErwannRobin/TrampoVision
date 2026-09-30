@@ -1,3 +1,4 @@
+import { t } from '../../i18n/core';
 import type { KnownPosition } from '../types';
 import type { Direction, Movement } from './elements';
 
@@ -63,32 +64,36 @@ export function difficultyOf(m: Movement): Difficulty {
 
   if (quarters === 0) {
     // A plain jump: tuck, pike and straddle jumps are elements worth 0.1, a straight jump is not; a twist adds its own value.
-    if (halfTwists === 0) add('Jump', m.position === 'straight' ? 0 : 0.1, '17.1.2');
-    else add('Twists', halfTwists * HALF_TWIST, '17.1.1.6');
+    if (halfTwists === 0) add(t('difficulty.jump'), m.position === 'straight' ? 0 : 0.1, '17.1.2');
+    else add(t('difficulty.twists'), halfTwists * HALF_TWIST, '17.1.1.6');
     return { value: tenths(parts.reduce((s, p) => s + p.value, 0)), parts };
   }
 
   add(
-    complete > 0 ? (extra > 0 ? 'Somersaults and quarters' : 'Somersaults') : 'Quarter somersaults',
+    complete > 0
+      ? extra > 0
+        ? t('difficulty.somersaultsQuarters')
+        : t('difficulty.somersaults')
+      : t('difficulty.quarters'),
     COMPLETE[complete] + extra * QUARTER,
     complete > 0 ? '17.1.1.2 to 17.1.1.5' : '17.1.1.1',
   );
-  add('Twists', halfTwists * HALF_TWIST, '17.1.1.6');
+  add(t('difficulty.twists'), halfTwists * HALF_TWIST, '17.1.1.6');
 
   if (halfTwists > TWIST_BONUS_AFTER[complete])
     add(
-      'Twisting multiple somersault',
+      t('difficulty.twistingMultiple'),
       (halfTwists - TWIST_BONUS_AFTER[complete]) * TWIST_BONUS[complete],
       '17.1.6.2 to 17.1.6.4',
     );
 
   if (m.direction === 'back' && complete >= 2)
-    add('Backward multiple somersault', BACKWARD_BONUS[complete], '17.1.6.1');
+    add(t('difficulty.backwardMultiple'), BACKWARD_BONUS[complete], '17.1.6.1');
 
   if (m.position !== 'tuck') {
-    if (complete >= 2) add(m.position === 'pike' ? 'Pike position' : 'Straight position', 0.1 * complete, '17.1.5');
-    else if (quarters >= 4 && quarters <= 7 && halfTwists === 0)
-      add(m.position === 'pike' ? 'Pike position' : 'Straight position', 0.1, '17.1.4');
+    const positionLabel = m.position === 'pike' ? t('difficulty.pike') : t('difficulty.straight');
+    if (complete >= 2) add(positionLabel, 0.1 * complete, '17.1.5');
+    else if (quarters >= 4 && quarters <= 7 && halfTwists === 0) add(positionLabel, 0.1, '17.1.4');
   }
   return { value: tenths(parts.reduce((s, p) => s + p.value, 0)), parts };
 }

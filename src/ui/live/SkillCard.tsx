@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { lower, t, tx } from '../../i18n';
 import { difficultyRange } from '../../skills/fig/difficulty';
+import { elementName } from '../../skills/fig/elements';
 import type { LiveJump } from '../../coaching/session';
-import { OTHER_LABEL } from '../../coaching/display';
+import { otherLabel } from '../../coaching/display';
 import { deductionText, difficultyText } from '../../coaching/summary';
 import { Button, Disclosure, cx } from '../kit';
 import { ElementPicker } from './ElementPicker';
@@ -26,23 +28,24 @@ export interface SkillActions {
 }
 
 const nameOf = (j: LiveJump): string => {
-  if (j.other) return OTHER_LABEL;
-  if (!j.element) return j.complete ? 'Not named' : 'Cut off by the clip';
-  return j.source === 'auto' && j.certainty === 'tentative' ? `${j.element.name}?` : j.element.name;
+  if (j.other) return otherLabel();
+  if (!j.element) return j.complete ? t('live.notNamed') : t('live.cutOff');
+  const name = elementName(j.element);
+  return j.source === 'auto' && j.certainty === 'tentative' ? `${name}?` : name;
 };
 
 /** What the row says under the name: how sure it is, in words. */
 export function subline(j: LiveJump): string {
   const parts: string[] = [];
-  if (!j.complete) parts.push('Filmed only in part');
-  else if (j.other) parts.push('Not in the list');
-  else if (j.source === 'coach') parts.push('Your label');
-  else if (j.pending) parts.push('Best guess, not counted yet');
-  else if (j.forced) parts.push('Best guess');
-  else if (j.certainty === 'tentative') parts.push('Not sure');
-  if (j.directionAssumed && j.source === 'auto') parts.push('direction assumed');
-  if (j.repeated) parts.push('repeat, does not count');
-  return parts.join(', ');
+  if (!j.complete) parts.push(t('live.sub.partial'));
+  else if (j.other) parts.push(t('live.sub.notInList'));
+  else if (j.source === 'coach') parts.push(t('live.sub.yours'));
+  else if (j.pending) parts.push(t('live.sub.pending'));
+  else if (j.forced) parts.push(t('live.sub.guess'));
+  else if (j.certainty === 'tentative') parts.push(t('live.sub.notSure'));
+  if (j.directionAssumed && j.source === 'auto') parts.push(t('live.sub.direction'));
+  if (j.repeated) parts.push(t('live.sub.repeat'));
+  return parts.join(t('list.separator'));
 }
 
 const tone = (deduction: number | null) =>
@@ -81,7 +84,7 @@ export function SkillRow({
       onKeyDown={onKeyDown}
     >
       <span className={cx('live-row__num num', selected && 'live-row__num--on')}>
-        <span className="sr-only">Skill </span>
+        <span className="sr-only">{t('live.skill')} </span>
         {jump.number}
       </span>
       <span className="live-row__main">
@@ -93,15 +96,15 @@ export function SkillRow({
         </span>
         {sub && <span className="live-row__sub">{sub}</span>}
       </span>
-      <span className="live-row__fig num" title={jump.pending ? 'Not counted until you check it' : 'Difficulty'}>
-        <span className="sr-only">Difficulty </span>
+      <span className="live-row__fig num" title={jump.pending ? t('live.notCounted') : t('live.difficulty')}>
+        <span className="sr-only">{t('live.difficulty')} </span>
         {jump.element && !jump.pending ? difficultyText(jump.counted) : '–'}
       </span>
       <span
         className={cx('live-row__fig num', !jump.pending && tone(jump.deduction))}
-        title={jump.pending ? 'Not counted until you check it' : 'Execution deduction'}
+        title={jump.pending ? t('live.notCounted') : t('live.executionDeduction')}
       >
-        <span className="sr-only">Execution </span>
+        <span className="sr-only">{t('live.execution')} </span>
         {jump.pending ? '–' : deductionText(jump.deduction)}
       </span>
     </button>
@@ -119,27 +122,28 @@ function CallBlock({ jump, actions }: { jump: LiveJump; actions: SkillActions })
   return (
     <section className="live-block live-block--call">
       {jump.other ? (
-        <p className="live-say">You said this is none of the skills in the list. It is left out of the totals.</p>
+        <p className="live-say">{t('live.say.other')}</p>
       ) : e ? (
         <p className="live-say">
-          {jump.source === 'coach' ? 'You said this is a ' : jump.forced ? 'Best guess: a ' : 'This looks like a '}
-          <strong>{e.name}</strong>.
-          {jump.directionAssumed && jump.source === 'auto' && ' Front or back could not be told, so back is assumed.'}
+          {tx(jump.source === 'coach' ? 'live.say.coach' : jump.forced ? 'live.say.forced' : 'live.say.auto', {
+            name: <strong>{elementName(e)}</strong>,
+          })}
+          {jump.directionAssumed && jump.source === 'auto' && t('sentence.gap') + t('live.say.directionAssumed')}
         </p>
       ) : null}
       {jump.source === 'auto' && jump.why && <p className="live-quiet">{jump.why}</p>}
       <div className="live-actions">
         {jump.source !== 'coach' && !jump.other && e && (
           <Button size="sm" variant="primary" icon="check" disabled={disabled} onClick={actions.onConfirm}>
-            Yes, that is it
+            {t('live.yes')}
           </Button>
         )}
         <Button size="sm" aria-expanded={changing} disabled={disabled} onClick={() => setChanging(!changing)}>
-          {changing ? 'Close' : 'Change'}
+          {changing ? t('common.close') : t('common.change')}
         </Button>
         {(jump.source === 'coach' || jump.other) && (
           <Button size="sm" variant="ghost" disabled={disabled} onClick={actions.onClear}>
-            Undo
+            {t('common.undo')}
           </Button>
         )}
         <Button
@@ -147,23 +151,23 @@ function CallBlock({ jump, actions }: { jump: LiveJump; actions: SkillActions })
           variant="ghost"
           icon="play"
           className="live-actions__play"
-          title="Play this skill with a little run-up and landing"
+          title={t('live.playTitle')}
           onClick={actions.onPlay}
         >
-          Play
+          {t('common.play')}
         </Button>
       </div>
       {changing && (
         <div className="live-change">
           {jump.alternatives.length > 0 && (
             <>
-              <p className="live-h">It could be</p>
+              <p className="live-h">{t('live.couldBe')}</p>
               <ul className="live-alts">
                 {jump.alternatives.slice(0, 3).map((a) => (
                   <li key={a.elementId}>
                     <button type="button" className="live-alt" onClick={() => pick(a.elementId)}>
                       <span>{a.name}</span>
-                      <span className="num live-alt__d" title="Difficulty">
+                      <span className="num live-alt__d" title={t('live.difficulty')}>
                         {difficultyText(a.difficulty)}
                       </span>
                     </button>
@@ -172,7 +176,7 @@ function CallBlock({ jump, actions }: { jump: LiveJump; actions: SkillActions })
               </ul>
             </>
           )}
-          <Disclosure title="Another skill" defaultOpen={jump.alternatives.length === 0}>
+          <Disclosure title={t('live.anotherSkill')} defaultOpen={jump.alternatives.length === 0}>
             <ElementPicker key={e?.id ?? 'none'} element={e} onPick={pick} />
           </Disclosure>
           <Button
@@ -183,11 +187,11 @@ function CallBlock({ jump, actions }: { jump: LiveJump; actions: SkillActions })
               actions.onOther();
             }}
           >
-            It is none of these
+            {t('live.noneOfThese')}
           </Button>
         </div>
       )}
-      {!actions.canLabel && <p className="live-quiet">Labels can be saved once the video is identified.</p>}
+      {!actions.canLabel && <p className="live-quiet">{t('live.cannotLabel')}</p>}
     </section>
   );
 }
@@ -199,38 +203,35 @@ function DifficultyBlock({ jump }: { jump: LiveJump }) {
   return (
     <section className="live-block">
       <div className="live-block__head">
-        <h4 className="live-h">Difficulty</h4>
+        <h4 className="live-h">{t('live.difficulty')}</h4>
         <span className="live-block__val num">{difficultyText(d.value)}</span>
       </div>
       {d.parts.length > 0 ? (
         <dl className="live-parts">
           {d.parts.map((p) => (
-            <div key={p.label} title={`FIG Code of Points 2025-2028, §${p.rule}`}>
+            <div key={p.label} title={t('live.partTitle', { rule: p.rule })}>
               <dt>{p.label}</dt>
               <dd className="num">{difficultyText(p.value)}</dd>
             </div>
           ))}
         </dl>
       ) : (
-        <p className="live-quiet">A straight jump is not an element: it has no difficulty.</p>
+        <p className="live-quiet">{t('live.noElement')}</p>
       )}
       {jump.easier && (
         <p className="live-quiet live-quiet--note">
-          The body looked like a {jump.easier.measured}
-          {jump.easier.hipDeg !== null &&
-            jump.easier.kneeDeg !== null &&
-            ` (hips ${Math.round(jump.easier.hipDeg)}°, knees ${Math.round(jump.easier.kneeDeg)}°)`}
-          . A judge gives the least difficult shape: {jump.easier.element.name} is worth{' '}
-          {difficultyText(jump.easier.element.difficulty)}.
+          {t(jump.easier.hipDeg !== null && jump.easier.kneeDeg !== null ? 'live.easierDetail' : 'live.easier', {
+            measured: lower(t(`pos.${jump.easier.measured}`)),
+            hip: `${Math.round(jump.easier.hipDeg ?? NaN)}°`,
+            knee: `${Math.round(jump.easier.kneeDeg ?? NaN)}°`,
+            element: elementName(jump.easier.element),
+            value: difficultyText(jump.easier.element.difficulty),
+          })}
         </p>
       )}
-      {jump.repeated && (
-        <p className="live-quiet">The same element was done earlier, so it counts for nothing in a routine.</p>
-      )}
+      {jump.repeated && <p className="live-quiet">{t('live.repeated')}</p>}
       {range && range.min !== range.max && (
-        <p className="live-quiet">
-          Front would be worth {difficultyText(range.min)}: the direction matters for a double or a triple.
-        </p>
+        <p className="live-quiet">{t('live.frontWorth', { value: difficultyText(range.min) })}</p>
       )}
     </section>
   );
@@ -241,7 +242,7 @@ function ExecutionBlock({ jump, actions }: { jump: LiveJump; actions: SkillActio
   return (
     <section className="live-block">
       <div className="live-block__head">
-        <h4 className="live-h">Execution</h4>
+        <h4 className="live-h">{t('live.execution')}</h4>
         <span className="live-block__val num">{deductionText(jump.deduction)}</span>
       </div>
       {x?.checked ? (
@@ -256,16 +257,16 @@ function ExecutionBlock({ jump, actions }: { jump: LiveJump; actions: SkillActio
             ))}
           </ul>
         ) : (
-          <p className="live-quiet">No deduction found in what one camera can see.</p>
+          <p className="live-quiet">{t('live.noDeduction')}</p>
         )
       ) : (
-        <p className="live-quiet">Not judged: {x?.reason ?? 'this skill has no measured shape.'}</p>
+        <p className="live-quiet">
+          {x?.reason ? t('live.notJudged', { reason: x.reason }) : t('live.notJudgedDefault')}
+        </p>
       )}
-      {x && x.quality < 0.5 && x.checked && (
-        <p className="live-quiet">The athlete was hard to see here, so treat this as a rough estimate.</p>
-      )}
-      <div className="live-yours" role="group" aria-label="Your execution score">
-        <span className="live-yours__name">Your deduction</span>
+      {x && x.quality < 0.5 && x.checked && <p className="live-quiet">{t('live.hardToSee')}</p>}
+      <div className="live-yours" role="group" aria-label={t('live.yourScore')}>
+        <span className="live-yours__name">{t('live.yourDeduction')}</span>
         <div className="live-chips">
           {SCORES.map((v) => (
             <button
@@ -282,10 +283,10 @@ function ExecutionBlock({ jump, actions }: { jump: LiveJump; actions: SkillActio
         </div>
       </div>
       {jump.coachDeduction !== null && jump.proposed !== null && jump.coachDeduction !== jump.proposed && (
-        <p className="live-quiet">The app proposed {deductionText(jump.proposed)}.</p>
+        <p className="live-quiet">{t('live.proposed', { value: deductionText(jump.proposed) })}</p>
       )}
       {x && x.unchecked.length > 0 && (
-        <Disclosure title="Not checked">
+        <Disclosure title={t('live.unchecked')}>
           <ul className="live-unchecked">
             {x.unchecked.map((u) => (
               <li key={u.id}>
@@ -303,13 +304,13 @@ function TipsBlock({ jump }: { jump: LiveJump }) {
   if (jump.tips.length === 0) return null;
   return (
     <section className="live-block">
-      <h4 className="live-h">What to fix</h4>
+      <h4 className="live-h">{t('live.fix')}</h4>
       <ul className="live-tips">
-        {jump.tips.map((t) => (
-          <li key={`${t.id}-${t.title}`} className="live-tip">
-            <p className="live-tip__title">{t.title}</p>
-            <p className="live-tip__text">{t.text}</p>
-            {t.gain === 0 && <p className="live-tip__detail">{t.detail}</p>}
+        {jump.tips.map((tip) => (
+          <li key={`${tip.id}-${tip.title}`} className="live-tip">
+            <p className="live-tip__title">{tip.title}</p>
+            <p className="live-tip__text">{tip.text}</p>
+            {tip.gain === 0 && <p className="live-tip__detail">{tip.detail}</p>}
           </li>
         ))}
       </ul>
@@ -330,13 +331,10 @@ export function SkillDetail({ jump, actions }: { jump: LiveJump; actions: SkillA
         </>
       ) : (
         <>
-          <p className="live-quiet">
-            The clip starts or ends during this skill, so it cannot be named or judged. Film a little before the takeoff
-            and after the landing.
-          </p>
+          <p className="live-quiet">{t('live.clipCutsSkill')}</p>
           <div className="live-actions">
             <Button size="sm" icon="play" onClick={actions.onPlay}>
-              Play
+              {t('common.play')}
             </Button>
           </div>
         </>

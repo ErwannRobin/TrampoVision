@@ -1,3 +1,4 @@
+import { lazyText } from '../../i18n/core';
 import type { TwistContext, JumpSequence } from '../types';
 
 /** The channels a movement signature is made of, in a fixed order. Every one is a function of normalized time (0 = takeoff, 1 = landing). */
@@ -14,17 +15,18 @@ export const CHANNELS = [
 ] as const;
 export type Channel = (typeof CHANNELS)[number];
 
-export const CHANNEL_LABELS: Record<Channel, string> = {
-  somersault: 'Somersault rotation (turns)',
-  twist: 'Twist rotation (turns)',
-  hip: 'Hip angle (÷180°)',
-  knee: 'Knee angle (÷180°)',
-  shoulderHip: 'Shoulder / hip alignment (÷90°)',
-  comHeight: 'Center-of-mass height (relative)',
-  angVel: 'Angular velocity (turns per flight)',
-  orientSin: 'Body orientation, sin',
-  orientCos: 'Body orientation, cos',
-};
+/** What each channel is called, in the language in use. */
+export const CHANNEL_LABELS: Record<Channel, string> = lazyText({
+  somersault: 'channel.somersault',
+  twist: 'channel.twist',
+  hip: 'channel.hip',
+  knee: 'channel.knee',
+  shoulderHip: 'channel.shoulderHip',
+  comHeight: 'channel.comHeight',
+  angVel: 'channel.angVel',
+  orientSin: 'channel.orientSin',
+  orientCos: 'channel.orientCos',
+});
 
 export type Channels = Record<Channel, number[]>;
 

@@ -1,5 +1,11 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { buildCalibration, DEFAULT_BED_M, type Quad, type TrampolineCalibration } from './analysis/calibration';
+import {
+  buildCalibration,
+  calibrationErrorText,
+  DEFAULT_BED_M,
+  type Quad,
+  type TrampolineCalibration,
+} from './analysis/calibration';
 import { computeAnalysis } from './analysis/computeAnalysis';
 import { download, toCsv, toJumpsCsv } from './analysis/export';
 import { extractPoseTrack } from './analysis/extractPoseTrack';
@@ -32,7 +38,7 @@ import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from
 import { buildPoseSeries, parsePoseSeries, toSeriesJson } from './analysis/timeSeries';
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point } from './pose/types';
-import { canDecode, disposeVideo, estimateFps, loadVideo } from './video/frames';
+import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
 import { loadSample, samplePath } from './video/sample';
 import { dragHasFiles, pickDroppedVideo } from './video/drop';
 import { transcodeToH264 } from './video/transcode';
@@ -58,7 +64,8 @@ import { Stage } from './ui/stage/Stage';
 import { Transport } from './ui/stage/Transport';
 import type { Appearance, Audience, CoachTab, RailView, StageView, Status } from './ui/types';
 import { useAnnotatedExport } from './ui/useAnnotatedExport';
-import { plural } from './ui/format';
+import { formatNumber, t, tp, useLocale } from './i18n';
+import { fmt } from './ui/format';
 
 const webgpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
 
@@ -92,6 +99,8 @@ function saveCalibration(file: File | null, cal: SavedCalibration) {
 }
 
 export default function App() {
+  // Text made while analyzing (skill names, tips, warnings) follows the language: it is made again when the language changes.
+  const locale = useLocale();
   const [url, setUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [fps, setFps] = useState(30);
@@ -194,7 +203,7 @@ export default function App() {
       track && result
         ? analyzeTwist({ world: track.world, time: result.time, fps: result.meta.fps, cycles: result.jumps.cycles })
         : null,
-    [track, result],
+    [track, result, locale], // oxlint-disable-line react-hooks/exhaustive-deps
   );
 
   // The jumps the person labelled with a figure are reference examples for the classifier. Keyed on what matters, so saving a
@@ -214,12 +223,12 @@ export default function App() {
   // The twist feeds the classifier: 'twists' is one of its four questions.
   const skills = useMemo(
     () => (result ? analyzeSkills(result, { config: skillConfig, twist, references, videoId }) : null),
-    [result, skillConfig, twist, references, videoId],
+    [result, skillConfig, twist, references, videoId, locale], // oxlint-disable-line react-hooks/exhaustive-deps
   );
   const jumpCount = skills?.jumps.length ?? 0;
   const jumpSel = Math.min(selectedJump, Math.max(0, jumpCount - 1));
 
-  const notes = useMemo(() => (result ? analysisWarnings(result) : []), [result]);
+  const notes = useMemo(() => (result ? analysisWarnings(result) : []), [result, locale]); // oxlint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => abort.current?.abort(), []);
 
@@ -361,9 +370,7 @@ export default function App() {
         finalUrl = convertedUrl;
         setUrl(convertedUrl);
         probe = await loadVideo(convertedUrl);
-        setNotice(
-          'This browser cannot decode the original file, so it was converted to H.264 (max 720p) in the browser.',
-        );
+        setNotice(t('app.converted'));
       }
       if (!probe) return;
       if (isCurrent()) setStatus({ kind: 'loading', stage: 'measuring' });
@@ -373,7 +380,7 @@ export default function App() {
       setFps(measured ?? 30);
       if (!advanced) {
         // The live view goes straight to the analysis: a coach on the trampoline has nothing to set up first.
-        if (!measured) setNotice('Could not measure the frame rate, so 30 fps is assumed.');
+        if (!measured) setNotice(t('app.fpsAssumed'));
         setStatus({ kind: 'idle' });
         setAutoUrl(finalUrl);
         return;
@@ -384,8 +391,7 @@ export default function App() {
           : {
               kind: 'error',
               severity: 'warning',
-              message:
-                'Could not measure the frame rate, so 30 fps is assumed. Set the real value under Analysis in the settings.',
+              message: t('app.fpsAssumedAdvanced'),
             },
       );
     } catch (err) {
@@ -424,7 +430,7 @@ export default function App() {
         return;
       }
       const msg = err instanceof Error ? err.message : String(err);
-      const hint = /^Seek to /.test(msg) ? '' : ` — if the model failed to load, run "npm run fetch-assets".`;
+      const hint = err instanceof SeekTimeoutError ? '' : t('app.fetchAssets');
       setStatus({ kind: 'error', message: `${msg}${hint}` });
     }
   }
@@ -443,7 +449,7 @@ export default function App() {
       setTrack(parsed.track);
       setSeriesName(parsed.source.fileName);
       setVideoId(parsed.source.videoId ?? videoId ?? videoIdFromTrack(parsed.source.fileName, parsed.track));
-      setBackend(`${parsed.source.backend} (from file)`);
+      setBackend(t('app.fromFile', { backend: parsed.source.backend }));
       setHeight(parsed.settings.athleteHeightM);
       setScaleSource(parsed.settings.scaleSource);
       setFps(parsed.source.sourceFps);
@@ -457,8 +463,7 @@ export default function App() {
       }
       setStatus({ kind: 'idle' });
       setNotice(
-        `Opened ${saved.name} (${parsed.track.frames.length} frames). ` +
-          (url ? 'Make sure the loaded video is the same clip.' : 'Add the video too to see the overlay.'),
+        t(url ? 'app.openedWithVideo' : 'app.openedNoVideo', { name: saved.name, frames: parsed.track.frames.length }),
       );
     } catch (err) {
       setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
@@ -467,8 +472,7 @@ export default function App() {
 
   /** Back to the first screen. Closing an analysis is asked for first: the numbers are not stored anywhere else. */
   function goHome() {
-    if (result && !window.confirm('Close this analysis? Save it from the export menu first if you want to keep it.'))
-      return;
+    if (result && !window.confirm(t('app.closeAnalysis'))) return;
     abort.current?.abort();
     if (url) URL.revokeObjectURL(url);
     fileRef.current = null;
@@ -532,7 +536,7 @@ export default function App() {
   const labels = useMemo(() => fresh.map(labelOf), [fresh]);
   const session = useMemo(
     () => (result && skills ? buildSession({ skills, result, twist, labels }) : null),
-    [result, skills, twist, labels],
+    [result, skills, twist, labels, locale], // oxlint-disable-line react-hooks/exhaustive-deps
   );
   // A new analysis of the live view opens on its first skill, not on a warm-up bounce.
   useEffect(() => {
@@ -647,15 +651,15 @@ export default function App() {
 
   const calStatus = (() => {
     if (editingCal) {
-      return corners.length < 4
-        ? `Click corner ${corners.length + 1} of 4 on the video: go around the bed. Scrub the video first if the bed is hidden.`
-        : 'Drag a corner to adjust it, then press Done.';
+      return corners.length < 4 ? t('calibration.status.click', { n: corners.length + 1 }) : t('calibration.adjust');
     }
-    if (!calibrationModel)
-      return 'Optional. Marks the bed so positions are measured relative to it. Works best with a level camera facing a side of the bed.';
-    if (!calibrationModel.ok) return calibrationModel.error;
+    if (!calibrationModel) return t('calibration.status.optional');
+    if (!calibrationModel.ok) return calibrationErrorText(calibrationModel.error);
     const m = calibrationModel.model;
-    return `Bed scale ${(1 / m.metersPerPixel).toFixed(0)} px/m at the bed center. The camera sees the bed ${m.viewAngleDeg.toFixed(0)}° from face-on (0° = a long side).`;
+    return t('calibration.status.scale', {
+      scale: formatNumber(1 / m.metersPerPixel, 0),
+      angle: formatNumber(m.viewAngleDeg, 0),
+    });
   })();
 
   // Labels on the video say more to a coach than to an athlete.
@@ -680,12 +684,12 @@ export default function App() {
     return [
       {
         id: 'video',
-        title: 'Video',
+        title: t('export.video'),
         items: [
           {
             id: 'annotated',
-            label: 'Annotated video (MP4)',
-            hint: 'The video with the skeleton, trajectory, labels and trampoline outline that are visible now',
+            label: t('export.annotated'),
+            hint: t('export.annotatedHint'),
             icon: 'film',
             disabled: !url || !annotated.available || annotated.exporting,
             onSelect: () => void annotated.start(),
@@ -694,26 +698,26 @@ export default function App() {
       },
       {
         id: 'data',
-        title: 'Data',
+        title: t('export.data'),
         items: [
           {
             id: 'frames',
-            label: 'Frames (CSV)',
-            hint: 'One row per frame',
+            label: t('export.frames'),
+            hint: t('export.framesHint'),
             icon: 'download',
             onSelect: () => download(`${base}-frames.csv`, toCsv(result), 'text/csv'),
           },
           {
             id: 'jumps',
-            label: 'Jumps (CSV)',
-            hint: 'One row per jump',
+            label: t('export.jumps'),
+            hint: t('export.jumpsHint'),
             icon: 'download',
             onSelect: () => download(`${base}-jumps.csv`, toJumpsCsv(result), 'text/csv'),
           },
           {
             id: 'series',
-            label: 'Save analysis (JSON)',
-            hint: 'Every frame: all joints with scores, center of mass, orientation, phase, plus the raw model output. Open it later to skip the analysis.',
+            label: t('export.series'),
+            hint: t('export.seriesHint'),
             icon: 'download',
             disabled: !track,
             onSelect: () =>
@@ -736,12 +740,12 @@ export default function App() {
       },
       {
         id: 'skills',
-        title: 'Skills',
+        title: t('export.skills'),
         items: [
           {
             id: 'skills-json',
-            label: 'Skills report (JSON)',
-            hint: 'Per jump: normalized sequence, features, prediction with evidence, and the thresholds used',
+            label: t('export.skillsJson'),
+            hint: t('export.skillsJsonHint'),
             icon: 'download',
             disabled: !skills,
             onSelect: () =>
@@ -761,16 +765,16 @@ export default function App() {
           },
           {
             id: 'skills-csv',
-            label: 'Skills (CSV)',
-            hint: 'One row per jump: features and prediction',
+            label: t('export.skillsCsv'),
+            hint: t('export.skillsCsvHint'),
             icon: 'download',
             disabled: !skills,
             onSelect: () => skills && download(`${base}-skills.csv`, toSkillsCsv(skills), 'text/csv'),
           },
           {
             id: 'sequences-csv',
-            label: 'Sequences (CSV)',
-            hint: 'One row per jump and normalized sample',
+            label: t('export.sequencesCsv'),
+            hint: t('export.sequencesCsvHint'),
             icon: 'download',
             disabled: !skills,
             onSelect: () => skills && download(`${base}-sequences.csv`, toSequencesCsv(skills), 'text/csv'),
@@ -778,13 +782,16 @@ export default function App() {
         ],
       },
     ];
-  }, [result, skills, track, url, base, fileName, videoId, stride, calibration, annotated]);
+  }, [result, skills, track, url, base, fileName, videoId, stride, calibration, annotated, locale]); // oxlint-disable-line react-hooks/exhaustive-deps
 
   const hasClip = !!url || !!result;
   // Both audiences of the advanced tools can pick the view. Without a clip only the 3D skeleton has anything to show. The live view is the video.
   const view: StageView = !advanced ? 'video' : !url && twist ? '3d' : stageView;
   const clipDetail = result
-    ? `${jumpCount} ${plural(jumpCount, 'jump')}, ${(result.time[result.time.length - 1] ?? 0).toFixed(1)} s`
+    ? t('app.clipDetail', {
+        jumps: tp('count.jumps', jumpCount),
+        seconds: fmt(result.time[result.time.length - 1] ?? 0, 1),
+      })
     : '';
 
   const pane =
@@ -889,8 +896,8 @@ export default function App() {
       {dragging && (
         <div className="dropzone" role="presentation">
           <Icon name="upload" size={40} strokeWidth={1.5} />
-          <span className="dropzone__title">{analyzing ? 'Analysis in progress' : 'Drop a video to analyze it'}</span>
-          <span className="dropzone__text">{analyzing ? 'Wait for it to finish first.' : 'MP4 or MOV'}</span>
+          <span className="dropzone__title">{analyzing ? t('app.dropBusy') : t('app.dropIdle')}</span>
+          <span className="dropzone__text">{analyzing ? t('app.dropWait') : t('app.dropFormats')}</span>
         </div>
       )}
 
@@ -916,7 +923,11 @@ export default function App() {
       />
 
       <main className="app__main">
-        {hasClip && <h1 className="sr-only">{result ? `Analysis of ${fileName}` : `Set up ${fileName}`}</h1>}
+        {hasClip && (
+          <h1 className="sr-only">
+            {result ? t('app.analysisOf', { name: fileName }) : t('app.setUp', { name: fileName })}
+          </h1>
+        )}
         {!hasClip ? (
           <>
             {loading && (
@@ -1011,7 +1022,7 @@ export default function App() {
               <aside
                 ref={railRef}
                 className="workspace__rail sheet"
-                aria-label={railView === 'setup' || !result ? 'Settings' : 'Analysis'}
+                aria-label={railView === 'setup' || !result ? t('setup.title') : t('app.analysis')}
               >
                 {!result || !skills || railView === 'setup' ? (
                   setup
@@ -1099,11 +1110,7 @@ export default function App() {
       </main>
 
       {annotated.exporting && (
-        <ActivityToast
-          label="Exporting the annotated video"
-          progress={annotated.progress ?? 0}
-          onCancel={annotated.cancel}
-        />
+        <ActivityToast label={t('app.exporting')} progress={annotated.progress ?? 0} onCancel={annotated.cancel} />
       )}
     </div>
   );

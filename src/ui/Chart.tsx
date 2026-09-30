@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type RefObject } from 'react';
+import { t } from '../i18n';
 import { readColors, drawChart, drawCursor, fitCanvas, type ChartColors } from './charts/draw';
 import { chartDomain, indexAt, makePlot } from './charts/geometry';
 import type { ChartProps } from './charts/types';
@@ -185,7 +186,7 @@ export function Chart({
           ref={cursorRef}
           className="chart__canvas chart__cursor"
           style={{ width, height }}
-          aria-label={`${title}: click or drag to move the video`}
+          aria-label={t('chart.aria', { title })}
           role="img"
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);

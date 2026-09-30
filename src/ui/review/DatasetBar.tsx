@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { download } from '../../analysis/export';
 import { toDatasetCsv, toDatasetJson } from '../../dataset/export';
 import type { DatasetApi } from '../../dataset/useDataset';
-import { plural } from '../format';
+import { t, tp, tx } from '../../i18n';
 import { Button, Disclosure, Icon } from '../kit';
 import { datasetMeta, summarizeDataset } from './logic';
 
@@ -22,17 +22,17 @@ export function DatasetBar({ dataset, baseName, onSaveAll, saveCount, canSave }:
   const onImport = async (f: File) => {
     try {
       const { added, updated, kept } = await dataset.importText(await f.text());
-      setMessage(`Imported: ${added} added, ${updated} updated, ${kept} kept (already newer here).`);
+      setMessage(t('dataset.imported', { added, updated, kept }));
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e));
     }
   };
   const storage =
     dataset.kind === 'indexeddb'
-      ? 'Stored in this browser (IndexedDB).'
+      ? t('dataset.indexeddb')
       : dataset.kind === 'memory'
-        ? 'Kept in memory only.'
-        : 'Opening the local database…';
+        ? t('dataset.memory')
+        : t('dataset.opening');
 
   return (
     <div className="review-dataset">
@@ -43,24 +43,22 @@ export function DatasetBar({ dataset, baseName, onSaveAll, saveCount, canSave }:
           {dataset.error}
         </p>
       )}
-      <Disclosure title="Dataset on this computer" meta={datasetMeta(summary)}>
+      <Disclosure title={t('dataset.title')} meta={datasetMeta(summary)}>
         <div className="review-dataset__body">
           <p className="review-dataset__summary">
-            <span className="num">{summary.jumps}</span> {plural(summary.jumps, 'jump')} from{' '}
-            <span className="num">{summary.videos}</span> {plural(summary.videos, 'video')},{' '}
-            <span className="num">{summary.labeled}</span> labeled.
+            {tx('dataset.summary', {
+              jumps: <span className="num">{tp('count.jumps', summary.jumps)}</span>,
+              videos: <span className="num">{tp('count.videos', summary.videos)}</span>,
+              labeled: <span className="num">{summary.labeled}</span>,
+            })}
           </p>
           <p className="review-note">{storage}</p>
           <div className="review-dataset__actions">
             {onSaveAll && (
-              <Button
-                size="sm"
-                icon="plus"
-                disabled={!canSave}
-                onClick={onSaveAll}
-                title="Stores every detected jump of this video, with its measurements and prediction"
-              >
-                Save all{saveCount !== undefined && ` ${saveCount} ${plural(saveCount, 'jump')}`}
+              <Button size="sm" icon="plus" disabled={!canSave} onClick={onSaveAll} title={t('dataset.saveTitle')}>
+                {saveCount !== undefined
+                  ? t('dataset.saveAllCount', { jumps: tp('count.jumps', saveCount) })
+                  : t('dataset.saveAll')}
               </Button>
             )}
             <Button
@@ -69,7 +67,7 @@ export function DatasetBar({ dataset, baseName, onSaveAll, saveCount, canSave }:
               disabled={empty}
               onClick={() => download(`${baseName}-dataset.json`, toDatasetJson(dataset.records), 'application/json')}
             >
-              Dataset JSON
+              {t('dataset.json')}
             </Button>
             <Button
               size="sm"
@@ -77,11 +75,11 @@ export function DatasetBar({ dataset, baseName, onSaveAll, saveCount, canSave }:
               disabled={empty}
               onClick={() => download(`${baseName}-dataset.csv`, toDatasetCsv(dataset.records), 'text/csv')}
             >
-              Dataset CSV
+              {t('dataset.csv')}
             </Button>
             <label className="btn btn--secondary btn--sm review-file">
               <Icon name="upload" size={15} />
-              Import dataset…
+              {t('dataset.import')}
               <input
                 className="sr-only"
                 type="file"
@@ -100,12 +98,10 @@ export function DatasetBar({ dataset, baseName, onSaveAll, saveCount, canSave }:
               icon="trash"
               disabled={empty}
               onClick={() =>
-                window.confirm(
-                  `Delete all ${dataset.records.length} saved jumps and their labels from this browser? Export first if you want to keep them.`,
-                ) && void dataset.clear()
+                window.confirm(tp('dataset.deleteConfirm', dataset.records.length)) && void dataset.clear()
               }
             >
-              Delete all…
+              {t('dataset.delete')}
             </Button>
           </div>
           {message && (

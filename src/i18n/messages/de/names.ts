@@ -1,0 +1,55 @@
+import type { Translation } from '..';
+import type { names as en } from '../en/names';
+
+export const names: Translation<typeof en> = {
+  'list.separator': ', ',
+
+  'pos.straight': 'Gestreckt',
+  'pos.tuck': 'Gehockt',
+  'pos.pike': 'Gebückt',
+  'pos.straddle': 'Gegrätscht',
+  'pos.unknown': 'Unbekannt',
+  'dir.front': 'Vorwärts',
+  'dir.back': 'Rückwärts',
+
+  'truth.back': 'Salto rückwärts',
+  'truth.front': 'Salto vorwärts',
+  'truth.unknown': 'Unbekannt',
+
+  'skill.straight-jump': 'Strecksprung',
+  'skill.tuck-jump': 'Hocksprung',
+  'skill.pike-jump': 'Bücksprung',
+  'skill.back': 'Salto rückwärts',
+  'skill.front': 'Salto vorwärts',
+  'skill.fig-element': 'Element',
+  'skill.somersault-direction-unknown': 'Salto (vorwärts oder rückwärts unbestimmt)',
+  'skill.unclassified': 'Nicht klassifiziert',
+
+  'name.somersault.1': 'Salto {direction}',
+  'name.somersault.2': 'Doppelsalto {direction}',
+  'name.somersault.3': 'Dreifachsalto {direction}',
+  'name.somersault.1.any': 'Salto',
+  'name.somersault.2.any': 'Doppelsalto',
+  'name.somersault.3.any': 'Dreifachsalto',
+  'name.twist.half': 'halber Schraube',
+  'name.twist.full': 'ganzer Schraube',
+  'name.twist.many': { one: '{n} Schraube', other: '{n} Schrauben' },
+  'name.twist.manyHalf': { one: '{n}½ Schraube', other: '{n}½ Schrauben' },
+  'name.withTwist': '{name} mit {twist}',
+  'name.withPosition': '{name} ({position})',
+  'name.jump.straight': 'Strecksprung',
+  'name.jump.tuck': 'Hocksprung',
+  'name.jump.pike': 'Bücksprung',
+  'name.jump.straddle': 'Grätschsprung',
+  'name.jumpTwist': 'Sprung mit {twist}',
+
+  'difficulty.jump': 'Sprung',
+  'difficulty.twists': 'Schrauben',
+  'difficulty.somersaultsQuarters': 'Saltos und Viertelsaltos',
+  'difficulty.somersaults': 'Saltos',
+  'difficulty.quarters': 'Viertelsaltos',
+  'difficulty.twistingMultiple': 'Mehrfachsalto mit Schrauben',
+  'difficulty.backwardMultiple': 'Mehrfachsalto rückwärts',
+  'difficulty.pike': 'Gebückte Haltung',
+  'difficulty.straight': 'Gestreckte Haltung',
+};

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { sampleIndexAt } from '../../analysis/lookup';
+import { t } from '../../i18n';
 import type { AnalysisResult } from '../../analysis/types';
 import type { Point } from '../../pose/types';
 import type { SkillAnalysis } from '../../skills/analyzeSkills';
@@ -40,11 +41,12 @@ const PICK_RADIUS_PX = 16;
 const SPLIT_GAP_PX = 12;
 const NO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
 
-const VIEW_OPTIONS = [
-  { value: 'video', label: 'Video', icon: 'video', title: 'The video with the skeleton' },
-  { value: 'split', label: 'Split', icon: 'split', title: 'The video next to the 3D skeleton' },
-  { value: '3d', label: '3D', icon: 'cube', title: 'The 3D skeleton alone (experimental)' },
-] as const;
+const viewOptions = () =>
+  [
+    { value: 'video', label: t('stage.viewVideo'), icon: 'video', title: t('stage.viewVideoTitle') },
+    { value: 'split', label: t('stage.viewSplit'), icon: 'split', title: t('stage.viewSplitTitle') },
+    { value: '3d', label: t('stage.view3d'), icon: 'cube', title: t('stage.view3dTitle') },
+  ] as const;
 
 /** Keys that belong to a focused control are not ours. */
 function isTyping(target: EventTarget | null): boolean {
@@ -247,7 +249,7 @@ export function Stage({
   const showPane = !!pane && view !== 'video';
 
   return (
-    <div className="stage" ref={viewportRef} role="region" aria-label="Video">
+    <div className="stage" ref={viewportRef} role="region" aria-label={t('stage.region')}>
       {url ? (
         <div
           className="stage__frame"
@@ -274,7 +276,7 @@ export function Stage({
               playerRef.current?.clearRange();
             }}
             onEnded={() => playhead.setPlaying(false)}
-            onError={() => onError('This browser cannot play the video. Try an MP4 (H.264) file.')}
+            onError={() => onError(t('stage.cannotPlay'))}
           />
           <canvas
             ref={canvasRef}
@@ -289,11 +291,11 @@ export function Stage({
       ) : (
         <div className="stage__empty">
           <Icon name="film" size={28} strokeWidth={1.5} />
-          <p className="stage__empty-title">Add the video to see the skeleton on it</p>
-          <p className="stage__empty-text">The charts and the panels already work without it.</p>
+          <p className="stage__empty-title">{t('stage.emptyTitle')}</p>
+          <p className="stage__empty-text">{t('stage.emptyText')}</p>
           <label className="btn btn--secondary stage__pick">
             <Icon name="upload" size={17} />
-            Choose video
+            {t('stage.choose')}
             <input
               type="file"
               accept="video/mp4,video/quicktime,.mp4,.mov"
@@ -320,12 +322,12 @@ export function Stage({
       {onView && (
         <div className="stage__views">
           <Segmented<StageView>
-            ariaLabel="Stage view"
+            ariaLabel={t('stage.views')}
             size="sm"
             value={view}
             onChange={onView}
-            options={VIEW_OPTIONS.map((o) =>
-              url || o.value === '3d' ? { ...o } : { ...o, disabled: true, title: 'A saved analysis has no video' },
+            options={viewOptions().map((o) =>
+              url || o.value === '3d' ? { ...o } : { ...o, disabled: true, title: t('stage.noVideo') },
             )}
           />
         </div>

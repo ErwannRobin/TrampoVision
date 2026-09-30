@@ -1,4 +1,5 @@
 import type { JumpCycle } from '../analysis/jumpCycles';
+import { lazyText } from '../i18n/core';
 import type { TwistEstimate } from '../pose3d/twist';
 import type { SkillConfig } from './config';
 import type { Movement } from './fig/elements';
@@ -168,16 +169,17 @@ export type SkillId =
   | 'somersault-direction-unknown'
   | 'unclassified';
 
-export const SKILL_LABELS: Record<SkillId, string> = {
-  'straight-jump': 'Straight Jump',
-  'tuck-jump': 'Tuck Jump',
-  'pike-jump': 'Pike Jump',
-  back: 'Back',
-  front: 'Front',
-  'fig-element': 'Element',
-  'somersault-direction-unknown': 'Somersault (front or back undetermined)',
-  unclassified: 'Unclassified',
-};
+/** What each skill is called, in the language in use (read it when it is needed: it changes with the language). */
+export const SKILL_LABELS: Record<SkillId, string> = lazyText({
+  'straight-jump': 'skill.straight-jump',
+  'tuck-jump': 'skill.tuck-jump',
+  'pike-jump': 'skill.pike-jump',
+  back: 'skill.back',
+  front: 'skill.front',
+  'fig-element': 'skill.fig-element',
+  'somersault-direction-unknown': 'skill.somersault-direction-unknown',
+  unclassified: 'skill.unclassified',
+});
 
 export interface EvidenceItem {
   /** Stable key for scripts, e.g. "hip_angle". */
@@ -191,6 +193,8 @@ export interface EvidenceItem {
 }
 
 export interface Limitation {
+  /** Stable key for code (the texts follow the language). */
+  id?: string;
   /** The signal that is unreliable or missing. */
   signal: string;
   problem: string;

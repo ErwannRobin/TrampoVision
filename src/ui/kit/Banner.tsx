@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { t } from '../../i18n';
 import { cx } from './cx';
 import { IconButton } from './Button';
 import { Icon } from './icons';
@@ -37,7 +38,9 @@ export function Banner({
       {(action || onDismiss) && (
         <div className="banner__actions">
           {action}
-          {onDismiss && <IconButton icon="close" label="Dismiss" size="sm" onClick={onDismiss} tip={false} />}
+          {onDismiss && (
+            <IconButton icon="close" label={t('common.dismiss')} size="sm" onClick={onDismiss} tip={false} />
+          )}
         </div>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { t } from '../../../i18n';
 import { Button, cx } from '../../kit';
 import { bedMarkers, bedSentenceParts, bedUnavailable, type BedEvent, type BedPositions } from './bed';
 import { Fade } from './Fade';
@@ -47,7 +48,7 @@ export function BedPosition({ jump, bed, complete, calibrated, calibrationError,
         <p className="ins-quiet">{text}</p>
         {setup && (
           <Button size="sm" onClick={onOpenSetup}>
-            Open settings
+            {t('ins.openSettings')}
           </Button>
         )}
       </section>
@@ -56,7 +57,7 @@ export function BedPosition({ jump, bed, complete, calibrated, calibrationError,
 
   return (
     <section className="ins-section">
-      <h3 className="ins-h">Landing on the bed</h3>
+      <h3 className="ins-h">{t('bed.title')}</h3>
       <Fade on={jump}>
         <div className="ins-bed">
           <svg className="ins-bed__svg" width="100%" height={HEIGHT} aria-hidden="true">
@@ -68,13 +69,13 @@ export function BedPosition({ jump, bed, complete, calibrated, calibrationError,
               </svg>
             ))}
             <text className="ins-bed__label" x="0" y={LABEL_Y} textAnchor="start">
-              Left edge
+              {t('bed.left')}
             </text>
             <text className="ins-bed__label" x="50%" y={LABEL_Y} textAnchor="middle">
-              Center
+              {t('bed.center')}
             </text>
             <text className="ins-bed__label" x="100%" y={LABEL_Y} textAnchor="end">
-              Right edge
+              {t('bed.right')}
             </text>
           </svg>
         </div>

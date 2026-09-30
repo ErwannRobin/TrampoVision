@@ -85,6 +85,20 @@ Open the app, film a set (a phone opens its camera; a computer picks a file) or 
 
 The interface adapts from phones to wide screens and follows the system's light or dark appearance (or the choice in _Settings_). Its design rules, tokens and parts are in [`docs/ui-design.md`](docs/ui-design.md).
 
+## Languages
+
+The whole interface is in **English, French, German and Japanese**: the skill names, the coaching text and tips, the classifier's explanations, the errors, the charts, the canvas labels and the review page (`review.html`). The app opens in the first language of the browser that it speaks (else English); the globe menu in the top bar changes it, and the choice is remembered. Files you export (JSON, CSV, the exported video) keep the English skill names and field names, so a dataset stays comparable whatever the language of the person who labelled it.
+
+How it is built (`src/i18n/`):
+
+- **English is the source.** `src/i18n/messages/en/*.ts` hold every message, one file per part of the app; `fr/`, `de/` and `ja/` have the same files. The type `Dictionary` makes a missing key a compile error, and `src/i18n/i18n.test.ts` checks that each language has exactly the keys of English, the same `{holes}` in every form, no untranslated English (a name or a shared word is listed on purpose), and no key written twice.
+- **Reading a message.** `t(key, params)` fills the `{holes}`; `tp(key, count, params)` picks the singular or the plural form of the language (`Intl.PluralRules`); `tx(key, holes)` fills holes with React nodes; `formatNumber`, `formatDecimal` and `formatPercent` write numbers as the language does (0,6 in French and German). French gets its no-break spaces before `: ; ? !` from `t`, so the messages are written with plain spaces.
+- **Loading.** A language is a separate chunk of the build and the first screen waits for the one in use, so a visitor downloads the one they read. Modules that are not UI (the analysis, the classifier, the review worker) import `i18n/core`, which has no React.
+- **Text made by an analysis** (a prediction's summary, a tip, a limitation) is written in the language in use when it is made and is rebuilt when the language changes. A name stored in data (`FigElement.name`) stays English; `elementName(element)` gives the one to show. A saved record and its fingerprint do not depend on the language.
+- **The words of the sport** are the ones coaches use in each language: _Difficulté / Exécution_ (French), _Schwierigkeit / Haltung_ and _Schraube_ for a twist (German), _難度 / 演技点_ and _ひねり_ (Japanese). French and German address the person formally (_vous_, _Sie_); Japanese is polite (です・ます).
+
+To add a language: add it to `LOCALES` and `LANGUAGE_NAMES` in `src/i18n/locale.ts`, copy `src/i18n/messages/en/` to a folder named after it, translate, and add its loader in `src/i18n/messages/index.ts`. `make check` lists what is missing.
+
 ## Pipeline and code map
 
 ```
@@ -107,6 +121,7 @@ video ─► extractPoseTrack ─► PoseTrack ─► stabilizePose ─► compu
 | `src/analysis/timeSeries.ts`                              | The frame-by-frame store (`PoseSeries` JSON, import/export) and a numeric feature matrix.                                                      |
 | `src/video/overlay.ts`                                    | Canvas overlay drawn on the video and in the exported video: skeleton, center of mass, trajectory comet, label chips, bed outline.             |
 | `src/ui/*`, `src/styles/*`                                | The interface (see `docs/ui-design.md`): design tokens and kit, stage and transport, timeline, athlete and coach rails, charts, settings.      |
+| `src/i18n/*`                                              | `t`, `tp`, `tx`, the number formats, the language in use and its loading, and the messages (English is the source, the others are checked).    |
 | `src/localOnlyGuard.ts` + CSP in `vite.config.ts`         | Blocks any cross-origin network request (see below).                                                                                           |
 | `src/analysis/testTracks.ts`                              | Test-only synthetic routines with analytic ground truth.                                                                                       |
 | `src/skills/frameShape.ts`                                | Per-sample pose measurements: hip/knee angles, knee-to-torso distance, compactness, leg separation, body-frame joint coordinates, facing cues. |

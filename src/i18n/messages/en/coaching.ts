@@ -1,0 +1,177 @@
+/**
+ * The live view and the coaching behind it: the deductions of the execution check, the tips, the summary of a set, and the words of
+ * the screen where a coach says what each skill was.
+ */
+export const coaching = {
+  // Where sentences are joined in code (Japanese has no space between them)
+  'sentence.gap': ' ',
+  'count.skills': { one: '{n} skill', other: '{n} skills' },
+  'unit.points': { one: '{n} point', other: '{n} points' },
+
+  // The position of the body on the clock of a somersault
+  'exec.clock': { one: "{hour} o'clock", other: "{hour} o'clock" },
+
+  // What could not be judged, and why
+  'exec.unchecked.feet.label': 'Feet and knees together, pointed toes',
+  'exec.unchecked.feet.why': 'Needs a view from the front or the back.',
+  'exec.none.cutOff': 'The skill is cut off by the clip, so its shape cannot be judged.',
+  'exec.none.noSequence': 'The pose was not tracked well enough to measure this skill.',
+  'exec.none.hardToSee': 'The athlete was hard to see, so too little of the pose was measured to judge this skill.',
+  'exec.none.tooLittle': 'Too little of the pose was measured to judge this skill.',
+
+  // The deductions
+  'exec.knees.label': 'Bent knees',
+  'exec.knees.detailPike': 'Knees at {deg}° in the pike (straight is {limit}° or more).',
+  'exec.knees.detailLayout': 'Knees at {deg}° in the layout (straight is {limit}° or more).',
+  'exec.bodyLine.label': 'Body line',
+  'exec.bodyLine.detail': 'Hips at {deg}° in the layout (open is {limit}° or more).',
+  'exec.opening.label': 'Opening',
+  'exec.opening.whyNoClock':
+    'The measured rotation does not match the somersaults of this skill, so the body cannot be placed on the clock.',
+  'exec.opening.whyFlipped':
+    'The rotation was not tracked reliably (the pose may have flipped), so the body cannot be placed on the clock.',
+  'exec.opening.whyNoFold': 'The hips never folded clearly, so there is no opening to time.',
+  'exec.noOpening.label': 'No opening',
+  'exec.noOpening.detail': "The body was not straight before 3 o'clock (hips at {deg}° or more).",
+  'exec.lateOpening.label': 'Late opening',
+  'exec.lateOpening.detail12': "Straight between 1 and 2 o'clock (on time is by 1 o'clock).",
+  'exec.lateOpening.detail23': "Straight between 2 and 3 o'clock (on time is by 1 o'clock).",
+  'exec.pikeDown.label': 'Piking down',
+  'exec.pikeDown.detail': "The hips folded again to {deg}° after opening (keep the body straight until 3 o'clock).",
+  'exec.arms.label': 'Arms',
+  'exec.arms.detailAway': 'Arms {deg}° away from the body (keep them within {limit}°).',
+  'exec.arms.detailBent': 'Elbows bent to {deg}° (keep the arms straight in a skill of this twist).',
+  'exec.twistEnd.label': 'Twist finishes late',
+  'exec.twistEnd.detail': "The last 90° of the twist come at {clock} or later (it should be done by 3 o'clock).",
+  'exec.twistEnd.uncheckedLabel': 'End of the twist',
+  'exec.twistEnd.uncheckedWhy': 'The 3D twist is experimental and was not reliable here.',
+
+  // The tips: the cue that goes with each deduction
+  'tip.knees.title': 'Straighten the legs',
+  'tip.knees.text': 'Squeeze the thighs together and push the toes away to lock the knees.',
+  'tip.opening.title': 'Open earlier',
+  'tip.opening.text': 'Look for the bed as you pass the top and open the hips sooner: be straight by 1 o’clock.',
+  'tip.noOpening.title': 'Open before you land',
+  'tip.noOpening.text': 'Start opening as soon as you pass the top: stretch out and look for the bed.',
+  'tip.pikeDown.title': 'Stay open',
+  'tip.pikeDown.text': 'Once you are open, hold the straight body until you are horizontal, then prepare the landing.',
+  'tip.bodyLine.title': 'Stay long',
+  'tip.bodyLine.text': 'Squeeze the glutes and keep the chest up so the hips do not fold.',
+  'tip.arms.title': 'Arms in',
+  'tip.arms.text': 'Keep the arms straight and close to the body, hands by the thighs.',
+  'tip.twistEnd.title': 'Finish the twist sooner',
+  'tip.twistEnd.text': 'Start the twist earlier and pull the arms in so it is done before you are horizontal.',
+  'tip.drift.title': 'Land in the center',
+  'tip.drift.text': 'Keep the shoulders square at takeoff and look at the center of the bed.',
+  'tip.drift.pastEdge': 'Landed past the {side} edge of the bed.',
+  'tip.drift.towardEdge': 'Landed {share} of the way to the {side} edge of the bed.',
+  'tip.drift.travelled': 'Travelled {dist} m to the {side} in the picture during the skill.',
+  'tip.height.title': 'Keep your height',
+  'tip.height.text': 'Stay tall through the bed to the last skill: keep the same rhythm and push through the takeoff.',
+  'tip.height.detail': 'Time in the air fell from {first} s in the first three skills to {last} s in the last three.',
+
+  // What to work on
+  'focus.of': { one: '{n} of {total} skill', other: '{n} of {total} skills' },
+  'focus.count': { one: '{n} skill', other: '{n} skills' },
+  'focus.withGain': '{count}, {gain}',
+
+  // Things that make the numbers less sure
+  'warn.oblique':
+    'The camera looks at the athlete from an angle, so the joint angles are approximate. Film from the side, with the camera level.',
+  'warn.poor':
+    'The athlete was hard to see in some skills, so the numbers there are rough. Keep the whole body in the frame.',
+  'warn.poseOverall': 'The pose was measured poorly overall: check the lighting and that nobody else is in the frame.',
+
+  // The set as text to paste
+  'summary.header': '{title}: {skills}',
+  'summary.headerPending': '{title}: {skills}, {pending} to check',
+  'summary.difficulty': 'Difficulty {value}',
+  'summary.execution': 'execution about {value} out of 10',
+  'summary.air': '{value} s in the air',
+  'summary.guess': ' (guess)',
+  'summary.repeat': ' (repeat)',
+  'summary.executionOne': ', execution {value}',
+  'summary.line': '{n}. {name}{guess}: difficulty {difficulty}{repeat}{execution}',
+  'summary.next': 'Work on next:',
+  'summary.focusItem': '- {title} ({summary}): {text}',
+
+  // The screen of the live view
+  'live.other': 'Something else',
+  'live.notNamed': 'Not named',
+  'live.cutOff': 'Cut off by the clip',
+  'live.sub.partial': 'Filmed only in part',
+  'live.sub.notInList': 'Not in the list',
+  'live.sub.yours': 'Your label',
+  'live.sub.pending': 'Best guess, not counted yet',
+  'live.sub.guess': 'Best guess',
+  'live.sub.notSure': 'Not sure',
+  'live.sub.direction': 'direction assumed',
+  'live.sub.repeat': 'repeat, does not count',
+  'live.skill': 'Skill',
+  'live.skills': 'Skills',
+  'live.difficulty': 'Difficulty',
+  'live.execution': 'Execution',
+  'live.colDifficulty': 'Difficulty',
+  'live.colExecution': 'Execution',
+  'live.executionDeduction': 'Execution deduction',
+  'live.notCounted': 'Not counted until you check it',
+  'live.say.other': 'You said this is none of the skills in the list. It is left out of the totals.',
+  'live.say.coach': 'You said this is a {name}.',
+  'live.say.forced': 'Best guess: a {name}.',
+  'live.say.auto': 'This looks like a {name}.',
+  'live.say.directionAssumed': 'Front or back could not be told, so back is assumed.',
+  'live.yes': 'Yes, that is it',
+  'live.playTitle': 'Play this skill with a little run-up and landing',
+  'live.couldBe': 'It could be',
+  'live.anotherSkill': 'Another skill',
+  'live.noneOfThese': 'It is none of these',
+  'live.cannotLabel': 'Labels can be saved once the video is identified.',
+  'live.partTitle': 'FIG Code of Points 2025-2028, §{rule}',
+  'live.noElement': 'A straight jump is not an element: it has no difficulty.',
+  'live.easier':
+    'The body looked like a {measured}. A judge gives the least difficult shape: {element} is worth {value}.',
+  'live.easierDetail':
+    'The body looked like a {measured} (hips {hip}, knees {knee}). A judge gives the least difficult shape: {element} is worth {value}.',
+  'live.repeated': 'The same element was done earlier, so it counts for nothing in a routine.',
+  'live.frontWorth': 'Front would be worth {value}: the direction matters for a double or a triple.',
+  'live.noDeduction': 'No deduction found in what one camera can see.',
+  'live.notJudged': 'Not judged: {reason}',
+  'live.notJudgedDefault': 'Not judged: this skill has no measured shape.',
+  'live.hardToSee': 'The athlete was hard to see here, so treat this as a rough estimate.',
+  'live.yourScore': 'Your execution score',
+  'live.yourDeduction': 'Your deduction',
+  'live.proposed': 'The app proposed {value}.',
+  'live.unchecked': 'Not checked',
+  'live.fix': 'What to fix',
+  'live.clipCutsSkill':
+    'The clip starts or ends during this skill, so it cannot be named or judged. Film a little before the takeoff and after the landing.',
+  'live.set': 'The set',
+  'live.toCheck': '{n} to check',
+  'live.cutOffCount': '{n} cut off',
+  'live.copySummary': 'Copy summary',
+  'live.copyTitle': 'Copy the skills, scores and what to work on as text',
+  'live.shared': 'Shared',
+  'live.copied': 'Copied',
+  'live.copyFailed': 'Could not copy',
+  'live.repeatHint': 'A repeat counts once',
+  'live.nothingJudged': 'Nothing judged',
+  'live.estimate': 'Estimate, out of 10',
+  'live.inTheAir': 'In the air',
+  'live.allSkills': 'All skills together',
+  'live.workOn': 'Work on next',
+  'live.nothingStands':
+    'Nothing stands out. No deduction was found in what one camera can see, and the landings were near the center.',
+  'live.bounce': 'Straight jump {n}',
+  'live.bounces': '{count} straight jumps, {from} to {to}',
+  'live.bounceItem': 'Straight jump',
+  'live.noSkill': 'No skill found, only straight jumps. Film a set with somersaults or twists to score them.',
+  'live.showTechnical': 'Show technical details',
+  'live.technicalText':
+    'The athlete and coach views add the evidence behind each skill, every measurement, the twist analysis and all the charts.',
+
+  // Saying what a skill was, one part at a time
+  'picker.somersaults': 'Somersaults',
+  'picker.direction': 'Direction',
+  'picker.twists': 'Twists',
+  'picker.position': 'Position',
+} as const;

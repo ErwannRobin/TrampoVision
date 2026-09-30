@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import type { CalibrationModel } from '../analysis/calibration';
 import type { AnalysisResult, PoseTrack } from '../analysis/types';
+import { t, useLocale } from '../i18n';
 import type { TwistAnalysis } from '../pose3d/twist';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { Chart } from './Chart';
@@ -73,31 +74,35 @@ export function TechnicalData({
   calibration,
   validation,
 }: TechnicalDataProps) {
-  const deco = useMemo(() => clipDecorations(result, calibration), [result, calibration]);
-  const motion = useMemo(() => motionSpecs(result, deco), [result, deco]);
-  const rotation = useMemo(() => rotationSpecs(result, deco), [result, deco]);
-  const joints = useMemo(() => jointSpecs(result, deco), [result, deco]);
-  const confidence = useMemo(() => confidenceSpec(result, deco), [result, deco]);
+  // The charts carry their titles and units: they are made again when the language changes.
+  const locale = useLocale();
+  /* oxlint-disable react-hooks/exhaustive-deps */
+  const deco = useMemo(() => clipDecorations(result, calibration), [result, calibration, locale]);
+  const motion = useMemo(() => motionSpecs(result, deco), [result, deco, locale]);
+  const rotation = useMemo(() => rotationSpecs(result, deco), [result, deco, locale]);
+  const joints = useMemo(() => jointSpecs(result, deco), [result, deco, locale]);
+  const confidence = useMemo(() => confidenceSpec(result, deco), [result, deco, locale]);
   const twistCharts = useMemo(
     () => (twist?.frames ? twistSpecs(result, twist.frames, deco) : []),
-    [result, twist, deco],
+    [result, twist, deco, locale],
   );
+  /* oxlint-enable react-hooks/exhaustive-deps */
 
   return (
     <section className="tech sheet" aria-labelledby="tech-title">
       <header className="tech__head">
         <h2 className="tech__h2" id="tech-title">
-          Technical data
+          {t('tech.title')}
         </h2>
-        <p className="tech__lead">Every curve follows the video. Click or drag on a chart to move it.</p>
+        <p className="tech__lead">{t('tech.lead')}</p>
       </header>
 
       {skills && skills.jumps.length > 0 && (
-        <Group title="Selected jump" note="Normalized: the same axes for every jump" defaultOpen>
+        <Group title={t('tech.selectedJump')} note={t('tech.selectedJumpNote')} defaultOpen>
           <JumpView result={result} skills={skills} playhead={playhead} selected={selected} />
         </Group>
       )}
-      <Group title="Motion" defaultOpen>
+      <Group title={t('tech.motion')} defaultOpen>
         <div className="tech__grid tech__grid--path">
           <TrajectoryPlot result={result} playhead={playhead} calibration={calibration} />
           <div className="tech__stack">
@@ -107,22 +112,22 @@ export function TechnicalData({
           </div>
         </div>
       </Group>
-      <Group title="Rotation">
+      <Group title={t('tech.rotation')}>
         <Charts specs={rotation} playhead={playhead} />
       </Group>
-      <Group title="Joints">
+      <Group title={t('tech.joints')}>
         <Charts specs={joints} playhead={playhead} />
       </Group>
-      <Group title="Pose confidence">
+      <Group title={t('tech.confidence')}>
         <Charts specs={[confidence]} playhead={playhead} />
       </Group>
       {twistCharts.length > 0 && (
-        <Group title="Twist" note="Experimental: from the 3D landmarks">
+        <Group title={t('tech.twist')} note={t('tech.twistNote')}>
           <Charts specs={twistCharts} playhead={playhead} />
         </Group>
       )}
       {validation && (
-        <Group title="Validation" defaultOpen>
+        <Group title={t('tech.validation')} defaultOpen>
           {validation}
         </Group>
       )}

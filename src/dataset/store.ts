@@ -1,3 +1,4 @@
+import { t } from '../i18n/core';
 import type { JumpRecord } from './types';
 
 /** Where the dataset lives. Everything stays in this browser: IndexedDB when it works, memory when it does not. */
@@ -34,14 +35,14 @@ const STORE = 'jump-records';
 const wrap = <T>(req: IDBRequest<T>): Promise<T> =>
   new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error('IndexedDB request failed'));
+    req.onerror = () => reject(req.error ?? new Error(t('err.idbRequest')));
   });
 
 const done = (tx: IDBTransaction): Promise<void> =>
   new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error('IndexedDB transaction failed'));
-    tx.onabort = () => reject(tx.error ?? new Error('IndexedDB transaction aborted'));
+    tx.onerror = () => reject(tx.error ?? new Error(t('err.idbTransaction')));
+    tx.onabort = () => reject(tx.error ?? new Error(t('err.idbAborted')));
   });
 
 function openDb(): Promise<IDBDatabase> {
@@ -51,15 +52,15 @@ function openDb(): Promise<IDBDatabase> {
       if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE, { keyPath: 'id' });
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error('Could not open the local database'));
-    req.onblocked = () => reject(new Error('The local database is blocked by another tab'));
+    req.onerror = () => reject(req.error ?? new Error(t('err.idbOpen')));
+    req.onblocked = () => reject(new Error(t('err.idbBlocked')));
   });
 }
 
 /** Opens the browser's local database. When it is unavailable (private mode, blocked storage) the dataset lives in memory and `warning` says so. */
 export async function openDatasetStore(): Promise<{ store: DatasetStore; warning?: string }> {
   try {
-    if (typeof indexedDB === 'undefined') throw new Error('IndexedDB is not available in this browser');
+    if (typeof indexedDB === 'undefined') throw new Error(t('err.idbMissing'));
     const db = await openDb();
     const store: DatasetStore = {
       kind: 'indexeddb',
@@ -86,7 +87,7 @@ export async function openDatasetStore(): Promise<{ store: DatasetStore; warning
   } catch (err) {
     return {
       store: createMemoryStore(),
-      warning: `The browser's local storage is not available (${err instanceof Error ? err.message : String(err)}). Labels are kept only until you close this page: export the dataset to keep them.`,
+      warning: t('err.storeWarning', { message: err instanceof Error ? err.message : String(err) }),
     };
   }
 }

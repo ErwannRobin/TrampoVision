@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { t } from '../../../i18n';
 import type { SkillAnalysis } from '../../../skills/analyzeSkills';
-import { KNOWN_LIMITS } from '../../../skills/classifier';
+import { knownLimits } from '../../../skills/classifier';
 import { CHECK_MARK, diagnoseUnclassified, formatClassificationDebug, movementText } from '../../../skills/debug';
 import { DEFAULT_SKILL_CONFIG, type SkillConfig } from '../../../skills/config';
 import { pct } from '../../format';
@@ -10,7 +11,7 @@ import type { SkillPrediction } from '../../../skills/types';
 import { fig, row } from './figures';
 import { Group, Limits, Rows } from './parts';
 import { TrajectoryCompare } from './TrajectoryCompare';
-import { FACING_OPTIONS, THRESHOLD_FIELDS } from './thresholds';
+import { facingOptions, THRESHOLD_FIELDS } from './thresholds';
 
 interface Props {
   skills: SkillAnalysis;
@@ -28,7 +29,7 @@ export function SkillTab({ skills, selected, config, onConfig }: Props) {
   if (!j) {
     return (
       <>
-        <p className="coach__empty">No jump found: the center of mass never rose 0.3 m above its surroundings.</p>
+        <p className="coach__empty">{t('coach.noJump')}</p>
         <div className="coach__more">
           <KnownLimits />
         </div>
@@ -48,40 +49,31 @@ export function SkillTab({ skills, selected, config, onConfig }: Props) {
           <span className="coach__tier">{TIER_TEXT[tier]}</span>
           <span className="coach__pct num">{pct(p.confidence)}</span>
         </div>
-        <ConfidenceMeter value={p.confidence} tier={tier} label="Classifier confidence" />
+        <ConfidenceMeter value={p.confidence} tier={tier} label={t('coach.classifierConfidence')} />
         <p>{p.summary}</p>
-        {p.certainty === 'tentative' && (
-          <p className="coach__note">
-            Tentative guess: weakly supported, shown so it can be checked. The alternatives below say what else it may
-            be.
-          </p>
-        )}
-        <p className="coach__note">
-          Heuristic score, not a probability. Classifier: {p.classifier.id} v{p.classifier.version}.
-        </p>
+        {p.certainty === 'tentative' && <p className="coach__note">{t('coach.tentative')}</p>}
+        <p className="coach__note">{t('coach.heuristic', { id: p.classifier.id, version: p.classifier.version })}</p>
       </section>
 
       <ClassificationDebug p={p} skills={skills} />
 
       {p.evidence.length > 0 && (
-        <Group title="Measurements">
+        <Group title={t('coach.measurements')}>
           <Rows rows={p.evidence.map((e) => row(e.key, e.label, fig(e.text), e.note))} />
         </Group>
       )}
 
       {p.limitations.length > 0 ? (
-        <Group title="What the data could not settle">
+        <Group title={t('coach.couldNotSettle')}>
           <Limits items={p.limitations} />
         </Group>
       ) : (
-        <p className="coach__quiet">
-          No data problem found for this jump. Some things are never measured from one side view: see the list below.
-        </p>
+        <p className="coach__quiet">{t('coach.noProblemSee')}</p>
       )}
 
       <div className="coach__more">
         {p.confidenceParts.length > 0 && (
-          <Disclosure title="Confidence is the product of">
+          <Disclosure title={t('coach.productOf')}>
             <Rows rows={p.confidenceParts.map((c) => row(c.name, c.name, fig(pct(c.value))))} />
           </Disclosure>
         )}
@@ -102,17 +94,19 @@ function ClassificationDebug({ p, skills }: { p: SkillPrediction; skills: SkillA
   const unclassified = diagnoseUnclassified(skills);
   return (
     <>
-      <Group title={named ? 'Movement' : 'Closest element'}>
+      <Group title={named ? t('coach.movement') : t('coach.closestElement')}>
         <Rows
           rows={[
-            row('predicted', named ? 'Predicted' : 'Closest', fig(named ? p.label : top.name)),
-            ...(named ? [row('movement', 'Movement', fig(movementText(p)))] : []),
+            row('predicted', named ? t('coach.predicted') : t('coach.closest'), fig(named ? p.label : top.name)),
+            ...(named ? [row('movement', t('coach.movement'), fig(movementText(p)))] : []),
             ...top.checks.map((c) =>
               row(
                 `check_${c.stage}`,
                 `${CHECK_MARK[c.status]} ${c.criterion}`,
                 fig(c.observed, undefined, c.status === 'unmeasured'),
-                c.status === 'unmeasured' ? `not measured; ${c.expected} assumed` : `element needs ${c.expected}`,
+                c.status === 'unmeasured'
+                  ? t('coach.notMeasuredAssumed', { expected: c.expected })
+                  : t('coach.elementNeeds', { expected: c.expected }),
               ),
             ),
           ]}
@@ -120,41 +114,41 @@ function ClassificationDebug({ p, skills }: { p: SkillPrediction; skills: SkillA
         {p.failure && <p className="coach__note">{p.failure.message}</p>}
         {p.failure?.ifResolved != null && (
           <p className="coach__note">
-            If the {p.failure.criterion} were certain, {p.failure.closest?.name} would score {pct(p.failure.ifResolved)}
-            .
+            {t('coach.ifCertain', {
+              criterion: t(`criterion.${p.failure.criterion}`),
+              name: p.failure.closest?.name ?? '',
+              score: pct(p.failure.ifResolved),
+            })}
           </p>
         )}
       </Group>
       {alternatives.length > 0 && (
-        <Group title="Alternatives">
+        <Group title={t('coach.alternatives')}>
           <Rows
             rows={alternatives.map((c) =>
               row(
                 c.elementId,
                 c.name,
                 fig(pct(c.score ?? c.posterior)),
-                c.similarity === undefined ? undefined : `trajectory match ${pct(c.similarity)}`,
+                c.similarity === undefined ? undefined : t('coach.trajectoryMatch', { sim: pct(c.similarity) }),
               ),
             )}
           />
         </Group>
       )}
       {p.comparison && (
-        <Group
-          title="Jump against the closest reference"
-          meta={<span className="num">{pct(p.comparison.similarity)}</span>}
-        >
+        <Group title={t('coach.againstReference')} meta={<span className="num">{pct(p.comparison.similarity)}</span>}>
           <TrajectoryCompare comparison={p.comparison} />
           <p className="coach__note">
-            Solid: this jump. Dashed:{' '}
-            {p.comparison.referenceKind === 'example' ? 'a jump you labelled' : 'the expected movement'} for {top.name},
-            warped in time to fit. Distances are in tolerances: 1 is a normal difference.
+            {t(p.comparison.referenceKind === 'example' ? 'coach.compareNoteExample' : 'coach.compareNoteModel', {
+              name: top.name,
+            })}
           </p>
         </Group>
       )}
       <div className="coach__more">
         {p.stages && (
-          <Disclosure title="Answer of each question">
+          <Disclosure title={t('coach.answerOfEach')}>
             {p.stages.map((st) => (
               <Rows
                 key={st.stage}
@@ -167,24 +161,23 @@ function ClassificationDebug({ p, skills }: { p: SkillPrediction; skills: SkillA
               />
             ))}
             {p.outOfTable !== undefined && (
-              <p className="coach__note">Outside the element table: {pct(p.outOfTable)} of the probability.</p>
+              <p className="coach__note">{t('coach.outsideTable', { share: pct(p.outOfTable) })}</p>
             )}
           </Disclosure>
         )}
         {unclassified.unclassified > 0 && (
-          <Disclosure title={`Unclassified in this clip (${unclassified.unclassified} of ${unclassified.total})`}>
-            <Rows
-              rows={unclassified.byKind.map((b) => row(b.kind, b.kind.replaceAll('-', ' '), fig(String(b.count))))}
-            />
+          <Disclosure title={t('coach.unclassifiedIn', { n: unclassified.unclassified, total: unclassified.total })}>
+            <Rows rows={unclassified.byKind.map((b) => row(b.kind, t(`failure.${b.kind}`), fig(String(b.count))))} />
             {unclassified.jumps.map((r) => (
               <p key={r.jump} className="coach__note">
-                Jump {r.jump + 1}: {r.message}
-                {r.top.length > 0 && ` ${r.top.map((t) => `${t.name} ${pct(t.posterior)}`).join(' · ')}.`}
+                {t('coach.jumpMessage', { n: r.jump + 1, message: r.message })}
+                {r.top.length > 0 &&
+                  `${t('sentence.gap')}${r.top.map((c) => `${c.name} ${pct(c.posterior)}`).join(' · ')}.`}
               </p>
             ))}
           </Disclosure>
         )}
-        <Disclosure title="Debug text">
+        <Disclosure title={t('coach.debugText')}>
           <CopyButton text={formatClassificationDebug(p)} />
           <pre className="coach__note">{formatClassificationDebug(p)}</pre>
         </Disclosure>
@@ -207,14 +200,14 @@ function CopyButton({ text }: { text: string }) {
   };
   return (
     <Button size="sm" onClick={copy} aria-live="polite">
-      {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed: select the text' : 'Copy debug text'}
+      {state === 'copied' ? t('coach.copied') : state === 'failed' ? t('coach.copyFailedSelect') : t('coach.copyDebug')}
     </Button>
   );
 }
 
 function Thresholds({ config, onConfig }: { config: SkillConfig; onConfig: (config: SkillConfig) => void }) {
   return (
-    <Disclosure title="Thresholds">
+    <Disclosure title={t('coach.thresholds')}>
       <div className="coach__fields">
         {THRESHOLD_FIELDS.map((f) => (
           <NumberField
@@ -230,29 +223,26 @@ function Thresholds({ config, onConfig }: { config: SkillConfig; onConfig: (conf
       </div>
       <SelectField
         className="coach__facing"
-        label="Athlete faces"
-        hint="Which way the athlete faces when upright. Needed to tell front from back."
+        label={t('coach.athleteFaces')}
+        hint={t('coach.athleteFacesHint')}
         value={config.facing.override}
-        options={FACING_OPTIONS}
+        options={facingOptions()}
         onChange={(override) => onConfig({ ...config, facing: { ...config.facing, override } })}
       />
       <div className="coach__actions">
         <Button size="sm" onClick={() => onConfig(DEFAULT_SKILL_CONFIG)}>
-          Reset thresholds
+          {t('coach.resetThresholds')}
         </Button>
       </div>
-      <p className="coach__note">
-        Starting values are estimates, not tuned on real athletes. Change them and watch the position strip and the
-        prediction update.
-      </p>
+      <p className="coach__note">{t('coach.thresholdsNote')}</p>
     </Disclosure>
   );
 }
 
 function KnownLimits() {
   return (
-    <Disclosure title="What one side view can never tell">
-      <Limits items={KNOWN_LIMITS} />
+    <Disclosure title={t('coach.knownLimits')}>
+      <Limits items={knownLimits()} />
     </Disclosure>
   );
 }

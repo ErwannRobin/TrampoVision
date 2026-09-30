@@ -1,3 +1,4 @@
+import { t, upperFirst } from '../../../i18n/core';
 import { describeBedPosition, type JumpHeadline } from '../../insights';
 
 /** Where a jump takes off, peaks and lands on the bed (+-1 = the edge along the on-screen horizontal). */
@@ -34,8 +35,6 @@ export interface SentencePart {
   event?: BedEvent;
 }
 
-const upperFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
 /**
  * "Takeoff in the center, apex 30% of the way to the left edge, landing past the right edge." in pieces. Events that
  * are described the same way share a clause ("Takeoff and apex in the center"); unknown positions are left out.
@@ -51,14 +50,20 @@ export function bedSentenceParts(bed: BedPositions): SentencePart[] {
   }
   const parts: SentencePart[] = [];
   clauses.forEach(({ events, where }, c) => {
+    if (c > 0) parts.push({ text: t('list.separator') });
+    // The language decides where the events go in the clause: "{events} in the center", "{events}は中央".
+    const [before, after] = t(events.length === BED_EVENTS.length ? 'bed.clauseAll' : 'bed.clause', { where }).split(
+      '{events}',
+    );
+    if (before) parts.push({ text: before });
     events.forEach((event, k) => {
-      if (k > 0) parts.push({ text: k === events.length - 1 ? ' and ' : ', ' });
-      else if (c > 0) parts.push({ text: ', ' });
-      parts.push({ text: c === 0 && k === 0 ? upperFirst(event) : event, event });
+      if (k > 0) parts.push({ text: k === events.length - 1 ? t('bed.and') : t('list.separator') });
+      const word = t(`bed.event.${event}`);
+      parts.push({ text: c === 0 && k === 0 ? upperFirst(word) : word, event });
     });
-    parts.push({ text: `${events.length === BED_EVENTS.length ? ' all ' : ' '}${where}` });
+    if (after) parts.push({ text: after });
   });
-  if (parts.length > 0) parts.push({ text: '.' });
+  if (parts.length > 0) parts.push({ text: t('bed.end') });
   return parts;
 }
 
@@ -73,17 +78,7 @@ export function bedUnavailable(state: { calibrated: boolean; calibrationError: s
   setup: boolean;
 } {
   if (!state.calibrated) {
-    return {
-      text: state.calibrationError
-        ? 'The marked trampoline could not be used, so landing positions are not available.'
-        : 'Mark the trampoline to see where each jump lands.',
-      setup: true,
-    };
+    return { text: t(state.calibrationError ? 'bed.unusable' : 'bed.markIt'), setup: true };
   }
-  return {
-    text: state.complete
-      ? 'The position on the bed could not be measured for this jump.'
-      : 'This jump is cut off by the clip, so its position on the bed is unknown.',
-    setup: false,
-  };
+  return { text: t(state.complete ? 'bed.noPosition' : 'bed.cutOff'), setup: false };
 }

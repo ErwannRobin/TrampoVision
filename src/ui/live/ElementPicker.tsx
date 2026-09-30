@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { t } from '../../i18n';
 import {
   POSITION_TEXT,
   SOMERSAULT_CHOICES,
@@ -73,7 +74,7 @@ export function ElementPicker({
 
   return (
     <div className="live-picker">
-      <Facet name="Somersaults">
+      <Facet name={t('picker.somersaults')}>
         {SOMERSAULT_CHOICES.map((n) => (
           <Chip key={n} on={draft.somersaults === n} onClick={() => apply({ somersaults: n })}>
             {n}
@@ -81,22 +82,22 @@ export function ElementPicker({
         ))}
       </Facet>
       {draft.somersaults > 0 && (
-        <Facet name="Direction">
+        <Facet name={t('picker.direction')}>
           {(['back', 'front'] as const).map((d) => (
             <Chip key={d} on={draft.direction === d} onClick={() => apply({ direction: d })}>
-              {d === 'back' ? 'Back' : 'Front'}
+              {t(`dir.${d}`)}
             </Chip>
           ))}
         </Facet>
       )}
-      <Facet name="Twists">
+      <Facet name={t('picker.twists')}>
         {Array.from({ length: maxHalfTwists(draft.somersaults) + 1 }, (_, h) => (
           <Chip key={h} on={draft.halfTwists === h} onClick={() => apply({ halfTwists: h })}>
             {twistName(h)}
           </Chip>
         ))}
       </Facet>
-      <Facet name="Position">
+      <Facet name={t('picker.position')}>
         {POSITIONS.map((p) => (
           <Chip key={p} on={draft.position === p} onClick={() => apply({ position: p })}>
             {POSITION_TEXT[p]}

@@ -1,3 +1,4 @@
+import { t } from '../i18n/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseDataset } from './export';
 import { mergeRecords, openDatasetStore, type DatasetStore } from './store';
@@ -55,7 +56,7 @@ export function useDataset(): DatasetApi {
       await fn(store);
       setError(null);
     } catch (e) {
-      setError(`Could not write to the local database: ${e instanceof Error ? e.message : String(e)}`);
+      setError(t('err.dbWrite', { message: e instanceof Error ? e.message : String(e) }));
     }
   }, []);
 

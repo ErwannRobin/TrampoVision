@@ -1,3 +1,4 @@
+import { t } from '../i18n/core';
 import coreURL from '@ffmpeg/core?url';
 import wasmURL from '@ffmpeg/core/wasm?url';
 
@@ -62,9 +63,9 @@ export async function transcodeToH264(file: File, opts: TranscodeOptions = {}): 
       '+faststart',
       'out.mp4',
     ]);
-    if (code !== 0) throw new Error(`ffmpeg failed to convert the video (exit code ${code}).`);
+    if (code !== 0) throw new Error(t('err.ffmpegExit', { code }));
     const data = await ffmpeg.readFile('out.mp4');
-    if (typeof data === 'string') throw new Error('ffmpeg returned no video data.');
+    if (typeof data === 'string') throw new Error(t('err.ffmpegNoData'));
     return new Blob([data as Uint8Array<ArrayBuffer>], { type: 'video/mp4' });
   } catch (err) {
     if (opts.signal?.aborted) throw new DOMException('Conversion cancelled', 'AbortError');

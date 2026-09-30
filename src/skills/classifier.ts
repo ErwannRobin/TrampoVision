@@ -1,6 +1,8 @@
+import { formatNumber, formatPercent, lower, t, type Locale } from '../i18n/core';
 import type { SkillConfig } from './config';
 import {
   SKILL_LABELS,
+  type BodyPosition,
   type ClassifierInput,
   type EvidenceItem,
   type Limitation,
@@ -10,43 +12,57 @@ import {
 } from './types';
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
-const pct = (v: number) => `${Math.round(clamp01(v) * 100)}%`;
+const pct = (v: number) => formatPercent(clamp01(v));
 const deg = (v: number | null | undefined) =>
   v === null || v === undefined || !Number.isFinite(v) ? '–' : `${Math.round(v)}°`;
+/** A measurement with two decimals, or a dash when there is none. */
+const two = (v: number | null | undefined) => (v === null || v === undefined ? '–' : formatNumber(v, 2));
+/** A body position as a word inside a sentence ("tuck"). */
+export const positionWord = (p: BodyPosition, locale?: Locale) => lower(t(`pos.${p}`, undefined, locale), locale);
 
-/** Things this input (a single 2D skeleton from one camera) cannot tell, whatever the pose quality. */
-export const KNOWN_LIMITS: Limitation[] = [
-  {
-    signal: 'Camera view',
-    problem:
-      'A somersault turns toward or away from a camera that is in front of or behind the athlete, so the 2D body angle barely changes.',
-    needed: 'A side-on, roughly level camera.',
-  },
-  {
-    signal: 'Twists',
-    problem:
-      'Rotation about the long axis is not measured: the shoulder and hip lines are almost points in a side view.',
-    needed: '3D pose (or two cameras).',
-  },
-  {
-    signal: 'Leg separation (straddle, scissor)',
-    problem: 'The legs hide each other in a side view, so the ankle distance says little about a straddle.',
-    needed: 'A front-view camera or 3D pose.',
-  },
-  {
-    signal: 'Quarter turns (drops, 1¼, 1¾ rotations)',
-    problem:
-      'Rotation is rounded to half turns; landings on back, front or seat are not separated from a measurement error.',
-    needed: 'A rule or a model for the landing position (torso angle at landing).',
-  },
-  {
-    signal: 'Pose model failures',
-    problem:
-      'Pose models are trained mostly on upright people. When the athlete is inverted, blurred or overlapped, the skeleton can flip or jump, and the confidence here can only notice it if the orientation jumps.',
-    needed:
-      'Real trampoline footage to measure how often this happens; a model fine-tuned on trampoline poses if it is frequent.',
-  },
-];
+/** Things this input (a single 2D skeleton from one camera) cannot tell, whatever the pose quality. In the language in use unless another is asked for. */
+export function knownLimits(locale?: Locale): Limitation[] {
+  return [
+    {
+      id: 'camera',
+      signal: t('limit.camera.signal', undefined, locale),
+      problem: t('limit.camera.problem', undefined, locale),
+      needed: t('limit.camera.needed', undefined, locale),
+    },
+    {
+      id: 'twists',
+      signal: t('limit.twists.signal', undefined, locale),
+      problem: t('limit.twists.problem', undefined, locale),
+      needed: t('limit.twists.needed', undefined, locale),
+    },
+    {
+      id: 'straddle',
+      signal: t('limit.straddle.signal', undefined, locale),
+      problem: t('limit.straddle.problem', undefined, locale),
+      needed: t('limit.straddle.needed', undefined, locale),
+    },
+    {
+      id: 'quarter-turns',
+      signal: t('limit.quarter.signal', undefined, locale),
+      problem: t('limit.quarter.problem', undefined, locale),
+      needed: t('limit.quarter.needed', undefined, locale),
+    },
+    {
+      id: 'pose-model',
+      signal: t('limit.poseModel.signal', undefined, locale),
+      problem: t('limit.poseModel.problem', undefined, locale),
+      needed: t('limit.poseModel.needed', undefined, locale),
+    },
+  ];
+}
+
+/** The limit of a jump that is cut off by the clip. */
+export const boundsLimit = (): Limitation => ({
+  id: 'bounds',
+  signal: t('limit.bounds.signal'),
+  problem: t('limit.bounds.problem'),
+  needed: t('limit.bounds.needed'),
+});
 
 interface Candidate {
   skill: SkillId;
@@ -62,10 +78,10 @@ function rotationMembership(totalDeg: number, halfTurns: number, tolerance: numb
 }
 
 function levelOf(v: number | null, cfg: SkillConfig): string {
-  if (v === null) return 'unknown';
-  if (v <= cfg.legSeparation.lowMax) return 'low';
-  if (v >= cfg.legSeparation.highMin) return 'high';
-  return 'medium';
+  if (v === null) return t('level.unknown');
+  if (v <= cfg.legSeparation.lowMax) return t('level.low');
+  if (v >= cfg.legSeparation.highMin) return t('level.high');
+  return t('level.medium');
 }
 
 /**
@@ -103,96 +119,86 @@ export const ruleBasedClassifier: SkillClassifier = {
         scores: {},
         confidenceParts: [],
         evidence,
-        limitations: [
-          {
-            signal: 'Jump boundaries',
-            problem:
-              'The takeoff or the landing is not in the clip, so the rotation and the shape over the whole flight are unknown.',
-            needed: 'A clip that starts before the takeoff and ends after the landing.',
-          },
-        ],
-        summary: 'This jump is cut off at the start or the end of the clip.',
+        limitations: [boundsLimit()],
+        summary: t('sum.cutOff'),
       };
     }
 
     // --- evidence -------------------------------------------------------------------------------
     const s = f.shape;
-    add(
-      'hip_angle',
-      'Hip angle',
-      deg(s.hipAngle.atPeak),
-      s.hipAngle.atPeak,
-      'shoulder–hip–knee at the most closed moment; 180° = open',
-    );
-    add(
-      'knee_angle',
-      'Knee angle',
-      deg(s.kneeAngle.atPeak),
-      s.kneeAngle.atPeak,
-      'hip–knee–ankle at the same moment; 180° = straight legs',
-    );
+    add('hip_angle', t('ev.hip.label'), deg(s.hipAngle.atPeak), s.hipAngle.atPeak, t('ev.hip.note'));
+    add('knee_angle', t('ev.knee.label'), deg(s.kneeAngle.atPeak), s.kneeAngle.atPeak, t('ev.knee.note'));
     add(
       'body_orientation',
-      'Body orientation',
+      t('ev.orientation.label'),
       deg(f.orientation.apexDeg),
       f.orientation.apexDeg,
-      'trunk angle from vertical at the apex',
+      t('ev.orientation.note'),
     );
     const sep = s.legSeparation.atPeak;
     add(
       'leg_separation',
-      'Leg separation',
-      `${levelOf(sep, cfg)}${sep === null ? '' : ` (${sep.toFixed(2)})`}`,
+      t('ev.legSep.label'),
+      sep === null ? levelOf(sep, cfg) : t('ev.legSep.text', { level: levelOf(sep, cfg), value: two(sep) }),
       sep,
-      'ankle distance / leg length; barely visible from the side',
+      t('ev.legSep.note'),
     );
+    const turnWord = t(`turn.${r.direction}`);
     add(
       'rotation',
-      'Rotation',
-      `${r.turns === null ? '–' : r.turns.toFixed(1)} turns (≈${r.nearestDeg}°, confidence ${pct(r.confidence)})`,
+      t('ev.rotation.label'),
+      t('ev.rotation.text', {
+        turns: r.turns === null ? '–' : formatNumber(r.turns, 1),
+        deg: r.nearestDeg ?? '–',
+        conf: pct(r.confidence),
+      }),
       r.turns,
-      `${r.direction}${r.residualDeg === null ? '' : `, ${Math.round(Math.abs(r.residualDeg))}° from the nearest half turn`}`,
+      r.residualDeg === null
+        ? t('ev.rotation.note', { direction: turnWord })
+        : t('ev.rotation.noteResidual', { direction: turnWord, residual: Math.round(Math.abs(r.residualDeg)) }),
     );
     const kt = s.kneeTorsoDistance.atPeak;
     add(
       'knee_torso',
-      'Knees to torso',
-      kt === null ? '–' : `${kt.toFixed(2)} trunk lengths`,
+      t('ev.kneeTorso.label'),
+      kt === null ? '–' : t('ev.kneeTorso.text', { value: two(kt) }),
       kt,
-      'small = knees drawn in',
+      t('ev.kneeTorso.note'),
     );
     add(
       'compactness',
-      'Body compactness',
-      s.compactness.atPeak === null ? '–' : s.compactness.atPeak.toFixed(2),
+      t('ev.compactness.label'),
+      two(s.compactness.atPeak),
       s.compactness.atPeak,
-      '0 = stretched, higher = folded',
+      t('ev.compactness.note'),
     );
     add(
       'position',
-      'Body position',
-      `${p.label} (${pct(p.confidence)})`,
+      t('ev.position.label'),
+      t('ev.position.text', { position: positionWord(p.label), conf: pct(p.confidence) }),
       p.ruleScore,
-      `over the flight: ${(['straight', 'tuck', 'pike', 'unknown'] as const).map((k) => `${k} ${pct(p.timeShare[k])}`).join(', ')}`,
+      t('ev.position.note', {
+        shares: (['straight', 'tuck', 'pike', 'unknown'] as const)
+          .map((k) => t('ev.share', { position: positionWord(k), share: pct(p.timeShare[k]) }))
+          .join(t('list.separator')),
+      }),
     );
+    const side = face.sign > 0 ? t('side.right') : t('side.left');
     add(
       'facing',
-      'Facing',
+      t('ev.facing.label'),
       face.sign === 0
-        ? `undetermined (${pct(face.confidence)})`
-        : `${face.sign > 0 ? 'right' : 'left'} of the image (${pct(face.confidence)})${face.source === 'manual' ? ', set manually' : ''}`,
+        ? t('ev.facing.undetermined', { conf: pct(face.confidence) })
+        : t(face.source === 'manual' ? 'ev.facing.sideManual' : 'ev.facing.side', {
+            side,
+            conf: pct(face.confidence),
+          }),
       face.sign,
       face.source === 'manual'
         ? undefined
-        : `face ${face.cues.face?.toFixed(2) ?? '–'}, knee ${face.cues.knee?.toFixed(2) ?? '–'}, foot ${face.cues.foot?.toFixed(2) ?? '–'} (each -1 = left … +1 = right)`,
+        : t('ev.facing.note', { face: two(face.cues.face), knee: two(face.cues.knee), foot: two(face.cues.foot) }),
     );
-    add(
-      'pose_quality',
-      'Pose quality in flight',
-      pct(f.quality.pose),
-      f.quality.pose,
-      'measured joints count 1, interpolated 0.6, corrected 0.4, missing 0',
-    );
+    add('pose_quality', t('ev.poseQuality.label'), pct(f.quality.pose), f.quality.pose, t('ev.poseQuality.note'));
 
     // --- candidates -----------------------------------------------------------------------------
     const none = rotationMembership(r.totalDeg, 0, tol);
@@ -225,118 +231,131 @@ export const ruleBasedClassifier: SkillClassifier = {
 
     if (nHalf === 0) {
       if (p.label === 'unknown') {
-        summary = `No rotation (${deg(r.totalDeg)}), but the body position is between the definitions (hip ${deg(s.hipAngle.atPeak)}, knee ${deg(s.kneeAngle.atPeak)}).`;
+        summary = t('sum.noRotationUnknownPosition', {
+          rot: deg(r.totalDeg),
+          hip: deg(s.hipAngle.atPeak),
+          knee: deg(s.kneeAngle.atPeak),
+        });
         limitations.push({
-          signal: 'Body position',
-          problem: `Hip ${deg(s.hipAngle.atPeak)} and knee ${deg(s.kneeAngle.atPeak)} fit no definition well (transitional shape, or the pose is noisy).`,
-          needed:
-            'Adjust the thresholds if this athlete is more or less flexible than the defaults, or a cleaner pose.',
+          id: 'body-position',
+          signal: t('limit.position.signal'),
+          problem: t('limit.position.problem', { hip: deg(s.hipAngle.atPeak), knee: deg(s.kneeAngle.atPeak) }),
+          needed: t('limit.position.needed'),
         });
       } else {
         skill = `${p.label}-jump` as SkillId;
         parts = [
-          { name: 'rotation (none)', value: r.parts.rounding },
-          { name: 'rotation quality', value: rotQuality },
-          { name: 'body position rule', value: p.ruleScore },
-          { name: 'shape held', value: p.stability },
-          { name: 'pose quality', value: f.quality.pose },
+          { name: t('part.rotationNone'), value: r.parts.rounding },
+          { name: t('part.rotationQuality'), value: rotQuality },
+          { name: t('part.positionRule'), value: p.ruleScore },
+          { name: t('part.shapeHeld'), value: p.stability },
+          { name: t('part.poseQuality'), value: f.quality.pose },
         ];
-        parts.push({ name: 'side-on view', value: viewFactor });
+        parts.push({ name: t('part.sideOn'), value: viewFactor });
         confidence = r.parts.rounding * rotQuality * p.ruleScore * p.stability * f.quality.pose * viewFactor;
-        summary =
-          p.label === 'straight'
-            ? `No rotation and the hips (${deg(s.hipAngle.atPeak)}) and knees (${deg(s.kneeAngle.atPeak)}) stay open.`
-            : p.label === 'pike'
-              ? `No rotation; the hips fold to ${deg(s.hipAngle.atPeak)} while the legs stay straight (knees ${deg(s.kneeAngle.atPeak)}).`
-              : `No rotation; the hips fold to ${deg(s.hipAngle.atPeak)} and the knees bend to ${deg(s.kneeAngle.atPeak)}.`;
+        summary = t(p.label === 'straight' ? 'sum.straight' : p.label === 'pike' ? 'sum.pike' : 'sum.tuck', {
+          hip: deg(s.hipAngle.atPeak),
+          knee: deg(s.kneeAngle.atPeak),
+        });
       }
     } else if (nHalf === 2) {
       if (face.sign === 0) {
         skill = 'somersault-direction-unknown';
         parts = [
-          { name: 'rotation (360°)', value: r.parts.rounding },
-          { name: 'rotation quality', value: rotQuality },
+          { name: t('part.rotationFull'), value: r.parts.rounding },
+          { name: t('part.rotationQuality'), value: rotQuality },
         ];
-        parts.push({ name: 'side-on view', value: viewFactor });
+        parts.push({ name: t('part.sideOn'), value: viewFactor });
         confidence = r.parts.rounding * rotQuality * viewFactor;
-        summary = `A full rotation (${deg(r.totalDeg)}, ${r.direction}), but which way the athlete faces is unknown, so front and back cannot be told apart.`;
+        summary = t('sum.directionUnknownFull', { rot: deg(r.totalDeg), turn: turnWord });
         limitations.push({
-          signal: 'Facing direction',
-          problem: `The face, knee and toe cues are too weak or disagree (${pct(face.confidence)} confidence): a clockwise turn is a front somersault for an athlete facing right and a back somersault for one facing left.`,
-          needed: 'A clearer side view (larger athlete, face and feet visible), or set the facing side manually.',
+          id: 'facing',
+          signal: t('limit.facing.signal'),
+          problem: t('limit.facing.problem', { conf: pct(face.confidence) }),
+          needed: t('limit.facing.needed'),
         });
       } else {
         skill = forward > 0 ? 'front' : 'back';
         parts = [
-          { name: 'rotation (360°)', value: r.parts.rounding },
-          { name: 'rotation quality', value: rotQuality },
-          { name: 'facing', value: face.confidence },
+          { name: t('part.rotationFull'), value: r.parts.rounding },
+          { name: t('part.rotationQuality'), value: rotQuality },
+          { name: t('part.facing'), value: face.confidence },
         ];
-        parts.push({ name: 'side-on view', value: viewFactor });
+        parts.push({ name: t('part.sideOn'), value: viewFactor });
         confidence = r.parts.rounding * rotQuality * face.confidence * viewFactor;
-        summary = `A full rotation (${deg(r.totalDeg)}, ${r.direction}) with the athlete facing ${face.sign > 0 ? 'right' : 'left'}: the body turned ${forward > 0 ? 'toward' : 'away from'} the face, which is a ${forward > 0 ? 'front' : 'back'} somersault.`;
+        summary = t(forward > 0 ? 'sum.front' : 'sum.back', { rot: deg(r.totalDeg), turn: turnWord, side });
       }
     } else {
-      summary = `Rotation ≈ ${r.nearestDeg}° (${r.turns?.toFixed(1)} turns) is outside the initial skill set (no rotation or one full somersault).`;
+      summary = t('sum.outOfSet', { deg: r.nearestDeg ?? '–', turns: two(r.turns) });
     }
 
     // --- limitations that come from this jump's data ---------------------------------------------
     if (f.quality.pose < 0.6) {
       limitations.push({
-        signal: 'Pose quality',
-        problem: `Only ${pct(f.quality.pose)} of the core joint samples in the flight were measured directly (the rest interpolated, corrected or missing).`,
-        needed: 'Higher resolution or a closer athlete, better light, a faster shutter (less blur), fewer occlusions.',
+        id: 'pose-quality',
+        signal: t('limit.pose.signal'),
+        problem: t('limit.pose.problem', { share: pct(f.quality.pose) }),
+        needed: t('limit.pose.needed'),
       });
     }
     if (f.quality.trunkLengthVariation !== null && f.quality.trunkLengthVariation > cfg.maxTrunkVariation) {
       limitations.push({
-        signal: 'Camera view',
-        problem: `The 2D trunk length changes by ${pct(f.quality.trunkLengthVariation)} during the flight; from a side-on camera it should stay nearly constant.`,
-        needed: 'A side-on camera (or 3D pose); otherwise angles and rotation are distorted.',
+        id: 'camera-view',
+        signal: t('limit.camera.signal'),
+        problem: t('limit.view.problem', { change: pct(f.quality.trunkLengthVariation) }),
+        needed: t('limit.view.needed'),
       });
     }
     if (r.maxStepDeg !== null && r.maxStepDeg > cfg.rotation.maxStepDeg) {
       limitations.push({
-        signal: 'Orientation tracking',
-        problem: `The body orientation changes by up to ${deg(r.maxStepDeg)} between two samples: the rotation may be miscounted, or the pose model flipped the body.`,
-        needed: 'A higher frame rate (analyze every frame) and a check of the skeleton at the inverted moments.',
+        id: 'orientation-step',
+        signal: t('limit.tracking.signal'),
+        problem: t('limit.tracking.step.problem', { deg: deg(r.maxStepDeg) }),
+        needed: t('limit.tracking.step.needed'),
       });
     }
     if (r.reversalDeg !== null && r.reversalDeg > cfg.rotation.reversalOkDeg) {
       limitations.push({
-        signal: 'Orientation tracking',
-        problem: `The body orientation turned one way and then back by ${deg(r.reversalDeg)}. A real rotation keeps going one way, so the pose model probably flipped or lost the athlete when inverted, and the net rotation is not trustworthy.`,
-        needed:
-          'Check the skeleton on the inverted frames; a pose model that handles inverted athletes, or a manual correction.',
+        id: 'orientation-reversal',
+        signal: t('limit.tracking.signal'),
+        problem: t('limit.tracking.reversal.problem', { deg: deg(r.reversalDeg) }),
+        needed: t('limit.tracking.reversal.needed'),
       });
     }
     if (r.crossCheckDiffDeg !== null && Math.abs(r.crossCheckDiffDeg) > 60) {
       limitations.push({
-        signal: 'Rotation cross-check',
-        problem: `The body line (ankles to head) rotated ${deg(Math.abs(r.crossCheckDiffDeg))} differently from the trunk (hips to shoulders).`,
-        needed: 'A cleaner pose at the takeoff and landing frames.',
+        id: 'cross-check',
+        signal: t('limit.cross.signal'),
+        problem: t('limit.cross.problem', { deg: deg(Math.abs(r.crossCheckDiffDeg)) }),
+        needed: t('limit.cross.needed'),
       });
     }
     if (r.residualDeg !== null && Math.abs(r.residualDeg) > 0.66 * tol) {
       limitations.push({
-        signal: 'Rotation granularity',
-        problem: `The rotation (${deg(r.totalDeg)}) is ${deg(Math.abs(r.residualDeg))} from the nearest half turn. It may be a quarter-turn skill (such as a drop) or a measurement error.`,
-        needed: 'A landing-position rule (torso angle at landing) to recognize quarter turns.',
+        id: 'granularity',
+        signal: t('limit.granularity.signal'),
+        problem: t('limit.granularity.problem', { total: deg(r.totalDeg), off: deg(Math.abs(r.residualDeg)) }),
+        needed: t('limit.granularity.needed'),
       });
     }
     if (face.twistSuspected) {
       limitations.push({
-        signal: 'Twist',
-        problem:
-          'The facing before the takeoff differs from the facing at the landing: the athlete may have twisted, or the pose flipped.',
-        needed: '3D pose or a second camera to measure the twist.',
+        id: 'twist-suspected',
+        signal: t('limit.twist.signal'),
+        problem: t('limit.twist.problem'),
+        needed: t('limit.twist.needed'),
       });
     }
 
     // --- final ---------------------------------------------------------------------------------------
     let label = SKILL_LABELS[skill];
     if (skill !== 'unclassified' && confidence < cfg.minConfidence) {
-      summary = `Best guess ${SKILL_LABELS[skill]} at ${pct(confidence)}, below the minimum of ${pct(cfg.minConfidence)}. ${summary}`;
+      summary = t('sum.bestGuess', {
+        name: SKILL_LABELS[skill],
+        conf: pct(confidence),
+        min: pct(cfg.minConfidence),
+        reason: summary,
+      });
       skill = 'unclassified';
       label = SKILL_LABELS[skill];
     }

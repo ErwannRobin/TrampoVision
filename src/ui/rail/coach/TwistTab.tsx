@@ -4,7 +4,8 @@ import type { AnalysisResult } from '../../../analysis/types';
 import { describeSupport, probeCapabilities, type Capabilities } from '../../../pose3d/capabilities';
 import { DEFAULT_TWIST_CONFIG } from '../../../pose3d/config';
 import type { TwistAnalysis, TwistEstimate } from '../../../pose3d/twist';
-import { DASH, fmt, pct, plural, signed } from '../../format';
+import { t, tp } from '../../../i18n';
+import { DASH, fmt, pct, signed } from '../../format';
 import { Badge, ConfidenceMeter, Disclosure, SelectField } from '../../kit';
 import { usePlayheadTime, type Playhead } from '../../playhead';
 import { fig, row } from './figures';
@@ -32,8 +33,8 @@ interface Props {
   canAnnotate: boolean;
 }
 
-const ANNOTATION_OPTIONS = [
-  { value: '', label: 'Not counted' },
+const annotationOptions = () => [
+  { value: '', label: t('twist.notCounted') },
   ...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((v) => ({ value: String(v), label: halfTwistOption(v) })),
 ];
 
@@ -60,14 +61,14 @@ export function TwistTab({ result, twist, selected, playhead, annotation, onAnno
   return (
     <>
       <div className="coach__title">
-        <h2 className="coach__h2">Twist</h2>
-        <Badge tone="outline">Experimental</Badge>
+        <h2 className="coach__h2">{t('twist.title')}</h2>
+        <Badge tone="outline">{t('twist.experimental')}</Badge>
       </div>
 
       {!twist ? (
-        <p className="coach__empty">This analysis has no 3D pose data, so there is no twist to measure.</p>
+        <p className="coach__empty">{t('twist.noWorld')}</p>
       ) : !e ? (
-        <p className="coach__empty">No jump found, so there is no twist to measure.</p>
+        <p className="coach__empty">{t('twist.noJump')}</p>
       ) : (
         <>
           <Verdict e={e} minConfidence={twist.config.minConfidence} />
@@ -87,7 +88,7 @@ export function TwistTab({ result, twist, selected, playhead, annotation, onAnno
       )}
 
       <div className="coach__more">
-        <Disclosure title="What one camera can never tell about a twist">
+        <Disclosure title={t('twist.cameraLimits')}>
           <Limits items={cameraLimits(result.meta.fps, twist?.config.maxStepDeg ?? DEFAULT_TWIST_CONFIG.maxStepDeg)} />
         </Disclosure>
         <Readiness hasWorld={!!twist?.frames} />
@@ -102,12 +103,12 @@ function Verdict({ e, minConfidence }: { e: TwistEstimate; minConfidence: number
     const why = e.limitations[0];
     return (
       <section className="coach__lead">
-        <h3 className="coach__verdict">Twist: not measured</h3>
+        <h3 className="coach__verdict">{t('twist.notMeasured')}</h3>
         {why && (
           <>
             <p>{why.problem}</p>
             <p>
-              <em>Needed:</em> {why.needed}
+              <em>{t('coach.needed')}</em> {why.needed}
             </p>
           </>
         )}
@@ -120,33 +121,25 @@ function Verdict({ e, minConfidence }: { e: TwistEstimate; minConfidence: number
         <>
           <div className="coach__result">
             <span className="coach__big num">≈ {e.twists ?? DASH}</span>
-            <span className="coach__result-unit">{plural(e.twists ?? 0, 'twist')}</span>
+            <span className="coach__result-unit">{tp('twist.unit', e.twists ?? 0)}</span>
           </div>
           <p className="coach__quiet">
-            <span className="num">{e.halfTwists ?? DASH}</span> half {plural(e.halfTwists ?? 0, 'twist')}
+            <span className="num">{e.halfTwists ?? DASH}</span> {tp('twist.halfUnit', e.halfTwists ?? 0)}
           </p>
         </>
       ) : (
-        <h3 className="coach__verdict">Twist: not reliable</h3>
+        <h3 className="coach__verdict">{t('twist.notReliable')}</h3>
       )}
       <div className="coach__conf">
-        <span className="coach__tier">Consistency</span>
+        <span className="coach__tier">{t('twist.consistency')}</span>
         <span className="coach__readings">
           <span className="coach__pct num">{pct(e.confidence)}</span>
-          {!e.reliable && <span className="coach__extra">below {pct(minConfidence)}</span>}
+          {!e.reliable && <span className="coach__extra">{t('twist.belowMin', { min: pct(minConfidence) })}</span>}
         </span>
       </div>
-      <ConfidenceMeter value={e.confidence} tier={e.reliable ? 'high' : 'low'} label="Twist consistency" />
-      {!e.reliable && (
-        <p className="coach__caution">
-          The raw value below is shown for inspection only. Do not read it as a measurement.
-        </p>
-      )}
-      <p className="coach__note">
-        Consistency = how well the 3D data agrees with itself (the checks below multiplied). It is <strong>not</strong>{' '}
-        a probability of being right: it has not been compared with real twists yet. Use the annotation at the bottom to
-        do that.
-      </p>
+      <ConfidenceMeter value={e.confidence} tier={e.reliable ? 'high' : 'low'} label={t('twist.consistencyLabel')} />
+      {!e.reliable && <p className="coach__caution">{t('twist.rawCaution')}</p>}
+      <p className="coach__note">{t('twist.consistencyNote')}</p>
     </section>
   );
 }
@@ -165,7 +158,7 @@ function JumpTwist({ result, twist, e, jump, playhead, annotation, onAnnotate, c
   const same = annotation === e.halfTwists;
   return (
     <>
-      <Group title={e.reliable ? 'Measured' : 'Raw values (not reliable)'}>
+      <Group title={e.reliable ? t('twist.measured') : t('twist.raw')}>
         <dl className="coach__rows">
           <RowList rows={twistSummaryRows(e)} />
           <TwistNow result={result} twist={twist} jump={jump} playhead={playhead} />
@@ -173,16 +166,16 @@ function JumpTwist({ result, twist, e, jump, playhead, annotation, onAnnotate, c
         </dl>
       </Group>
 
-      <Group title="Same twist by other routes">
+      <Group title={t('twist.sameRoutes')}>
         <Rows rows={crossRows(e)} />
       </Group>
 
       <div className="coach__more">
-        <Disclosure title="Checks behind the consistency" meta={`${weak} weak`} defaultOpen={!e.reliable}>
+        <Disclosure title={t('twist.checksBehind')} meta={t('twist.weakCount', { n: weak })} defaultOpen={!e.reliable}>
           <dl className="coach__rows">
             {checks.map((c) => (
               <Row key={c.key} label={c.label}>
-                {c.weak && <Badge tone="warn">Weak</Badge>}
+                {c.weak && <Badge tone="warn">{t('twist.weak')}</Badge>}
                 <span className="coach__fig">
                   <span className="num">{c.value}</span>
                 </span>
@@ -193,39 +186,35 @@ function JumpTwist({ result, twist, e, jump, playhead, annotation, onAnnotate, c
       </div>
 
       {e.limitations.length > 0 ? (
-        <Group title="What the 3D data could not settle">
+        <Group title={t('twist.couldNotSettle')}>
           <Limits items={e.limitations} />
         </Group>
       ) : (
-        <p className="coach__quiet">
-          No data problem found for this jump. That is not proof that the twist is right (see below).
-        </p>
+        <p className="coach__quiet">{t('twist.noProblem')}</p>
       )}
 
-      <Group title="Check against your own count">
+      <Group title={t('twist.checkAgainst')}>
         <SelectField
-          label="Half twists you counted in this jump"
-          hint={
-            canAnnotate ? undefined : 'This jump cannot be saved to the dataset right now, so it cannot be counted.'
-          }
+          label={t('twist.countLabel')}
+          hint={canAnnotate ? undefined : t('twist.cannotSave')}
           value={annotation === null ? '' : String(annotation)}
           disabled={!canAnnotate}
-          options={ANNOTATION_OPTIONS}
+          options={annotationOptions()}
           onChange={(v) => onAnnotate(v === '' ? null : Number(v))}
         />
         {counted && (
           <dl className="coach__rows coach__compare">
-            <Row label="You counted" figures={[fig(String(annotation), plural(annotation, 'half twist'))]} />
-            <Row label="Estimate" figures={[fig(String(e.halfTwists ?? 0), plural(e.halfTwists ?? 0, 'half twist'))]}>
-              <Badge tone={same ? 'ok' : 'warn'}>{same ? 'Same' : 'Different'}</Badge>
+            <Row label={t('twist.youCounted')} figures={[fig(String(annotation), tp('twist.halfUnit', annotation))]} />
+            <Row
+              label={t('twist.estimate')}
+              figures={[fig(String(e.halfTwists ?? 0), tp('twist.halfUnit', e.halfTwists ?? 0))]}
+            >
+              <Badge tone={same ? 'ok' : 'warn'}>{same ? t('twist.same') : t('twist.different')}</Badge>
             </Row>
           </dl>
         )}
-        {counted && !e.reliable && <p className="coach__quiet">The estimate was flagged as not reliable.</p>}
-        <p className="coach__note">
-          Saved with the jump in the dataset, so the twist estimate can be scored on real jumps. Half twists are counted
-          from the video, not from this tool.
-        </p>
+        {counted && !e.reliable && <p className="coach__quiet">{t('twist.flagged')}</p>}
+        <p className="coach__note">{t('twist.annotationNote')}</p>
       </Group>
     </>
   );
@@ -251,8 +240,8 @@ function TwistNow({
   return (
     <RowList
       rows={[
-        row('since-takeoff', 'Twist since takeoff, now', fig(signed(since, 0), '°')),
-        row('speed-now', 'Twist speed, now', fig(fmt(frames?.angularVelocity[i], 0), '°/s')),
+        row('since-takeoff', t('twist.sinceTakeoff'), fig(signed(since, 0), '°')),
+        row('speed-now', t('twist.speedNow'), fig(fmt(frames?.angularVelocity[i], 0), '°/s')),
       ]}
     />
   );
@@ -262,21 +251,19 @@ function Readiness({ hasWorld }: { hasWorld: boolean }) {
   const caps = useCapabilities();
   const support = caps ? describeSupport(caps, hasWorld) : null;
   return (
-    <Disclosure title="3D readiness of this browser">
+    <Disclosure title={t('twist.readiness')}>
       {!caps || !support ? (
-        <p className="coach__quiet">Checking…</p>
+        <p className="coach__quiet">{t('twist.checking')}</p>
       ) : (
         <>
           <Rows rows={capabilityRows(caps)} />
           <p className="coach__para">
-            <strong>Model in use.</strong> {support.current.text}
+            <strong>{t('twist.modelInUse')}</strong> {support.current.text}
           </p>
           <p className="coach__para">
-            <strong>A separate 3D model.</strong> {support.dedicated.text}
+            <strong>{t('twist.separateModel')}</strong> {support.dedicated.text}
           </p>
-          <p className="coach__note">
-            MediaPipe Tasks Vision runs on WebGL (“GPU”) or WebAssembly (“CPU”). It does not use WebGPU.
-          </p>
+          <p className="coach__note">{t('twist.mediapipeNote')}</p>
         </>
       )}
     </Disclosure>

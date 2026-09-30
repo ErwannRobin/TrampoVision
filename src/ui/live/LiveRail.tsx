@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { t } from '../../i18n';
 import type { LiveJump, Session } from '../../coaching/session';
 import { Button, cx } from '../kit';
 import { EmptyState } from '../rail/insights/EmptyState';
@@ -76,8 +77,8 @@ function Bounces({
   const shown = open || inside;
   const label =
     jumps.length === 1
-      ? `Straight jump ${jumps[0].number}`
-      : `${jumps.length} straight jumps, ${jumps[0].number} to ${jumps[jumps.length - 1].number}`;
+      ? t('live.bounce', { n: jumps[0].number })
+      : t('live.bounces', { count: jumps.length, from: jumps[0].number, to: jumps[jumps.length - 1].number });
   return (
     <li className="live-bounces">
       <button type="button" className="live-bounces__toggle" aria-expanded={shown} onClick={() => setOpen(!shown)}>
@@ -94,7 +95,7 @@ function Bounces({
                 onClick={() => onSelect(j.index)}
               >
                 <span className="num">{j.number}</span>
-                <span>Straight jump</span>
+                <span>{t('live.bounceItem')}</span>
               </button>
             </li>
           ))}
@@ -149,16 +150,12 @@ export function LiveRail(props: LiveRailProps) {
     <div className="live">
       <SetSummary session={session} title={props.title} />
 
-      <section className="live-list" aria-label="Skills">
-        {session.summary.skills === 0 && (
-          <p className="live-quiet">
-            No skill found, only straight jumps. Film a set with somersaults or twists to score them.
-          </p>
-        )}
+      <section className="live-list" aria-label={t('live.skills')}>
+        {session.summary.skills === 0 && <p className="live-quiet">{t('live.noSkill')}</p>}
         <div className="live-list__head" aria-hidden="true">
-          <h3 className="live-h">Skills</h3>
-          <span className="live-list__col">Difficulty</span>
-          <span className="live-list__col">Execution</span>
+          <h3 className="live-h">{t('live.skills')}</h3>
+          <span className="live-list__col">{t('live.colDifficulty')}</span>
+          <span className="live-list__col">{t('live.colExecution')}</span>
         </div>
         <ul ref={listRef} className="live-list__body">
           {items.map((item) =>
@@ -198,12 +195,9 @@ export function LiveRail(props: LiveRailProps) {
 
       <section className="ins-section live-foot">
         <Button variant="ghost" size="sm" className="ins-coach" onClick={props.onShowAdvanced}>
-          Show technical details
+          {t('live.showTechnical')}
         </Button>
-        <p className="ins-quiet">
-          The athlete and coach views add the evidence behind each skill, every measurement, the twist analysis and all
-          the charts.
-        </p>
+        <p className="ins-quiet">{t('live.technicalText')}</p>
       </section>
     </div>
   );

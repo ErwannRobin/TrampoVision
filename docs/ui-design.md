@@ -401,6 +401,24 @@ American English ("analyze", "center", "meters"). Sentence case. Plain verbs, ac
 the whole flow ("Save analysis" and "Open saved analysis"). Errors say what happened and what to do, never apologize.
 Empty states point at the next step. Keep the existing technical wording where it is precise; shorten filler.
 
+### Languages
+
+English is the source, in American English, and French, German and Japanese follow it (see _Languages_ in the README). No
+string is written in a component: it is a message (`t('key')`) in `src/i18n/messages/en/`, with its translations beside it,
+and the compiler and `src/i18n/i18n.test.ts` refuse a key that a language lacks. A new string is written in the four
+languages in the same change.
+
+- Use the words of the sport in each language (FIG French _exécution_; German _Haltung_ for the execution score and _Schraube_
+  for a twist; Japanese _演技点_ and _ひねり_), the formal address in French and German, the polite form in Japanese.
+- Give a count with `tp` (two forms), a number with `formatNumber` / `formatDecimal` / `formatPercent`, never with
+  `toFixed` or a hand-written plural.
+- A label that shares a narrow column with others needs a short form where a language runs long (German "Schwierigkeit"
+  does not fit the list header: `live.colDifficulty` is "Schwierigk."). Layout is checked in the longest language (German)
+  and in Japanese, at phone width.
+- `<html lang>` follows the language, and CSS may key on it (`:lang(ja)` uses phrase-aware line breaking). Text that is
+  built when an analysis runs takes the language of that moment, and a memo that holds such text lists the language in its
+  dependencies (`useLocale()`).
+
 ## Accessibility and performance
 
 - Every control has an accessible name; icon buttons use `IconButton`. Visible focus is global (`:focus-visible`).

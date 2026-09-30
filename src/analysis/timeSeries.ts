@@ -1,3 +1,4 @@
+import { t } from '../i18n/core';
 import { CORE_LANDMARKS, LANDMARK_COUNT, LANDMARK_NAMES } from '../pose/landmarks';
 import type { Keypoint, WorldPoint } from '../pose/types';
 import type { TrampolineCalibration } from './calibration';
@@ -210,26 +211,25 @@ export function parsePoseSeries(text: string): ParsedSeries {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error('This file is not valid JSON.');
+    throw new Error(t('err.notJson'));
   }
-  if (!data || data.schema !== SERIES_SCHEMA) throw new Error('This is not a TrampoVision pose-series file.');
+  if (!data || data.schema !== SERIES_SCHEMA) throw new Error(t('err.notSeries'));
   if (typeof data.version !== 'number' || data.version > SERIES_VERSION) {
-    throw new Error(`Unsupported file version (${String(data.version)}); this app reads version ${SERIES_VERSION}.`);
+    throw new Error(t('err.seriesVersion', { found: String(data.version), expected: SERIES_VERSION }));
   }
   const { source, raw, frames } = data;
   if (!source || !Array.isArray(raw) || !Array.isArray(frames) || raw.length !== frames.length || frames.length === 0) {
-    throw new Error('The file has no frame data.');
+    throw new Error(t('err.noFrames'));
   }
   const keypoints = (f: [number, number, number][] | null): Keypoint[] | null => {
     if (f === null) return null;
     if (!Array.isArray(f) || f.length !== LANDMARK_COUNT)
-      throw new Error(`A frame does not have ${LANDMARK_COUNT} landmarks.`);
+      throw new Error(t('err.frameLandmarks', { n: LANDMARK_COUNT }));
     return f.map(([x, y, visibility]) => ({ x, y, visibility }));
   };
   const worldPoints = (f: [number, number, number, number][] | null): WorldPoint[] | null => {
     if (f === null) return null;
-    if (!Array.isArray(f) || f.length !== LANDMARK_COUNT)
-      throw new Error(`A 3D frame does not have ${LANDMARK_COUNT} landmarks.`);
+    if (!Array.isArray(f) || f.length !== LANDMARK_COUNT) throw new Error(t('err.frame3d', { n: LANDMARK_COUNT }));
     return f.map(([x, y, z, visibility]) => ({ x, y, z, visibility }));
   };
   const track: PoseTrack = {

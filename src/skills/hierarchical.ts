@@ -1,5 +1,13 @@
+import { formatDecimal, formatNumber, formatPercent, lower, t, tp } from '../i18n/core';
 import type { SkillConfig } from './config';
-import { FIG_ELEMENTS, movementToElement, type Direction, type FigElement, type Movement } from './fig/elements';
+import {
+  FIG_ELEMENTS,
+  elementName,
+  movementToElement,
+  type Direction,
+  type FigElement,
+  type Movement,
+} from './fig/elements';
 import {
   SKILL_LABELS,
   type CandidateCheck,
@@ -19,7 +27,7 @@ import {
   type StageReport,
   type TwistContext,
 } from './types';
-import { KNOWN_LIMITS, ruleBasedClassifier } from './classifier';
+import { boundsLimit, knownLimits, positionWord, ruleBasedClassifier } from './classifier';
 
 /**
  * Hierarchical classifier. It answers four questions in turn, each with a probability for every possible answer:
@@ -43,7 +51,9 @@ const ID = { id: 'hierarchical', version: '1' } as const;
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 const gauss = (x: number, mean: number, sigma: number) => Math.exp(-0.5 * ((x - mean) / sigma) ** 2);
-export const pct = (v: number) => `${Math.round(clamp01(v) * 100)}%`;
+export const pct = (v: number) => formatPercent(clamp01(v));
+const two = (v: number) => formatNumber(v, 2);
+const dirWord = (d: Direction) => lower(t(`dir.${d}`));
 const normalize = <T extends string | number>(m: Map<T, number>): Map<T, number> => {
   let sum = 0;
   for (const v of m.values()) sum += v;
@@ -64,9 +74,13 @@ export function somersaultText(quarters: number): string {
   const frac = ['', '¼', '½', '¾'][quarters % 4];
   return `${whole || (frac ? '' : '0')}${frac}` || '0';
 }
-const rotationLabel = (q: number) => `${somersaultText(q)} somersault${q === 4 ? '' : 's'}`;
+const rotationLabel = (q: number) => tp('label.somersaults', q / 4, { n: somersaultText(q) });
 export const twistLabel = (h: number) =>
-  h === 0 ? 'no twist' : h === 1 ? '½ twist' : h === 2 ? '1 twist' : `${h / 2} twists`;
+  h === 0
+    ? t('label.noTwist')
+    : h === 1
+      ? t('name.twist.half')
+      : tp('label.twists', h / 2, { n: formatDecimal(h / 2) });
 
 /** Sequence columns used here (see SEQUENCE_COLUMNS). */
 const COL = { turns: 8, hip: 12 } as const;
@@ -180,11 +194,11 @@ function rotationStage(f: JumpFeatures, tm: Temporal, cfg: SkillConfig): Rotatio
       quality,
       report: {
         stage: 'rotation',
-        title: 'Somersaults',
+        title: t('stage.rotation.title'),
         measured: false,
-        observed: 'not measured',
+        observed: t('label.notMeasured'),
         distribution: [],
-        notes: ['The takeoff or the landing is missing, so the rotation cannot be summed.'],
+        notes: [t('stage.rotation.cutOff')],
       },
     };
   }
@@ -203,9 +217,8 @@ function rotationStage(f: JumpFeatures, tm: Temporal, cfg: SkillConfig): Rotatio
     dist.set(q, lik + 1e-9);
   }
   const d = normalize(dist);
-  if (tm.pathTurns !== null)
-    notes.push(`path ${tm.pathTurns.toFixed(2)} turns (sum of the orientation steps), net ${obs.toFixed(2)} turns`);
-  notes.push(`tolerance ±${Math.round(sigmaTurns * 360)}° (measurement quality ${pct(quality)})`);
+  if (tm.pathTurns !== null) notes.push(t('stage.rotation.path', { path: two(tm.pathTurns), net: two(obs) }));
+  notes.push(t('stage.rotation.tolerance', { deg: Math.round(sigmaTurns * 360), quality: pct(quality) }));
   return {
     dist: d,
     fit: (n) => gauss(obs, readAt(n, true), sigmaAt(n)),
@@ -214,9 +227,9 @@ function rotationStage(f: JumpFeatures, tm: Temporal, cfg: SkillConfig): Rotatio
     quality,
     report: {
       stage: 'rotation',
-      title: 'Somersaults',
+      title: t('stage.rotation.title'),
       measured: true,
-      observed: `${obs.toFixed(2)} somersaults (${Math.round(Math.abs(r.totalDeg))}°)`,
+      observed: t('stage.rotation.observed', { turns: two(obs), deg: Math.round(Math.abs(r.totalDeg)) }),
       distribution: labelled(d, rotationLabel),
       notes,
     },
@@ -244,25 +257,28 @@ function directionStage(f: JumpFeatures): DirectionStage {
     ['back', 1 - pFront],
   ]);
   const notes: string[] = [];
+  const turn = t(`turn.${r.direction}`);
   if (!measured)
     notes.push(
-      dirSign === 0
-        ? 'the body does not turn: front and back cannot be told apart'
-        : `the facing side is unknown (${pct(face.confidence)}): a ${r.direction} turn is a front somersault for an athlete facing right and a back somersault for one facing left`,
+      dirSign === 0 ? t('stage.direction.noTurn') : t('stage.direction.noFacing', { conf: pct(face.confidence), turn }),
     );
   else
     notes.push(
-      `${r.direction} turn, athlete facing ${face.sign > 0 ? 'right' : 'left'} (${pct(face.confidence)}): ${forward > 0 ? 'toward' : 'away from'} the face`,
+      t(forward > 0 ? 'stage.direction.towardFace' : 'stage.direction.awayFromFace', {
+        turn,
+        side: face.sign > 0 ? t('side.right') : t('side.left'),
+        conf: pct(face.confidence),
+      }),
     );
   return {
     dist,
     measured,
     report: {
       stage: 'direction',
-      title: 'Direction',
+      title: t('stage.direction.title'),
       measured,
-      observed: measured ? (forward > 0 ? 'forward' : 'backward') : 'undetermined',
-      distribution: labelled(dist, (d) => d),
+      observed: measured ? (forward > 0 ? t('facing.forward') : t('facing.backward')) : t('facing.undetermined'),
+      distribution: labelled(dist, dirWord),
       notes,
     },
   };
@@ -294,11 +310,7 @@ function twistStage(f: JumpFeatures, tw: TwistContext | null, tm: Temporal, cfg:
   const prior = normalize(unmeasured);
 
   if (!est || !est.available || est.totalDeg === null) {
-    notes.push(
-      suspected
-        ? 'no 3D twist measurement; the 2D facing before takeoff and at landing disagree, so an odd number of half twists is more likely'
-        : 'no 3D twist measurement: no twist is assumed, with a low prior for each half twist',
-    );
+    notes.push(t(suspected ? 'stage.twists.noMeasureSuspected' : 'stage.twists.noMeasure'));
     return {
       dist: prior,
       fit: () => 1,
@@ -306,9 +318,9 @@ function twistStage(f: JumpFeatures, tw: TwistContext | null, tm: Temporal, cfg:
       observedTwists: null,
       report: {
         stage: 'twists',
-        title: 'Twists',
+        title: t('stage.twists.title'),
         measured: false,
-        observed: 'not measured',
+        observed: t('label.notMeasured'),
         distribution: labelled(prior, twistLabel),
         notes,
       },
@@ -320,7 +332,7 @@ function twistStage(f: JumpFeatures, tw: TwistContext | null, tm: Temporal, cfg:
   let sigma = c.twistSigmaDeg / Math.sqrt(Math.max(est.confidence, 0.25));
   if (tm.twistEndDrift !== null && tm.twistEndDrift > c.twistSettleDeg) {
     sigma *= 1.5;
-    notes.push(`still twisting at landing (${Math.round(tm.twistEndDrift)}° in the last tenth of the flight)`);
+    notes.push(t('stage.twists.stillTwisting', { deg: Math.round(tm.twistEndDrift) }));
   }
   const measuredDist = new Map<number, number>();
   for (const h of HALF_TWISTS) measuredDist.set(h, gauss(obsDeg, 180 * h, sigma) * TWIST_PRIOR(h) + 1e-9);
@@ -330,9 +342,12 @@ function twistStage(f: JumpFeatures, tw: TwistContext | null, tm: Temporal, cfg:
   const dist = new Map<number, number>();
   for (const h of HALF_TWISTS) dist.set(h, trust * (meas.get(h) ?? 0) + (1 - trust) * (prior.get(h) ?? 0));
   notes.push(
-    `tolerance ±${Math.round(sigma)}°, twist confidence ${pct(est.confidence)}${est.reliable ? '' : ' (below its reliability limit: partly discounted)'}`,
+    t(est.reliable ? 'stage.twists.tolerance' : 'stage.twists.toleranceDiscounted', {
+      deg: Math.round(sigma),
+      conf: pct(est.confidence),
+    }),
   );
-  if (tm.twistDoneU !== null) notes.push(`90% of the twist done by ${Math.round(tm.twistDoneU * 100)}% of the flight`);
+  if (tm.twistDoneU !== null) notes.push(t('stage.twists.done', { at: pct(tm.twistDoneU) }));
   return {
     dist,
     fit: (h) => trust * gauss(obsDeg, 180 * h, sigma) + (1 - trust),
@@ -340,9 +355,9 @@ function twistStage(f: JumpFeatures, tw: TwistContext | null, tm: Temporal, cfg:
     observedTwists: obsDeg / 360,
     report: {
       stage: 'twists',
-      title: 'Twists',
+      title: t('stage.twists.title'),
       measured: true,
-      observed: `${(obsDeg / 360).toFixed(2)} twists (${Math.round(obsDeg)}°)`,
+      observed: t('stage.twists.observed', { turns: two(obsDeg / 360), deg: Math.round(obsDeg) }),
       distribution: labelled(dist, twistLabel),
       notes,
     },
@@ -366,7 +381,7 @@ export function viewFactorOf(f: JumpFeatures, cfg: SkillConfig): number {
 }
 
 const viewNote = (f: JumpFeatures) =>
-  f.quality.trunkLengthVariation === null ? '' : `: the trunk length changes by ${pct(f.quality.trunkLengthVariation)}`;
+  f.quality.trunkLengthVariation === null ? '' : t('diag.viewNote', { change: pct(f.quality.trunkLengthVariation) });
 
 /** Folds that begin at this point of the flight (0..1) start to count as landing preparation, fully so `LATE_FOLD_SPAN` later. */
 const LATE_FOLD_FROM = 0.6;
@@ -394,23 +409,29 @@ function positionStage(f: JumpFeatures, tm: Temporal): PositionStage {
   raw.set('straight', (raw.get('straight') ?? 0) + lost);
   const dist = normalize(raw);
   notes.push(
-    `most closed moment: ${p.label} (rule score ${pct(p.ruleScore)}, held ${pct(p.stability)})`,
-    `share of the flight: ${POSITIONS.map((k) => `${k} ${pct(p.timeShare[k])}`).join(', ')}`,
+    t('stage.position.mostClosed', {
+      position: positionWord(p.label),
+      score: pct(p.ruleScore),
+      held: pct(p.stability),
+    }),
+    t('stage.position.share', {
+      shares: POSITIONS.map((k) => t('ev.share', { position: positionWord(k), share: pct(p.timeShare[k]) })).join(
+        t('list.separator'),
+      ),
+    }),
   );
-  if (p.peakTimeU !== null) notes.push(`most closed at ${Math.round(p.peakTimeU * 100)}% of the flight`);
+  if (p.peakTimeU !== null) notes.push(t('stage.position.peakAt', { at: pct(p.peakTimeU) }));
   if (tm.closedFromU !== null && tm.closedToU !== null)
-    notes.push(
-      `hips folded from ${Math.round(tm.closedFromU * 100)}% to ${Math.round(tm.closedToU * 100)}% of the flight`,
-    );
+    notes.push(t('stage.position.folded', { from: pct(tm.closedFromU), to: pct(tm.closedToU) }));
   return {
     dist,
     measured: informed,
     report: {
       stage: 'position',
-      title: 'Body position',
+      title: t('stage.position.title'),
       measured: informed,
-      observed: p.label === 'unknown' ? 'between the definitions' : p.label,
-      distribution: labelled(dist, (k) => k),
+      observed: p.label === 'unknown' ? t('label.betweenDefinitions') : positionWord(p.label),
+      distribution: labelled(dist, (k) => positionWord(k)),
       notes,
     },
   };
@@ -475,8 +496,11 @@ export function checksFor(sc: Scored, s: Stages): CandidateCheck[] {
   const out: CandidateCheck[] = [];
   out.push({
     stage: 'rotation',
-    criterion: 'somersaults',
-    expected: e.somersaults === 0 ? 'no somersault' : `${e.somersaults} somersault${e.somersaults > 1 ? 's' : ''}`,
+    criterion: t('check.somersaults'),
+    expected:
+      e.somersaults === 0
+        ? t('label.noSomersault')
+        : tp('label.somersaults', e.somersaults, { n: formatDecimal(e.somersaults) }),
     observed: s.rot.report.observed,
     status: statusOf(ratio(sc.shares[0], s.rot.dist) * fits[0], s.rot.measured),
     match: ratio(sc.shares[0], s.rot.dist) * fits[0],
@@ -484,24 +508,24 @@ export function checksFor(sc: Scored, s: Stages): CandidateCheck[] {
   if (e.direction !== null)
     out.push({
       stage: 'direction',
-      criterion: 'direction',
-      expected: e.direction,
+      criterion: t('check.direction'),
+      expected: dirWord(e.direction),
       observed: s.dir.report.observed,
       status: statusOf(ratio(sc.shares[1], s.dir.dist), s.dir.measured),
       match: ratio(sc.shares[1], s.dir.dist),
     });
   out.push({
     stage: 'twists',
-    criterion: 'twists',
-    expected: e.twists === 0 ? 'no twist' : `${e.twists} twist${e.twists === 1 ? '' : 's'}`,
+    criterion: t('check.twists'),
+    expected: e.twists === 0 ? t('label.noTwist') : tp('label.twists', e.twists, { n: formatDecimal(e.twists) }),
     observed: s.tw.report.observed,
     status: statusOf(ratio(sc.shares[2], s.tw.dist) * fits[2], s.tw.measured),
     match: ratio(sc.shares[2], s.tw.dist) * fits[2],
   });
   out.push({
     stage: 'position',
-    criterion: 'position',
-    expected: e.position,
+    criterion: t('check.position'),
+    expected: positionWord(e.position),
     observed: s.pos.report.observed,
     status: statusOf(ratio(sc.shares[3], s.pos.dist), s.pos.measured),
     match: ratio(sc.shares[3], s.pos.dist),
@@ -511,7 +535,7 @@ export function checksFor(sc: Scored, s: Stages): CandidateCheck[] {
 
 export const candidateOf = (sc: Scored, s: Stages): ElementCandidate => ({
   elementId: sc.element.id,
-  name: sc.element.name,
+  name: elementName(sc.element),
   movement: movementOf(sc.element),
   posterior: sc.posterior,
   checks: checksFor(sc, s),
@@ -538,7 +562,7 @@ export function diagnose(
   const checks = checksFor(best, s);
   const distances = checks.map((c) => ({
     stage: c.stage,
-    text: `${c.criterion}: expected ${c.expected}, measured ${c.observed}`,
+    text: t('check.distance', { criterion: c.criterion, expected: c.expected, observed: c.observed }),
     match: c.match,
   }));
   // The failing criterion is where the closest element fits worst; an unmeasured signal counts as a failure only when a value
@@ -560,31 +584,40 @@ export function diagnose(
   if (quality < 0.5) {
     kind = 'low-data-quality';
     criterion = 'data';
-    message = `The measurements are too unreliable to name the movement (data quality ${pct(quality)}: pose ${pct(f.quality.pose)}, orientation checks ${pct(s.rot.quality)}, camera view ${pct(view)}${viewNote(f)}).`;
+    message = t('diag.lowQuality', {
+      quality: pct(quality),
+      pose: pct(f.quality.pose),
+      orientation: pct(s.rot.quality),
+      view: pct(view),
+      viewNote: viewNote(f),
+    });
   } else if (rotationOffGrid > 0.4 || bestWholeFit < 0.4) {
     kind = 'rotation-off-grid';
     criterion = 'rotation';
     const turns = Math.abs(r.turns ?? 0);
     const off = Math.abs(turns - Math.round(turns)) * 360;
-    message = `The rotation (${turns.toFixed(2)} somersaults, ${Math.round(turns * 360)}°) is ${Math.round(off)}° from the nearest whole somersault, more than the measurement tolerance allows: a quarter-turn skill (1¼, a drop) that is not in the table, or a measurement error.`;
+    message = t('diag.offGrid', { turns: two(turns), deg: Math.round(turns * 360), off: Math.round(off) });
   } else if (outOfTable > 0.5) {
     kind = 'not-in-table';
     criterion = 'table';
-    message = `Most of the probability (${pct(outOfTable)}) lies on movements the element table does not contain.`;
+    message = t('diag.notInTable', { share: pct(outOfTable) });
   } else if (weakest.stage === 'rotation') {
     kind = 'rotation-ambiguous';
-    message = `The rotation cannot be settled between whole numbers of somersaults (${r.turns === null ? '–' : Math.abs(r.turns).toFixed(2)} measured; the closest element needs ${e.somersaults}).`;
+    message = t('diag.rotationAmbiguous', {
+      measured: r.turns === null ? '–' : two(Math.abs(r.turns)),
+      needs: e.somersaults,
+    });
   } else if (weakest.stage === 'direction') {
     kind = 'direction-unknown';
-    message = `Front and back cannot be told apart: ${s.dir.report.notes[0]}.`;
+    message = t('diag.directionUnknown', { reason: s.dir.report.notes[0] });
   } else if (weakest.stage === 'twists') {
     kind = s.tw.measured ? 'twist-ambiguous' : 'twist-unmeasured';
     message = s.tw.measured
-      ? `The twist (${s.tw.report.observed}) falls between counts; the closest element needs ${e.twists}.`
-      : `Twist is not measured (no 3D) and the movement could have ${e.twists === 0 ? 'no twist or a twist' : 'a different twist count'}.`;
+      ? t('diag.twistAmbiguous', { observed: s.tw.report.observed, needs: formatDecimal(e.twists) })
+      : t(e.twists === 0 ? 'diag.twistUnmeasuredNone' : 'diag.twistUnmeasuredOther');
   } else {
     kind = 'position-ambiguous';
-    message = `The body position fits no definition well (${s.pos.report.notes[0]}).`;
+    message = t('diag.positionAmbiguous', { reason: s.pos.report.notes[0] });
   }
 
   // What confidence would the closest element have if the failing stage were certain?
@@ -594,7 +627,7 @@ export function diagnose(
     const prod = best.factors.reduce((a, b, i) => (i === idx ? a : a * b), 1);
     ifResolved = clamp01(prod * quality);
   }
-  return { kind, criterion, message, closest: { elementId: e.id, name: e.name }, distances, ifResolved };
+  return { kind, criterion, message, closest: { elementId: e.id, name: elementName(e) }, distances, ifResolved };
 }
 type FailureKind = FailureDiagnosis['kind'];
 
@@ -615,19 +648,12 @@ export function cutOff(): SkillPrediction {
     scores: {},
     confidenceParts: [],
     evidence: [],
-    limitations: [
-      {
-        signal: 'Jump boundaries',
-        problem:
-          'The takeoff or the landing is not in the clip, so the rotation and the shape over the whole flight are unknown.',
-        needed: 'A clip that starts before the takeoff and ends after the landing.',
-      },
-    ],
-    summary: 'This jump is cut off at the start or the end of the clip.',
+    limitations: [boundsLimit()],
+    summary: t('sum.cutOff'),
     failure: {
       kind: 'cut-off',
       criterion: 'data',
-      message: 'The takeoff or the landing is not in the clip.',
+      message: t('diag.cutOff'),
       closest: null,
       distances: [],
       ifResolved: null,
@@ -706,24 +732,36 @@ export const hierarchicalClassifier: SkillClassifier = {
         label = SKILL_LABELS[skill];
         outConfidence = merged;
         movement = { ...movementOf(best.element), direction: null };
-        summary = `${best.element.somersaults} somersault(s), ${twistLabel(Math.round(best.element.twists * 2))}, ${best.element.position}; the direction (front or back) cannot be told: ${stages.dir.report.notes[0]}.`;
+        summary = t('sum.directionUnknown', {
+          n: best.element.somersaults,
+          twist: twistLabel(Math.round(best.element.twists * 2)),
+          position: positionWord(best.element.position),
+          reason: stages.dir.report.notes[0],
+        });
       } else summary = '';
     } else summary = '';
 
     const namedSummary = (e: FigElement) =>
-      `${e.name}: ${[
-        stages.rot.report.observed,
-        e.somersaults > 0 ? stages.dir.report.observed : null,
-        stages.tw.report.observed,
-        `${stages.pos.report.observed} (hips ${Math.round(f.shape.hipAngle.atPeak ?? NaN)}°, knees ${Math.round(f.shape.kneeAngle.atPeak ?? NaN)}°)`,
-      ]
-        .filter(Boolean)
-        .join(', ')}.`;
+      t('sum.elementObserved', {
+        name: elementName(e),
+        parts: [
+          stages.rot.report.observed,
+          e.somersaults > 0 ? stages.dir.report.observed : null,
+          stages.tw.report.observed,
+          t('sum.positionDetail', {
+            position: stages.pos.report.observed,
+            hip: `${Math.round(f.shape.hipAngle.atPeak ?? NaN)}°`,
+            knee: `${Math.round(f.shape.kneeAngle.atPeak ?? NaN)}°`,
+          }),
+        ]
+          .filter(Boolean)
+          .join(t('list.separator')),
+      });
 
     if (skill === 'unclassified' && confidence >= cfg.minConfidence) {
       const e = best.element;
       skill = legacyId(e);
-      label = e.name;
+      label = elementName(e);
       movement = movementOf(e);
       elementId = e.id;
       summary = namedSummary(e);
@@ -731,7 +769,7 @@ export const hierarchicalClassifier: SkillClassifier = {
         // The direction was not measured: the likelier one is named and the other stays among the candidates.
         outConfidence = clamp01((best.posterior + twin.posterior) * quality);
         guess = { closest: false, direction: true };
-        summary = `${namedSummary(e)} The direction (front or back) was assumed: ${stages.dir.report.notes[0]}.`;
+        summary = t('sum.assumedDirection', { summary: namedSummary(e), reason: stages.dir.report.notes[0] });
       }
     }
     if (skill === 'unclassified') {
@@ -740,25 +778,29 @@ export const hierarchicalClassifier: SkillClassifier = {
         // Not sure enough to name it, but a guess is more useful than nothing: the closest element, with the reason it is weak.
         const e = best.element;
         skill = legacyId(e);
-        label = e.name;
+        label = elementName(e);
         movement = movementOf(e);
         elementId = e.id;
         guess = { closest: true, direction: directionOnly && !!twin };
-        summary = `Best guess ${e.name} at ${pct(confidence)}, below the minimum of ${pct(cfg.minConfidence)}. ${failure.message}`;
-      } else {
-        summary = `Best guess ${best.element.name} at ${pct(confidence)}, below the minimum of ${pct(cfg.minConfidence)}. ${failure.message}`;
       }
+      summary = t('sum.bestGuess', {
+        name: elementName(best.element),
+        conf: pct(confidence),
+        min: pct(cfg.minConfidence),
+        reason: failure.message,
+      });
     }
 
     // The measurements and the data problems of this jump come from the rule set (same numbers, same wording); the stages add theirs.
     const rules = ruleBasedClassifier.classify(input);
     const limitations: Limitation[] = [...rules.limitations];
-    if (!stages.tw.measured && !limitations.some((l) => l.signal === 'Twist'))
+    if (!stages.tw.measured && !limitations.some((l) => l.id === 'twist-suspected'))
       limitations.push(
-        KNOWN_LIMITS.find((l) => l.signal === 'Twists') ?? {
-          signal: 'Twists',
-          problem: 'Not measured.',
-          needed: '3D pose.',
+        knownLimits().find((l) => l.id === 'twists') ?? {
+          id: 'twists',
+          signal: t('limit.twists.signal'),
+          problem: t('limit.unmeasured.problem'),
+          needed: t('limit.unmeasured.needed'),
         },
       );
     const evidence: EvidenceItem[] = [...rules.evidence];
@@ -785,7 +827,7 @@ export const hierarchicalClassifier: SkillClassifier = {
       scores: scoresById,
       confidenceParts: [
         ...STAGE_ORDER.map((st, i) => ({ name: stages[stageKey(st)].report.title, value: best.factors[i] })),
-        { name: 'data quality', value: quality },
+        { name: t('part.dataQuality'), value: quality },
       ],
       evidence,
       limitations,

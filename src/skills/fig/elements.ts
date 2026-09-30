@@ -1,3 +1,4 @@
+import { getLocale, lower, t, tp, upperFirst, type Locale } from '../../i18n/core';
 import type { KnownPosition } from '../types';
 import { OFFICIAL_EXAMPLES, difficultyValue, exampleMovement } from './difficulty';
 
@@ -27,6 +28,7 @@ export interface Movement {
 export interface FigElement extends Movement {
   /** Stable key, derived from the movement: `back-1s-1t-straight`. */
   id: string;
+  /** The name in English, the same in every language: what is kept in data. To show, use `elementName`, which follows the language. */
   name: string;
   /** Difficulty value by the FIG rule (`difficulty.ts`). */
   difficulty: number;
@@ -44,21 +46,40 @@ export function movementKey(m: Movement): string {
   return `${m.direction ?? 'none'}|${m.somersaults}|${m.twists}|${m.position}`;
 }
 
-const twistText = (t: number): string =>
-  t === 0 ? '' : t === 0.5 ? '½ twist' : t === 1 ? 'full twist' : `${t % 1 === 0.5 ? `${Math.floor(t)}½` : t} twists`;
-const somersaultText = (s: number): string =>
-  s === 1 ? 'somersault' : s === 2 ? 'double somersault' : 'triple somersault';
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const SOMERSAULT_KEYS = ['name.somersault.1', 'name.somersault.2', 'name.somersault.3'] as const;
+const SOMERSAULT_ANY_KEYS = ['name.somersault.1.any', 'name.somersault.2.any', 'name.somersault.3.any'] as const;
+const somersaultIndex = (somersaults: number) => Math.min(Math.max(Math.round(somersaults), 1), 3) - 1;
 
-/** Name from the movement alone: "Back somersault, full twist (straight)". */
-export function movementName(m: Movement): string {
+/** The twists in words: "½ twist", "full twist", "1½ twists", "2 twists" (empty for none). */
+export function twistName(twists: number, locale: Locale = getLocale()): string {
+  if (twists <= 0) return '';
+  if (twists === 0.5) return t('name.twist.half', undefined, locale);
+  if (twists === 1) return t('name.twist.full', undefined, locale);
+  return twists % 1 === 0.5
+    ? tp('name.twist.manyHalf', twists, { n: Math.floor(twists) }, locale)
+    : tp('name.twist.many', twists, undefined, locale);
+}
+
+/** A somersault count in words, with its direction when there is one: "back double somersault", "somersault". */
+export function somersaultName(somersaults: number, direction: Direction | null, locale: Locale = getLocale()): string {
+  const i = somersaultIndex(somersaults);
+  if (!direction) return t(SOMERSAULT_ANY_KEYS[i], undefined, locale);
+  return t(SOMERSAULT_KEYS[i], { direction: lower(t(`dir.${direction}`, undefined, locale), locale) }, locale);
+}
+
+/** Name from the movement alone: "Back somersault, full twist (straight)". In the language in use unless another is asked for. */
+export function movementName(m: Movement, locale: Locale = getLocale()): string {
   if (m.somersaults === 0) {
-    const t = twistText(m.twists);
-    return t ? `${cap(t)} jump` : `${cap(m.position)} jump`;
+    const twist = twistName(m.twists, locale);
+    return upperFirst(
+      twist ? t('name.jumpTwist', { twist }, locale) : t(`name.jump.${m.position}`, undefined, locale),
+      locale,
+    );
   }
-  const parts = [`${cap(m.direction ?? 'back')} ${somersaultText(m.somersaults)}`];
-  if (m.twists > 0) parts.push(twistText(m.twists));
-  return `${parts.join(', ')} (${m.position})`;
+  let name = somersaultName(m.somersaults, m.direction ?? 'back', locale);
+  if (m.twists > 0) name = t('name.withTwist', { name, twist: twistName(m.twists, locale) }, locale);
+  const position = lower(t(`pos.${m.position}`, undefined, locale), locale);
+  return upperFirst(t('name.withPosition', { name, position }, locale), locale);
 }
 
 /** The movements the Code lists in its table of examples (whole somersaults only: the table below has no quarter rotations). */
@@ -68,7 +89,13 @@ function build(): FigElement[] {
   const out: FigElement[] = [];
   const add = (m: Movement) => {
     const id = `${m.direction ?? 'none'}-${m.somersaults}s-${m.twists}t-${m.position}`;
-    out.push({ ...m, id, name: movementName(m), difficulty: difficultyValue(m), inCode: LISTED.has(movementKey(m)) });
+    out.push({
+      ...m,
+      id,
+      name: movementName(m, 'en'),
+      difficulty: difficultyValue(m),
+      inCode: LISTED.has(movementKey(m)),
+    });
   };
   // No somersault: the three basic jumps, and straight jumps with twists.
   for (const position of POSITIONS) add({ direction: null, somersaults: 0, twists: 0, position });
@@ -93,3 +120,12 @@ export function movementToElement(m: Movement): FigElement | null {
 }
 
 export const elementById = (id: string): FigElement | undefined => BY_ID.get(id);
+
+const NAMES = new Map<string, string>();
+/** What an element is called in the language in use (`element.name` is the English name that data keeps). */
+export function elementName(e: Movement): string {
+  const key = `${getLocale()}|${movementKey(e)}`;
+  let name = NAMES.get(key);
+  if (name === undefined) NAMES.set(key, (name = movementName(e)));
+  return name;
+}

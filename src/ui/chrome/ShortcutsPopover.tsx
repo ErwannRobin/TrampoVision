@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { t } from '../../i18n';
 import { useDismiss } from '../hooks';
 import { IconButton } from '../kit';
 import { isShortcutsKey } from './keys';
 
-const SHORTCUTS: { keys: string[]; text: string }[] = [
-  { keys: ['Space'], text: 'Play or pause' },
-  { keys: ['←', '→'], text: 'Previous or next frame' },
-  { keys: ['Shift', '← →'], text: 'Ten frames at a time' },
-  { keys: ['[', ']'], text: 'Previous or next jump' },
-  { keys: ['1', '–', '6'], text: 'Label the jump (Review tab)' },
-  { keys: ['N'], text: 'Next unlabeled jump (Review tab)' },
-  { keys: ['?'], text: 'This list' },
+const shortcuts = (): { keys: string[]; text: string }[] => [
+  { keys: ['Space'], text: t('shortcuts.playPause') },
+  { keys: ['←', '→'], text: t('shortcuts.frame') },
+  { keys: ['Shift', '← →'], text: t('shortcuts.tenFrames') },
+  { keys: ['[', ']'], text: t('shortcuts.jump') },
+  { keys: ['1', '–', '6'], text: t('shortcuts.label') },
+  { keys: ['N'], text: t('shortcuts.nextUnlabeled') },
+  { keys: ['?'], text: t('shortcuts.list') },
 ];
 
 /** The keyboard shortcuts of the app. The ? key opens and closes it. */
@@ -33,7 +34,7 @@ export function ShortcutsPopover() {
     <div className="shortcuts" ref={root}>
       <IconButton
         icon="keyboard"
-        label="Keyboard shortcuts"
+        label={t('shortcuts.title')}
         pressed={open}
         aria-expanded={open}
         aria-controls={open ? id : undefined}
@@ -41,15 +42,15 @@ export function ShortcutsPopover() {
         onClick={() => setOpen((o) => !o)}
       />
       {open && (
-        <div className="shortcuts__panel" id={id} role="dialog" aria-label="Keyboard shortcuts">
+        <div className="shortcuts__panel" id={id} role="dialog" aria-label={t('shortcuts.title')}>
           <dl className="shortcuts__list">
-            {SHORTCUTS.map((s) => (
+            {shortcuts().map((s) => (
               <div className="shortcuts__row" key={s.text}>
                 <dt>
                   {s.keys.map((k, i) =>
                     k === '–' ? (
                       <span key={i} className="shortcuts__to">
-                        to
+                        {t('shortcuts.to')}
                       </span>
                     ) : (
                       <kbd key={i}>{k}</kbd>

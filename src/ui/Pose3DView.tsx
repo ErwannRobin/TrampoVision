@@ -6,25 +6,16 @@ import type { TwistAnalysis } from '../pose3d/twist';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { canExportVideo, exportPose3DVideo, exportSideBySideVideo, saveBlob } from '../video/exportVideo';
 import type { CalibrationDraw, OverlayOptions } from '../video/overlay';
+import { formatPercent, t, useLocale } from '../i18n';
 import { useElementSize } from './hooks';
 import { Badge, Button, IconButton, Segmented } from './kit';
 import { usePlayheadTime, type Playhead } from './playhead';
 import { pose3dColors, useThemeVersion } from './theme';
 
-const PRESETS: { value: string; label: string; view: View; title: string }[] = [
-  {
-    value: 'camera',
-    label: 'Camera',
-    view: { yaw: 0, pitch: 0 },
-    title: 'As the camera sees it: x to the right, y down',
-  },
-  {
-    value: 'side',
-    label: 'Side',
-    view: { yaw: 90, pitch: 0 },
-    title: 'Looking along the camera’s x axis: shows the depth the model estimated',
-  },
-  { value: 'above', label: 'Above', view: { yaw: 0, pitch: 90 }, title: 'Looking down from above the athlete' },
+const presets = (): { value: string; label: string; view: View; title: string }[] => [
+  { value: 'camera', label: t('p3d.camera'), view: { yaw: 0, pitch: 0 }, title: t('p3d.cameraTitle') },
+  { value: 'side', label: t('p3d.side'), view: { yaw: 90, pitch: 0 }, title: t('p3d.sideTitle') },
+  { value: 'above', label: t('p3d.above'), view: { yaw: 0, pitch: 90 }, title: t('p3d.aboveTitle') },
 ];
 
 /** The height of the view when it is not asked to fill its parent. */
@@ -72,8 +63,9 @@ export function Pose3DView({
   const size = useElementSize(wrapRef);
   const width = Math.max(1, Math.round(size.width));
   const height = fill ? Math.max(1, Math.round(size.height)) : FIXED_HEIGHT;
-  const [preset, setPreset] = useState(PRESETS[0].value);
-  const [view, setView] = useState<View>(PRESETS[0].view);
+  useLocale();
+  const [preset, setPreset] = useState('camera');
+  const [view, setView] = useState<View>({ yaw: 0, pitch: 0 });
   const [legend, setLegend] = useState(false);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const [exporting, setExporting] = useState<number | null>(null);
@@ -146,7 +138,7 @@ export function Pose3DView({
     setView((v) => ({ yaw: v.yaw + dx * 0.5, pitch: Math.max(-90, Math.min(90, v.pitch + dy * 0.5)) }));
   };
   const choose = (value: string) => {
-    const p = PRESETS.find((x) => x.value === value);
+    const p = presets().find((x) => x.value === value);
     if (!p) return;
     setPreset(value);
     setView(p.view);
@@ -165,15 +157,15 @@ export function Pose3DView({
         onPointerMove={move}
         onPointerUp={() => (drag.current = null)}
         onPointerCancel={() => (drag.current = null)}
-        aria-label="3D skeleton. Drag to rotate."
+        aria-label={t('p3d.canvas')}
       />
 
       <div className="p3d__top">
-        <Badge tone="outline">Experimental</Badge>
-        {estimate && estimate.available && !estimate.reliable && <Badge tone="warn">Twist not reliable here</Badge>}
+        <Badge tone="outline">{t('twist.experimental')}</Badge>
+        {estimate && estimate.available && !estimate.reliable && <Badge tone="warn">{t('p3d.notReliable')}</Badge>}
         <IconButton
           icon="info"
-          label="How to read this view"
+          label={t('p3d.howToRead')}
           size="sm"
           pressed={legend}
           onClick={() => setLegend((v) => !v)}
@@ -181,32 +173,33 @@ export function Pose3DView({
       </div>
       {legend && (
         <p className="p3d__legend" role="note">
-          Blue = left, orange = right. Dashed amber = the longitudinal axis (hips to shoulders). Dark dot = chest
-          direction. The ring is the plane perpendicular to the axis: grey = where the shoulder line pointed at takeoff,
-          amber arc = the twist since then
-          {rel !== null ? ` (now ${rel >= 0 ? '+' : '−'}${Math.abs(Math.round(rel))}°)` : ''}. Drag to rotate.
+          {rel !== null
+            ? t('p3d.legendNow', { now: `${rel >= 0 ? '+' : '−'}${Math.abs(Math.round(rel))}` })
+            : t('p3d.legend')}
         </p>
       )}
 
       <div className="p3d__bottom">
         <Segmented
-          ariaLabel="Point of view"
+          ariaLabel={t('p3d.pointOfView')}
           size="sm"
           value={preset}
           onChange={choose}
-          options={PRESETS.map(({ value, label, title }) => ({ value, label, title }))}
+          options={presets().map(({ value, label, title }) => ({ value, label, title }))}
         />
         {canExportVideo() && (
           <div className="p3d__exports">
             {exporting !== null ? (
               <Button size="sm" onClick={() => exportAbort.current?.abort()}>
-                Cancel {exportKind === 'side' ? 'side by side' : '3D video'} {Math.round(exporting * 100)}%
+                {t(exportKind === 'side' ? 'p3d.cancelSide' : 'p3d.cancel3d', {
+                  percent: formatPercent(exporting),
+                })}
               </Button>
             ) : (
               <>
                 <IconButton
                   icon="download"
-                  label="Download the 3D skeleton as a video (no footage)"
+                  label={t('p3d.download3d')}
                   size="sm"
                   variant="solid"
                   onClick={() => void onExport('3d')}
@@ -214,7 +207,7 @@ export function Pose3DView({
                 {sideBySide && (
                   <IconButton
                     icon="split"
-                    label="Download the annotated video and this 3D view side by side"
+                    label={t('p3d.downloadSide')}
                     size="sm"
                     variant="solid"
                     onClick={() => void onExport('side')}

@@ -1,3 +1,4 @@
+import { formatNumber, formatPercent, lower, t } from '../i18n/core';
 import { agrees, labelOf, predictionOf, PREDICTED_TEXT, type PredictedClass } from './metrics';
 import { TRUTH_TEXT, type JumpRecord, type TruthLabel } from './types';
 
@@ -24,8 +25,9 @@ export interface Failure {
 }
 
 const deg = (v: number | null | undefined, d = 0) =>
-  v === null || v === undefined || !Number.isFinite(v) ? '–' : `${v.toFixed(d)}°`;
-const pct = (v: number) => `${Math.round(v * 100)}%`;
+  v === null || v === undefined || !Number.isFinite(v) ? '–' : `${formatNumber(v, d)}°`;
+const pct = (v: number) => formatPercent(v);
+const side = (sign: number) => t(sign > 0 ? 'side.right' : 'side.left');
 
 /**
  * The label turned into measurable requirements (using the thresholds the prediction was made with), each compared with the
@@ -42,9 +44,9 @@ export function checksFor(record: JumpRecord, truth: TruthLabel = record.truth?.
     const p = predictionOf(record);
     if (p !== 'none') {
       checks.push({
-        signal: 'Classifier answer',
-        expected: 'no answer (you could not tell what it was)',
-        measured: `${PREDICTED_TEXT[p]} at ${pct(record.prediction.confidence)}`,
+        signal: t('rc.classifierAnswer'),
+        expected: t('rc.noAnswer'),
+        measured: t('rc.answerAt', { predicted: PREDICTED_TEXT[p], conf: pct(record.prediction.confidence) }),
         status: 'off',
       });
     }
@@ -55,31 +57,39 @@ export function checksFor(record: JumpRecord, truth: TruthLabel = record.truth?.
   if (flat || somersault) {
     const want = somersault ? 360 : 0;
     checks.push({
-      signal: 'Rotation',
-      expected: somersault ? 'one somersault, about 360°' : 'no somersault, about 0°',
+      signal: t('rc.rotation'),
+      expected: t(somersault ? 'rc.oneSomersault' : 'rc.noSomersault'),
       measured:
         rot.totalDeg === null
-          ? 'not measured'
-          : `${deg(rot.totalDeg)} (nearest ${deg(rot.nearestDeg)}), confidence ${pct(rot.confidence)}`,
+          ? t('rc.notMeasured')
+          : t('rc.rotationMeasured', {
+              total: deg(rot.totalDeg),
+              nearest: deg(rot.nearestDeg),
+              conf: pct(rot.confidence),
+            }),
       status: rot.nearestDeg === null ? 'unknown' : rot.nearestDeg === want ? 'ok' : 'off',
     });
   }
 
   if (flat) {
     const need = {
-      straight: `hip at least ${P.hipOpenMinDeg}° and knees at least ${P.kneeStraightMinDeg}°`,
-      tuck: `hip at most ${P.hipFoldedMaxDeg}° and knees at most ${P.kneeBentMaxDeg}°`,
-      pike: `hip at most ${P.hipFoldedMaxDeg}° and knees at least ${P.kneeStraightMinDeg}°`,
+      straight: t('rc.needStraight', { hip: P.hipOpenMinDeg, knee: P.kneeStraightMinDeg }),
+      tuck: t('rc.needTuck', { hip: P.hipFoldedMaxDeg, knee: P.kneeBentMaxDeg }),
+      pike: t('rc.needPike', { hip: P.hipFoldedMaxDeg, knee: P.kneeStraightMinDeg }),
     }[truth];
     const hip = f.shape.hipAngle.atPeak;
     const knee = f.shape.kneeAngle.atPeak;
     checks.push({
-      signal: 'Body position',
-      expected: `${TRUTH_TEXT[truth].toLowerCase()}: ${need}`,
+      signal: t('rc.bodyPosition'),
+      expected: t('rc.expectedPosition', { truth: lower(TRUTH_TEXT[truth]), need }),
       measured:
         hip === null
-          ? 'not measured'
-          : `${f.position.label} (hip ${deg(hip)}, knee ${deg(knee)} at the most closed moment)`,
+          ? t('rc.notMeasured')
+          : t('rc.positionMeasured', {
+              position: lower(t(`pos.${f.position.label}`)),
+              hip: deg(hip),
+              knee: deg(knee),
+            }),
       status: hip === null ? 'unknown' : f.position.label === truth ? 'ok' : 'off',
     });
   }
@@ -87,34 +97,42 @@ export function checksFor(record: JumpRecord, truth: TruthLabel = record.truth?.
   if (somersault) {
     const dir = rot.direction;
     const facing = f.facing.sign;
-    let measured = 'not determined';
+    let measured = t('rc.notDetermined');
     let status: CheckStatus = 'unknown';
     if (dir !== 'none' && facing !== 0) {
       const front = (dir === 'clockwise' ? 1 : -1) * facing > 0;
-      measured = `${dir}, facing ${facing > 0 ? 'right' : 'left'}: ${front ? 'front' : 'back'}`;
+      measured = t('rc.directionMeasured', {
+        turn: t(`turn.${dir}`),
+        side: side(facing),
+        kind: t(front ? 'rc.kindFront' : 'rc.kindBack'),
+      });
       status = (front ? 'front' : 'back') === truth ? 'ok' : 'off';
-    } else if (dir === 'none') measured = 'no rotation direction';
-    else measured = `${dir}, facing undetermined`;
+    } else if (dir === 'none') measured = t('rc.noDirection');
+    else measured = t('rc.facingUndetermined', { turn: t(`turn.${dir}`) });
     checks.push({
-      signal: 'Somersault direction',
-      expected: `${TRUTH_TEXT[truth].toLowerCase()}: turning ${truth === 'front' ? 'toward' : 'away from'} the face`,
+      signal: t('rc.direction'),
+      expected: t(truth === 'front' ? 'rc.turnToward' : 'rc.turnAway', { truth: lower(TRUTH_TEXT[truth]) }),
       measured,
       status,
     });
     checks.push({
-      signal: 'Facing',
-      expected: `sure enough (at least ${pct(cfg.facing.minConfidence)})`,
+      signal: t('rc.facing'),
+      expected: t('rc.sureEnough', { min: pct(cfg.facing.minConfidence) }),
       measured:
         f.facing.sign === 0
-          ? `undetermined (${pct(f.facing.confidence)})`
-          : `${f.facing.sign > 0 ? 'right' : 'left'} (${pct(f.facing.confidence)}, ${f.facing.source})`,
+          ? t('rc.facingUnknown', { conf: pct(f.facing.confidence) })
+          : t('rc.facingSide', {
+              side: side(f.facing.sign),
+              conf: pct(f.facing.confidence),
+              source: t(f.facing.source === 'manual' ? 'rc.source.manual' : 'rc.source.auto'),
+            }),
       status: f.facing.sign !== 0 && f.facing.confidence >= cfg.facing.minConfidence ? 'ok' : 'off',
     });
     if (f.facing.twistSuspected) {
       checks.push({
-        signal: 'Facing before and after',
-        expected: 'the same side',
-        measured: 'the athlete seems to face the other way after landing (a twist?)',
+        signal: t('rc.facingChange'),
+        expected: t('rc.sameSide'),
+        measured: t('rc.otherWay'),
         status: 'off',
       });
     }
@@ -122,23 +140,23 @@ export function checksFor(record: JumpRecord, truth: TruthLabel = record.truth?.
 
   if (flat || somersault) {
     checks.push({
-      signal: 'Rotation confidence',
-      expected: 'at least 50%',
+      signal: t('rc.rotationConfidence'),
+      expected: t('rc.atLeast50'),
       measured: pct(rot.confidence),
       status: rot.totalDeg === null ? 'unknown' : rot.confidence >= 0.5 ? 'ok' : 'off',
     });
   }
   checks.push({
-    signal: 'Pose quality in the flight',
-    expected: 'at least 60%',
+    signal: t('rc.poseQuality'),
+    expected: t('rc.atLeast60'),
     measured: pct(f.quality.pose),
     status: f.quality.pose >= 0.6 ? 'ok' : 'off',
   });
   const tv = f.quality.trunkLengthVariation;
   checks.push({
-    signal: 'Camera view',
-    expected: `trunk length varies less than ${pct(cfg.maxTrunkVariation)} (side-on)`,
-    measured: tv === null ? 'not measured' : `varies by ${pct(tv)}`,
+    signal: t('rc.camera'),
+    expected: t('rc.trunkVaries', { max: pct(cfg.maxTrunkVariation) }),
+    measured: tv === null ? t('rc.notMeasured') : t('rc.variesBy', { v: pct(tv) }),
     status: tv === null ? 'unknown' : tv <= cfg.maxTrunkVariation ? 'ok' : 'off',
   });
   return checks;
@@ -167,4 +185,8 @@ export function findFailures(records: JumpRecord[]): Failure[] {
 }
 
 export const describeFailure = (f: Failure): string =>
-  `Labeled ${TRUTH_TEXT[f.truth]}, predicted ${PREDICTED_TEXT[f.predicted]} at ${pct(f.confidence)}`;
+  t('fail.labeledPredicted', {
+    truth: TRUTH_TEXT[f.truth],
+    predicted: PREDICTED_TEXT[f.predicted],
+    conf: pct(f.confidence),
+  });

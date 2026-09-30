@@ -1,3 +1,4 @@
+import { formatNumber, t } from '../i18n/core';
 import { ArrayBufferTarget, Muxer } from 'mp4-muxer';
 import { sampleIndexAt } from '../analysis/lookup';
 import type { AnalysisResult, PoseTrack } from '../analysis/types';
@@ -31,14 +32,14 @@ interface EncodeOptions {
 
 /** Encodes `frames` painted canvases as an H.264 MP4. Shared by every export. */
 async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
-  if (!canExportVideo()) throw new Error('This browser cannot export video (WebCodecs is not available).');
+  if (!canExportVideo()) throw new Error(t('err.exportUnsupported'));
   const { width, height, fps, frames, signal } = opts;
   const config = await pickConfig(width, height, fps);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Could not create a drawing surface for the export.');
+  if (!ctx) throw new Error(t('err.exportSurface'));
 
   const muxer = new Muxer({
     target: new ArrayBufferTarget(),
@@ -101,7 +102,7 @@ async function pickConfig(width: number, height: number, fps: number): Promise<V
     const config: VideoEncoderConfig = { codec, width, height, bitrate, framerate: fps };
     if ((await VideoEncoder.isConfigSupported(config)).supported) return config;
   }
-  throw new Error('This browser cannot encode H.264 video.');
+  throw new Error(t('err.exportH264'));
 }
 
 /** Paints the current video frame at (x, 0) in a w x h area, with the overlay and the trampoline outline on top. */
@@ -196,8 +197,9 @@ function paintPose3D(
   ctx.font = '600 13px system-ui, sans-serif';
   ctx.fillStyle = colors.ink;
   ctx.textAlign = 'left';
+  const clock = `${formatNumber(o.result.time[i], 2)} s`;
   ctx.fillText(
-    `${o.result.time[i].toFixed(2)} s` + (rel !== null ? ` · twist ${sign}${Math.abs(Math.round(rel))}°` : ''),
+    rel !== null ? t('p3d.captionTwist', { time: clock, rel: `${sign}${Math.abs(Math.round(rel))}` }) : clock,
     12,
     22,
   );

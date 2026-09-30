@@ -4,7 +4,7 @@ import { analyzeSkills } from '../../../skills/analyzeSkills';
 import { mannequinRoutine } from '../../../skills/testMannequin';
 import { DASH, fmt } from '../../format';
 import { jumpHeadline, type JumpHeadline } from '../../insights';
-import { jumpFigures, SHAPE_WORD } from './figures';
+import { jumpFigures, shapeWord } from './figures';
 
 const headline: JumpHeadline = {
   index: 0,
@@ -65,7 +65,7 @@ describe('jumpFigures', () => {
 
   it('tells a body between shapes from a shape that was not measured', () => {
     const f = byKey({ ...headline, bodyShape: 'unknown' });
-    expect(f.shape).toMatchObject({ value: SHAPE_WORD.unknown, hint: 'fits no shape well', missing: false });
+    expect(f.shape).toMatchObject({ value: shapeWord('unknown'), hint: 'fits no shape well', missing: false });
   });
 
   it('never prints NaN when the scale could not be estimated', () => {
@@ -91,7 +91,7 @@ describe('jumpFigures on a synthetic routine', () => {
       expect(f.height.value).toBe(fmt(j.features.trajectory.maxHeightM, 2));
       expect(f.air.value).toBe(fmt(j.features.timing.flightTimeS, 2));
       expect(f.rotation.value).toBe(fmt(Math.abs(j.features.rotation.turns ?? NaN), 1));
-      expect(f.shape.value).toBe(SHAPE_WORD[j.features.position.label]);
+      expect(f.shape.value).toBe(shapeWord(j.features.position.label));
     });
   });
 });

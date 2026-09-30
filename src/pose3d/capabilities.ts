@@ -1,3 +1,5 @@
+import { t } from '../i18n/core';
+
 /**
  * What this browser can run for a 3D pose model, measured (not assumed). The result is shown in the 3D panel.
  * MediaPipe Tasks Vision runs its "GPU" delegate on WebGL and its "CPU" delegate on WebAssembly (XNNPACK); it does not use WebGPU.
@@ -63,24 +65,27 @@ export interface SupportVerdict {
 }
 
 export function describeSupport(c: Capabilities, hasWorld: boolean): SupportVerdict {
-  const runtime = c.webgl2 ? 'WebGL (GPU delegate)' : c.wasm ? 'WebAssembly (CPU delegate)' : 'no supported runtime';
+  const runtime = t(c.webgl2 ? 'cap.runtime.webgl' : c.wasm ? 'cap.runtime.wasm' : 'cap.runtime.none');
   const current = hasWorld
-    ? {
-        ok: true,
-        text: `Available. The MediaPipe pose model already returns 3D landmarks (BlazePose GHUM, in meters) with every frame, so no second model is loaded. It runs on ${runtime}${c.wasmSimd ? ', WASM SIMD on' : ''}.`,
-      }
-    : { ok: false, text: 'This analysis has no 3D landmarks (data saved before 3D support). Analyze the video again.' };
+    ? { ok: true, text: t(c.wasmSimd ? 'cap.current.okSimd' : 'cap.current.ok', { runtime }) }
+    : { ok: false, text: t('cap.current.none') };
+  const noAdapter = c.webgpu === 'no-adapter';
   const dedicated =
     c.webgpu === 'available'
-      ? {
-          ok: true,
-          text: 'A dedicated 3D model could run on WebGPU (through onnxruntime-web) in this browser. Not built: it needs a model file, and I have not tested any.',
-        }
+      ? { ok: true, text: t('cap.dedicated.webgpu') }
       : c.wasm
         ? {
             ok: true,
-            text: `WebGPU is ${c.webgpu === 'no-adapter' ? 'present but has no GPU adapter' : 'not available'}, so a dedicated 3D model would fall back to WebAssembly${c.wasmThreads ? ' with threads' : ' without threads (the page is not cross-origin isolated), which is slow'}. Not built, not tested.`,
+            text: t(
+              noAdapter
+                ? c.wasmThreads
+                  ? 'cap.dedicated.noAdapterThreads'
+                  : 'cap.dedicated.noAdapterSingle'
+                : c.wasmThreads
+                  ? 'cap.dedicated.noWebgpuThreads'
+                  : 'cap.dedicated.noWebgpuSingle',
+            ),
           }
-        : { ok: false, text: 'Neither WebGPU nor WebAssembly is available: no 3D model can run here.' };
+        : { ok: false, text: t('cap.dedicated.none') };
   return { current, dedicated };
 }

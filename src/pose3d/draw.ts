@@ -1,3 +1,4 @@
+import { t } from '../i18n/core';
 import { LM } from '../pose/landmarks';
 import type { WorldPoint } from '../pose/types';
 import { lateralPerp, vectorAt } from './torso';
@@ -97,7 +98,7 @@ export function drawPose3D(ctx: CanvasRenderingContext2D, width: number, height:
   if (!world || !frames) {
     ctx.fillStyle = soft;
     ctx.textAlign = 'center';
-    ctx.fillText(frames ? 'No 3D pose in this frame' : 'This analysis has no 3D landmarks', width / 2, HEIGHT / 2);
+    ctx.fillText(t(frames ? 'p3d.noFrame' : 'p3d.noLandmarks'), width / 2, HEIGHT / 2);
     return;
   }
 
@@ -177,7 +178,7 @@ export function drawPose3D(ctx: CanvasRenderingContext2D, width: number, height:
     ctx.closePath();
     ctx.fill();
     ctx.textAlign = 'left';
-    ctx.fillText('long axis', b[0] + 6, b[1] + 4);
+    ctx.fillText(t('p3d.longAxis'), b[0] + 6, b[1] + 4);
 
     // Chest direction and the twist dial in the plane perpendicular to the axis, through the shoulders.
     const s = lateralPerp(frames.torso, 'shoulders', i);
@@ -197,7 +198,7 @@ export function drawPose3D(ctx: CanvasRenderingContext2D, width: number, height:
       ctx.arc(c1[0], c1[1], 3, 0, 2 * Math.PI);
       ctx.fill();
       ctx.textAlign = 'left';
-      ctx.fillText('chest', c1[0] + 5, c1[1] - 4);
+      ctx.fillText(t('p3d.chest'), c1[0] + 5, c1[1] - 4);
 
       // Dial: a ring through the shoulders; grey = where the shoulder line pointed at takeoff (carried along with the axis), amber = now.
       const radius = Math.max(0.16, Math.min(0.26, (frames.torso.shoulderWidthM[i] || 0.36) / 2));

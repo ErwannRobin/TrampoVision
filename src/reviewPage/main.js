@@ -1,4 +1,16 @@
-import { FIG_ELEMENTS } from '../skills/fig/elements';
+import { FIG_ELEMENTS, elementName } from '../skills/fig/elements';
+// The core of the i18n module, not its React bindings: this page is plain script.
+import {
+  LANGUAGE_NAMES,
+  LOCALES,
+  formatNumber,
+  formatPercent,
+  getLocale,
+  lower,
+  setLocale,
+  subscribeLocale,
+  t,
+} from '../i18n/core';
 
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -7,18 +19,15 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
   const token = import.meta.env.VITE_REVIEW_INGEST_TOKEN || '';
 
   const TABS = [
-    { status: 'auto', label: 'To review' },
-    { status: 'confirmed', label: 'Confirmed' },
-    { status: 'corrected', label: 'Corrected' },
-    { status: 'unknown', label: 'Unknown' },
-    { status: 'bad-data', label: 'Bad data' },
+    { status: 'auto' },
+    { status: 'confirmed' },
+    { status: 'corrected' },
+    { status: 'unknown' },
+    { status: 'bad-data' },
   ];
-  const VERDICT_TEXT = {
-    confirmed: 'Confirmed',
-    corrected: 'Corrected to',
-    unknown: 'Marked: cannot tell',
-    'bad-data': 'Marked: bad data',
-  };
+  const tabLabel = (status) => t('rv.tab.' + status);
+  const verdictText = (status) => (status in STATUS_OF_VERDICT ? t('rv.verdict.' + status) : status);
+  const STATUS_OF_VERDICT = { confirmed: 1, corrected: 1, unknown: 1, 'bad-data': 1 };
   const TWIST_LABELS = { 0: '0', 0.5: '½', 1: '1', 1.5: '1½', 2: '2', 2.5: '2½', 3: '3' };
   const POSITIONS = ['tuck', 'pike', 'straight'];
 
@@ -35,8 +44,8 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
   let toastTimer = 0;
 
   const byId = new Map(FIG_ELEMENTS.map((e) => [e.id, e]));
-  const nameOf = (id) => (byId.get(id) ? byId.get(id).name : id || 'Unclassified');
-  const pct = (v) => Math.round(v * 100) + '%';
+  const nameOf = (id) => (byId.get(id) ? elementName(byId.get(id)) : id || t('skill.unclassified'));
+  const pct = (v) => formatPercent(v);
   const shortVideo = (id) => String(id).slice(0, 8);
 
   function api(path, init) {
@@ -47,7 +56,7 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
     );
     return fetch(API + path, init).then((r) => {
       if (r.status === 401) {
-        signOut("The review service does not accept this build's token.");
+        signOut('rv.badToken');
         throw new Error('unauthorized');
       }
       return r.json().then((b) => {
@@ -56,23 +65,25 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
       });
     });
   }
-  // The page cannot work: say why instead of showing an empty queue.
-  function signOut(msg) {
+  // The page cannot work: say why (a message key) instead of showing an empty queue.
+  let loginKey = '';
+  function signOut(key) {
+    loginKey = key || '';
     $('app').hidden = true;
     document.body.classList.add('out');
     $('login').hidden = false;
-    $('loginerr').textContent = msg || '';
+    $('loginerr').textContent = loginKey ? t(loginKey) : '';
   }
   function showErr(e) {
     $('err').textContent = e && e.message ? e.message : String(e);
   }
   function toast(text) {
-    const t = $('toast');
-    t.textContent = text;
-    t.hidden = false;
+    const box = $('toast');
+    box.textContent = text;
+    box.hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => {
-      t.hidden = true;
+      box.hidden = true;
     }, 2200);
   }
 
@@ -84,7 +95,7 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
     try {
       $('who').value = localStorage.getItem('trampovision.reviewer') || '';
       const saved = localStorage.getItem('trampovision.reviewMode');
-      if (TABS.some((t) => t.status === saved)) mode = saved;
+      if (TABS.some((tab) => tab.status === saved)) mode = saved;
     } catch {
       /* the name and tab are not remembered */
     }
@@ -96,18 +107,18 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
   function renderTabs() {
     const box = $('tabs');
     box.textContent = '';
-    TABS.forEach((t) => {
+    TABS.forEach((tab) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.setAttribute('role', 'tab');
-      b.setAttribute('aria-selected', String(t.status === mode));
-      b.appendChild(document.createTextNode(t.label));
+      b.setAttribute('aria-selected', String(tab.status === mode));
+      b.appendChild(document.createTextNode(tabLabel(tab.status)));
       const n = document.createElement('span');
       n.className = 'n';
-      n.textContent = counts[t.status] == null ? '' : String(counts[t.status]);
+      n.textContent = counts[tab.status] == null ? '' : String(counts[tab.status]);
       b.appendChild(n);
       b.onclick = () => {
-        mode = t.status;
+        mode = tab.status;
         try {
           localStorage.setItem('trampovision.reviewMode', mode);
         } catch {
@@ -124,7 +135,7 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
     return api('/stats')
       .then((b) => {
         counts = {};
-        TABS.forEach((t) => (counts[t.status] = 0));
+        TABS.forEach((tab) => (counts[tab.status] = 0));
         b.stats.forEach((s) => (counts[s.status] = s.n));
         renderTabs();
         renderList();
@@ -135,7 +146,7 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
   function load() {
     const seq = ++loadSeq;
     const path = mode === 'auto' ? '/jumps?queue=1&limit=100' : '/jumps?status=' + mode + '&limit=100';
-    $('listtitle').textContent = TABS.find((t) => t.status === mode).label;
+    $('listtitle').textContent = tabLabel(mode);
     loadStats();
     api(path)
       .then((b) => {
@@ -157,7 +168,7 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
     const ul = $('queue');
     ul.textContent = '';
     $('empty').hidden = list.length > 0;
-    $('empty').textContent = mode === 'auto' ? 'Nothing to review. All done!' : 'Nothing here.';
+    $('empty').textContent = t(mode === 'auto' ? 'rv.nothingReview' : 'rv.nothingHere');
     list.forEach((j) => {
       const li = document.createElement('li');
       const b = document.createElement('button');
@@ -170,7 +181,11 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
       a.textContent = j.review_element_id ? nameOf(j.review_element_id) : nameOf(j.auto_element_id);
       const m = document.createElement('span');
       m.className = 'li-sub muted';
-      m.textContent = 'Jump ' + j.jump_id + ' · video ' + shortVideo(j.video_id) + ' · ' + pct(j.auto_confidence);
+      m.textContent = t('rv.jumpVideoConf', {
+        n: j.jump_id,
+        video: shortVideo(j.video_id),
+        conf: pct(j.auto_confidence),
+      });
       b.append(dot, a, m);
       b.onclick = () => select(j.id);
       li.appendChild(b);
@@ -193,20 +208,25 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
   }
 
   // ---- the jump on screen ----
-  function show(row) {
+  // The words on the screen for one jump: they are drawn again when the language changes, so nothing typed or playing is touched.
+  function renderTexts(row) {
     const r = row.record;
     const p = r.prediction;
-    $('detail').hidden = false;
     const idx = list.findIndex((j) => j.id === row.id);
-    $('progress').textContent = 'Automatic answer · ' + (idx + 1) + ' of ' + list.length;
-    $('autoname').textContent = p.skill === 'unclassified' ? 'Unclassified' : p.label;
+    $('progress').textContent = t('rv.progress', { n: idx + 1, total: list.length });
+    // The name is the element's, in the language of the page; the label the sender wrote is only the fallback.
+    $('autoname').textContent = row.auto_element_id
+      ? nameOf(row.auto_element_id)
+      : p.skill === 'unclassified'
+        ? t('skill.unclassified')
+        : p.label;
     const tag = $('autotag');
     const cert = p.skill === 'unclassified' ? 'unclassified' : p.certainty || 'confident';
-    tag.textContent = cert;
+    tag.textContent = cert === 'unclassified' ? t('skill.unclassified') : t('certainty.' + cert);
     tag.className = 'tag ' + cert;
     $('autoconf').textContent = pct(p.confidence);
     $('autoclf').textContent = row.classifier;
-    $('ident').textContent = 'Jump ' + row.jump_id + ' · video ' + shortVideo(row.video_id);
+    $('ident').textContent = t('rv.jumpVideo', { n: row.jump_id, video: shortVideo(row.video_id) });
     $('summary').textContent = p.summary || '';
 
     const vn = $('verdictnow');
@@ -214,27 +234,24 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
       vn.hidden = false;
       vn.className = row.status;
       vn.textContent =
-        (VERDICT_TEXT[row.status] || row.status) +
+        verdictText(row.status) +
         (row.status === 'corrected' ? ' ' + nameOf(row.review_element_id) : '') +
-        (row.reviewer ? ' · by ' + row.reviewer : '');
+        (row.reviewer ? t('rv.by', { who: row.reviewer }) : '');
     } else vn.hidden = true;
 
     const conf = $('confirm');
     conf.disabled = !row.auto_element_id;
-    conf.textContent = row.auto_element_id
-      ? '✓ Confirm: ' + nameOf(row.auto_element_id) + '  (Enter)'
-      : 'No automatic figure: pick one';
-    $('note').value = row.review_note || '';
+    conf.textContent = row.auto_element_id ? t('rv.confirm', { name: nameOf(row.auto_element_id) }) : t('rv.noAuto');
 
     const m = p.measured;
     const facts = $('measured');
     facts.textContent = '';
     if (m) {
       [
-        ['Somersaults', m.somersaults == null ? '–' : m.somersaults.toFixed(2)],
-        ['Direction', m.direction || '–'],
-        ['Twists', m.twists == null ? 'not measured' : m.twists.toFixed(2)],
-        ['Position', m.position || '–'],
+        [t('picker.somersaults'), m.somersaults == null ? '–' : formatNumber(m.somersaults, 2)],
+        [t('picker.direction'), m.direction ? lower(t('dir.' + m.direction)) : '–'],
+        [t('picker.twists'), m.twists == null ? t('rv.notMeasured') : formatNumber(m.twists, 2)],
+        [t('picker.position'), m.position ? lower(t('pos.' + m.position)) : '–'],
       ].forEach(([k, v]) => {
         const d = document.createElement('div');
         d.className = 'fact';
@@ -249,12 +266,18 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
     }
 
     renderCandidates(p, row);
-    setPick(row.review_element_id || row.auto_element_id || 'back-1s-0t-tuck');
     $('debug').textContent = JSON.stringify(
       { failure: p.failure, evidence: p.evidence, outOfTable: p.outOfTable, dataQuality: p.dataQuality },
       null,
       1,
     );
+  }
+
+  function show(row) {
+    $('detail').hidden = false;
+    renderTexts(row);
+    $('note').value = row.review_note || '';
+    setPick(row.review_element_id || row.auto_element_id || 'back-1s-0t-tuck');
     u = 0;
     $('scrub').value = 0;
     stop();
@@ -280,14 +303,15 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
       const k = document.createElement('kbd');
       k.textContent = String(cands.length);
       const n = document.createElement('span');
-      n.textContent = cd.name || nameOf(id);
+      n.textContent = byId.get(id) ? nameOf(id) : cd.name || nameOf(id);
       const s = document.createElement('span');
       s.className = 'muted';
       const score = cd.score != null ? cd.score : cd.posterior;
       s.textContent =
-        (score != null ? pct(score) : '') + (cd.similarity != null ? ' · trajectory ' + pct(cd.similarity) : '');
+        (score != null ? pct(score) : '') +
+        (cd.similarity != null ? t('rv.trajectory', { sim: pct(cd.similarity) }) : '');
       b.append(k, n, s);
-      b.title = 'It was: ' + n.textContent;
+      b.title = t('rv.itWas', { name: n.textContent });
       b.onclick = () => verdict({ verdict: 'correct', elementId: id });
       box.appendChild(b);
     });
@@ -295,7 +319,7 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
       const e = document.createElement('p');
       e.className = 'muted';
       e.style.margin = '0';
-      e.textContent = row.auto_element_id ? '' : 'The classifier gave no alternatives. Use the pickers below.';
+      e.textContent = row.auto_element_id ? '' : t('rv.noAlternatives');
       box.appendChild(e);
     }
   }
@@ -316,22 +340,22 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
       });
     };
     fill('s', [
-      [0, 'None'],
-      [1, 'Single'],
-      [2, 'Double'],
-      [3, 'Triple'],
+      [0, t('rv.somNone')],
+      [1, t('rv.somSingle')],
+      [2, t('rv.somDouble')],
+      [3, t('rv.somTriple')],
     ]);
     fill('d', [
-      ['front', 'Front'],
-      ['back', 'Back'],
+      ['front', t('dir.front')],
+      ['back', t('dir.back')],
     ]);
     fill(
       't',
-      Object.keys(TWIST_LABELS).map((t) => [Number(t), TWIST_LABELS[t]]),
+      Object.keys(TWIST_LABELS).map((key) => [Number(key), TWIST_LABELS[key]]),
     );
     fill(
       'p',
-      POSITIONS.map((x) => [x, x.charAt(0).toUpperCase() + x.slice(1)]),
+      POSITIONS.map((x) => [x, t('pos.' + x)]),
     );
     $('savepick').onclick = () => pick && verdict({ verdict: 'correct', elementId: pick.id });
   }
@@ -367,7 +391,7 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
     const noSomersault = pick.somersaults === 0;
     $('dirlab').hidden = noSomersault;
     document.querySelector('.chips[data-field="d"]').hidden = noSomersault;
-    $('savepick').textContent = 'It was: ' + pick.name;
+    $('savepick').textContent = t('rv.itWas', { name: elementName(pick) });
   }
 
   // ---- replay: the stored sequence, the body in its own frame ----
@@ -404,7 +428,7 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
     g.clearRect(0, 0, cv.width, cv.height);
     if (!seq) {
       g.fillStyle = css('--muted');
-      g.fillText('No pose sequence for this jump.', 12, 24);
+      g.fillText(t('rv.noSequence'), 12, 24);
       return;
     }
     const row = rowAt(seq);
@@ -438,11 +462,10 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
     g.fillStyle = css('--muted');
     g.font = '15px system-ui';
     g.fillText(
-      'hips ' +
-        Math.round(row[col(seq, 'hip_angle_deg')]) +
-        '°   knees ' +
-        Math.round(row[col(seq, 'knee_angle_deg')]) +
-        '°',
+      t('rv.hipsKnees', {
+        hip: Math.round(row[col(seq, 'hip_angle_deg')]),
+        knee: Math.round(row[col(seq, 'knee_angle_deg')]),
+      }),
       8,
       312,
     );
@@ -454,10 +477,10 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
     const g = cv.getContext('2d');
     g.clearRect(0, 0, cv.width, cv.height);
     const defs = [
-      ['orient_turns', 'Rotation (turns)'],
-      ['hip_angle_deg', 'Hip angle'],
-      ['knee_angle_deg', 'Knee angle'],
-      ['com_h_m', 'Height (m)'],
+      ['orient_turns', t('rv.curve.turns')],
+      ['hip_angle_deg', t('rv.curve.hip')],
+      ['knee_angle_deg', t('rv.curve.knee')],
+      ['com_h_m', t('rv.curve.height')],
     ];
     const h = cv.height / defs.length;
     defs.forEach((d, k) => {
@@ -472,7 +495,7 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
       const bot = (k + 1) * h - 6;
       g.fillStyle = css('--muted');
       g.font = '15px system-ui';
-      g.fillText(d[1] + '  ' + lo.toFixed(1) + ' … ' + hi.toFixed(1), 6, k * h + 12);
+      g.fillText(d[1] + '  ' + formatNumber(lo, 1) + ' … ' + formatNumber(hi, 1), 6, k * h + 12);
       g.strokeStyle = css('--accent');
       g.lineWidth = 2;
       g.beginPath();
@@ -506,11 +529,11 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
       cancelAnimationFrame(timer);
       timer = 0;
     }
-    $('play').textContent = 'Play';
+    $('play').textContent = t('rv.play');
   }
   function play() {
     if (timer) return stop();
-    $('play').textContent = 'Pause';
+    $('play').textContent = t('rv.pause');
     let last = performance.now();
     const seq = rec && rec.record.sequence;
     const dur = seq && seq.durationS ? seq.durationS : 1;
@@ -547,10 +570,10 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
           body.verdict === 'confirm' ? rec.auto_element_id : body.verdict === 'correct' ? body.elementId : null;
         toast(
           body.verdict === 'confirm'
-            ? 'Confirmed: ' + nameOf(figure)
+            ? t('rv.toastConfirmed', { name: nameOf(figure) })
             : body.verdict === 'correct'
-              ? 'Saved: ' + nameOf(figure)
-              : VERDICT_TEXT[status],
+              ? t('rv.toastSaved', { name: nameOf(figure) })
+              : verdictText(status),
         );
         afterVerdict(id, status, figure);
       })
@@ -626,5 +649,47 @@ import { FIG_ELEMENTS } from '../skills/fig/elements';
     api('/stats')
       .then(start)
       .catch(() => {});
-  else signOut('This build has no review service configured (VITE_REVIEW_API_URL and VITE_REVIEW_INGEST_TOKEN).');
+  else signOut('rv.noService');
+
+  // ---- the language ----
+  // Static words carry data-i18n (text) and data-i18n-attr (attribute:key pairs); the rest is drawn by the code above.
+  function translateStatic() {
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      el.textContent = t(el.dataset.i18n);
+    });
+    document.querySelectorAll('[data-i18n-attr]').forEach((el) => {
+      el.dataset.i18nAttr.split(';').forEach((pair) => {
+        const [attr, key] = pair.split(':');
+        el.setAttribute(attr, t(key));
+      });
+    });
+    document.title = t('rv.title');
+    if (loginKey) $('loginerr').textContent = t(loginKey);
+    if (!timer) $('play').textContent = t('rv.play');
+    else $('play').textContent = t('rv.pause');
+  }
+  const langSelect = $('lang');
+  LOCALES.forEach((l) => {
+    const o = document.createElement('option');
+    o.value = l;
+    o.textContent = LANGUAGE_NAMES[l];
+    langSelect.appendChild(o);
+  });
+  langSelect.value = getLocale();
+  langSelect.onchange = () => setLocale(langSelect.value);
+  translateStatic();
+  subscribeLocale(() => {
+    langSelect.value = getLocale();
+    translateStatic();
+    if ($('app').hidden) return;
+    renderTabs();
+    $('listtitle').textContent = tabLabel(mode);
+    buildChips();
+    renderList();
+    if (rec) {
+      renderTexts(rec);
+      setPick(pick ? pick.id : rec.review_element_id || rec.auto_element_id || 'back-1s-0t-tuck');
+      draw();
+    }
+  });
 })();

@@ -4,6 +4,9 @@
 .live {
   display: flex;
   flex-direction: column;
+  /* The two figure columns of the list: the header names them, so each is as wide as its name (a language with long names widens one). */
+  --live-col-d: 60px;
+  --live-col-e: 60px;
 }
 .live-h {
   font-size: var(--fs-md);
@@ -135,7 +138,7 @@
 }
 .live-list__head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 60px 60px;
+  grid-template-columns: minmax(0, 1fr) var(--live-col-d) var(--live-col-e);
   column-gap: 8px;
   align-items: baseline;
   padding: 0 0 8px;
@@ -162,7 +165,7 @@
 }
 .live-row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 60px 60px;
+  grid-template-columns: 28px minmax(0, 1fr) var(--live-col-d) var(--live-col-e);
   column-gap: 8px;
   align-items: center;
   width: 100%;
@@ -511,12 +514,17 @@
   .live-fig + .live-fig {
     padding-left: 12px;
   }
-  .live-row,
-  .live-list__head {
-    grid-template-columns: 22px minmax(0, 1fr) 52px 52px;
+  .live {
+    --live-col-d: 52px;
+    --live-col-e: 52px;
   }
-  .live-list__head {
-    grid-template-columns: minmax(0, 1fr) 52px 52px;
+  /* "Schwierigk." needs more than 52px; "Haltung" needs less. */
+  .live:lang(de) {
+    --live-col-d: 60px;
+    --live-col-e: 44px;
+  }
+  .live-row {
+    grid-template-columns: 22px minmax(0, 1fr) var(--live-col-d) var(--live-col-e);
   }
   .live-detail {
     padding-inline: 10px;

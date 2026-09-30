@@ -1,3 +1,5 @@
+import { t } from '../i18n/core';
+
 /** Frame timing helpers shared by the analysis loop and the player. */
 
 /** Time to seek to so the decoder shows frame `k` (middle of its interval avoids rounding errors). */
@@ -7,8 +9,9 @@ export const frameSeekTime = (k: number, fps: number) => (k + 0.5) / fps;
 export const frameAtTime = (time: number, fps: number) => Math.max(0, Math.floor(time * fps + 0.25));
 
 const LOAD_TIMEOUT_MS = 20000;
-const UNSUPPORTED_MESSAGE =
-  'This browser cannot decode the video (iPhone/HEVC .mov and ProRes are common causes). Try an MP4 (H.264) file.';
+
+/** The decoder stopped answering to seeks: what to do about it is in the message. */
+export class SeekTimeoutError extends Error {}
 
 /** Frees the decoder and removes the hidden element created by `loadVideo`. */
 export function disposeVideo(video: HTMLVideoElement) {
@@ -56,15 +59,11 @@ export function loadVideo(url: string, timeoutMs = LOAD_TIMEOUT_MS): Promise<HTM
       if (video.videoWidth > 0) {
         cleanup();
         resolve(video);
-      } else if (e.type !== 'loadedmetadata') fail(UNSUPPORTED_MESSAGE); // data is there but no picture
+      } else if (e.type !== 'loadedmetadata') fail(t('err.unsupportedVideo')); // data is there but no picture
     };
-    const onError = () => fail(UNSUPPORTED_MESSAGE);
+    const onError = () => fail(t('err.unsupportedVideo'));
     const timer = setTimeout(
-      () =>
-        fail(
-          `Loading the video timed out (readyState ${video.readyState}, networkState ${video.networkState}). ` +
-            'Try an MP4 (H.264) file.',
-        ),
+      () => fail(t('err.loadTimeout', { ready: video.readyState, network: video.networkState })),
       timeoutMs,
     );
 
@@ -111,11 +110,15 @@ export async function seekTo(video: HTMLVideoElement, time: number, timeoutMs = 
     }
     if (await seekOnce(video, time, timeoutMs)) return;
   }
-  throw new Error(
-    `Seek to ${time.toFixed(3)}s timed out after ${SEEK_ATTEMPTS} attempts ` +
-      `(readyState ${video.readyState}, networkState ${video.networkState}, seeking ${video.seeking}, ` +
-      `currentTime ${video.currentTime.toFixed(3)}s). The decoder stalled: iPhone HEVC/HDR .mov files often do this ` +
-      'in desktop Chrome. Convert to H.264 (make convert VIDEO=file.MOV) and open the .mp4.',
+  throw new SeekTimeoutError(
+    t('err.seekTimeout', {
+      time: time.toFixed(3),
+      attempts: SEEK_ATTEMPTS,
+      ready: video.readyState,
+      network: video.networkState,
+      seeking: String(video.seeking),
+      current: video.currentTime.toFixed(3),
+    }),
   );
 }
 

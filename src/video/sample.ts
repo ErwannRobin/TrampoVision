@@ -1,3 +1,4 @@
+import { t } from '../i18n/core';
 /**
  * Bundled sample videos (video-sample/). Vite emits them as same-origin assets and only fetches one when
  * requested. The browser gets the file it decodes natively: the iPhone .mov in Safari, the H.264 .mp4 elsewhere
@@ -36,7 +37,7 @@ export const samplePath = pickSample(Object.keys(samples));
 export async function loadSample(path: string, onProgress?: (fraction: number) => void): Promise<File> {
   const url = await samples[path]();
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Could not load the sample video (HTTP ${response.status}).`);
+  if (!response.ok) throw new Error(t('err.sampleHttp', { status: response.status }));
   const size = Number(response.headers.get('content-length'));
   let blob: Blob;
   if (response.body && size > 0 && onProgress) {

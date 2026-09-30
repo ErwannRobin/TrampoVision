@@ -1,8 +1,11 @@
+import { lazyText, lower, t, upperFirst } from '../i18n/core';
 import {
   MAX_HALF_TWISTS,
   SOMERSAULT_MAX,
   elementById,
   movementToElement,
+  somersaultName,
+  twistName,
   type Direction,
   type FigElement,
 } from '../skills/fig/elements';
@@ -19,12 +22,13 @@ import type { JumpRecord, TruthLabel } from './types';
 export const LABEL_POSITIONS = ['straight', 'tuck', 'pike', 'straddle'] as const;
 export type LabelPosition = (typeof LABEL_POSITIONS)[number];
 
-export const POSITION_TEXT: Record<LabelPosition, string> = {
-  straight: 'Straight',
-  tuck: 'Tuck',
-  pike: 'Pike',
-  straddle: 'Straddle',
-};
+/** What each position is called, in the language in use. */
+export const POSITION_TEXT: Record<LabelPosition, string> = lazyText({
+  straight: 'pos.straight',
+  tuck: 'pos.tuck',
+  pike: 'pos.pike',
+  straddle: 'pos.straddle',
+});
 
 export interface MovementLabel {
   position: LabelPosition | null;
@@ -128,19 +132,12 @@ export function movementOfRecord(r: JumpRecord): MovementLabel | null {
   }
 }
 
-const twistText = (h: number): string =>
-  h === 1 ? '½ twist' : h === 2 ? 'full twist' : h % 2 === 0 ? `${h / 2} twists` : `${(h - 1) / 2}½ twists`;
-
 /** One line for the label: "Back double somersault, full twist, tuck". */
 export function describeMovement(m: MovementLabel): string {
   const parts: string[] = [];
-  if (m.somersaults > 0) {
-    const name = ['', 'somersault', 'double somersault', 'triple somersault'][m.somersaults];
-    parts.push(m.direction ? `${m.direction[0].toUpperCase()}${m.direction.slice(1)} ${name}` : name);
-  } else if (m.position) {
-    parts.push(`${POSITION_TEXT[m.position]} jump`);
-  }
-  if (m.halfTwists > 0) parts.push(twistText(m.halfTwists));
-  if (m.somersaults > 0 && m.position) parts.push(m.position);
-  return parts.join(', ');
+  if (m.somersaults > 0) parts.push(upperFirst(somersaultName(m.somersaults, m.direction)));
+  else if (m.position) parts.push(upperFirst(t(`name.jump.${m.position}`)));
+  if (m.halfTwists > 0) parts.push(twistName(m.halfTwists / 2));
+  if (m.somersaults > 0 && m.position) parts.push(lower(POSITION_TEXT[m.position]));
+  return parts.join(t('list.separator'));
 }

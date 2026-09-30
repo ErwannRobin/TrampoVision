@@ -1,3 +1,4 @@
+import { t, tp } from '../i18n/core';
 import { analysisFingerprint } from '../dataset/record';
 import { RECORD_SCHEMA, type JumpRecord } from '../dataset/types';
 
@@ -137,16 +138,16 @@ export function syncStatusText(
 ): string {
   switch (state) {
     case 'unavailable':
-      return 'Nothing is uploaded.';
+      return t('sync.unavailable');
     case 'off':
-      return 'Off. Nothing is uploaded.';
+      return t('sync.off');
     case 'idle':
-      return 'Waiting for an analysis.';
+      return t('sync.idle');
     case 'sending':
-      return 'Sending…';
+      return t('sync.sending');
     case 'sent':
-      return `${posted} ${posted === 1 ? 'jump' : 'jumps'} sent.`;
+      return tp('sync.sent', posted);
     case 'failed':
-      return 'Could not reach the review service. Trying again in a moment.';
+      return t('sync.failed');
   }
 }

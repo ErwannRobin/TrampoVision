@@ -1,5 +1,7 @@
+import { t } from '../i18n';
 import { useMediaQuery } from './hooks';
 import { Icon, IconButton, Logo, Menu, Segmented, type MenuGroupDef } from './kit';
+import { LanguageMenu } from './LanguageMenu';
 import { ShortcutsPopover } from './chrome/ShortcutsPopover';
 import type { Audience } from './types';
 
@@ -21,10 +23,11 @@ export interface TopBarProps {
   onHome: (() => void) | null;
 }
 
-const AUDIENCES = [
-  { value: 'athlete', label: 'Athlete', title: 'Plain answers for each jump' },
-  { value: 'coach', label: 'Coach', title: 'Every measurement, chart and threshold' },
-] as const;
+const audiences = () =>
+  [
+    { value: 'athlete', label: t('topbar.athlete'), title: t('topbar.athleteHint') },
+    { value: 'coach', label: t('topbar.coach'), title: t('topbar.coachHint') },
+  ] as const;
 
 /** The one bar of the app: where you are, who the interface speaks to, and the few things you do with a clip. */
 export function TopBar({
@@ -43,7 +46,7 @@ export function TopBar({
     <header className={clip ? 'topbar topbar--clip' : 'topbar'}>
       <div className="topbar__left">
         {onHome ? (
-          <button type="button" className="topbar__home" onClick={onHome} aria-label="TrampoVision: back to the start">
+          <button type="button" className="topbar__home" onClick={onHome} aria-label={t('topbar.home')}>
             <Logo />
           </button>
         ) : (
@@ -60,24 +63,27 @@ export function TopBar({
       </div>
 
       <div className="topbar__right">
+        <LanguageMenu compact={narrow} />
         {showAudience && (
           <Segmented<Audience>
-            ariaLabel="Interface for"
+            ariaLabel={t('topbar.audience')}
             size="sm"
             value={audience}
             onChange={onAudience}
-            options={AUDIENCES.map((a) => ({ ...a }))}
+            options={audiences().map((a) => ({ ...a }))}
           />
         )}
-        {exportGroups && <Menu label="Export" icon="download" groups={exportGroups} size="sm" iconOnly={narrow} />}
-        {clip && <IconButton icon="gear" label="Settings" pressed={setupOpen} onClick={onToggleSetup} />}
+        {exportGroups && (
+          <Menu label={t('topbar.export')} icon="download" groups={exportGroups} size="sm" iconOnly={narrow} />
+        )}
+        {clip && <IconButton icon="gear" label={t('topbar.settings')} pressed={setupOpen} onClick={onToggleSetup} />}
         {onFile && (
-          <label className="icon-btn topbar__open" data-tip="Open another video">
+          <label className="icon-btn topbar__open" data-tip={t('topbar.openAnother')}>
             <Icon name="plus" size={18} />
             <input
               type="file"
               accept="video/mp4,video/quicktime,.mp4,.mov"
-              aria-label="Open another video"
+              aria-label={t('topbar.openAnother')}
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) onFile(f);

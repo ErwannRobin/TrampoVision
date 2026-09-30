@@ -1,4 +1,5 @@
 import type { AnalysisResult } from '../analysis/types';
+import { formatPercent, lazyText, t } from '../i18n/core';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
 import type { BodyPosition, Limitation, RotationDirection, SkillId, SkillPrediction } from '../skills/types';
 
@@ -12,12 +13,13 @@ export type ConfidenceTier = 'high' | 'medium' | 'low' | 'none';
 /** A prediction at or above this is shown as confident (the same line the video labels and the skill card always used). */
 export const HIGH_CONFIDENCE = 0.6;
 
-export const TIER_TEXT: Record<ConfidenceTier, string> = {
-  high: 'High confidence',
-  medium: 'Medium confidence',
-  low: 'Low confidence',
-  none: 'Not classified',
-};
+/** How sure the classifier is, in words of the language in use. */
+export const TIER_TEXT: Record<ConfidenceTier, string> = lazyText({
+  high: 'tier.high',
+  medium: 'tier.medium',
+  low: 'tier.low',
+  none: 'tier.none',
+});
 
 /**
  * How sure the classifier is, in words. `none` = it never tried (the jump is cut off by the clip); `low` = it named a
@@ -42,10 +44,10 @@ export const BED_CENTER_BAND = 0.15;
 /** Where on the bed a bed-normalized position is (+-1 = the edge, + = right in the image); null when unknown. */
 export function describeBedPosition(x: number | null): string | null {
   if (x === null || !Number.isFinite(x)) return null;
-  const side = x > 0 ? 'right' : 'left';
-  if (Math.abs(x) < BED_CENTER_BAND) return 'in the center';
-  if (Math.abs(x) > 1) return `past the ${side} edge`;
-  return `${Math.round(Math.abs(x) * 100)}% of the way to the ${side} edge`;
+  const right = x > 0;
+  if (Math.abs(x) < BED_CENTER_BAND) return t('bed.inCenter');
+  if (Math.abs(x) > 1) return t(right ? 'bed.pastRight' : 'bed.pastLeft');
+  return t(right ? 'bed.towardRight' : 'bed.towardLeft', { share: formatPercent(Math.abs(x)) });
 }
 
 export interface JumpHeadline {

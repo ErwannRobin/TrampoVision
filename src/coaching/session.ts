@@ -1,4 +1,5 @@
 import type { AnalysisResult } from '../analysis/types';
+import { formatNumber, t } from '../i18n/core';
 import type { JumpRecord } from '../dataset/types';
 import type { TwistAnalysis } from '../pose3d/twist';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
@@ -243,9 +244,9 @@ function heightTrend(flights: number[]): { title: string; text: string; detail: 
   const last = mean(flights.slice(-3));
   if (!(first > 0) || last > first * (1 - TREND_DROP)) return null;
   return {
-    title: 'Keep your height',
-    text: 'Stay tall through the bed to the last skill: keep the same rhythm and push through the takeoff.',
-    detail: `Time in the air fell from ${first.toFixed(2)} s in the first three skills to ${last.toFixed(2)} s in the last three.`,
+    title: t('tip.height.title'),
+    text: t('tip.height.text'),
+    detail: t('tip.height.detail', { first: formatNumber(first, 2), last: formatNumber(last, 2) }),
   };
 }
 
@@ -256,17 +257,10 @@ function warningsOf(skills: SkillAnalysis): string[] {
   const oblique = complete.filter(
     (j) => (j.features.quality.trunkLengthVariation ?? 0) > skills.config.maxTrunkVariation,
   );
-  if (oblique.length >= Math.max(1, complete.length / 2))
-    out.push(
-      'The camera looks at the athlete from an angle, so the joint angles are approximate. Film from the side, with the camera level.',
-    );
+  if (oblique.length >= Math.max(1, complete.length / 2)) out.push(t('warn.oblique'));
   const poor = complete.filter((j) => j.features.quality.pose < 0.5);
-  if (poor.length >= Math.max(1, complete.length * 0.3))
-    out.push(
-      'The athlete was hard to see in some skills, so the numbers there are rough. Keep the whole body in the frame.',
-    );
+  if (poor.length >= Math.max(1, complete.length * 0.3)) out.push(t('warn.poor'));
   const medianPose = median(complete.map((j) => j.features.quality.pose));
-  if (Number.isFinite(medianPose) && medianPose < 0.35 && out.length === 0)
-    out.push('The pose was measured poorly overall: check the lighting and that nobody else is in the frame.');
+  if (Number.isFinite(medianPose) && medianPose < 0.35 && out.length === 0) out.push(t('warn.poseOverall'));
   return out;
 }

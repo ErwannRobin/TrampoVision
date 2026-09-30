@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DASH, fmt, pct, plural, signed, timecode } from './format';
+import { DASH, fmt, pct, signed, timecode } from './format';
 
 describe('fmt', () => {
   it('uses fixed decimals and never prints a negative zero', () => {
@@ -46,13 +46,5 @@ describe('timecode', () => {
   it('treats garbage as zero', () => {
     expect(timecode(-1)).toBe('0:00.000');
     expect(timecode(NaN)).toBe('0:00.000');
-  });
-});
-
-describe('plural', () => {
-  it('picks the form by count', () => {
-    expect(plural(1, 'jump')).toBe('jump');
-    expect(plural(0, 'jump')).toBe('jumps');
-    expect(plural(2, 'somersault', 'somersaults')).toBe('somersaults');
   });
 });

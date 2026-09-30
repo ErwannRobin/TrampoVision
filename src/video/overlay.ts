@@ -1,5 +1,6 @@
 import { JUMP_PHASES, type JumpPhase } from '../analysis/jumpCycles';
 import type { AnalysisResult } from '../analysis/types';
+import { lower, t } from '../i18n/core';
 import { buildWireframe, type Side } from '../pose/skeleton';
 import type { Keypoint, Point } from '../pose/types';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
@@ -114,8 +115,8 @@ const MARK_COLOR: Record<ChipMark, string> = {
 };
 
 function phaseText(phase: Exclude<JumpPhase, 'unknown'>, jump: number): string {
-  if (phase === 'ground') return 'On the bed';
-  return jump >= 0 ? `Jump ${jump + 1}, ${phase}` : phase.charAt(0).toUpperCase() + phase.slice(1);
+  if (phase === 'ground') return t('phase.ground');
+  return jump >= 0 ? t('overlay.jumpPhase', { n: jump + 1, phase: lower(t(`phase.${phase}`)) }) : t(`phase.${phase}`);
 }
 
 /** The jump the playhead is in, else the last one that took off: what the labels and the path markers describe. */
@@ -152,20 +153,23 @@ export function buildLabels(
       const position = POSITIONS[skills.frames.position[sample]];
       if (position) {
         left.push({
-          parts: [{ text: 'Body', muted: true }, { text: position === 'unknown' ? 'between shapes' : position }],
+          parts: [
+            { text: t('overlay.body'), muted: true },
+            { text: position === 'unknown' ? lower(t('fig.between')) : lower(t(`pos.${position}`)) },
+          ],
         });
       }
       const turns = result.jumps.turnsSinceTakeoff[sample];
       if (Number.isFinite(turns)) {
-        const text = `${turns < 0 ? '−' : ''}${fmt(Math.abs(turns), 2)} turns`;
-        left.push({ parts: [{ text: 'Rotation', muted: true }, { text }] });
+        const text = `${turns < 0 ? '−' : ''}${fmt(Math.abs(turns), 2)} ${t('u.turns')}`;
+        left.push({ parts: [{ text: t('row.rotation'), muted: true }, { text }] });
       }
     }
   }
 
   const unclear = result.confidence[sample] < UNCLEAR_BELOW;
   const right: ChipSpec | null = unclear
-    ? { parts: [{ text: result.landmarks[sample] ? 'Low pose confidence' : 'No athlete found' }], dashed: true }
+    ? { parts: [{ text: t(result.landmarks[sample] ? 'overlay.lowConfidence' : 'overlay.noAthlete') }], dashed: true }
     : null;
   return { left, right };
 }
@@ -210,9 +214,9 @@ function ellipsize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 }
 
 /** Measures a chip with the font that is set on the context. Only the first part gives way when the chip is too wide. */
-function layoutChip(ctx: CanvasRenderingContext2D, chip: ChipSpec, t: TypeScale, maxWidth: number): LaidChip {
+function layoutChip(ctx: CanvasRenderingContext2D, chip: ChipSpec, ts: TypeScale, maxWidth: number): LaidChip {
   const parts = chip.parts.map((p) => ({ text: p.text, muted: !!p.muted, width: ctx.measureText(p.text).width }));
-  const fixed = 2 * t.padX + (chip.mark ? t.markWidth : 0) + t.partGap * (parts.length - 1);
+  const fixed = 2 * ts.padX + (chip.mark ? ts.markWidth : 0) + ts.partGap * (parts.length - 1);
   const rest = parts.slice(1).reduce((sum, p) => sum + p.width, 0);
   if (parts[0] && fixed + parts[0].width + rest > maxWidth) {
     parts[0].text = ellipsize(ctx, parts[0].text, Math.max(0, maxWidth - fixed - rest));
@@ -236,12 +240,12 @@ function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
 }
 
 /** Paints a laid-out chip with its top left corner at (x, y). Expects `ctx.font` to be the chip font. */
-function paintChip(ctx: CanvasRenderingContext2D, laid: LaidChip, x: number, y: number, t: TypeScale) {
+function paintChip(ctx: CanvasRenderingContext2D, laid: LaidChip, x: number, y: number, ts: TypeScale) {
   const { chip, parts, width } = laid;
-  const cy = y + t.height / 2;
+  const cy = y + ts.height / 2;
   ctx.save();
   ctx.beginPath();
-  roundedRect(ctx, x, y, width, t.height, t.height / 2);
+  roundedRect(ctx, x, y, width, ts.height, ts.height / 2);
   ctx.fillStyle = CHIP_FILL;
   ctx.fill();
   ctx.lineWidth = 1;
@@ -250,14 +254,14 @@ function paintChip(ctx: CanvasRenderingContext2D, laid: LaidChip, x: number, y: 
   ctx.stroke();
   ctx.setLineDash([]);
 
-  let tx = x + t.padX;
+  let tx = x + ts.padX;
   if (chip.mark) {
-    const r = t.size * 0.25;
+    const r = ts.size * 0.25;
     ctx.beginPath();
     ctx.arc(tx + r, cy, r, 0, TAU);
     if (chip.mark === 'medium' || chip.mark === 'low' || chip.mark === 'none') {
       // Not sure: a dashed ring, so the meaning does not rest on the color alone. A faint fill keeps the hue readable at this size.
-      const dash = Math.max(1.2, t.size * 0.14);
+      const dash = Math.max(1.2, ts.size * 0.14);
       if (chip.mark !== 'none') {
         ctx.globalAlpha = 0.3;
         ctx.fillStyle = MARK_COLOR[chip.mark];
@@ -273,15 +277,15 @@ function paintChip(ctx: CanvasRenderingContext2D, laid: LaidChip, x: number, y: 
       ctx.fillStyle = MARK_COLOR[chip.mark];
       ctx.fill();
     }
-    tx += t.markWidth;
+    tx += ts.markWidth;
   }
 
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   for (const p of parts) {
     ctx.fillStyle = p.muted ? CHIP_MUTED : CHIP_TEXT;
-    ctx.fillText(p.text, tx, cy + t.size * 0.35);
-    tx += p.width + t.partGap;
+    ctx.fillText(p.text, tx, cy + ts.size * 0.35);
+    tx += p.width + ts.partGap;
   }
   ctx.restore();
 }
@@ -296,23 +300,23 @@ function drawLabels(
 ) {
   const { left, right } = buildLabels(result, sample, skills, detail);
   if (left.length === 0 && !right) return;
-  const t = typeScale(f.u);
-  const room = f.w - 2 * t.margin;
+  const ts = typeScale(f.u);
+  const room = f.w - 2 * ts.margin;
   ctx.save();
-  ctx.font = t.font;
-  const rows = left.map((chip) => layoutChip(ctx, chip, t, room));
-  let warning = right && layoutChip(ctx, right, t, room);
+  ctx.font = ts.font;
+  const rows = left.map((chip) => layoutChip(ctx, chip, ts, room));
+  let warning = right && layoutChip(ctx, right, ts, room);
   // On a narrow picture the warning would run into the first chip: it joins the column instead.
-  if (warning && rows[0] && rows[0].width + 2 * t.gap + warning.width > room) {
+  if (warning && rows[0] && rows[0].width + 2 * ts.gap + warning.width > room) {
     rows.push(warning);
     warning = null;
   }
-  let y = t.margin;
+  let y = ts.margin;
   for (const row of rows) {
-    paintChip(ctx, row, t.margin, y, t);
-    y += t.height + t.gap;
+    paintChip(ctx, row, ts.margin, y, ts);
+    y += ts.height + ts.gap;
   }
-  if (warning) paintChip(ctx, warning, f.w - t.margin - warning.width, t.margin, t);
+  if (warning) paintChip(ctx, warning, f.w - ts.margin - warning.width, ts.margin, ts);
   ctx.restore();
 }
 
@@ -384,13 +388,13 @@ function drawJumpMarks(
   ctx.stroke();
 
   if (detail === 'full' && Number.isFinite(cycle.apexHeightM)) {
-    const t = typeScale(f.u);
-    ctx.font = t.font;
-    const laid = layoutChip(ctx, { parts: [{ text: `${fmt(cycle.apexHeightM, 2)} m` }] }, t, f.w - 2 * t.margin);
+    const ts = typeScale(f.u);
+    ctx.font = ts.font;
+    const laid = layoutChip(ctx, { parts: [{ text: `${fmt(cycle.apexHeightM, 2)} m` }] }, ts, f.w - 2 * ts.margin);
     const offset = 7 * f.u;
-    const x = apex.x + offset + laid.width <= f.w - t.margin ? apex.x + offset : apex.x - offset - laid.width;
-    const y = Math.min(Math.max(apex.y - t.height / 2, t.margin), f.h - t.height - t.margin);
-    paintChip(ctx, laid, x, y, t);
+    const x = apex.x + offset + laid.width <= f.w - ts.margin ? apex.x + offset : apex.x - offset - laid.width;
+    const y = Math.min(Math.max(apex.y - ts.height / 2, ts.margin), f.h - ts.height - ts.margin);
+    paintChip(ctx, laid, x, y, ts);
   }
 }
 

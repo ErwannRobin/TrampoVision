@@ -1,0 +1,177 @@
+import type { Translation } from '..';
+import type { coaching as en } from '../en/coaching';
+
+export const coaching: Translation<typeof en> = {
+  'sentence.gap': ' ',
+  'count.skills': { one: '{n} Element', other: '{n} Elemente' },
+  'unit.points': { one: '{n} Punkt', other: '{n} Punkte' },
+
+  'exec.clock': { one: '{hour} Uhr', other: '{hour} Uhr' },
+
+  'exec.unchecked.feet.label': 'Füße und Knie zusammen, gestreckte Fußspitzen',
+  'exec.unchecked.feet.why': 'Erfordert eine Ansicht von vorn oder von hinten.',
+  'exec.none.cutOff': 'Das Element wird vom Clip abgeschnitten, daher lässt sich seine Form nicht beurteilen.',
+  'exec.none.noSequence': 'Die Pose wurde nicht gut genug verfolgt, um dieses Element zu messen.',
+  'exec.none.hardToSee':
+    'Der Athlet war schwer zu sehen, daher wurde zu wenig von der Pose gemessen, um dieses Element zu beurteilen.',
+  'exec.none.tooLittle': 'Es wurde zu wenig von der Pose gemessen, um dieses Element zu beurteilen.',
+
+  'exec.knees.label': 'Gebeugte Knie',
+  'exec.knees.detailPike': 'Knie bei {deg}° in der gebückten Haltung (gestreckt sind {limit}° oder mehr).',
+  'exec.knees.detailLayout': 'Knie bei {deg}° in der gestreckten Haltung (gestreckt sind {limit}° oder mehr).',
+  'exec.bodyLine.label': 'Körperlinie',
+  'exec.bodyLine.detail': 'Hüfte bei {deg}° in der gestreckten Haltung (offen sind {limit}° oder mehr).',
+  'exec.opening.label': 'Öffnen',
+  'exec.opening.whyNoClock':
+    'Die gemessene Rotation passt nicht zu den Saltos dieses Elements, daher lässt sich der Körper nicht auf dem Zifferblatt platzieren.',
+  'exec.opening.whyFlipped':
+    'Die Rotation wurde nicht zuverlässig verfolgt (die Pose ist möglicherweise umgeklappt), daher lässt sich der Körper nicht auf dem Zifferblatt platzieren.',
+  'exec.opening.whyNoFold': 'Die Hüfte hat sich nie deutlich gebeugt, daher gibt es kein Öffnen zu bewerten.',
+  'exec.noOpening.label': 'Kein Öffnen',
+  'exec.noOpening.detail': 'Der Körper war vor 3 Uhr nicht gestreckt (Hüfte bei {deg}° oder mehr).',
+  'exec.lateOpening.label': 'Spätes Öffnen',
+  'exec.lateOpening.detail12': 'Gestreckt zwischen 1 und 2 Uhr (rechtzeitig wäre bis 1 Uhr).',
+  'exec.lateOpening.detail23': 'Gestreckt zwischen 2 und 3 Uhr (rechtzeitig wäre bis 1 Uhr).',
+  'exec.pikeDown.label': 'Erneutes Einknicken',
+  'exec.pikeDown.detail':
+    'Die Hüfte beugte sich nach dem Öffnen erneut auf {deg}° (den Körper bis 3 Uhr gestreckt halten).',
+  'exec.arms.label': 'Arme',
+  'exec.arms.detailAway': 'Arme {deg}° vom Körper entfernt (innerhalb von {limit}° halten).',
+  'exec.arms.detailBent':
+    'Ellbogen auf {deg}° gebeugt (die Arme bei einem Element mit dieser Schraube gestreckt halten).',
+  'exec.twistEnd.label': 'Schraube endet spät',
+  'exec.twistEnd.detail':
+    'Die letzten 90° der Schraube kommen bei {clock} oder später (sie sollte bis 3 Uhr beendet sein).',
+  'exec.twistEnd.uncheckedLabel': 'Ende der Schraube',
+  'exec.twistEnd.uncheckedWhy': 'Die 3D-Schraube ist experimentell und war hier nicht zuverlässig.',
+
+  'tip.knees.title': 'Beine strecken',
+  'tip.knees.text': 'Oberschenkel zusammenpressen und die Fußspitzen wegdrücken, um die Knie zu strecken.',
+  'tip.opening.title': 'Früher öffnen',
+  'tip.opening.text':
+    'Suchen Sie das Sprungtuch, sobald Sie den höchsten Punkt passieren, und öffnen Sie die Hüfte früher: bis 1 Uhr gestreckt sein.',
+  'tip.noOpening.title': 'Vor der Landung öffnen',
+  'tip.noOpening.text':
+    'Beginnen Sie zu öffnen, sobald Sie den höchsten Punkt passieren: strecken Sie sich und suchen Sie das Sprungtuch.',
+  'tip.pikeDown.title': 'Offen bleiben',
+  'tip.pikeDown.text':
+    'Halten Sie den gestreckten Körper, sobald Sie offen sind, bis Sie waagerecht sind, und bereiten Sie dann die Landung vor.',
+  'tip.bodyLine.title': 'Lang bleiben',
+  'tip.bodyLine.text': 'Gesäß anspannen und die Brust oben halten, damit die Hüfte nicht einknickt.',
+  'tip.arms.title': 'Arme anlegen',
+  'tip.arms.text': 'Arme gestreckt und nah am Körper halten, Hände an den Oberschenkeln.',
+  'tip.twistEnd.title': 'Schraube früher beenden',
+  'tip.twistEnd.text':
+    'Die Schraube früher beginnen und die Arme anziehen, damit sie vor der Waagerechten beendet ist.',
+  'tip.drift.title': 'In der Mitte landen',
+  'tip.drift.text': 'Schultern beim Absprung quer halten und auf die Mitte des Sprungtuchs schauen.',
+  'tip.drift.pastEdge': 'Landung {side} über den Rand des Sprungtuchs hinaus.',
+  'tip.drift.towardEdge': 'Landung {side}: {share} des Weges zum Rand des Sprungtuchs.',
+  'tip.drift.travelled': 'Während des Elements {dist} m nach {side} im Bild gewandert.',
+  'tip.height.title': 'Höhe halten',
+  'tip.height.text':
+    'Bleiben Sie bis zum letzten Element groß im Sprungtuch: gleicher Rhythmus, kräftig durch den Absprung drücken.',
+  'tip.height.detail': 'Die Flugzeit sank von {first} s in den ersten drei Elementen auf {last} s in den letzten drei.',
+
+  'focus.of': { one: '{n} von {total} Element', other: '{n} von {total} Elementen' },
+  'focus.count': { one: '{n} Element', other: '{n} Elemente' },
+  'focus.withGain': '{count}, {gain}',
+
+  'warn.oblique':
+    'Die Kamera sieht den Athleten von schräg, daher sind die Gelenkwinkel nur näherungsweise bestimmt. Filmen Sie von der Seite mit waagerechter Kamera.',
+  'warn.poor':
+    'Der Athlet war bei einigen Elementen schwer zu sehen, daher sind die Werte dort grob. Halten Sie den ganzen Körper im Bild.',
+  'warn.poseOverall':
+    'Die Pose wurde insgesamt schlecht gemessen: Prüfen Sie das Licht und dass sich sonst niemand im Bild befindet.',
+
+  'summary.header': '{title}: {skills}',
+  'summary.headerPending': '{title}: {skills}, {pending} zu prüfen',
+  'summary.difficulty': 'Schwierigkeit {value}',
+  'summary.execution': 'Haltung etwa {value} von 10',
+  'summary.air': '{value} s in der Luft',
+  'summary.guess': ' (Vermutung)',
+  'summary.repeat': ' (Wiederholung)',
+  'summary.executionOne': ', Haltung {value}',
+  'summary.line': '{n}. {name}{guess}: Schwierigkeit {difficulty}{repeat}{execution}',
+  'summary.next': 'Als Nächstes üben:',
+  'summary.focusItem': '- {title} ({summary}): {text}',
+
+  'live.other': 'Etwas anderes',
+  'live.notNamed': 'Nicht benannt',
+  'live.cutOff': 'Vom Clip abgeschnitten',
+  'live.sub.partial': 'Nur teilweise gefilmt',
+  'live.sub.notInList': 'Nicht in der Liste',
+  'live.sub.yours': 'Ihre Beschriftung',
+  'live.sub.pending': 'Beste Vermutung, noch nicht gezählt',
+  'live.sub.guess': 'Beste Vermutung',
+  'live.sub.notSure': 'Nicht sicher',
+  'live.sub.direction': 'Richtung angenommen',
+  'live.sub.repeat': 'Wiederholung, zählt nicht',
+  'live.skill': 'Element',
+  'live.skills': 'Elemente',
+  'live.difficulty': 'Schwierigkeit',
+  'live.execution': 'Haltung',
+  'live.colDifficulty': 'Schwierigk.',
+  'live.colExecution': 'Haltung',
+  'live.executionDeduction': 'Haltungsabzug',
+  'live.notCounted': 'Zählt erst, wenn Sie es prüfen',
+  'live.say.other': 'Sie haben angegeben, dass dies keines der Elemente der Liste ist. Es bleibt außerhalb der Summen.',
+  'live.say.coach': 'Sie haben angegeben: {name}.',
+  'live.say.forced': 'Beste Vermutung: {name}.',
+  'live.say.auto': 'Das sieht aus wie: {name}.',
+  'live.say.directionAssumed': 'Vorwärts oder rückwärts ließ sich nicht bestimmen, daher wird rückwärts angenommen.',
+  'live.yes': 'Ja, das stimmt',
+  'live.playTitle': 'Dieses Element mit etwas Anlauf und Landung abspielen',
+  'live.couldBe': 'Es könnte sein',
+  'live.anotherSkill': 'Ein anderes Element',
+  'live.noneOfThese': 'Es ist keines davon',
+  'live.cannotLabel': 'Beschriftungen lassen sich speichern, sobald das Video identifiziert ist.',
+  'live.partTitle': 'FIG-Wertungsvorschriften 2025–2028, §{rule}',
+  'live.noElement': 'Ein Strecksprung ist kein Element: Er hat keine Schwierigkeit.',
+  'live.easier':
+    'Der Körper sah {measured} aus. Ein Kampfrichter wertet die am wenigsten schwierige Form: {element} ist {value} wert.',
+  'live.easierDetail':
+    'Der Körper sah {measured} aus (Hüfte {hip}, Knie {knee}). Ein Kampfrichter wertet die am wenigsten schwierige Form: {element} ist {value} wert.',
+  'live.repeated': 'Dasselbe Element wurde schon früher geturnt, daher zählt es in einer Übung nicht.',
+  'live.frontWorth': 'Vorwärts wäre {value} wert: Bei einem Doppel- oder Dreifachsalto kommt es auf die Richtung an.',
+  'live.noDeduction': 'Kein Abzug in dem gefunden, was eine Kamera sehen kann.',
+  'live.notJudged': 'Nicht bewertet: {reason}',
+  'live.notJudgedDefault': 'Nicht bewertet: Für dieses Element gibt es keine gemessene Form.',
+  'live.hardToSee': 'Der Athlet war hier schwer zu sehen, betrachten Sie dies daher als grobe Schätzung.',
+  'live.yourScore': 'Ihre Haltungsnote',
+  'live.yourDeduction': 'Ihr Abzug',
+  'live.proposed': 'Die App schlug {value} vor.',
+  'live.unchecked': 'Nicht geprüft',
+  'live.fix': 'Was zu verbessern ist',
+  'live.clipCutsSkill':
+    'Der Clip beginnt oder endet während dieses Elements, daher lässt es sich weder benennen noch bewerten. Filmen Sie etwas vor dem Absprung und nach der Landung.',
+  'live.set': 'Die Übung',
+  'live.toCheck': '{n} zu prüfen',
+  'live.cutOffCount': '{n} abgeschnitten',
+  'live.copySummary': 'Zusammenfassung kopieren',
+  'live.copyTitle': 'Die Elemente, Noten und Übungshinweise als Text kopieren',
+  'live.shared': 'Geteilt',
+  'live.copied': 'Kopiert',
+  'live.copyFailed': 'Kopieren nicht möglich',
+  'live.repeatHint': 'Eine Wiederholung zählt einmal',
+  'live.nothingJudged': 'Nichts bewertet',
+  'live.estimate': 'Schätzung, von 10',
+  'live.inTheAir': 'In der Luft',
+  'live.allSkills': 'Alle Elemente zusammen',
+  'live.workOn': 'Als Nächstes üben',
+  'live.nothingStands':
+    'Nichts fällt auf. In dem, was eine Kamera sehen kann, wurde kein Abzug gefunden, und die Landungen lagen nahe der Mitte.',
+  'live.bounce': 'Strecksprung {n}',
+  'live.bounces': '{count} Strecksprünge, {from} bis {to}',
+  'live.bounceItem': 'Strecksprung',
+  'live.noSkill':
+    'Kein Element gefunden, nur Strecksprünge. Filmen Sie eine Übung mit Saltos oder Schrauben, um sie zu bewerten.',
+  'live.showTechnical': 'Technische Details anzeigen',
+  'live.technicalText':
+    'Die Athleten- und die Trainer-Ansicht zeigen zusätzlich die Belege hinter jedem Element, alle Messwerte, die Schraubenanalyse und alle Diagramme.',
+
+  'picker.somersaults': 'Saltos',
+  'picker.direction': 'Richtung',
+  'picker.twists': 'Schrauben',
+  'picker.position': 'Haltung',
+};

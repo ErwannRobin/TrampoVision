@@ -1,3 +1,4 @@
+import { lazyText, t, type Locale } from '../i18n/core';
 import type { MovementLabel } from './movementLabel';
 import type { TwistEstimate, TwistSequence } from '../pose3d/twist';
 import type { SkillConfig } from '../skills/config';
@@ -6,14 +7,18 @@ import type { JumpFeatures, JumpSequence, SkillPrediction } from '../skills/type
 /** What a person says the jump was. "Unknown" = cannot tell, or not one of the five. */
 export const TRUTH_LABELS = ['straight', 'tuck', 'pike', 'back', 'front', 'unknown'] as const;
 export type TruthLabel = (typeof TRUTH_LABELS)[number];
-export const TRUTH_TEXT: Record<TruthLabel, string> = {
-  straight: 'Straight',
-  tuck: 'Tuck',
-  pike: 'Pike',
-  back: 'Back',
-  front: 'Front',
-  unknown: 'Unknown',
-};
+const TRUTH_KEYS = {
+  straight: 'pos.straight',
+  tuck: 'pos.tuck',
+  pike: 'pos.pike',
+  back: 'truth.back',
+  front: 'truth.front',
+  unknown: 'truth.unknown',
+} as const;
+/** What each label is called, in the language in use. */
+export const TRUTH_TEXT: Record<TruthLabel, string> = lazyText(TRUTH_KEYS);
+/** A label in a chosen language (English for a file). */
+export const truthText = (label: TruthLabel, locale?: Locale): string => t(TRUTH_KEYS[label], undefined, locale);
 
 /** The five skills the classifier can name, in the order they are listed everywhere. */
 export const CLASS_LABELS = ['straight', 'tuck', 'pike', 'back', 'front'] as const;

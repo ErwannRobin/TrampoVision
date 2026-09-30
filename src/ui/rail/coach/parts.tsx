@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { t } from '../../../i18n';
 import { DASH } from '../../format';
 import { cx } from '../../kit';
 import type { Figure, FigureRow, Glyph } from './figures';
@@ -92,7 +93,7 @@ export function Limits({ items }: { items: Limit[] }) {
           <strong>{l.signal}.</strong> {l.problem}
           {l.needed && (
             <span className="coach__needed">
-              <em>Needed:</em> {l.needed}
+              <em>{t('coach.needed')}</em> {l.needed}
             </span>
           )}
         </li>

@@ -4,7 +4,7 @@ import { syntheticRoutine } from '../analysis/testTracks';
 import type { PoseTrack } from '../analysis/types';
 import { LM } from '../pose/landmarks';
 import { analyzeSkills } from './analyzeSkills';
-import { KNOWN_LIMITS, ruleBasedClassifier } from './classifier';
+import { knownLimits, ruleBasedClassifier } from './classifier';
 import { SEQUENCE_COLUMNS } from './jumpFeatures';
 import { flipInverted, yawView } from './evaluation';
 import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from './export';
@@ -62,7 +62,7 @@ describe('positions without rotation', () => {
     expect(pike.evidence.find((e) => e.key === 'hip_angle')!.text).toBe('80°');
     expect(pike.evidence.find((e) => e.key === 'rotation')!.text).toMatch(/^0\.0 turns/);
     expect(pike.summary).toMatch(/hips 80°/);
-    expect(KNOWN_LIMITS.map((l) => l.signal)).toEqual(expect.arrayContaining(['Twists', 'Camera view']));
+    expect(knownLimits().map((l) => l.signal)).toEqual(expect.arrayContaining(['Twists', 'Camera view']));
   });
 });
 

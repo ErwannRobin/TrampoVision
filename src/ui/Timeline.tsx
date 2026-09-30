@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } 
 import { JUMP_PHASES } from '../analysis/jumpCycles';
 import { sampleIndexAt } from '../analysis/lookup';
 import type { AnalysisResult } from '../analysis/types';
+import { t, useLocale } from '../i18n';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { fmt, timecode } from './format';
 import { skillName } from './insights';
@@ -52,12 +53,13 @@ export interface TimelineProps {
 const REVEAL_MS = 700;
 const ZOOM_EASE_MS = 90;
 
-const EVENT_TEXT: Record<EventKind, string> = { takeoff: 'Takeoff', apex: 'Apex', landing: 'Landing' };
+const eventText = (kind: EventKind): string => t(`phase.${kind}`);
 
-const ZOOM_OPTIONS = [
-  { value: 'clip', label: 'Clip', title: 'Show the whole clip' },
-  { value: 'jump', label: 'Jump', title: 'Zoom to the selected jump' },
-] as const;
+const zoomOptions = () =>
+  [
+    { value: 'clip', label: t('tl.zoomClip'), title: t('tl.zoomClipTitle') },
+    { value: 'jump', label: t('tl.zoomJump'), title: t('tl.zoomJumpTitle') },
+  ] as const;
 
 function prepare(canvas: HTMLCanvasElement, w: number, h: number) {
   const dpr = window.devicePixelRatio || 1;
@@ -101,6 +103,7 @@ export function Timeline({
   const cursorRef = useRef<HTMLCanvasElement>(null);
   const { width } = useElementSize(wrapRef);
   const theme = useThemeVersion();
+  const locale = useLocale();
   const reduced = useReducedMotion();
   const compact = width > 0 && width < 640;
   const height = timelineHeight(compact);
@@ -171,7 +174,7 @@ export function Timeline({
   useEffect(() => {
     paintStatic();
     paintCursor();
-  }, [result, skills, selected, width, height, compact, paintStatic, paintCursor]);
+  }, [result, skills, selected, width, height, compact, locale, paintStatic, paintCursor]);
 
   // A new analysis: the window starts on the clip and the strip draws itself in.
   useEffect(() => {
@@ -222,12 +225,15 @@ export function Timeline({
   useEffect(() => {
     const onTime = () => {
       paintCursor();
-      const t = playhead.getSnapshot();
+      const now = playhead.getSnapshot();
       const slider = cursorRef.current;
       if (slider) {
-        slider.setAttribute('aria-valuenow', t.toFixed(2));
-        const jump = jumpAt(t, latest.current.cycles, latest.current.clip);
-        slider.setAttribute('aria-valuetext', `${timecode(t)}${jump >= 0 ? `, jump ${jump + 1}` : ''}`);
+        slider.setAttribute('aria-valuenow', now.toFixed(2));
+        const jump = jumpAt(now, latest.current.cycles, latest.current.clip);
+        slider.setAttribute(
+          'aria-valuetext',
+          jump >= 0 ? t('tl.valueText', { time: timecode(now), n: jump + 1 }) : timecode(now),
+        );
       }
     };
     onTime();
@@ -241,9 +247,9 @@ export function Timeline({
   const onDown = (e: PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     dragging.current = true;
-    const { t } = at(e);
-    playhead.seek(t);
-    const jump = jumpAt(t, cycles, clip);
+    const { t: time } = at(e);
+    playhead.seek(time);
+    const jump = jumpAt(time, cycles, clip);
     if (jump >= 0) onSelect(jump);
   };
   const onMove = (e: PointerEvent<HTMLCanvasElement>) => {
@@ -267,23 +273,24 @@ export function Timeline({
     const i = sampleIndexAt(result.meta, event ? event.time : hover.t);
     const jump = event ? event.jump : result.jumps.cycleIndex[i];
     const parts: string[] = [];
-    if (event) parts.push(EVENT_TEXT[event.kind]);
+    if (event) parts.push(eventText(event.kind));
     else {
       const phase = JUMP_PHASES[result.jumps.phase[i]];
-      if (phase && phase !== 'unknown') parts.push(phase === 'ground' ? 'On the bed' : phase);
+      if (phase && phase !== 'unknown') parts.push(t(`phase.${phase}`));
     }
     const h = result.height[i];
     if (Number.isFinite(h)) parts.push(`${fmt(h, 2)} m`);
     if (jump >= 0) {
       const prediction = skills?.jumps[jump]?.prediction;
       const label = prediction && skillName(prediction);
-      parts.push(`Jump ${jump + 1}${label ? `, ${label}` : ''}`);
+      parts.push(label ? t('tl.tipJumpLabel', { n: jump + 1, label }) : t('tl.tipJump', { n: jump + 1 }));
     }
     return { time: timecode(event ? event.time : hover.t), parts, right: hover.x > width - 190 };
-  }, [hover, width, events, plot, result, skills]);
+  }, [hover, width, events, plot, result, skills, locale]); // oxlint-disable-line react-hooks/exhaustive-deps
 
   const jumpTotal = cycles.length;
-  const title = selected !== null && jumpTotal > 0 ? `Jump ${selected + 1} of ${jumpTotal}` : 'No jumps found';
+  const title =
+    selected !== null && jumpTotal > 0 ? t('ins.jumpOf', { n: selected + 1, total: jumpTotal }) : t('coach.noJumps');
 
   return (
     <div className="tl">
@@ -291,7 +298,7 @@ export function Timeline({
         <div className="tl__nav">
           <IconButton
             icon="chevron-left"
-            label="Previous jump ( [ )"
+            label={t('tl.previous')}
             size="sm"
             disabled={selected === null || selected <= 0}
             onClick={() => onStepJump(-1)}
@@ -301,7 +308,7 @@ export function Timeline({
           </span>
           <IconButton
             icon="chevron-right"
-            label="Next jump ( ] )"
+            label={t('tl.next')}
             size="sm"
             disabled={selected === null || selected >= jumpTotal - 1}
             onClick={() => onStepJump(1)}
@@ -309,11 +316,11 @@ export function Timeline({
         </div>
         <div className="tl__actions">
           <Button variant="secondary" size="sm" icon="play" disabled={selected === null} onClick={onPlayJump}>
-            Play jump
+            {t('ins.playJump')}
           </Button>
           <IconButton
             icon="loop"
-            label="Loop the jump"
+            label={t('tl.loop')}
             size="sm"
             pressed={loop}
             disabled={selected === null}
@@ -322,25 +329,25 @@ export function Timeline({
         </div>
         <div className="tl__zoom">
           <Segmented<'clip' | 'jump'>
-            ariaLabel="Timeline zoom"
+            ariaLabel={t('tl.zoom')}
             size="sm"
             value={zoom}
             onChange={setZoom}
-            options={ZOOM_OPTIONS.map((o) => ({ ...o, disabled: o.value === 'jump' && selected === null }))}
+            options={zoomOptions().map((o) => ({ ...o, disabled: o.value === 'jump' && selected === null }))}
           />
         </div>
-        <ul className="tl__legend" aria-label="Legend">
+        <ul className="tl__legend" aria-label={t('tl.legend')}>
           <li>
             <Glyph pointing="up" />
-            Takeoff
+            {t('phase.takeoff')}
           </li>
           <li>
             <span className="tl__dot" aria-hidden="true" />
-            Apex
+            {t('phase.apex')}
           </li>
           <li>
             <Glyph pointing="down" />
-            Landing
+            {t('phase.landing')}
           </li>
         </ul>
       </div>
@@ -353,7 +360,7 @@ export function Timeline({
           style={{ width, height }}
           role="slider"
           tabIndex={0}
-          aria-label="Video position"
+          aria-label={t('tl.position')}
           aria-valuemin={Number(clip.t0.toFixed(2))}
           aria-valuemax={Number(clip.t1.toFixed(2))}
           aria-valuenow={0}

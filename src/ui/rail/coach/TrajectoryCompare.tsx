@@ -1,3 +1,4 @@
+import { formatNumber, t } from '../../../i18n';
 import type { TemporalComparison } from '../../../skills/types';
 import { sparkLayout } from '../../review/logic';
 
@@ -21,7 +22,7 @@ export function TrajectoryCompare({ comparison }: { comparison: TemporalComparis
         const size = { width: WIDTH, height: HEIGHT };
         const detected = sparkLayout(c.detected, size, { domain });
         const reference = sparkLayout(c.reference, size, { domain });
-        const off = c.distance === null ? '–' : `${c.distance.toFixed(1)} tolerances off`;
+        const off = c.distance === null ? '–' : t('ev.tolerances', { d: formatNumber(c.distance, 1) });
         return (
           <figure key={c.channel} className="review-spark">
             <figcaption className="review-spark__head">
@@ -32,7 +33,7 @@ export function TrajectoryCompare({ comparison }: { comparison: TemporalComparis
               className="review-spark__svg"
               viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
               role="img"
-              aria-label={`${c.label}: the jump against the reference, ${off}`}
+              aria-label={t('trajectory.aria', { label: c.label, off })}
             >
               <rect className="review-spark__bg" x="0" y="0" width={WIDTH} height={HEIGHT} rx="4" />
               {reference && (

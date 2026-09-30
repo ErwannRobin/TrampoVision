@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { t } from '../../i18n';
 import { ARCS_VIEW, FLIGHTS, flightGeometry, flightTiming, glyphPoints } from './arcs';
 
 const { width, height, baseline } = ARCS_VIEW;
@@ -12,12 +13,7 @@ const delay = (ms: number): CSSProperties => ({ '--delay': `${ms}ms` }) as CSSPr
 export function HeroArcs() {
   const hero = FLIGHTS.find((f) => f.hero);
   return (
-    <svg
-      className="arcs"
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label="Flight arcs of a trampoline routine"
-    >
+    <svg className="arcs" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={t('hero.arcs')}>
       <line className="arcs__bed" x1="0" y1={baseline} x2={width} y2={baseline} />
       {FLIGHTS.map((flight, i) => {
         const g = flightGeometry(flight);

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { t } from '../i18n';
 import { REVIEW_API_URL, fetchQueueCount } from '../sync/reviewSync';
 import type { DatasetApi } from '../dataset/useDataset';
 import { HeroArcs } from './chrome/HeroArcs';
@@ -34,8 +35,8 @@ function ReviewLink() {
     <a className="landing__review" href="/review.html">
       <Icon name="check" size={18} />
       <span>
-        Review jumps
-        <small>{waiting === null ? 'Confirm or correct what the app found' : `${waiting} waiting for a check`}</small>
+        {t('landing.review')}
+        <small>{waiting === null ? t('landing.reviewIdle') : t('landing.reviewWaiting', { n: waiting })}</small>
       </span>
     </a>
   );
@@ -86,30 +87,27 @@ export function Landing({ onFile, onSample, onOpenSeries, dataset, busy, advance
     <div className="landing">
       <section className="landing__hero">
         <div className="landing__copy">
-          <h1 className="landing__title t-brand">Score every skill.</h1>
-          <p className="landing__lead">
-            Film a set. TrampoVision names each skill, works out its difficulty, proposes an execution score and tells
-            you what to fix. It runs on your device.
-          </p>
+          <h1 className="landing__title t-brand">{t('landing.title')}</h1>
+          <p className="landing__lead">{t('landing.lead')}</p>
           <div className="landing__actions">
             {touch ? (
               <>
-                <VideoButton label="Film a set" icon="video" primary capture busy={busy} onFile={onFile} />
-                <VideoButton label="Choose a video" icon="upload" primary={false} busy={busy} onFile={onFile} />
+                <VideoButton label={t('landing.film')} icon="video" primary capture busy={busy} onFile={onFile} />
+                <VideoButton label={t('landing.choose')} icon="upload" primary={false} busy={busy} onFile={onFile} />
               </>
             ) : (
-              <VideoButton label="Choose a video" icon="upload" primary busy={busy} onFile={onFile} />
+              <VideoButton label={t('landing.choose')} icon="upload" primary busy={busy} onFile={onFile} />
             )}
             {onSample && (
               <Button variant="secondary" size="lg" disabled={busy} onClick={onSample}>
-                Use the sample video
+                {t('landing.sample')}
               </Button>
             )}
           </div>
-          <p className="landing__hint">or drop a video anywhere on this page</p>
+          <p className="landing__hint">{t('landing.drop')}</p>
           {advanced && (
             <label className="landing__link">
-              Open a saved analysis
+              {t('landing.openSaved')}
               <input
                 type="file"
                 accept="application/json,.json"
@@ -125,12 +123,11 @@ export function Landing({ onFile, onSample, onOpenSeries, dataset, busy, advance
           <ul className="landing__notes">
             <li>
               <Icon name="video" size={17} />
-              Best results come from a fixed, level camera at the side, with the whole trampoline in frame and the
-              athlete in view from the takeoff of the first skill to the landing of the last.
+              {t('landing.noteCamera')}
             </li>
             <li>
               <Icon name="shield" size={17} />
-              Runs in your browser. The video never leaves your device.
+              {t('landing.notePrivacy')}
             </li>
           </ul>
         </div>
@@ -141,8 +138,8 @@ export function Landing({ onFile, onSample, onOpenSeries, dataset, busy, advance
       </section>
 
       {hasDataset && (
-        <section className="landing__dataset sheet" aria-label="Saved dataset">
-          <h2 className="landing__dataset-title">Saved dataset</h2>
+        <section className="landing__dataset sheet" aria-label={t('landing.savedDataset')}>
+          <h2 className="landing__dataset-title">{t('landing.savedDataset')}</h2>
           <DatasetBar dataset={dataset} baseName="trampovision" />
           <EvaluationReport
             records={dataset.records}

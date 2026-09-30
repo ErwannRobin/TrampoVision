@@ -1,0 +1,55 @@
+import type { Translation } from '..';
+import type { names as en } from '../en/names';
+
+export const names: Translation<typeof en> = {
+  'list.separator': '、',
+
+  'pos.straight': '伸身',
+  'pos.tuck': '抱え込み',
+  'pos.pike': '屈伸',
+  'pos.straddle': '開脚',
+  'pos.unknown': '不明',
+  'dir.front': '前方',
+  'dir.back': '後方',
+
+  'truth.back': '後方宙返り',
+  'truth.front': '前方宙返り',
+  'truth.unknown': '不明',
+
+  'skill.straight-jump': '伸身ジャンプ',
+  'skill.tuck-jump': '抱え込みジャンプ',
+  'skill.pike-jump': '屈伸ジャンプ',
+  'skill.back': '後方宙返り',
+  'skill.front': '前方宙返り',
+  'skill.fig-element': '技',
+  'skill.somersault-direction-unknown': '宙返り（前方か後方か判別不能）',
+  'skill.unclassified': '未分類',
+
+  'name.somersault.1': '{direction}宙返り',
+  'name.somersault.2': '{direction}2回宙返り',
+  'name.somersault.3': '{direction}3回宙返り',
+  'name.somersault.1.any': '宙返り',
+  'name.somersault.2.any': '2回宙返り',
+  'name.somersault.3.any': '3回宙返り',
+  'name.twist.half': '半ひねり',
+  'name.twist.full': '1回ひねり',
+  'name.twist.many': { one: '{n}回ひねり', other: '{n}回ひねり' },
+  'name.twist.manyHalf': { one: '{n}回半ひねり', other: '{n}回半ひねり' },
+  'name.withTwist': '{name} {twist}',
+  'name.withPosition': '{name}（{position}）',
+  'name.jump.straight': '伸身ジャンプ',
+  'name.jump.tuck': '抱え込みジャンプ',
+  'name.jump.pike': '屈伸ジャンプ',
+  'name.jump.straddle': '開脚ジャンプ',
+  'name.jumpTwist': '{twist}ジャンプ',
+
+  'difficulty.jump': 'ジャンプ',
+  'difficulty.twists': 'ひねり',
+  'difficulty.somersaultsQuarters': '宙返りと4分の1回転',
+  'difficulty.somersaults': '宙返り',
+  'difficulty.quarters': '4分の1回転宙返り',
+  'difficulty.twistingMultiple': 'ひねり付き複数回宙返り',
+  'difficulty.backwardMultiple': '後方の複数回宙返り',
+  'difficulty.pike': '屈伸姿勢',
+  'difficulty.straight': '伸身姿勢',
+};

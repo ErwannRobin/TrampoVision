@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 import { sampleIndexAt } from '../../../analysis/lookup';
 import type { AnalysisResult } from '../../../analysis/types';
+import { t, useLocale } from '../../../i18n';
 import type { SkillAnalysis } from '../../../skills/analyzeSkills';
 import { fmt } from '../../format';
 import { cx } from '../../kit';
 import { usePlayheadTime, type Playhead } from '../../playhead';
-import { frameFigures, JUMP_COLUMNS, jumpFigures, jumpTable, type JumpTableRow } from './figures';
+import { frameFigures, jumpColumns, jumpFigures, jumpTable, type JumpTableRow } from './figures';
 import { Group, Rows } from './parts';
 
 interface Props {
@@ -18,13 +19,12 @@ interface Props {
   onSelect: (jump: number) => void;
 }
 
-const NO_JUMP = 'No jump found: the center of mass never rose 0.3 m above its surroundings.';
-
 /** Numbers at the playhead, for the selected jump, and for every jump of the clip. */
 export function MetricsTab({ result, skills, selected, playhead, onSelect }: Props) {
+  const locale = useLocale();
   const k = Math.min(selected, skills.jumps.length - 1);
   const j = skills.jumps[k];
-  const groups = useMemo(() => (j ? jumpFigures(j.features, result.meta) : []), [j, result.meta]);
+  const groups = useMemo(() => (j ? jumpFigures(j.features, result.meta) : []), [j, result.meta, locale]); // oxlint-disable-line react-hooks/exhaustive-deps
   const table = useMemo(() => jumpTable(result.jumps.cycles), [result.jumps.cycles]);
 
   return (
@@ -32,7 +32,7 @@ export function MetricsTab({ result, skills, selected, playhead, onSelect }: Pro
       <AtThisFrame result={result} skills={skills} selected={selected} playhead={playhead} />
       {j ? (
         <>
-          <Group title="This jump">
+          <Group title={t('coach.thisJump')}>
             {groups.map((g) => (
               <div key={g.title} className="coach__sub">
                 <h4 className="coach__subheading">{g.title}</h4>
@@ -40,13 +40,13 @@ export function MetricsTab({ result, skills, selected, playhead, onSelect }: Pro
               </div>
             ))}
           </Group>
-          <Group title="All jumps">
+          <Group title={t('coach.allJumps')}>
             <JumpTable rows={table} selected={k} onSelect={onSelect} />
           </Group>
         </>
       ) : (
-        <Group title="Jumps">
-          <p className="coach__empty">{NO_JUMP}</p>
+        <Group title={t('coach.jumps')}>
+          <p className="coach__empty">{t('coach.noJump')}</p>
         </Group>
       )}
     </>
@@ -60,15 +60,15 @@ function AtThisFrame({ result, skills, selected, playhead }: Omit<Props, 'onSele
   const { inJump, blocks } = frameFigures(result, skills, selected, i);
   return (
     <Group
-      title="At this frame"
+      title={t('coach.atFrame')}
       meta={
         <>
-          <span className="num">Sample {i + 1}</span>
+          <span className="num">{t('coach.sample', { n: i + 1 })}</span>
           <span className="num">{fmt(result.time[i], 3)} s</span>
         </>
       }
     >
-      {!inJump && skills.jumps.length > 0 && <p className="coach__quiet">The playhead is outside this jump.</p>}
+      {!inJump && skills.jumps.length > 0 && <p className="coach__quiet">{t('coach.outsideJump')}</p>}
       {blocks.map((rows, n) => (
         <Rows key={n} rows={rows} />
       ))}
@@ -94,7 +94,7 @@ function JumpTable({
               <th scope="col" className="coach__th coach__th--lead">
                 #
               </th>
-              {JUMP_COLUMNS.map((c) => (
+              {jumpColumns().map((c) => (
                 <th key={c.label} scope="col" className="coach__th" title={c.title}>
                   {c.label}
                   {c.unit && <span className="coach__thu num">{c.unit}</span>}
@@ -108,14 +108,14 @@ function JumpTable({
                 key={r.index}
                 className={cx('coach__tr', r.index === selected && 'coach__tr--on')}
                 aria-current={r.index === selected ? 'true' : undefined}
-                title="Go to the takeoff"
+                title={t('coach.goTakeoff')}
                 onClick={() => onSelect(r.index)}
               >
                 <td className="coach__td coach__td--lead">
                   <button
                     type="button"
                     className="coach__go"
-                    aria-label={`Go to the takeoff of jump ${r.number}${r.complete ? '' : ', cut off by the clip'}`}
+                    aria-label={t(r.complete ? 'coach.goTakeoffOf' : 'coach.goTakeoffOfCut', { n: r.number })}
                   >
                     <span className="num">{r.number}</span>
                     {!r.complete && <span aria-hidden="true">*</span>}
@@ -131,7 +131,7 @@ function JumpTable({
           </tbody>
         </table>
       </div>
-      {rows.some((r) => !r.complete) && <p className="coach__foot">* Cut off at the start or end of the clip.</p>}
+      {rows.some((r) => !r.complete) && <p className="coach__foot">{t('coach.cutOffFoot')}</p>}
     </>
   );
 }

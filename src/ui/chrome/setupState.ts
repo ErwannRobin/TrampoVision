@@ -1,3 +1,5 @@
+import { t } from '../../i18n/core';
+
 export type Busy = 'idle' | 'loading' | 'analyzing';
 
 export interface SetupInputs {
@@ -31,11 +33,9 @@ export function setupState({ busy, hasVideo, hasResult }: SetupInputs): SetupSta
   if (analyzing) return { ...base, action: 'cancel', actionDisabled: false, hint: null };
 
   const action = hasResult ? 'again' : 'analyze';
-  if (busy === 'loading') return { ...base, action, actionDisabled: true, hint: 'The video is loading.' };
+  if (busy === 'loading') return { ...base, action, actionDisabled: true, hint: t('setup.hintLoading') };
   if (!hasVideo) {
-    const hint = hasResult
-      ? 'Open the video that goes with this analysis to run it again.'
-      : 'Choose a video to analyze.';
+    const hint = hasResult ? t('setup.hintOpenVideo') : t('setup.hintChoose');
     return { ...base, action, actionDisabled: true, hint };
   }
   return { ...base, action, actionDisabled: false, hint: null };

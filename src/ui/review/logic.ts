@@ -1,7 +1,7 @@
 import type { JumpCycle } from '../../analysis/jumpCycles';
 import type { Metrics } from '../../dataset/metrics';
 import type { JumpRecord } from '../../dataset/types';
-import { plural } from '../format';
+import { t, tp } from '../../i18n/core';
 
 /**
  * Where "Next unlabeled" goes: the first jump after `from` without a label, wrapping around the clip. It is `from`
@@ -25,9 +25,9 @@ export function jumpPlayRange(
 
 /** The line under the label buttons: why they cannot be used yet, what to do, or that the label is stored. */
 export function labelStatus(state: { ready: boolean; labeled: boolean; saved: boolean }): string {
-  if (!state.ready) return 'Reading the video id. Labels can be saved in a moment.';
-  if (state.labeled) return state.saved ? 'Saved in this browser.' : '';
-  return 'Watch the jump, then choose what it really was.';
+  if (!state.ready) return t('review.status.reading');
+  if (state.labeled) return state.saved ? t('review.status.saved') : '';
+  return t('review.status.choose');
 }
 
 /** Tint of a confusion matrix cell (share of full color). Capped so the count stays readable on it in both themes. */
@@ -97,35 +97,31 @@ export function summarizeDataset(records: readonly Pick<JumpRecord, 'videoId' | 
 
 /** The counts shown next to the closed "Dataset on this computer" row. */
 export function datasetMeta({ jumps, labeled }: Pick<DatasetSummary, 'jumps' | 'labeled'>): string {
-  return jumps === 0 ? 'No saved jumps' : `${jumps} ${plural(jumps, 'jump')}, ${labeled} labeled`;
+  return jumps === 0 ? t('dataset.none') : t('dataset.meta', { jumps: tp('count.jumps', jumps), labeled });
 }
 
 /** What is in the scope of the report: the saved jumps, and how many carry which kind of label. */
 export function describeCounts(c: Metrics['counts']): string {
-  return `${c.records} saved ${plural(c.records, 'jump')}, ${c.labeled} labeled (${c.known} with one of the five skills, ${c.unknown} Unknown), ${c.unlabeled} unlabeled.`;
+  return t('report.counts', {
+    saved: tp('report.savedJumps', c.records),
+    labeled: c.labeled,
+    known: c.known,
+    unknown: c.unknown,
+    unlabeled: c.unlabeled,
+  });
 }
 
 /** Why the numbers of the report should not be over-read. */
 export function reportCaveats(evaluated: number, noExample: readonly string[], configs: number): string[] {
   const out: string[] = [];
-  if (evaluated < 30) {
-    out.push(
-      `Only ${evaluated} ${plural(evaluated, 'jump')}: with so few, the true accuracy can be far from the number above (see the interval). Label more jumps, of every skill.`,
-    );
-  }
-  if (noExample.length > 0) out.push(`No example yet of: ${noExample.join(', ')}. Those rows have no recall.`);
-  if (configs > 1) {
-    out.push(
-      `These predictions were made with ${configs} different threshold sets. Use “Update predictions” in the Review tab before comparing them.`,
-    );
-  }
-  out.push(
-    'Not classified and “somersault, direction unknown” count as wrong here, because the classifier did not answer. If you change the thresholds while looking at these jumps, the accuracy becomes training accuracy: it will look better than it is.',
-  );
+  if (evaluated < 30) out.push(tp('report.caveat.few', evaluated));
+  if (noExample.length > 0) out.push(t('report.caveat.noExample', { classes: noExample.join(t('list.separator')) }));
+  if (configs > 1) out.push(t('report.caveat.configs', { n: configs }));
+  out.push(t('report.caveat.notClassified'));
   return out;
 }
 
 /** "3 checks differ", "1 check differs". */
 export function checkCount(differing: number): string {
-  return `${differing} ${plural(differing, 'check')} ${differing === 1 ? 'differs' : 'differ'}`;
+  return tp('fail.checkCount', differing);
 }

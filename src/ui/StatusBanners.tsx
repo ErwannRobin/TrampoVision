@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { t } from '../i18n';
 import { Banner } from './kit';
 import type { Status } from './types';
 
@@ -41,7 +42,7 @@ export function StatusBanners({
       {status.kind === 'error' && (
         <Banner
           tone={warning ? 'warning' : 'error'}
-          title={warning ? 'Worth checking' : 'Something went wrong'}
+          title={warning ? t('status.warning') : t('status.error')}
           onDismiss={onDismissStatus}
         >
           {status.message}
@@ -53,7 +54,7 @@ export function StatusBanners({
         </Banner>
       )}
       {exportError && (
-        <Banner tone="error" title="Export failed" onDismiss={onDismissExportError}>
+        <Banner tone="error" title={t('status.exportFailed')} onDismiss={onDismissExportError}>
           {exportError}
         </Banner>
       )}

@@ -1,18 +1,20 @@
+import { lazyText } from '../i18n/core';
 import type { SkillId } from '../skills/types';
 import { CLASS_LABELS, TRUTH_LABELS, type ClassLabel, type JumpRecord, type TruthLabel } from './types';
 
 /** The classifier's answer in the label space of the annotator, plus two ways of not answering. */
 export const PREDICTED_COLUMNS = [...CLASS_LABELS, 'somersault', 'none'] as const;
 export type PredictedClass = (typeof PREDICTED_COLUMNS)[number];
-export const PREDICTED_TEXT: Record<PredictedClass, string> = {
-  straight: 'Straight',
-  tuck: 'Tuck',
-  pike: 'Pike',
-  back: 'Back',
-  front: 'Front',
-  somersault: 'Somersault, direction unknown',
-  none: 'Not classified',
-};
+/** What each answer is called, in the language in use. */
+export const PREDICTED_TEXT: Record<PredictedClass, string> = lazyText({
+  straight: 'pos.straight',
+  tuck: 'pos.tuck',
+  pike: 'pos.pike',
+  back: 'truth.back',
+  front: 'truth.front',
+  somersault: 'pred.somersault',
+  none: 'tier.none',
+});
 
 export function predictedClass(skill: SkillId): PredictedClass {
   switch (skill) {

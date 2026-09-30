@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { t } from '../i18n';
 import { demoStraddleJump } from '../pose3d/demoJump';
 import { drawPose3D, type View } from '../pose3d/draw';
 import { useElementSize } from './hooks';
@@ -68,7 +69,7 @@ export function DemoSkeleton() {
         className="demo3d__canvas"
         style={{ width: size.width, height: size.height }}
         role="img"
-        aria-label="A 3D skeleton in a straddle jump. Drag to turn it."
+        aria-label={t('demo.skeleton')}
         onPointerDown={(e) => {
           drag.current = { x: e.clientX, y: e.clientY };
           e.currentTarget.setPointerCapture(e.pointerId);

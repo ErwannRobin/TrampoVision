@@ -1,4 +1,6 @@
+import { formatDecimal, formatNumber, formatPercent, lower, t, tp } from '../i18n/core';
 import type { SkillAnalysis } from './analyzeSkills';
+import { positionWord } from './classifier';
 import type { CheckStatus, ElementCandidate, FailureKind, SkillPrediction } from './types';
 
 /**
@@ -6,7 +8,7 @@ import type { CheckStatus, ElementCandidate, FailureKind, SkillPrediction } from
  * marks and the alternatives. Pure formatting of what the classifier returned; it decides nothing.
  */
 
-const pct = (v: number) => `${Math.round(Math.min(Math.max(v, 0), 1) * 100)}%`;
+const pct = (v: number) => formatPercent(Math.min(Math.max(v, 0), 1));
 export const CHECK_MARK: Record<CheckStatus, string> = { match: '✓', weak: '~', mismatch: '✗', unmeasured: '?' };
 
 export interface ClassificationDebug {
@@ -32,10 +34,14 @@ export function movementText(p: SkillPrediction): string {
   const m = p.movement;
   if (!m) return '–';
   const parts = [
-    m.somersaults === 0 ? 'no somersault' : `${m.direction ?? 'front or back'}`,
-    m.somersaults === 0 ? null : `${m.somersaults} somersault${m.somersaults > 1 ? 's' : ''}`,
-    m.twists === 0 ? 'no twist' : `${m.twists} twist${m.twists === 1 ? '' : 's'}`,
-    m.position,
+    m.somersaults === 0
+      ? t('label.noSomersault')
+      : m.direction
+        ? lower(t(`dir.${m.direction}`))
+        : t('label.directionOrBoth'),
+    m.somersaults === 0 ? null : tp('label.somersaults', m.somersaults, { n: formatDecimal(m.somersaults) }),
+    m.twists === 0 ? t('label.noTwist') : tp('label.twists', m.twists, { n: formatDecimal(m.twists) }),
+    positionWord(m.position),
   ];
   return parts.filter(Boolean).join(' / ');
 }
@@ -46,8 +52,12 @@ function evidenceOf(c: ElementCandidate) {
     status: k.status,
     text:
       k.status === 'unmeasured'
-        ? `${k.criterion}: not measured (expected ${k.expected})`
-        : `${k.criterion}: ${k.observed}, ${k.status === 'match' ? 'expected' : 'needs'} ${k.expected}`,
+        ? t('debug.notMeasured', { criterion: k.criterion, expected: k.expected })
+        : t(k.status === 'match' ? 'debug.observedMatch' : 'debug.observedNeeds', {
+            criterion: k.criterion,
+            observed: k.observed,
+            expected: k.expected,
+          }),
   }));
 }
 
@@ -57,7 +67,7 @@ export function describeClassification(p: SkillPrediction): ClassificationDebug 
   const named = p.skill !== 'unclassified';
   const top = cands[0];
   return {
-    predicted: named ? p.label : 'Unclassified',
+    predicted: named ? p.label : t('skill.unclassified'),
     named,
     confidence: p.confidence,
     movement: named ? movementText(p) : '–',
@@ -78,34 +88,44 @@ export function formatClassificationDebug(p: SkillPrediction): string {
   const d = describeClassification(p);
   if (!d) return `Predicted:\n${p.label}\n\n${p.summary}`;
   const lines = [
-    `Predicted:`,
+    t('debug.predicted'),
     d.predicted,
     '',
-    `Confidence:`,
-    `${pct(d.confidence)}${d.certainty === 'tentative' ? ' (tentative guess)' : ''}`,
+    t('debug.confidence'),
+    `${pct(d.confidence)}${d.certainty === 'tentative' ? t('debug.tentative') : ''}`,
     '',
   ];
-  if (d.named) lines.push('Movement:', d.movement, '');
-  else if (d.closest) lines.push('Closest element:', d.closest, '');
-  lines.push('Evidence:', ...d.evidence.map((e) => `${e.mark} ${e.text}`), '');
+  if (d.named) lines.push(t('debug.movement'), d.movement, '');
+  else if (d.closest) lines.push(t('debug.closest'), d.closest, '');
+  lines.push(t('debug.evidence'), ...d.evidence.map((e) => `${e.mark} ${e.text}`), '');
   if (d.trajectory.length)
     lines.push(
-      `Trajectory match: ${d.similarity === null ? '–' : pct(d.similarity)}`,
+      t('debug.trajectory', { sim: d.similarity === null ? '–' : pct(d.similarity) }),
       ...d.trajectory.map(
-        (t) => `- ${t.label}: ${t.distance === null ? '–' : `${t.distance.toFixed(1)} tolerances off`}`,
+        (c) => `- ${c.label}: ${c.distance === null ? '–' : t('ev.tolerances', { d: formatNumber(c.distance, 1) })}`,
       ),
       '',
     );
-  if (d.failure) lines.push('Why not named:', d.failure, '');
+  if (d.failure) lines.push(t('debug.why'), d.failure, '');
   if (d.alternatives.length)
     lines.push(
-      'Alternatives:',
-      ...d.alternatives.map(
-        (a) => `${a.name} — ${pct(a.posterior)}${a.similarity === null ? '' : ` (trajectory ${pct(a.similarity)})`}`,
+      t('debug.alternatives'),
+      ...d.alternatives.map((a) =>
+        a.similarity === null
+          ? t('debug.alternative', { name: a.name, conf: pct(a.posterior) })
+          : t('debug.alternativeSim', { name: a.name, conf: pct(a.posterior), sim: pct(a.similarity) }),
       ),
     );
   if (p.evidence.length)
-    lines.push('', 'Measurements:', ...p.evidence.map((e) => `- ${e.label}: ${e.text}${e.note ? ` (${e.note})` : ''}`));
+    lines.push(
+      '',
+      t('debug.measurements'),
+      ...p.evidence.map((e) =>
+        e.note
+          ? t('debug.measurementNote', { label: e.label, text: e.text, note: e.note })
+          : t('debug.measurement', { label: e.label, text: e.text }),
+      ),
+    );
   return lines.join('\n').trimEnd();
 }
 
@@ -143,7 +163,7 @@ export function diagnoseUnclassified(skills: Pick<SkillAnalysis, 'jumps'>): Uncl
       criterion: p.failure.criterion,
       message: p.failure.message,
       closest: p.failure.closest?.name ?? null,
-      distances: p.failure.distances.map((d) => `${d.text} (fit ${pct(d.match)})`),
+      distances: p.failure.distances.map((d) => t('debug.fit', { text: d.text, fit: pct(d.match) })),
       ifResolved: p.failure.ifResolved,
       top: (p.candidates ?? []).slice(0, 3).map((c) => ({ name: c.name, posterior: c.posterior })),
     });

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { AnalysisResult } from '../../analysis/types';
+import { t, useLocale } from '../../i18n';
 import type { SkillAnalysis } from '../../skills/analyzeSkills';
 import { compareJumps, jumpHeadline } from '../insights';
 import { Button } from '../kit';
@@ -42,10 +43,11 @@ export function AthleteInsights({
   onShowCoach,
   notes,
 }: AthleteInsightsProps) {
+  const locale = useLocale();
   const total = skills.jumps.length;
   const index = Math.min(Math.max(selected, 0), Math.max(total - 1, 0));
-  const headline = useMemo(() => jumpHeadline(skills, result, index), [skills, result, index]);
-  const rows = useMemo(() => compareJumps(skills), [skills]);
+  const headline = useMemo(() => jumpHeadline(skills, result, index), [skills, result, index, locale]); // oxlint-disable-line react-hooks/exhaustive-deps
+  const rows = useMemo(() => compareJumps(skills), [skills, locale]); // oxlint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="ins">
@@ -69,12 +71,9 @@ export function AthleteInsights({
       {rows.length > 1 && <JumpList rows={rows} selected={index} onSelect={onSelect} />}
       <section className="ins-section">
         <Button variant="ghost" size="sm" className="ins-coach" onClick={onShowCoach}>
-          Show technical details
+          {t('ins.showTechnical')}
         </Button>
-        <p className="ins-quiet">
-          The coach's view adds the evidence behind each skill, every measurement, the twist analysis and all the
-          charts.
-        </p>
+        <p className="ins-quiet">{t('ins.coachText')}</p>
       </section>
     </div>
   );

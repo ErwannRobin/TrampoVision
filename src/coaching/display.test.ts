@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { computeAnalysis } from '../analysis/computeAnalysis';
 import { analyzeSkills } from '../skills/analyzeSkills';
 import { mannequinRoutine } from '../skills/testMannequin';
-import { OTHER_LABEL, withCalls } from './display';
+import { otherLabel, withCalls } from './display';
 import { buildSession } from './session';
 
 const { track } = mannequinRoutine({
@@ -56,6 +56,9 @@ describe('the skills as they are shown', () => {
       twist: null,
       labels: [null, { elementId: null, other: true, deduction: null }, null],
     });
-    expect(withCalls(skills, session).jumps[1].prediction).toMatchObject({ label: OTHER_LABEL, skill: 'unclassified' });
+    expect(withCalls(skills, session).jumps[1].prediction).toMatchObject({
+      label: otherLabel(),
+      skill: 'unclassified',
+    });
   });
 });

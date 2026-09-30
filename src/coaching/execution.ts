@@ -1,4 +1,5 @@
 import { median } from '../analysis/signal';
+import { t, tp } from '../i18n/core';
 import type { Movement } from '../skills/fig/elements';
 import { SEQUENCE_COLUMNS } from '../skills/jumpFeatures';
 import type { JumpFeatures, JumpSequence, TwistContext } from '../skills/types';
@@ -73,12 +74,8 @@ const tenths = (v: number) => Math.round(v * 10) / 10;
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 const deg = (rad: number) => (rad * 180) / Math.PI;
 
-const UNCHECKED_ALWAYS: Unchecked[] = [
-  {
-    id: 'feet-knees-toes',
-    label: 'Feet and knees together, pointed toes',
-    why: 'Needs a view from the front or the back.',
-  },
+const uncheckedAlways = (): Unchecked[] => [
+  { id: 'feet-knees-toes', label: t('exec.unchecked.feet.label'), why: t('exec.unchecked.feet.why') },
 ];
 
 /** The hour on the clock (1 to 12) of a position in the last somersault, as the judges say it: 12 o'clock is upside down at the top. */
@@ -86,9 +83,9 @@ export function clockHour(g: number): number {
   const hour = Math.round((6 + 12 * g + 12 * 4) % 12);
   return hour === 0 ? 12 : hour;
 }
-export const clockText = (g: number): string => `${clockHour(g)} o'clock`;
+export const clockText = (g: number): string => tp('exec.clock', clockHour(g), { hour: clockHour(g) });
 
-const none = (reason: string, unchecked: Unchecked[] = UNCHECKED_ALWAYS): Execution => ({
+const none = (reason: string, unchecked: Unchecked[] = uncheckedAlways()): Execution => ({
   checked: false,
   reason,
   deduction: 0,
@@ -116,16 +113,15 @@ function angleAt(ax: number, ay: number, bx: number, by: number, cx: number, cy:
 export function executionOf(input: ExecutionInput): Execution {
   const cfg = input.config ?? DEFAULT_EXECUTION_CONFIG;
   const { sequence, features, movement } = input;
-  if (!features.complete) return none('The skill is cut off by the clip, so its shape cannot be judged.');
-  if (!sequence) return none('The pose was not tracked well enough to measure this skill.');
+  if (!features.complete) return none(t('exec.none.cutOff'));
+  if (!sequence) return none(t('exec.none.noSequence'));
   const rows = sequence.data;
   const n = rows.length;
   const N = Math.round(movement.somersaults);
   const halfTwists = Math.round(movement.twists * 2);
   const position = movement.position;
-  const unchecked = [...UNCHECKED_ALWAYS];
-  if (clamp01(features.quality.pose) < cfg.minQuality)
-    return none('The athlete was hard to see, so too little of the pose was measured to judge this skill.', unchecked);
+  const unchecked = uncheckedAlways();
+  if (clamp01(features.quality.pose) < cfg.minQuality) return none(t('exec.none.hardToSee'), unchecked);
 
   const u = rows.map((r) => r[COL.u]);
   const hip = rows.map((r) => r[COL.hip]);
@@ -146,7 +142,7 @@ export function executionOf(input: ExecutionInput): Execution {
     const total = Math.abs(last);
     if (total >= cfg.minRotationShare * N && total <= cfg.maxRotationShare * N) {
       const sign = Math.sign(last);
-      g = turns.map((t) => N * ((sign * t) / total) - (N - 1));
+      g = turns.map((turn) => N * ((sign * turn) / total) - (N - 1));
     }
   }
 
@@ -158,8 +154,7 @@ export function executionOf(input: ExecutionInput): Execution {
     const before = g ? g[k] <= CLOCK.three : u[k] <= (N >= 1 ? 0.75 : cfg.jumpEndU);
     if (before) judged.push(k);
   }
-  if (judged.length < cfg.minSamples)
-    return none('Too little of the pose was measured to judge this skill.', unchecked);
+  if (judged.length < cfg.minSamples) return none(t('exec.none.tooLittle'), unchecked);
   const quality = clamp01(features.quality.pose) * Math.min(1, judged.length / (0.5 * n));
 
   const items: Deduction[] = [];
@@ -172,9 +167,12 @@ export function executionOf(input: ExecutionInput): Execution {
       const value = k < cfg.kneeBentDeg ? 0.2 : 0.1;
       items.push({
         id: 'knees',
-        label: 'Bent knees',
+        label: t('exec.knees.label'),
         value,
-        detail: `Knees at ${Math.round(k)}° in the ${position === 'pike' ? 'pike' : 'layout'} (straight is ${cfg.kneeStraightDeg}° or more).`,
+        detail: t(position === 'pike' ? 'exec.knees.detailPike' : 'exec.knees.detailLayout', {
+          deg: Math.round(k),
+          limit: cfg.kneeStraightDeg,
+        }),
         measure: { name: 'knee angle', value: k, limit: cfg.kneeStraightDeg, unit: 'deg' },
         rule: '20.2.1.2',
       });
@@ -188,9 +186,9 @@ export function executionOf(input: ExecutionInput): Execution {
       const value = h < cfg.layoutHipDeg - cfg.bodyLineDeepMarginDeg ? 0.2 : 0.1;
       items.push({
         id: 'body-line',
-        label: 'Body line',
+        label: t('exec.bodyLine.label'),
         value,
-        detail: `Hips at ${Math.round(h)}° in the layout (open is ${cfg.layoutHipDeg}° or more).`,
+        detail: t('exec.bodyLine.detail', { deg: Math.round(h), limit: cfg.layoutHipDeg }),
         measure: { name: 'hip angle', value: h, limit: cfg.layoutHipDeg, unit: 'deg' },
         rule: '20.2.1.5',
       });
@@ -202,10 +200,8 @@ export function executionOf(input: ExecutionInput): Execution {
     if (!g) {
       unchecked.push({
         id: 'opening',
-        label: 'Opening',
-        why: rotationSure
-          ? 'The measured rotation does not match the somersaults of this skill, so the body cannot be placed on the clock.'
-          : 'The rotation was not tracked reliably (the pose may have flipped), so the body cannot be placed on the clock.',
+        label: t('exec.opening.label'),
+        why: t(rotationSure ? 'exec.opening.whyNoClock' : 'exec.opening.whyFlipped'),
       });
     } else {
       let fold = -1;
@@ -213,8 +209,8 @@ export function executionOf(input: ExecutionInput): Execution {
       if (hip[fold] > cfg.foldedHipDeg) {
         unchecked.push({
           id: 'opening',
-          label: 'Opening',
-          why: 'The hips never folded clearly, so there is no opening to time.',
+          label: t('exec.opening.label'),
+          why: t('exec.opening.whyNoFold'),
         });
       } else {
         // The first time after the deepest fold that the hips are open again, placed by interpolation between two samples.
@@ -227,8 +223,8 @@ export function executionOf(input: ExecutionInput): Execution {
             let prev = k - 1;
             while (prev > fold && !Number.isFinite(hip[prev])) prev--;
             const span = hip[k] - hip[prev];
-            const t = span > 0 ? (cfg.openHipDeg - hip[prev]) / span : 1;
-            open = g[prev] + t * (g[k] - g[prev]);
+            const frac = span > 0 ? (cfg.openHipDeg - hip[prev]) / span : 1;
+            open = g[prev] + frac * (g[k] - g[prev]);
             openAfter = k;
             break;
           }
@@ -237,9 +233,9 @@ export function executionOf(input: ExecutionInput): Execution {
         if (open === null || open > CLOCK.three + tol) {
           items.push({
             id: 'opening',
-            label: 'No opening',
+            label: t('exec.noOpening.label'),
             value: 0.3,
-            detail: `The body was not straight before 3 o'clock (hips at ${cfg.openHipDeg}° or more).`,
+            detail: t('exec.noOpening.detail', { deg: cfg.openHipDeg }),
             measure: { name: 'opening', value: null, limit: CLOCK.one, unit: 'clock' },
             rule: '20.2.1.3',
           });
@@ -247,9 +243,9 @@ export function executionOf(input: ExecutionInput): Execution {
           if (open > CLOCK.one + tol) {
             items.push({
               id: 'opening',
-              label: 'Late opening',
+              label: t('exec.lateOpening.label'),
               value: open > CLOCK.two + tol ? 0.2 : 0.1,
-              detail: `Straight between ${open > CLOCK.two + tol ? '2 and 3' : '1 and 2'} o'clock (on time is by 1 o'clock).`,
+              detail: t(open > CLOCK.two + tol ? 'exec.lateOpening.detail23' : 'exec.lateOpening.detail12'),
               measure: { name: 'opening', value: open, limit: CLOCK.one, unit: 'clock' },
               rule: '20.2.1.3',
             });
@@ -260,9 +256,9 @@ export function executionOf(input: ExecutionInput): Execution {
             if (lowest < cfg.pikeDownMildDeg) {
               items.push({
                 id: 'pike-down',
-                label: 'Piking down',
+                label: t('exec.pikeDown.label'),
                 value: lowest < cfg.pikeDownDeepDeg ? 0.2 : 0.1,
-                detail: `The hips folded again to ${Math.round(lowest)}° after opening (keep the body straight until 3 o'clock).`,
+                detail: t('exec.pikeDown.detail', { deg: Math.round(lowest) }),
                 measure: { name: 'hip angle after opening', value: lowest, limit: cfg.pikeDownMildDeg, unit: 'deg' },
                 rule: '20.2.1.5',
               });
@@ -304,11 +300,11 @@ export function executionOf(input: ExecutionInput): Execution {
       if (away || bent)
         items.push({
           id: 'arms',
-          label: 'Arms',
+          label: t('exec.arms.label'),
           value: 0.1,
           detail: away
-            ? `Arms ${Math.round(a)}° away from the body (keep them within ${limit - cfg.armMarginDeg}°).`
-            : `Elbows bent to ${Math.round(e)}° (keep the arms straight in a skill of this twist).`,
+            ? t('exec.arms.detailAway', { deg: Math.round(a), limit: limit - cfg.armMarginDeg })
+            : t('exec.arms.detailBent', { deg: Math.round(e) }),
           measure: away
             ? { name: 'arm angle', value: a, limit: limit - cfg.armMarginDeg, unit: 'deg' }
             : { name: 'elbow angle', value: e, limit: cfg.elbowFlexDeg, unit: 'deg' },
@@ -327,9 +323,9 @@ export function executionOf(input: ExecutionInput): Execution {
       if (total >= 270 && done >= 0 && Number.isFinite(g[done]) && g[done] >= CLOCK.three - cfg.clockTolerance) {
         items.push({
           id: 'twist-end',
-          label: 'Twist finishes late',
+          label: t('exec.twistEnd.label'),
           value: 0.3,
-          detail: `The last 90° of the twist come at ${clockText(g[done])} or later (it should be done by 3 o'clock).`,
+          detail: t('exec.twistEnd.detail', { clock: clockText(g[done]) }),
           measure: { name: 'twist finish', value: g[done], limit: CLOCK.three, unit: 'clock' },
           rule: '20.2.1.4',
         });
@@ -337,8 +333,8 @@ export function executionOf(input: ExecutionInput): Execution {
     } else {
       unchecked.push({
         id: 'twist-end',
-        label: 'End of the twist',
-        why: 'The 3D twist is experimental and was not reliable here.',
+        label: t('exec.twistEnd.uncheckedLabel'),
+        why: t('exec.twistEnd.uncheckedWhy'),
       });
     }
   }

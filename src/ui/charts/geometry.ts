@@ -1,3 +1,4 @@
+import { formatDecimal } from '../../i18n/core';
 import type { ChartGuide, ChartSeries } from './types';
 
 /** Pure geometry of the charts: ticks, ranges, scales and runs of samples. No DOM, so it can be tested. */
@@ -156,9 +157,9 @@ export function makePlot(
   };
 }
 
-/** An axis label: plain digits, a real minus sign, no trailing zeros. */
+/** An axis label: plain digits (the decimal mark of the language), a real minus sign, no trailing zeros. */
 export function tickLabel(v: number): string {
-  const s = Number(v.toFixed(2)).toString();
+  const s = formatDecimal(Number(v.toFixed(2)), 2);
   return s.startsWith('-') ? `−${s.slice(1)}` : s;
 }
 

@@ -11,6 +11,11 @@ html {
   text-size-adjust: 100%;
 }
 
+/* Japanese has no spaces between words: break between phrases instead of anywhere (where a browser does not know this, it breaks as before). */
+html:lang(ja) {
+  word-break: auto-phrase;
+}
+
 body {
   margin: 0;
   min-height: 100dvh;

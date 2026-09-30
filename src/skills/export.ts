@@ -1,6 +1,6 @@
 import type { SkillAnalysis } from './analyzeSkills';
-import { KNOWN_LIMITS } from './classifier';
-import type { JumpFeatures, JumpSkillResult, SkillPrediction } from './types';
+import { knownLimits } from './classifier';
+import type { JumpFeatures, JumpSkillResult, Limitation, SkillPrediction } from './types';
 
 export const SKILLS_SCHEMA = 'trampovision.jump-skills';
 export const SKILLS_VERSION = 1;
@@ -16,7 +16,7 @@ export interface SkillReport {
   source: { fileName: string; fps: number; width: number; height: number };
   classifier: { id: string; version: string };
   config: SkillAnalysis['config'];
-  knownLimits: typeof KNOWN_LIMITS;
+  knownLimits: Limitation[];
   jumps: {
     index: number;
     features: JumpSkillResult['features'];
@@ -34,7 +34,8 @@ export function buildSkillReport(analysis: SkillAnalysis, source: SkillReport['s
     source,
     classifier: analysis.classifier,
     config: analysis.config,
-    knownLimits: KNOWN_LIMITS,
+    // The file is data, not a page: the limits are written in English whatever the language of the interface.
+    knownLimits: knownLimits('en'),
     jumps: analysis.jumps.map((j) => ({
       index: j.cycle.index,
       features: j.features,

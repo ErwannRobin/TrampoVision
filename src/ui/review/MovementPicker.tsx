@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { t } from '../../i18n';
 import {
   EMPTY_MOVEMENT,
   LABEL_POSITIONS,
@@ -78,17 +79,13 @@ export function MovementPicker({ movement, predicted, cannotTell, disabled, onCh
         disabled={disabled || !predicted || confirmed}
         onClick={() => predicted && onChange(predicted)}
       >
-        {confirmed ? 'Prediction confirmed' : 'Confirm prediction'}
+        {confirmed ? t('picker.confirmed') : t('picker.confirm')}
       </Button>
       <p className="review-note">
-        {predicted
-          ? confirmed
-            ? predictedText
-            : `The classifier says: ${predictedText}. Press to say it is right, or change the parts below.`
-          : 'The classifier did not name a movement for this jump. Choose it below.'}
+        {predicted ? (confirmed ? predictedText : t('picker.says', { text: predictedText })) : t('picker.none')}
       </p>
 
-      <Facet label="Position">
+      <Facet label={t('picker.position')}>
         {LABEL_POSITIONS.map((p) => (
           <Chip
             key={p}
@@ -100,7 +97,7 @@ export function MovementPicker({ movement, predicted, cannotTell, disabled, onCh
           </Chip>
         ))}
       </Facet>
-      <Facet label="Somersaults">
+      <Facet label={t('picker.somersaults')}>
         {SOMERSAULT_CHOICES.map((n) => (
           <Chip
             key={n}
@@ -113,7 +110,7 @@ export function MovementPicker({ movement, predicted, cannotTell, disabled, onCh
         ))}
       </Facet>
       {current.somersaults > 0 && (
-        <Facet label="Direction">
+        <Facet label={t('picker.direction')}>
           {(['back', 'front'] as const).map((d) => (
             <Chip
               key={d}
@@ -121,12 +118,12 @@ export function MovementPicker({ movement, predicted, cannotTell, disabled, onCh
               disabled={disabled}
               onClick={() => set({ direction: current.direction === d ? null : d })}
             >
-              {d === 'back' ? 'Back' : 'Front'}
+              {t(`dir.${d}`)}
             </Chip>
           ))}
         </Facet>
       )}
-      <Facet label="Half twists">
+      <Facet label={t('picker.halfTwists')}>
         {Array.from({ length: maxHalfTwists(current.somersaults) + 1 }, (_, n) => (
           <Chip
             key={n}
@@ -144,20 +141,20 @@ export function MovementPicker({ movement, predicted, cannotTell, disabled, onCh
           {movement && !cannotTell ? (
             <>
               <Icon name="check" size={14} strokeWidth={2.2} className="review-hint__ok" />
-              {describeMovement(movement) || 'Choose a position'}
+              {describeMovement(movement) || t('picker.choosePosition')}
             </>
           ) : cannotTell ? (
-            'Marked as impossible to tell.'
+            t('picker.impossible')
           ) : (
-            'Watch the jump, then choose what it really was.'
+            t('review.status.choose')
           )}
         </p>
         <div className="review-actions">
           <Button variant="ghost" size="sm" disabled={disabled || cannotTell} onClick={onUnknown}>
-            Can’t tell
+            {t('picker.cannotTell')}
           </Button>
           <Button variant="ghost" size="sm" disabled={disabled || (!movement && !cannotTell)} onClick={onClear}>
-            Clear
+            {t('common.clear')}
           </Button>
         </div>
       </div>

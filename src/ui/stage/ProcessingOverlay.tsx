@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { t, tx } from '../../i18n';
 import { Button, ProgressRing } from '../kit';
 import type { Status } from '../types';
 import { estimateRemaining, formatRemaining } from './eta';
@@ -14,12 +15,12 @@ export interface ProcessingOverlayProps {
   onCancel: () => void;
 }
 
-const LOADING_TEXT = {
-  downloading: 'Loading the sample video',
-  reading: 'Reading the video',
-  measuring: 'Measuring the frame rate',
-  converting: 'Converting the video for this browser',
-} as const;
+const loadingText = () => ({
+  downloading: t('busy.downloading'),
+  reading: t('busy.reading'),
+  measuring: t('busy.measuring'),
+  converting: t('busy.converting'),
+});
 
 /** Milliseconds since the analysis began, kept across renders so the estimate has something to work from. */
 function useElapsed(active: boolean) {
@@ -44,11 +45,11 @@ export function ProcessingOverlay({ status, ready, fileName, backend, onAnalyze,
     return (
       <div className="busy" role="status">
         <div className="busy__panel">
-          <ProgressRing value={progress} size={56} label={LOADING_TEXT[status.stage]}>
+          <ProgressRing value={progress} size={56} label={loadingText()[status.stage]}>
             {progress !== undefined && <span className="busy__percent num">{Math.round(progress * 100)}%</span>}
           </ProgressRing>
-          <p className="busy__title">{LOADING_TEXT[status.stage]}</p>
-          {converting && <p className="busy__text">Runs on your device and can take a while.</p>}
+          <p className="busy__title">{loadingText()[status.stage]}</p>
+          {converting && <p className="busy__text">{t('busy.convertingText')}</p>}
         </div>
       </div>
     );
@@ -60,16 +61,19 @@ export function ProcessingOverlay({ status, ready, fileName, backend, onAnalyze,
     return (
       <div className="busy" role="status">
         <div className="busy__panel">
-          <ProgressRing value={progress} size={104} stroke={5} label="Analysis progress">
+          <ProgressRing value={progress} size={104} stroke={5} label={t('busy.progress')}>
             <span className="busy__percent busy__percent--big num">{Math.round(progress * 100)}%</span>
           </ProgressRing>
           <p className="busy__title">
-            Analyzing frame <span className="num">{status.done}</span> of <span className="num">{status.total}</span>
+            {tx('busy.analyzing', {
+              done: <span className="num">{status.done}</span>,
+              total: <span className="num">{status.total}</span>,
+            })}
           </p>
           {left !== null && <p className="busy__text">{formatRemaining(left)}</p>}
-          <p className="busy__text">{backend ? `Running on ${backend}` : 'The video stays on your device.'}</p>
+          <p className="busy__text">{backend ? t('busy.runningOn', { backend }) : t('busy.stays')}</p>
           <Button variant="secondary" onClick={onCancel}>
-            Cancel
+            {t('common.cancel')}
           </Button>
         </div>
       </div>
@@ -82,12 +86,12 @@ export function ProcessingOverlay({ status, ready, fileName, backend, onAnalyze,
         <div className="ready__panel">
           <div className="ready__text">
             <p className="ready__name" title={fileName}>
-              {fileName || 'Your video'}
+              {fileName || t('busy.yourVideo')}
             </p>
-            <p className="ready__hint">Ready to analyze. It runs on your device.</p>
+            <p className="ready__hint">{t('busy.ready')}</p>
           </div>
           <Button variant="primary" size="lg" onClick={onAnalyze}>
-            Analyze video
+            {t('setup.analyze')}
           </Button>
         </div>
       </div>

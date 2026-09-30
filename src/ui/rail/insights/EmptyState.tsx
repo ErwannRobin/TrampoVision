@@ -1,3 +1,4 @@
+import { t } from '../../../i18n';
 import { Button } from '../../kit';
 import { DataChecks, Folds } from './WorthKnowing';
 
@@ -11,18 +12,16 @@ export function EmptyState({ notes, onOpenSetup }: Props) {
   return (
     <>
       <section className="ins-empty">
-        <h2 className="ins-empty__title t-brand">No jump found</h2>
-        <p className="ins-summary">
-          The center of mass never rose 0.3 m above its surroundings, so nothing in this clip counts as a jump.
-        </p>
-        <h3 className="ins-h ins-empty__check">Check that</h3>
+        <h2 className="ins-empty__title t-brand">{t('ins.empty.title')}</h2>
+        <p className="ins-summary">{t('ins.empty.text')}</p>
+        <h3 className="ins-h ins-empty__check">{t('ins.empty.check')}</h3>
         <ul className="ins-checks">
-          <li>The whole athlete is in the frame from start to end.</li>
-          <li>The camera is fixed and level, and does not follow the athlete.</li>
-          <li>The athlete height and the trampoline size are right in the settings, because meters come from them.</li>
+          <li>{t('ins.empty.frame')}</li>
+          <li>{t('ins.empty.camera')}</li>
+          <li>{t('ins.empty.settings')}</li>
         </ul>
         <Button icon="sliders" onClick={onOpenSetup}>
-          Open settings
+          {t('ins.openSettings')}
         </Button>
       </section>
       {notes.length > 0 && (

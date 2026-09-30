@@ -1,4 +1,5 @@
 import type { Point } from '../pose/types';
+import { t } from '../i18n/core';
 import { solveLinearSystem } from './signal';
 
 /** Four bed corners, in order around the bed (either direction, any corner first). */
@@ -77,9 +78,23 @@ function diagonalCrossing(c: Quad): Point | null {
   const d2 = { x: s.x - r.x, y: s.y - r.y };
   const den = d1.x * d2.y - d1.y * d2.x;
   if (Math.abs(den) < 1e-9) return null;
-  const t = ((r.x - p.x) * d2.y - (r.y - p.y) * d2.x) / den;
-  return { x: p.x + t * d1.x, y: p.y + t * d1.y };
+  const along = ((r.x - p.x) * d2.y - (r.y - p.y) * d2.x) / den;
+  return { x: p.x + along * d1.x, y: p.y + along * d1.y };
 }
+
+/**
+ * The reasons a marking is refused, as the analysis keeps them (English, in the data). What a person reads is the same reason in the
+ * language in use.
+ */
+const ERROR_KEYS = {
+  'Bed sizes must be positive.': 'calibration.error.sizes',
+  'Invalid corner position.': 'calibration.error.corner',
+  'The four corners must be in order around the bed (no crossing lines).': 'calibration.error.order',
+  'The bed outline is too small: click the corners farther apart.': 'calibration.error.small',
+  'Could not compute the calibration from these corners.': 'calibration.error.compute',
+} as const;
+export const calibrationErrorText = (error: string): string =>
+  error in ERROR_KEYS ? t(ERROR_KEYS[error as keyof typeof ERROR_KEYS]) : error;
 
 /**
  * Builds the calibration model.

@@ -1,10 +1,8 @@
+import { t } from '../../../i18n';
 import { TIER_TEXT, type JumpHeadline } from '../../insights';
 import { Button, ConfidenceMeter, cx } from '../../kit';
 import { Fade } from './Fade';
 import { headlineSize } from './layout';
-
-/** What the confidence bar is. Said in a tooltip and to screen readers instead of a percentage that looks precise. */
-const SCORE_NOTE = 'Heuristic score, not a probability';
 
 interface Props {
   headline: JumpHeadline;
@@ -16,14 +14,14 @@ interface Props {
 export function Answer({ headline: h, total, onPlayJump }: Props) {
   // Best guesses and unclassified jumps are not an answer: the name is set quieter so it does not read as one.
   const named = h.tier === 'high' || h.tier === 'medium';
+  // What the confidence bar is. Said in a tooltip and to screen readers instead of a percentage that looks precise.
+  const scoreNote = t('ins.scoreNote');
   return (
     <section className="ins-answer">
       <div className="ins-answer__top">
-        <p className="ins-count">
-          Jump {h.number} of {total}
-        </p>
-        <Button size="sm" icon="play" title="Play the jump with a little run-up and landing" onClick={onPlayJump}>
-          Play jump
+        <p className="ins-count">{t('ins.jumpOf', { n: h.number, total })}</p>
+        <Button size="sm" icon="play" title={t('ins.playJumpTitle')} onClick={onPlayJump}>
+          {t('ins.playJump')}
         </Button>
       </div>
       <Fade on={h.index}>
@@ -36,12 +34,12 @@ export function Answer({ headline: h, total, onPlayJump }: Props) {
         >
           {h.label}
         </h2>
-        <div className="ins-conf" title={SCORE_NOTE}>
+        <div className="ins-conf" title={scoreNote}>
           <div className="ins-conf__meter">
-            <ConfidenceMeter value={h.confidence} tier={h.tier} label="Skill confidence" />
+            <ConfidenceMeter value={h.confidence} tier={h.tier} label={t('ins.confidence')} />
           </div>
           <span className="ins-conf__text">{TIER_TEXT[h.tier]}</span>
-          <span className="sr-only">. {SCORE_NOTE}.</span>
+          <span className="sr-only">. {scoreNote}.</span>
         </div>
         <p className="ins-summary">{h.summary}</p>
       </Fade>

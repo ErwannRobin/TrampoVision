@@ -1,3 +1,4 @@
+import { t } from '../i18n/core';
 import { createMediaPipeEstimator } from '../pose/MediaPipePoseEstimator';
 import { AthleteTracker } from '../pose/selectAthlete';
 import type { EstimatorOptions, Keypoint, PoseEstimatorFactory, WorldPoint } from '../pose/types';
@@ -33,7 +34,7 @@ export async function extractPoseTrack(url: string, opts: ExtractOptions): Promi
 
 async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): Promise<PoseTrack> {
   const { videoWidth: width, videoHeight: height, duration } = video;
-  if (!width || !height || !Number.isFinite(duration)) throw new Error('Could not read the video dimensions/duration.');
+  if (!width || !height || !Number.isFinite(duration)) throw new Error(t('err.dimensions'));
 
   // Always look for several people: with a single pose the model picks who to follow by itself and can swap to somebody
   // in the foreground. Seeing everyone lets the tracker keep the person it locked on.

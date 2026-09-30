@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import { frameAtTime } from '../../video/frames';
 import type { OverlayOptions } from '../../video/overlay';
 import { timecode } from '../format';
@@ -23,11 +24,11 @@ export interface TransportProps {
   simple?: boolean;
 }
 
-const LAYERS: { key: 'skeleton' | 'com' | 'trail' | 'hud'; label: string; icon: IconName }[] = [
-  { key: 'skeleton', label: 'Skeleton', icon: 'person' },
-  { key: 'com', label: 'Center of mass', icon: 'target' },
-  { key: 'trail', label: 'Trajectory', icon: 'route' },
-  { key: 'hud', label: 'Labels', icon: 'tag' },
+const layers = (): { key: 'skeleton' | 'com' | 'trail' | 'hud'; label: string; icon: IconName }[] => [
+  { key: 'skeleton', label: t('transport.skeleton'), icon: 'person' },
+  { key: 'com', label: t('transport.com'), icon: 'target' },
+  { key: 'trail', label: t('transport.trail'), icon: 'route' },
+  { key: 'hud', label: t('transport.hud'), icon: 'tag' },
 ];
 
 /** The position in the clip, as a video editor shows it. Its own component: it re-renders at frame rate, the buttons do not. */
@@ -40,7 +41,7 @@ function Timecode({ playhead, fps, simple }: { playhead: Playhead; fps: number; 
       <span className="transport__code num">{timecode(time)}</span>
       {total > 0 && !simple && (
         <span className="transport__frame num">
-          Frame {Math.min(frameAtTime(time, fps) + 1, total)} of {total}
+          {t('transport.frame', { n: Math.min(frameAtTime(time, fps) + 1, total), total })}
         </span>
       )}
     </div>
@@ -70,28 +71,28 @@ export function Transport({
           <IconButton
             className="transport__far"
             icon="chevron-left"
-            label="Back 10 frames (Shift + ←)"
+            label={t('transport.back10')}
             disabled={off}
             onClick={() => playhead.step(-10)}
           />
         )}
-        <IconButton icon="step-back" label="Previous frame (←)" disabled={off} onClick={() => playhead.step(-1)} />
+        <IconButton icon="step-back" label={t('transport.prev')} disabled={off} onClick={() => playhead.step(-1)} />
         <IconButton
           className="transport__play"
           icon={playing ? 'pause' : 'play'}
-          label={playing ? 'Pause (Space)' : 'Play (Space)'}
+          label={playing ? t('transport.pause') : t('transport.play')}
           variant="primary"
           size="lg"
           iconSize={20}
           disabled={off}
           onClick={() => playhead.toggle()}
         />
-        <IconButton icon="step-forward" label="Next frame (→)" disabled={off} onClick={() => playhead.step(1)} />
+        <IconButton icon="step-forward" label={t('transport.next')} disabled={off} onClick={() => playhead.step(1)} />
         {!simple && (
           <IconButton
             className="transport__far"
             icon="chevron-right"
-            label="Forward 10 frames (Shift + →)"
+            label={t('transport.forward10')}
             disabled={off}
             onClick={() => playhead.step(10)}
           />
@@ -104,7 +105,7 @@ export function Transport({
         {narrow ? (
           <select
             className="select select--sm select--pill transport__speed"
-            aria-label="Playback speed"
+            aria-label={t('transport.speed')}
             value={String(speed)}
             disabled={off}
             onChange={(e) => onSpeed(Number(e.target.value))}
@@ -117,7 +118,7 @@ export function Transport({
           </select>
         ) : (
           <Segmented<string>
-            ariaLabel="Playback speed"
+            ariaLabel={t('transport.speed')}
             size="sm"
             value={String(speed)}
             onChange={(v) => onSpeed(Number(v))}
@@ -125,8 +126,8 @@ export function Transport({
           />
         )}
         {!simple && (
-          <div className="transport__layers" role="group" aria-label="Layers on the video">
-            {LAYERS.map((l) => (
+          <div className="transport__layers" role="group" aria-label={t('transport.layers')}>
+            {layers().map((l) => (
               <IconButton
                 key={l.key}
                 icon={l.icon}

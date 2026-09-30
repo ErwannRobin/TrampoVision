@@ -2,6 +2,7 @@ import { JUMP_PHASES, type JumpCycle, type JumpPhase } from '../../../analysis/j
 import { JOINT_STATE_NAMES } from '../../../analysis/stabilize';
 import type { AnalysisResult } from '../../../analysis/types';
 import type { SkillAnalysis } from '../../../skills/analyzeSkills';
+import { lazyText, t } from '../../../i18n/core';
 import { POSITIONS, type JumpFeatures, type JumpSkillResult } from '../../../skills/types';
 import { DASH, fmt, pct, signed } from '../../format';
 
@@ -57,17 +58,16 @@ export function deg(v: number | null | undefined, digits = 0): string {
   return text === DASH ? text : `${text}°`;
 }
 
-export const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
-
-export const PHASE_TEXT: Record<JumpPhase, string> = {
-  unknown: 'Unknown',
-  ground: 'On the bed',
-  takeoff: 'Takeoff',
-  ascent: 'Ascent',
-  apex: 'Apex',
-  descent: 'Descent',
-  landing: 'Landing',
-};
+/** What each phase of a jump is called, in the language in use. */
+export const PHASE_TEXT: Record<JumpPhase, string> = lazyText({
+  unknown: 'phase.unknown',
+  ground: 'phase.ground',
+  takeoff: 'phase.takeoff',
+  ascent: 'phase.ascent',
+  apex: 'phase.apex',
+  descent: 'phase.descent',
+  landing: 'phase.landing',
+});
 
 const PHASE_GLYPH: Partial<Record<JumpPhase, Glyph>> = {
   takeoff: 'up',
@@ -78,7 +78,7 @@ const PHASE_GLYPH: Partial<Record<JumpPhase, Glyph>> = {
 };
 
 const heightWord = (reference: AnalysisResult['meta']['heightReference']) =>
-  reference === 'bed' ? 'above bed' : 'above lowest point';
+  reference === 'bed' ? t('row.aboveBed') : t('row.aboveLowest');
 
 export interface FrameFigures {
   /** The playhead is inside the selected jump: the shape and rotation rows only mean something there. */
@@ -105,19 +105,20 @@ export function frameFigures(result: AnalysisResult, skills: SkillAnalysis, sele
 
   const phaseRow: FigureRow = {
     key: 'phase',
-    label: 'Jump phase',
-    figures: [{ value: PHASE_TEXT[phase] }, ...(cycle >= 0 ? [{ value: `Jump ${cycle + 1}`, muted: true }] : [])],
+    label: t('row.phase'),
+    figures: [
+      { value: PHASE_TEXT[phase] },
+      ...(cycle >= 0 ? [{ value: t('row.jumpNumber', { n: cycle + 1 }), muted: true }] : []),
+    ],
   };
   const glyph = PHASE_GLYPH[phase];
   if (glyph) phaseRow.glyph = glyph;
 
   const displacement = row(
     'x',
-    meta.calibrated ? 'Displacement from bed center' : 'Displacement from start',
+    meta.calibrated ? t('row.displacementBed') : t('row.displacementStart'),
     [fig(signed(result.x[i], 2), 'm'), ...(meta.calibrated ? [fig(signed(result.xNorm[i] * 100, 0), '%', true)] : [])],
-    `Along the on-screen horizontal, + is right in the image.${
-      meta.calibrated ? ' The percentage is of the half-size of the bed.' : ''
-    }`,
+    t(meta.calibrated ? 'row.displacementHintBed' : 'row.displacementHint'),
   );
 
   return {
@@ -125,49 +126,43 @@ export function frameFigures(result: AnalysisResult, skills: SkillAnalysis, sele
     blocks: [
       [
         phaseRow,
-        row('position', 'Body position', fig(inside(sentence(POSITIONS[fr.position[i]])))),
-        row('hip', 'Hip angle', fig(inside(fmt(fr.hipAngle[i], 0)), '°')),
-        row('knee', 'Knee angle', fig(inside(fmt(fr.kneeAngle[i], 0)), '°')),
-        row('turns-now', 'Rotation so far', fig(inside(fmt(jumps.turnsSinceTakeoff[i], 2)), 'turns')),
-        row('turns-jump', 'Rotation, whole jump', fig(fmt(jump?.features.rotation.turns, 2), 'turns')),
+        row('position', t('row.bodyPosition'), fig(inside(t(`pos.${POSITIONS[fr.position[i]]}`)))),
+        row('hip', t('row.hip'), fig(inside(fmt(fr.hipAngle[i], 0)), '°')),
+        row('knee', t('row.knee'), fig(inside(fmt(fr.kneeAngle[i], 0)), '°')),
+        row('turns-now', t('row.turnsNow'), fig(inside(fmt(jumps.turnsSinceTakeoff[i], 2)), t('u.turns'))),
+        row('turns-jump', t('row.turnsJump'), fig(fmt(jump?.features.rotation.turns, 2), t('u.turns'))),
       ],
       [
-        row('com', 'Center of mass', fig(com, 'px')),
-        row('height', `Height ${heightWord(meta.heightReference)}`, fig(fmt(result.height[i], 2), 'm')),
-        row('vy', 'Vertical velocity', fig(signed(result.vy[i], 2), 'm/s')),
+        row('com', t('row.com'), fig(com, 'px')),
+        row(
+          'height',
+          t('row.height', { reference: heightWord(meta.heightReference) }),
+          fig(fmt(result.height[i], 2), 'm'),
+        ),
+        row('vy', t('row.vy'), fig(signed(result.vy[i], 2), 'm/s')),
         displacement,
       ],
       [
-        row(
-          'trunk',
-          'Body angle',
-          fig(fmt(result.trunkAngle[i], 1), '°'),
-          'Trunk angle from vertical-up, wrapped to ±180°, + is clockwise.',
-        ),
-        row(
-          'orientation',
-          'Orientation (continuous)',
-          fig(fmt(result.orientation[i], 1), '°'),
-          'The same angle made continuous: it keeps counting past 360°.',
-        ),
-        row('count', 'Rotation count', [
-          fig(fmt(jumps.turnsSinceTakeoff[i], 2), 'turns'),
-          fig(String(jumps.completedRotations[i]), 'done', true),
+        row('trunk', t('row.trunk'), fig(fmt(result.trunkAngle[i], 1), '°'), t('row.trunkHint')),
+        row('orientation', t('row.orientation'), fig(fmt(result.orientation[i], 1), '°'), t('row.orientationHint')),
+        row('count', t('row.count'), [
+          fig(fmt(jumps.turnsSinceTakeoff[i], 2), t('u.turns')),
+          fig(String(jumps.completedRotations[i]), t('u.done'), true),
         ]),
-        row('omega', 'Angular velocity', fig(fmt(result.angularVelocity[i], 0), '°/s')),
+        row('omega', t('row.omega'), fig(fmt(result.angularVelocity[i], 0), '°/s')),
       ],
       [
-        row('confidence', 'Pose confidence', fig(fmt(result.confidence[i] * 100, 0), '%')),
+        row('confidence', t('row.confidence'), fig(fmt(result.confidence[i] * 100, 0), '%')),
         row(
           'joints',
-          'Joints this frame',
+          t('row.joints'),
           [
-            fig(String(measured), 'measured'),
-            fig(String(interpolated), 'interpolated'),
-            fig(String(corrected), 'corrected'),
-            fig(String(missing), 'missing'),
+            fig(String(measured), t('u.measured')),
+            fig(String(interpolated), t('u.interpolated')),
+            fig(String(corrected), t('u.corrected')),
+            fig(String(missing), t('u.missing')),
           ],
-          'Corrected means a glitch was replaced.',
+          t('row.jointsHint'),
         ),
       ],
     ],
@@ -179,102 +174,86 @@ export function jumpFigures(
   feat: JumpFeatures,
   meta: Pick<AnalysisResult['meta'], 'calibrated' | 'heightReference'>,
 ): FigureGroup[] {
-  const { timing: t, trajectory: tr, orientation: o, shape: s, rotation: r, facing, quality } = feat;
+  const { timing: tm, trajectory: tr, orientation: o, shape: s, rotation: r, facing, quality } = feat;
 
   const trajectory = [
-    row('max-height', `Max height ${heightWord(meta.heightReference)}`, fig(fmt(tr.maxHeightM, 2), 'm')),
-    row('rise', 'Height gained', [
-      fig(fmt(tr.riseM, 2), 'm'),
-      ...(tr.riseBodyLengths !== null ? [fig(fmt(tr.riseBodyLengths, 2), 'body lengths', true)] : []),
-    ]),
     row(
-      'drift',
-      'Horizontal displacement',
-      fig(signed(tr.horizontalDisplacementM, 2), 'm'),
-      'Landing minus takeoff position, + is right in the image.',
+      'max-height',
+      t('row.maxHeight', { reference: heightWord(meta.heightReference) }),
+      fig(fmt(tr.maxHeightM, 2), 'm'),
     ),
+    row('rise', t('row.rise'), [
+      fig(fmt(tr.riseM, 2), 'm'),
+      ...(tr.riseBodyLengths !== null ? [fig(fmt(tr.riseBodyLengths, 2), t('u.bodyLengths'), true)] : []),
+    ]),
+    row('drift', t('row.drift'), fig(signed(tr.horizontalDisplacementM, 2), 'm'), t('row.driftHint')),
   ];
   if (meta.calibrated)
     trajectory.push(
-      row(
-        'bed-takeoff',
-        'Bed position at takeoff',
-        fig(signed(tr.takeoffXBed, 2)),
-        'Across the bed: ±1 is the edge, + is right in the image.',
-      ),
-      row('bed-apex', 'Bed position at apex', fig(signed(tr.apexXBed, 2))),
-      row('bed-landing', 'Bed position at landing', fig(signed(tr.landingXBed, 2))),
+      row('bed-takeoff', t('row.bedTakeoff'), fig(signed(tr.takeoffXBed, 2)), t('row.bedTakeoffHint')),
+      row('bed-apex', t('row.bedApex'), fig(signed(tr.apexXBed, 2))),
+      row('bed-landing', t('row.bedLanding'), fig(signed(tr.landingXBed, 2))),
     );
 
-  const facingWord = facing.sign === 0 ? 'Undetermined' : facing.sign > 0 ? 'Right' : 'Left';
+  const facingWord = t(facing.sign === 0 ? 'facing.none' : facing.sign > 0 ? 'facing.right' : 'facing.left');
 
   return [
     {
-      title: 'Timing',
+      title: t('group.timing'),
       rows: [
-        row('flight', 'Flight time', fig(fmt(t.flightTimeS, 2), 's')),
-        row('to-apex', 'Time to apex', fig(fmt(t.timeToApexS, 2), 's')),
+        row('flight', t('row.flight'), fig(fmt(tm.flightTimeS, 2), 's')),
+        row('to-apex', t('row.toApex'), fig(fmt(tm.timeToApexS, 2), 's')),
       ],
     },
-    { title: 'Trajectory', rows: trajectory },
+    { title: t('group.trajectory'), rows: trajectory },
     {
-      title: 'Rotation',
+      title: t('group.rotation'),
       rows: [
-        row('rotation', 'Rotation', [
+        row('rotation', t('row.rotation'), [
           fig(signed(r.totalDeg, 0), '°'),
-          ...(r.totalDeg !== null ? [fig(r.direction, undefined, true)] : []),
+          ...(r.totalDeg !== null ? [fig(t(`turn.${r.direction}`), undefined, true)] : []),
         ]),
-        row('peak-omega', 'Peak angular velocity', fig(fmt(o.peakAngularVelocityDps, 0), '°/s')),
-        row('apex-orientation', 'Orientation at apex', fig(fmt(o.apexDeg, 0), '°')),
+        row('peak-omega', t('row.peakOmega'), fig(fmt(o.peakAngularVelocityDps, 0), '°/s')),
+        row('apex-orientation', t('row.apexOrientation'), fig(fmt(o.apexDeg, 0), '°')),
       ],
     },
     {
-      title: 'Shape',
+      title: t('group.shape'),
       rows: [
-        row('hip', 'Hip angle', [
-          { value: deg(s.hipAngle.min), unit: 'min' },
-          { value: deg(s.hipAngle.atPeak), unit: 'at peak' },
+        row('hip', t('row.hip'), [
+          { value: deg(s.hipAngle.min), unit: t('u.min') },
+          { value: deg(s.hipAngle.atPeak), unit: t('u.atPeak') },
         ]),
-        row('knee', 'Knee angle', [
-          { value: deg(s.kneeAngle.min), unit: 'min' },
-          { value: deg(s.kneeAngle.atPeak), unit: 'at peak' },
+        row('knee', t('row.knee'), [
+          { value: deg(s.kneeAngle.min), unit: t('u.min') },
+          { value: deg(s.kneeAngle.atPeak), unit: t('u.atPeak') },
         ]),
-        row('knee-torso', 'Knees to torso', fig(fmt(s.kneeTorsoDistance.atPeak, 2), 'trunk lengths')),
-        row('compactness', 'Compactness', fig(fmt(s.compactness.atPeak, 2))),
-        row(
-          'legs',
-          'Leg separation',
-          fig(fmt(s.legSeparation.atPeak, 2)),
-          'Ankle distance / leg length. Barely visible from the side.',
-        ),
-        row(
-          'axis',
-          'Shoulder / hip axis',
-          fig(fmt(s.shoulderHipAxis.atPeak, 0), '°'),
-          'Angle between the shoulder line and the hip line. Not reliable in a side view.',
-        ),
+        row('knee-torso', t('row.kneeTorso'), fig(fmt(s.kneeTorsoDistance.atPeak, 2), t('u.trunkLengths'))),
+        row('compactness', t('row.compactness'), fig(fmt(s.compactness.atPeak, 2))),
+        row('legs', t('row.legs'), fig(fmt(s.legSeparation.atPeak, 2)), t('row.legsHint')),
+        row('axis', t('row.axis'), fig(fmt(s.shoulderHipAxis.atPeak, 0), '°'), t('row.axisHint')),
       ],
     },
     {
-      title: 'Quality',
+      title: t('group.quality'),
       rows: [
-        row('rotation-confidence', 'Rotation confidence', fig(pct(r.confidence))),
-        row('facing', 'Facing', [{ value: facingWord }, fig(pct(facing.confidence), undefined, true)]),
-        row('pose-quality', 'Pose quality in flight', fig(pct(quality.pose))),
+        row('rotation-confidence', t('row.rotationConfidence'), fig(pct(r.confidence))),
+        row('facing', t('row.facing'), [{ value: facingWord }, fig(pct(facing.confidence), undefined, true)]),
+        row('pose-quality', t('row.poseQuality'), fig(pct(quality.pose))),
       ],
     },
   ];
 }
 
 /** Columns of the table of all jumps; `cells` of a `JumpTableRow` follow this order. */
-export const JUMP_COLUMNS: { label: string; unit?: string; title: string }[] = [
-  { label: 'Flight', unit: 's', title: 'Time in the air' },
-  { label: 'To apex', unit: 's', title: 'Time from takeoff to apex' },
-  { label: 'Max height', unit: 'm', title: 'Highest point of the center of mass' },
-  { label: 'Takeoff vy', unit: 'm/s', title: 'Vertical speed at takeoff' },
-  { label: 'Δx', unit: 'm', title: 'Horizontal displacement: landing minus takeoff position' },
-  { label: 'Turns', title: 'Body rotation in the air, in turns' },
-  { label: 'Done', title: 'Whole somersaults completed' },
+export const jumpColumns = (): { label: string; unit?: string; title: string }[] => [
+  { label: t('col.flight'), unit: 's', title: t('col.flightTitle') },
+  { label: t('col.toApex'), unit: 's', title: t('col.toApexTitle') },
+  { label: t('col.maxHeight'), unit: 'm', title: t('col.maxHeightTitle') },
+  { label: t('col.takeoffVy'), unit: 'm/s', title: t('col.takeoffVyTitle') },
+  { label: t('col.dx'), unit: 'm', title: t('col.dxTitle') },
+  { label: t('col.turns'), title: t('col.turnsTitle') },
+  { label: t('col.done'), title: t('col.doneTitle') },
 ];
 
 export interface JumpTableRow {
@@ -312,36 +291,31 @@ export function dataQualityRows(result: AnalysisResult): FigureRow[] {
   const meanGravity = gravity.length ? gravity.reduce((s, v) => s + v, 0) / gravity.length : null;
 
   const rows = [
-    row('scale', 'Scale', [
+    row('scale', t('row.scale'), [
       fig(fmt(meta.pixelsPerMeter, 0), 'px/m'),
-      fig(meta.scaleSource === 'trampoline' ? 'from the bed' : 'from athlete height', undefined, true),
+      fig(t(meta.scaleSource === 'trampoline' ? 'row.scaleBed' : 'row.scaleAthlete'), undefined, true),
     ]),
   ];
   if (meta.calibrated)
     rows.push(
       row(
         'scales',
-        'Bed vs. athlete scale',
+        t('row.scales'),
         fig(`${fmt(meta.trampolinePixelsPerMeter, 0)} vs ${fmt(meta.athletePixelsPerMeter, 0)}`, 'px/m'),
       ),
     );
   rows.push(
-    row(
-      'free-fall',
-      'Free-fall check',
-      fig(fmt(meanGravity, 2), 'm/s²'),
-      'Acceleration fitted to the middle of each flight. It should be 9.81 m/s².',
-    ),
-    row('valid', 'Frames with a center of mass', fig(fmt(summary.validFraction * 100, 0), '%')),
-    row('glitches', 'Glitches removed', [
-      fig(String(stats.spikesRejected), 'joint samples'),
-      fig(String(stats.jumpFrames), 'frames'),
+    row('free-fall', t('row.freeFall'), fig(fmt(meanGravity, 2), 'm/s²'), t('row.freeFallHint')),
+    row('valid', t('row.valid'), fig(fmt(summary.validFraction * 100, 0), '%')),
+    row('glitches', t('row.glitches'), [
+      fig(String(stats.spikesRejected), t('u.jointSamples')),
+      fig(String(stats.jumpFrames), t('u.frames')),
     ]),
-    row('filled', 'Joint samples filled in', fig(fmt(((stats.interpolated + stats.corrected) / total) * 100, 1), '%')),
-    row('missing', 'Joint samples missing', fig(fmt((stats.missing / total) * 100, 1), '%')),
-    row('net-rotation', 'Net rotation of the clip', [
+    row('filled', t('row.filled'), fig(fmt(((stats.interpolated + stats.corrected) / total) * 100, 1), '%')),
+    row('missing', t('row.missing'), fig(fmt((stats.missing / total) * 100, 1), '%')),
+    row('net-rotation', t('row.netRotation'), [
       fig(signed(summary.totalRotationDeg, 0), '°'),
-      fig(fmt(summary.totalRotationDeg / 360, 2), 'turns', true),
+      fig(fmt(summary.totalRotationDeg / 360, 2), t('u.turns'), true),
     ]),
   );
   return rows;
@@ -357,10 +331,10 @@ export interface JointAngleRow {
 export function jointAngleRows(result: AnalysisResult, i: number): JointAngleRow[] {
   const j = result.joints;
   const pairs: [string, Float64Array, Float64Array][] = [
-    ['Elbow', j.leftElbow, j.rightElbow],
-    ['Shoulder', j.leftShoulder, j.rightShoulder],
-    ['Hip', j.leftHip, j.rightHip],
-    ['Knee', j.leftKnee, j.rightKnee],
+    [t('joint.elbow'), j.leftElbow, j.rightElbow],
+    [t('joint.shoulder'), j.leftShoulder, j.rightShoulder],
+    [t('joint.hip'), j.leftHip, j.rightHip],
+    [t('joint.knee'), j.leftKnee, j.rightKnee],
   ];
   return pairs.map(([name, left, right]) => ({ name, left: deg(left[i], 1), right: deg(right[i], 1) }));
 }

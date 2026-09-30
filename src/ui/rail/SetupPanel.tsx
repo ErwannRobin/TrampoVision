@@ -1,9 +1,11 @@
 import type { ScaleSource } from '../../analysis/types';
 import type { ModelVariant, Point } from '../../pose/types';
+import { LANGUAGE_NAMES, LOCALES, setLocale, t, useLocale } from '../../i18n';
 import { setupState } from '../chrome/setupState';
 import { Button, Field, Icon, NumberField, Segmented, SelectField, Switch } from '../kit';
 import { syncStatusText } from '../../sync/reviewSync';
 import type { SyncState } from '../../sync/useReviewSync';
+import type { Locale } from '../../i18n';
 import type { Appearance } from '../types';
 
 export interface SetupPanelProps {
@@ -72,34 +74,36 @@ export interface SetupPanelProps {
   onClose?: () => void;
 }
 
-const MODELS: { value: ModelVariant; label: string }[] = [
-  { value: 'lite', label: 'Lite (fast)' },
-  { value: 'full', label: 'Full' },
-  { value: 'heavy', label: 'Heavy (most accurate)' },
+const models = (): { value: ModelVariant; label: string }[] => [
+  { value: 'lite', label: t('setup.modelLite') },
+  { value: 'full', label: t('setup.modelFull') },
+  { value: 'heavy', label: t('setup.modelHeavy') },
 ];
-const STRIDES = [
-  { value: 1, label: 'Every frame' },
-  { value: 2, label: 'Every 2nd frame' },
-  { value: 3, label: 'Every 3rd frame' },
-  { value: 4, label: 'Every 4th frame' },
+const strides = () => [
+  { value: 1, label: t('setup.stride1') },
+  { value: 2, label: t('setup.stride2') },
+  { value: 3, label: t('setup.stride3') },
+  { value: 4, label: t('setup.stride4') },
 ];
 const PEOPLE = [1, 2, 3].map((n) => ({ value: n, label: String(n) }));
-const SIDES = [
-  { value: 'long' as const, label: 'long side' },
-  { value: 'short' as const, label: 'short side' },
+const sides = () => [
+  { value: 'long' as const, label: t('setup.sideLong') },
+  { value: 'short' as const, label: t('setup.sideShort') },
 ];
-const SCALES: { value: ScaleSource | 'auto'; label: string }[] = [
-  { value: 'auto', label: 'Auto (the bed if it is marked)' },
-  { value: 'trampoline', label: 'The bed' },
-  { value: 'athlete', label: "The athlete's height" },
+const scales = (): { value: ScaleSource | 'auto'; label: string }[] => [
+  { value: 'auto', label: t('setup.scaleAuto') },
+  { value: 'trampoline', label: t('setup.scaleBed') },
+  { value: 'athlete', label: t('setup.scaleAthlete') },
 ];
-const APPEARANCES = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-] as const;
+const appearances = () =>
+  [
+    { value: 'system', label: t('setup.appearanceSystem') },
+    { value: 'light', label: t('setup.appearanceLight') },
+    { value: 'dark', label: t('setup.appearanceDark') },
+  ] as const;
 
-const ACTION_TEXT = { analyze: 'Analyze video', again: 'Analyze again', cancel: 'Cancel' } as const;
+const actionText = () =>
+  ({ analyze: t('setup.analyze'), again: t('setup.again'), cancel: t('common.cancel') }) as const;
 
 /**
  * The settings page of the rail, and where a new video is set up: the athlete, the trampoline, the analysis engine.
@@ -107,6 +111,7 @@ const ACTION_TEXT = { analyze: 'Analyze video', again: 'Analyze again', cancel: 
  */
 export function SetupPanel(props: SetupPanelProps) {
   const { calibration: cal } = props;
+  const locale = useLocale();
   const state = setupState({ busy: props.busy, hasVideo: props.hasVideo, hasResult: props.hasResult });
   const marked = cal.corners.length === 4;
 
@@ -114,7 +119,7 @@ export function SetupPanel(props: SetupPanelProps) {
     <div className="setup">
       <header className="setup__head">
         <div className="setup__heading">
-          <h2 className="setup__title">Settings</h2>
+          <h2 className="setup__title">{t('setup.title')}</h2>
           {props.fileName && (
             <p className="setup__file" title={props.fileName}>
               {props.fileName}
@@ -123,71 +128,62 @@ export function SetupPanel(props: SetupPanelProps) {
         </div>
         {props.onClose && (
           <Button variant="secondary" size="sm" onClick={props.onClose}>
-            Done
+            {t('setup.done')}
           </Button>
         )}
       </header>
 
       <section className="setup__section" aria-labelledby="setup-athlete">
         <h3 className="setup__label" id="setup-athlete">
-          Athlete
+          {t('setup.athlete')}
         </h3>
         <NumberField
-          label="Height"
+          label={t('setup.height')}
           unit="m"
           min={1}
           max={2.3}
           step={0.01}
           value={props.height}
           onChange={props.onHeight}
-          hint="Scales the measurements in meters when the trampoline is not marked."
+          hint={t('setup.heightHint')}
         />
       </section>
 
       {props.review && (
         <section className="setup__section" aria-labelledby="setup-review">
           <h3 className="setup__label" id="setup-review">
-            Review
+            {t('setup.review')}
           </h3>
-          <Switch
-            checked={props.review.enabled}
-            onChange={props.review.onEnabled}
-            label="Send analyzed jumps for review"
-          />
+          <Switch checked={props.review.enabled} onChange={props.review.onEnabled} label={t('setup.reviewSwitch')} />
           <p className="setup__status">
-            Measurements, the answer of the classifier and what you say about each skill, so a person can check it and
-            the classifier can learn. No video and no file name leave this browser.{' '}
-            {syncStatusText(props.review.state, props.review.posted)}
+            {t('setup.reviewText')} {syncStatusText(props.review.state, props.review.posted)}
           </p>
         </section>
       )}
 
       <section className="setup__section" aria-labelledby="setup-advanced">
         <h3 className="setup__label" id="setup-advanced">
-          Advanced
+          {t('setup.advanced')}
         </h3>
-        <Switch checked={props.advanced} onChange={props.onAdvanced} label="Show the advanced tools" />
-        <p className="setup__status">
-          Adds the athlete and coach views with every measurement and chart, the trampoline outline, the pose model
-          settings, exports and saved analyses.
-        </p>
+        <Switch checked={props.advanced} onChange={props.onAdvanced} label={t('setup.advancedSwitch')} />
+        <p className="setup__status">{t('setup.advancedText')}</p>
       </section>
 
       {props.advanced && (
         <>
           <section className="setup__section" aria-labelledby="setup-bed">
             <h3 className="setup__label" id="setup-bed">
-              Trampoline
+              {t('setup.trampoline')}
             </h3>
             <p className={cal.error ? 'setup__status setup__status--error' : 'setup__status'}>{cal.status}</p>
             <div className="setup__buttons">
               {cal.editing ? (
                 <>
                   <Button variant="primary" size="sm" onClick={() => props.onEditCalibration(false)}>
-                    Done marking
+                    {t('setup.doneMarking')}
                   </Button>
                   <Button size="sm" disabled={cal.corners.length === 0} onClick={props.onUndoCorner}>
-                    Undo last corner
+                    {t('setup.undoCorner')}
                   </Button>
                 </>
               ) : (
@@ -195,21 +191,21 @@ export function SetupPanel(props: SetupPanelProps) {
                   size="sm"
                   icon="bed"
                   disabled={!state.canMark}
-                  title={state.canMark ? undefined : 'Choose a video first.'}
+                  title={state.canMark ? undefined : t('setup.chooseFirst')}
                   onClick={() => props.onEditCalibration(true)}
                 >
-                  {marked ? 'Edit corners' : 'Mark the trampoline'}
+                  {marked ? t('setup.editCorners') : t('setup.markBed')}
                 </Button>
               )}
               {cal.corners.length > 0 && (
                 <Button variant="ghost" size="sm" disabled={!state.canMark} onClick={props.onClearCalibration}>
-                  Clear
+                  {t('setup.clear')}
                 </Button>
               )}
             </div>
             <div className="setup__grid">
               <NumberField
-                label="Long side"
+                label={t('setup.longSide')}
                 unit="m"
                 min={0.5}
                 max={10}
@@ -219,7 +215,7 @@ export function SetupPanel(props: SetupPanelProps) {
                 onChange={props.onBedLong}
               />
               <NumberField
-                label="Short side"
+                label={t('setup.shortSide')}
                 unit="m"
                 min={0.5}
                 max={10}
@@ -230,16 +226,16 @@ export function SetupPanel(props: SetupPanelProps) {
               />
             </div>
             <SelectField
-              label="Side 1 to 2 is the"
+              label={t('setup.firstSide')}
               value={cal.firstSide}
-              options={SIDES}
+              options={sides()}
               disabled={state.calibrationLocked}
               onChange={props.onFirstSide}
             />
             <SelectField
-              label="Meters from"
+              label={t('setup.metersFrom')}
               value={cal.scaleSource}
-              options={SCALES}
+              options={scales()}
               disabled={state.calibrationLocked}
               onChange={props.onScaleSource}
             />
@@ -247,18 +243,18 @@ export function SetupPanel(props: SetupPanelProps) {
 
           <section className="setup__section" aria-labelledby="setup-engine">
             <h3 className="setup__label" id="setup-engine">
-              Analysis
+              {t('setup.analysis')}
             </h3>
             <SelectField
-              label="Model"
+              label={t('setup.model')}
               value={props.model}
-              options={MODELS}
+              options={models()}
               disabled={state.engineLocked}
               onChange={props.onModel}
             />
             <div className="setup__grid">
               <NumberField
-                label="Video frame rate"
+                label={t('setup.fps')}
                 unit="fps"
                 min={1}
                 max={480}
@@ -266,18 +262,18 @@ export function SetupPanel(props: SetupPanelProps) {
                 value={props.fps}
                 disabled={state.engineLocked}
                 onChange={props.onFps}
-                hint="Measured from the video. Changing it clears the analysis."
+                hint={t('setup.fpsHint')}
               />
               <SelectField
-                label="Analyze"
+                label={t('setup.stride')}
                 value={props.stride}
-                options={STRIDES}
+                options={strides()}
                 disabled={state.engineLocked}
                 onChange={props.onStride}
               />
             </div>
             <SelectField
-              label="People to look for"
+              label={t('setup.people')}
               value={props.numPoses}
               options={PEOPLE}
               disabled={state.engineLocked}
@@ -287,20 +283,16 @@ export function SetupPanel(props: SetupPanelProps) {
               checked={props.preferGpu}
               onChange={props.onPreferGpu}
               disabled={state.engineLocked}
-              label="Use the GPU if possible"
+              label={t('setup.gpu')}
             />
             <dl className="setup__runtime">
               <div>
-                <dt>Runtime</dt>
-                <dd>{props.backend || 'not started'}</dd>
+                <dt>{t('setup.runtime')}</dt>
+                <dd>{props.backend || t('setup.notStarted')}</dd>
               </div>
               <div>
-                <dt>WebGPU</dt>
-                <dd>
-                  {props.webgpu
-                    ? 'available in this browser, but MediaPipe uses WebGL (GPU delegate) or WASM (CPU)'
-                    : 'not available'}
-                </dd>
+                <dt>{t('setup.webgpu')}</dt>
+                <dd>{props.webgpu ? t('setup.webgpuYes') : t('setup.webgpuNo')}</dd>
               </div>
             </dl>
           </section>
@@ -309,29 +301,39 @@ export function SetupPanel(props: SetupPanelProps) {
 
       <section className="setup__section" aria-labelledby="setup-look">
         <h3 className="setup__label" id="setup-look">
-          Appearance
+          {t('setup.appearance')}
         </h3>
         <Segmented<Appearance>
-          ariaLabel="Appearance"
+          ariaLabel={t('setup.appearance')}
           fill
           value={props.appearance}
           onChange={props.onAppearance}
-          options={APPEARANCES.map((a) => ({ ...a }))}
+          options={appearances().map((a) => ({ ...a }))}
+        />
+      </section>
+
+      <section className="setup__section" aria-labelledby="setup-language">
+        <h3 className="setup__label" id="setup-language">
+          {t('setup.language')}
+        </h3>
+        <Segmented<Locale>
+          ariaLabel={t('setup.language')}
+          fill
+          value={locale}
+          onChange={setLocale}
+          options={LOCALES.map((code) => ({ value: code, label: LANGUAGE_NAMES[code] }))}
         />
       </section>
 
       {props.advanced && (
         <section className="setup__section" aria-labelledby="setup-data">
           <h3 className="setup__label" id="setup-data">
-            Saved data
+            {t('setup.savedData')}
           </h3>
-          <Field
-            label="Skip the analysis"
-            hint="Open a saved analysis (JSON) to see its results without running the pose model again."
-          >
+          <Field label={t('setup.skipAnalysis')} hint={t('setup.skipHint')}>
             <label className="btn btn--secondary setup__file-btn">
               <Icon name="file" size={17} />
-              Open saved analysis
+              {t('setup.openSaved')}
               <input
                 type="file"
                 accept="application/json,.json"
@@ -346,7 +348,7 @@ export function SetupPanel(props: SetupPanelProps) {
           </Field>
           {props.onSample && (
             <Button variant="secondary" icon="film" disabled={state.engineLocked} onClick={props.onSample}>
-              Use the sample video
+              {t('setup.sample')}
             </Button>
           )}
         </section>
@@ -361,7 +363,7 @@ export function SetupPanel(props: SetupPanelProps) {
           disabled={state.actionDisabled}
           onClick={state.action === 'cancel' ? props.onCancel : props.onAnalyze}
         >
-          {ACTION_TEXT[state.action]}
+          {actionText()[state.action]}
         </Button>
       </div>
     </div>

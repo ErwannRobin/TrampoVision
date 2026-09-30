@@ -1,9 +1,11 @@
+import { t } from '../i18n/core';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
+import { elementName } from '../skills/fig/elements';
 import { legacyId } from '../skills/hierarchical';
 import type { Session } from './session';
 
 /** The name shown for a jump a person says is none of the elements of the list. */
-export const OTHER_LABEL = 'Something else';
+export const otherLabel = (): string => t('live.other');
 
 /**
  * The skills as people see them on the video and on the timeline: each jump carries the name the session settled on (the coach's
@@ -23,7 +25,7 @@ export function withCalls(skills: SkillAnalysis, session: Session): SkillAnalysi
           prediction: {
             ...p,
             skill: 'unclassified',
-            label: OTHER_LABEL,
+            label: otherLabel(),
             confidence: 0,
             certainty: undefined,
             elementId: undefined,
@@ -36,7 +38,7 @@ export function withCalls(skills: SkillAnalysis, session: Session): SkillAnalysi
         prediction: {
           ...p,
           skill: legacyId(e),
-          label: e.name,
+          label: elementName(e),
           elementId: e.id,
           movement: { direction: e.direction, somersaults: e.somersaults, twists: e.twists, position: e.position },
           confidence: live.confidence,

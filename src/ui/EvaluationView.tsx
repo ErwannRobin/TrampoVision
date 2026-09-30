@@ -1,14 +1,15 @@
 import { useEffect, useId, useMemo } from 'react';
 import { download } from '../analysis/export';
+import { t, tp, tx, useLocale } from '../i18n';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { buildEvaluationReport, toEvaluationCsv, toEvaluationJson } from '../dataset/export';
 import { findFailures } from '../dataset/failures';
 import { agrees, computeMetrics, predictionOf } from '../dataset/metrics';
 import { movementFromPrediction, movementOfRecord, type MovementLabel } from '../dataset/movementLabel';
 import { TRUTH_TEXT, type JumpRecord } from '../dataset/types';
-import { elementById } from '../skills/fig/elements';
+import { elementById, elementName } from '../skills/fig/elements';
 import type { DatasetApi } from '../dataset/useDataset';
-import { pct, plural } from './format';
+import { pct } from './format';
 import { confidenceTier, TIER_TEXT } from './insights';
 import { Badge, Button, ConfidenceMeter, Field, Segmented } from './kit';
 import type { Playhead } from './playhead';
@@ -90,8 +91,14 @@ export function EvaluatePanel({
   // N goes to the next unlabeled jump.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || (t && /INPUT|TEXTAREA|SELECT|BUTTON/.test(t.tagName)))
+      const target = e.target as HTMLElement | null;
+      if (
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
+        e.repeat ||
+        (target && /INPUT|TEXTAREA|SELECT|BUTTON/.test(target.tagName))
+      )
         return;
       if (e.key === 'n' || e.key === 'N') {
         const next = nextUnlabeled(labeled, k);
@@ -105,7 +112,7 @@ export function EvaluatePanel({
   if (n === 0) {
     return (
       <div className="review">
-        <p className="review-empty">No jump found in this video, so there is nothing to label.</p>
+        <p className="review-empty">{t('review.noJump')}</p>
         <DatasetBar dataset={dataset} baseName={baseName} />
       </div>
     );
@@ -125,16 +132,19 @@ export function EvaluatePanel({
       <div className="review-section review-section--lead">
         <div className="review-actions">
           <Button size="sm" icon="play" onClick={() => playhead.playRange(from, to, false)}>
-            Play jump
+            {t('ins.playJump')}
           </Button>
           <Button size="sm" disabled={labeledCount === n} aria-keyshortcuts="N" onClick={goNextUnlabeled}>
-            Next unlabeled
+            {t('review.nextUnlabeled')}
             <Keycap>N</Keycap>
           </Button>
         </div>
         <div className="review-progress">
           <span className="review-progress__text">
-            <span className="num">{labeledCount}</span> of <span className="num">{n}</span> labeled
+            {tx('review.progress', {
+              done: <span className="num">{labeledCount}</span>,
+              total: <span className="num">{n}</span>,
+            })}
           </span>
           <div className="review-progress__track" aria-hidden="true">
             <div className="review-progress__fill" style={{ width: `${(labeledCount / n) * 100}%` }} />
@@ -143,15 +153,15 @@ export function EvaluatePanel({
       </div>
 
       <div className="review-section">
-        <h3 className="review-heading">The classifier says</h3>
+        <h3 className="review-heading">{t('review.classifierSays')}</h3>
         <div className="review-classifier">
           <div className="review-classifier__head">
             <span className="review-classifier__skill t-brand">{jump.prediction.label}</span>
-            <span className="review-classifier__pct num" title="Heuristic score, not a probability">
+            <span className="review-classifier__pct num" title={t('ins.scoreNote')}>
               {pct(jump.prediction.confidence)}
             </span>
           </div>
-          <ConfidenceMeter value={jump.prediction.confidence} tier={tier} label="Classifier confidence" />
+          <ConfidenceMeter value={jump.prediction.confidence} tier={tier} label={t('coach.classifierConfidence')} />
           <p className="review-classifier__tier">{TIER_TEXT[tier]}</p>
           <p className="review-note">{jump.prediction.summary}</p>
         </div>
@@ -159,13 +169,9 @@ export function EvaluatePanel({
 
       <div className="review-section">
         <div className="review-section__head">
-          <h3 className="review-heading">Your label</h3>
+          <h3 className="review-heading">{t('review.yourLabel')}</h3>
           <span role="status">
-            {truth && (
-              <Badge tone={agree ? 'ok' : 'danger'}>
-                {agree ? 'Matches the prediction' : 'Differs from the prediction'}
-              </Badge>
-            )}
+            {truth && <Badge tone={agree ? 'ok' : 'danger'}>{agree ? t('review.matches') : t('review.differs')}</Badge>}
           </span>
         </div>
         <MovementPicker
@@ -183,14 +189,14 @@ export function EvaluatePanel({
             {status}
           </p>
         )}
-        <Field label="Note (optional)" hint={canLabel && !truth ? 'Choose a label to add a note.' : undefined}>
+        <Field label={t('review.noteLabel')} hint={canLabel && !truth ? t('review.noteHint') : undefined}>
           <input
             key={noteKey}
             className="input"
             type="text"
             defaultValue={note}
             disabled={!canLabel || !truth}
-            placeholder="e.g. camera moved, athlete twisted"
+            placeholder={t('review.notePlaceholder')}
             onBlur={(e) => {
               if (e.target.value !== note) onNote(k, e.target.value);
             }}
@@ -203,19 +209,18 @@ export function EvaluatePanel({
 
       {figureId && (
         <p className="review-note">
-          Saved as a reference example of {elementById(figureId)?.name ?? figureId} ({exampleCounts.get(figureId) ?? 0}{' '}
-          saved): the classifier compares later jumps with it.
+          {t('review.savedExample', {
+            name: elementById(figureId) ? elementName(elementById(figureId)!) : figureId,
+            count: exampleCounts.get(figureId) ?? 0,
+          })}
         </p>
       )}
 
       {staleCount > 0 && (
         <div className="review-stale" role="status">
-          <p>
-            {staleCount} saved {plural(staleCount, 'jump')} of this video {staleCount > 1 ? 'were' : 'was'} predicted
-            with other settings or data.
-          </p>
+          <p>{tp('review.stale', staleCount)}</p>
           <Button size="sm" icon="refresh" onClick={onUpdateStale}>
-            Update predictions
+            {t('review.updatePredictions')}
           </Button>
         </div>
       )}
@@ -241,12 +246,13 @@ export interface EvaluationReportProps {
  */
 export function EvaluationReport({ records, videoId, scope, onScope, baseName, onGoTo }: EvaluationReportProps) {
   const titleId = useId();
+  const locale = useLocale();
   const scoped = useMemo(
     () => (scope === 'video' ? records.filter((r) => r.videoId === videoId) : records),
     [records, videoId, scope],
   );
   const metrics = useMemo(() => computeMetrics(scoped), [scoped]);
-  const failures = useMemo(() => findFailures(scoped), [scoped]);
+  const failures = useMemo(() => findFailures(scoped), [scoped, locale]); // oxlint-disable-line react-hooks/exhaustive-deps
   const o = metrics.overall;
   const configs = new Set(scoped.map((r) => JSON.stringify(r.analysis.config))).size;
   const noExample = metrics.perClass.filter((c) => c.support === 0).map((c) => TRUTH_TEXT[c.label]);
@@ -256,17 +262,17 @@ export function EvaluationReport({ records, videoId, scope, onScope, baseName, o
       <header className="review-report__intro">
         <div className="review-report__head">
           <h3 className="review-report__title" id={titleId}>
-            Evaluation
+            {t('report.title')}
           </h3>
           {videoId && (
             <Segmented
               size="sm"
-              ariaLabel="Scope"
+              ariaLabel={t('report.scope')}
               value={scope}
               onChange={onScope}
               options={[
-                { value: 'video', label: 'This video' },
-                { value: 'all', label: 'All saved videos' },
+                { value: 'video', label: t('report.thisVideo') },
+                { value: 'all', label: t('report.allVideos') },
               ]}
             />
           )}
@@ -283,7 +289,7 @@ export function EvaluationReport({ records, videoId, scope, onScope, baseName, o
                 )
               }
             >
-              Evaluation JSON
+              {t('report.json')}
             </Button>
             <Button
               size="sm"
@@ -291,7 +297,7 @@ export function EvaluationReport({ records, videoId, scope, onScope, baseName, o
               disabled={!scoped.length}
               onClick={() => download(`${baseName}-evaluation.csv`, toEvaluationCsv(metrics), 'text/csv')}
             >
-              Evaluation CSV
+              {t('report.csv')}
             </Button>
           </div>
         </div>
@@ -299,21 +305,18 @@ export function EvaluationReport({ records, videoId, scope, onScope, baseName, o
       </header>
 
       {o.n === 0 ? (
-        <p className="review-empty">
-          No labeled jumps yet. Label jumps in the Review tab (or press keys 1 to 6): accuracy, precision, recall and
-          the confusion matrix appear here. Unknown does not count in them.
-        </p>
+        <p className="review-empty">{t('report.empty')}</p>
       ) : (
         <>
           <ReportFigures overall={o} />
           <ReportCaveats items={reportCaveats(o.n, noExample, configs)} />
           <div className="review-report__tables">
             <div className="review-block">
-              <h4 className="review-block__title">Per class</h4>
+              <h4 className="review-block__title">{t('report.perClass')}</h4>
               <PerClassTable metrics={metrics} />
             </div>
             <div className="review-block">
-              <h4 className="review-block__title">Confusion matrix</h4>
+              <h4 className="review-block__title">{t('report.confusion')}</h4>
               <ConfusionMatrix metrics={metrics} />
             </div>
           </div>
@@ -322,16 +325,11 @@ export function EvaluationReport({ records, videoId, scope, onScope, baseName, o
 
       <div className="review-block">
         <h4 className="review-block__title">
-          Failure cases <span className="review-block__count num">{failures.length}</span>
+          {t('report.failures')} <span className="review-block__count num">{failures.length}</span>
         </h4>
-        <p className="review-note">
-          Jumps where your label and the prediction differ, including low-confidence ones. Wrong answers come first, the
-          most confident first.
-        </p>
+        <p className="review-note">{t('report.failuresNote')}</p>
         {failures.length === 0 ? (
-          <p className="review-note">
-            {o.n === 0 ? 'Nothing labeled yet.' : 'No disagreement between your labels and the predictions.'}
-          </p>
+          <p className="review-note">{o.n === 0 ? t('report.nothingLabeled') : t('report.noDisagreement')}</p>
         ) : (
           <div className="review-fails">
             {failures.map((f, i) => (

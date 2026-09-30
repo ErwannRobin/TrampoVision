@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { sampleIndexAt } from '../analysis/lookup';
 import type { AnalysisResult } from '../analysis/types';
+import { formatNumber, lower, t, useLocale } from '../i18n';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { POSITIONS, type BodyPosition } from '../skills/types';
 import { Chart } from './Chart';
@@ -18,6 +19,9 @@ interface Props {
 
 const SHAPES: BodyPosition[] = ['straight', 'tuck', 'pike', 'unknown'];
 
+/** A body shape as a word of the language in use ("tuck", "between shapes"). */
+const shapeWord = (p: BodyPosition): string => (p === 'unknown' ? lower(t('fig.between')) : lower(t(`pos.${p}`)));
+
 /** Where the playhead is inside the jump (0 = takeoff, 1 = landing) and the body position of that frame. */
 function Now({ result, skills, playhead, toX }: Omit<Props, 'selected'> & { toX: (seconds: number) => number }) {
   const time = usePlayheadTime(playhead);
@@ -27,7 +31,7 @@ function Now({ result, skills, playhead, toX }: Omit<Props, 'selected'> & { toX:
     <>
       {x >= 0 && x <= 1 && <b className="jv__cursor" style={{ left: `${x * 100}%` }} />}
       <span className="jv__now">
-        Now <span className="jv__now-shape">{now === 'unknown' ? 'between shapes' : now}</span>
+        {t('jv.now')} <span className="jv__now-shape">{shapeWord(now)}</span>
       </span>
     </>
   );
@@ -39,6 +43,7 @@ function Now({ result, skills, playhead, toX }: Omit<Props, 'selected'> & { toX:
  * depend on the resolution, the position or the size of the athlete.
  */
 export function JumpView({ result, skills, playhead, selected }: Props) {
+  const locale = useLocale();
   const jump = skills.jumps[Math.min(selected, skills.jumps.length - 1)];
   const seq = jump?.sequence ?? null;
 
@@ -51,29 +56,26 @@ export function JumpView({ result, skills, playhead, selected }: Props) {
       runs: positionRuns(cols.position, cols.quality),
       specs: jumpSpecs(cols, axis, jumpMarkers(jump.cycle, seq), skills.config.position),
     };
-  }, [jump, seq, skills.config.position]);
+  }, [jump, seq, skills.config.position, locale]); // oxlint-disable-line react-hooks/exhaustive-deps
 
-  if (!jump) return <p className="jv__empty">No jump detected, so there is nothing to show per jump.</p>;
-  if (!seq || !view) {
-    return (
-      <p className="jv__empty">
-        This jump is cut off by the start or the end of the clip, so it has no normalized sequence: its takeoff or its
-        landing is missing.
-      </p>
-    );
-  }
+  if (!jump) return <p className="jv__empty">{t('jv.empty')}</p>;
+  if (!seq || !view) return <p className="jv__empty">{t('jv.cutOff')}</p>;
 
   return (
     <div className="jv">
       <div className="jv__strip">
-        <span className="jv__label">Body position</span>
-        <div className="jv__bar" role="img" aria-label="Body position over the jump">
+        <span className="jv__label">{t('jv.bodyPosition')}</span>
+        <div className="jv__bar" role="img" aria-label={t('jv.bodyPositionAria')}>
           {view.runs.map((r, k) => (
             <i
               key={k}
               className={`jv__run jv__run--${r.position}${r.unsure ? ' jv__run--unsure' : ''}`}
               style={{ flexGrow: r.weight }}
-              title={`${r.position === 'unknown' ? 'Between shapes' : r.position} from ${r.from.toFixed(2)} to ${r.to.toFixed(2)}${r.unsure ? ', pose unclear' : ''}`}
+              title={t(r.unsure ? 'jv.runUnsure' : 'jv.run', {
+                shape: shapeWord(r.position),
+                from: formatNumber(r.from, 2),
+                to: formatNumber(r.to, 2),
+              })}
             />
           ))}
           <Now result={result} skills={skills} playhead={playhead} toX={view.axis.toX} />
@@ -82,12 +84,12 @@ export function JumpView({ result, skills, playhead, selected }: Props) {
           {SHAPES.map((s) => (
             <li key={s}>
               <i className={`jv__swatch jv__run--${s}`} />
-              {s === 'unknown' ? 'Between shapes' : s}
+              {shapeWord(s)}
             </li>
           ))}
           <li>
             <i className="jv__swatch jv__run--unknown jv__run--unsure" />
-            Pose unclear
+            {t('jv.poseUnclear')}
           </li>
         </ul>
       </div>
@@ -97,10 +99,7 @@ export function JumpView({ result, skills, playhead, selected }: Props) {
           <Chart key={spec.id} {...spec} playhead={playhead} />
         ))}
       </div>
-      <p className="jv__note">
-        Every jump is resampled to {seq.samples} steps between takeoff and landing, and the joints are measured in the
-        athlete's own frame in body lengths. Click a chart to move the video inside the jump.
-      </p>
+      <p className="jv__note">{t('jv.note', { n: seq.samples })}</p>
     </div>
   );
 }

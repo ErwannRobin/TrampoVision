@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_TWIST_CONFIG } from './config';
 import { degradeWorld, syntheticTwistJump, type TwistJumpSpec, type WorldDegrade } from './testTwistMannequin';
-import { analyzeTwist, NO_3D } from './twist';
+import { analyzeTwist, no3d } from './twist';
 import { cross, rotateAbout, signedAngleDeg, transport, unit } from './vec3';
 
 function run(spec: TwistJumpSpec, degrade?: WorldDegrade) {
@@ -138,7 +138,7 @@ describe('what the estimator says when the 3D data is bad', () => {
     expect(a.frames).toBeNull();
     expect(a.jumps[0].available).toBe(false);
     expect(a.jumps[0].totalDeg).toBeNull();
-    expect(a.jumps[0].limitations).toContainEqual(NO_3D);
+    expect(a.jumps[0].limitations).toContainEqual(no3d());
   });
 
   it('says so for a jump cut off by the clip', () => {

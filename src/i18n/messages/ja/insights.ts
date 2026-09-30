@@ -1,0 +1,98 @@
+import type { Translation } from '..';
+import type { insights as en } from '../en/insights';
+
+export const insights: Translation<typeof en> = {
+  'tier.high': '確信度：高',
+  'tier.medium': '確信度：中',
+  'tier.low': '確信度：低',
+  'tier.none': '未分類',
+
+  'ins.jumpOf': 'ジャンプ {n} / {total}',
+  'ins.playJump': 'ジャンプを再生',
+  'ins.playJumpTitle': '少し助走と着地を含めてジャンプを再生',
+  'ins.scoreNote': 'ヒューリスティックなスコアで、確率ではありません',
+  'ins.confidence': '技の確信度',
+  'ins.openSettings': '設定を開く',
+  'ins.showTechnical': '技術的な詳細を表示',
+  'ins.coachText': 'コーチビューでは、各技の根拠、すべての測定値、ひねりの解析、すべてのグラフを確認できます。',
+
+  'ins.empty.title': 'ジャンプが見つかりません',
+  'ins.empty.text': '重心が周囲より0.3 m以上上がらなかったため、このクリップにはジャンプとみなせるものがありません。',
+  'ins.empty.check': '次の点を確認してください',
+  'ins.empty.frame': '選手の全身が、最初から最後までフレームに収まっている。',
+  'ins.empty.camera': 'カメラが固定・水平で、選手を追いかけていない。',
+  'ins.empty.settings': '設定の選手の身長とトランポリンのサイズが正しい（メートル換算に使われます）。',
+
+  'ins.worth': '知っておきたいこと',
+  'ins.whatHelps': '改善に役立つこと',
+  'ins.dataChecks': 'データのチェック',
+  'ins.noProblem': 'このジャンプにデータ上の問題は見つかりませんでした。',
+  'ins.more': { one: '他に{n}件の注意点', other: '他に{n}件の注意点' },
+
+  'ins.jumpsInClip': 'このクリップのジャンプ',
+  'ins.height': '高さ',
+  'ins.airTime': '滞空時間',
+  'ins.jump': 'ジャンプ',
+  'ins.cutOffSr': 'クリップで途切れています',
+  'ins.barsNote': 'バーはこのクリップ内のジャンプを比較したものです。',
+  'ins.barsNoteDashed':
+    'バーはこのクリップ内のジャンプを比較したものです。破線のバーは、クリップで途切れたジャンプです。',
+  'unit.meters': 'メートル',
+  'unit.seconds': '秒',
+  'unit.turns': '回転',
+
+  'fig.height': '最高到達点',
+  'fig.air': '滞空時間',
+  'fig.rotation': '回転',
+  'fig.shape': '体の形',
+  'fig.cutOff': 'クリップで途切れています',
+  'fig.unknown': '測定できませんでした',
+  'fig.aboveBed': 'ベッドからの高さ',
+  'fig.aboveLowest': '最下点からの高さ',
+  'fig.takeoffToLanding': '踏み切りから着地まで',
+  'fig.clockwise': '画面上で時計回り',
+  'fig.counterclockwise': '画面上で反時計回り',
+  'fig.noRotation': '回転なし',
+  'fig.between': '形の中間',
+  'fig.noShape': 'どの形にもよく当てはまりません',
+  'fig.mostClosed': '最も閉じた瞬間',
+
+  'bed.title': 'ベッド上の着地',
+  'bed.left': '左端',
+  'bed.center': '中央',
+  'bed.right': '右端',
+  'bed.event.takeoff': '踏み切り',
+  'bed.event.apex': '頂点',
+  'bed.event.landing': '着地',
+  'bed.and': 'と',
+  'bed.clause': '{events}は{where}',
+  'bed.clauseAll': '{events}はすべて{where}',
+  'bed.end': '。',
+  'bed.inCenter': '中央',
+  'bed.pastLeft': '左端の外側',
+  'bed.pastRight': '右端の外側',
+  'bed.towardLeft': '左端まで{share}の位置',
+  'bed.towardRight': '右端まで{share}の位置',
+  'bed.unusable': 'マークしたトランポリンを使用できなかったため、着地位置は利用できません。',
+  'bed.markIt': 'トランポリンをマークすると、各ジャンプの着地位置が分かります。',
+  'bed.noPosition': 'このジャンプのベッド上の位置は測定できませんでした。',
+  'bed.cutOff': 'このジャンプはクリップで途切れているため、ベッド上の位置は不明です。',
+
+  'quality.calibrationIgnored': 'キャリブレーションを無視しました：{error}',
+  'quality.scales':
+    'ベッドと選手から得られた縮尺が {gap} 食い違っています。角の位置、ベッドのサイズ、選手の身長、選手がベッドの上に留まっているかを確認してください。',
+  'quality.viewAlong':
+    'カメラはベッドの長辺に沿って見ています。水平方向の移動はベッドを横切る方向でしか測定されません。',
+  'quality.freeFall':
+    '自由落下チェック：9.81 の代わりに {g} m/s² のため、メートルと m/s は約 {gap} ずれている可能性があります。',
+  'quality.rotationStep':
+    '2つのサンプルの間で体の向きが120°を超えて変化しています。回転数が少なく数えられている可能性があります。全フレームを解析してください。',
+  'quality.missingCom': 'フレームの {share} で重心が欠けています。',
+  'quality.cutOff': 'クリップの始めまたは終わりで途切れているジャンプがあります。踏み切りまたは着地が不明です。',
+
+  'calibration.error.sizes': 'ベッドのサイズは正の値にしてください。',
+  'calibration.error.corner': '角の位置が無効です。',
+  'calibration.error.order': '4つの角は、ベッドを一周する順に並べる必要があります（線が交差しないように）。',
+  'calibration.error.small': 'ベッドの輪郭が小さすぎます。角をもっと離してクリックしてください。',
+  'calibration.error.compute': 'これらの角からキャリブレーションを計算できませんでした。',
+};

@@ -1,9 +1,10 @@
+import { t } from '../i18n/core';
 import { cell, FEATURE_COLUMNS, type FlatJump } from '../skills/export';
 import { SEQUENCE_JOINTS } from '../skills/frameShape';
 import { POSITIONS } from '../skills/types';
 import { findFailures } from './failures';
 import { agrees, computeMetrics, labelOf, predictionOf, PREDICTED_COLUMNS, type Metrics } from './metrics';
-import { RECORD_SCHEMA, RECORD_VERSION, TRUTH_TEXT, type JumpRecord } from './types';
+import { RECORD_SCHEMA, RECORD_VERSION, truthText, type JumpRecord } from './types';
 
 export const DATASET_SCHEMA = 'trampovision.jump-dataset';
 export const DATASET_VERSION = 1;
@@ -105,14 +106,12 @@ export function parseDataset(text: string): JumpRecord[] {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error('This file is not valid JSON.');
+    throw new Error(t('err.notJson'));
   }
-  if (!data || data.schema !== DATASET_SCHEMA) throw new Error('This is not a TrampoVision dataset file.');
+  if (!data || data.schema !== DATASET_SCHEMA) throw new Error(t('err.notDataset'));
   if (typeof data.version !== 'number' || data.version > DATASET_VERSION)
-    throw new Error(
-      `Unsupported dataset version (${String(data.version)}); this app reads version ${DATASET_VERSION}.`,
-    );
-  if (!Array.isArray(data.records)) throw new Error('The dataset has no records.');
+    throw new Error(t('err.datasetVersion', { found: String(data.version), expected: DATASET_VERSION }));
+  if (!Array.isArray(data.records)) throw new Error(t('err.noRecords'));
   return data.records.map((raw, i) => {
     const r = raw as Partial<JumpRecord> & { views?: unknown };
     if (
@@ -124,7 +123,7 @@ export function parseDataset(text: string): JumpRecord[] {
       !r.prediction ||
       !r.timestamps
     ) {
-      throw new Error(`Record ${i + 1} is not a valid jump record.`);
+      throw new Error(t('err.badRecord', { n: i + 1 }));
     }
     const { views: _views, ...rest } = r;
     void _views;
@@ -262,7 +261,7 @@ export function toEvaluationCsv(m: Metrics): string {
     const cls = m.perClass.find((c) => c.label === label);
     rows.push(
       [
-        TRUTH_TEXT[label],
+        truthText(label, 'en'),
         m.samplesPerClass[label],
         cls?.predicted ?? '',
         cls?.correct ?? '',

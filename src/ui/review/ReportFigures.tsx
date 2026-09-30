@@ -1,4 +1,5 @@
 import type { Metrics } from '../../dataset/metrics';
+import { t } from '../../i18n';
 import { pct } from '../format';
 import { Stat } from '../kit';
 
@@ -13,22 +14,22 @@ interface Figure {
 export function ReportFigures({ overall: o }: { overall: Metrics['overall'] }) {
   const figures: Figure[] = [
     {
-      label: 'Accuracy',
+      label: t('report.accuracy'),
       value: pct(o.accuracy),
-      hint: o.ci95 ? `95% interval ${pct(o.ci95.lo)}–${pct(o.ci95.hi)}` : undefined,
+      hint: o.ci95 ? t('report.interval', { lo: pct(o.ci95.lo), hi: pct(o.ci95.hi) }) : undefined,
       lead: true,
     },
-    { label: 'Jumps evaluated', value: String(o.n), hint: 'known label' },
-    { label: 'Balanced accuracy', value: pct(o.balancedAccuracy), hint: 'mean recall per class' },
+    { label: t('report.evaluated'), value: String(o.n), hint: t('report.knownLabel') },
+    { label: t('report.balanced'), value: pct(o.balancedAccuracy), hint: t('report.meanRecall') },
     {
-      label: 'Answered',
+      label: t('report.answered'),
       value: pct(o.coverage),
-      hint: `${o.answered} of ${o.n}; right when answered: ${pct(o.accuracyWhenAnswered)}`,
+      hint: t('report.answeredHint', { answered: o.answered, n: o.n, right: pct(o.accuracyWhenAnswered) }),
     },
     {
-      label: `Wrong at ≥${Math.round(o.confidentAt * 100)}%`,
+      label: t('report.wrongAt', { p: Math.round(o.confidentAt * 100) }),
       value: String(o.confidentWrong),
-      hint: `mean confidence right ${pct(o.meanConfidenceCorrect)}, wrong ${pct(o.meanConfidenceWrong)}`,
+      hint: t('report.meanConfidence', { right: pct(o.meanConfidenceCorrect), wrong: pct(o.meanConfidenceWrong) }),
     },
   ];
   return (

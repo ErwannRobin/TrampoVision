@@ -1,3 +1,5 @@
+import { t } from '../../i18n/core';
+
 /** How far along the analysis must be, and for how long it must have run, before a time estimate means something. */
 // The first frames are slow (the model warms up), so an earlier guess would be far too pessimistic.
 const MIN_PROGRESS = 0.08;
@@ -13,9 +15,9 @@ export function estimateRemaining(elapsedS: number, progress: number): number | 
 
 /** "About 40 s left", "About 1 min 35 s left". */
 export function formatRemaining(seconds: number): string {
-  if (seconds < STEP_S) return 'Almost done';
-  if (seconds < 60) return `About ${seconds} s left`;
+  if (seconds < STEP_S) return t('eta.almost');
+  if (seconds < 60) return t('eta.seconds', { s: seconds });
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
-  return `About ${minutes} min${rest ? ` ${rest} s` : ''} left`;
+  return rest ? t('eta.minutesSeconds', { m: minutes, s: rest }) : t('eta.minutes', { m: minutes });
 }

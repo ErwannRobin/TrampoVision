@@ -1,4 +1,5 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
+import { t } from '../../../i18n';
 import { fmt } from '../../format';
 import { useReducedMotion } from '../../hooks';
 import { TIER_TEXT, type JumpComparisonRow } from '../../insights';
@@ -76,9 +77,9 @@ export function JumpList({ rows, selected, onSelect }: Props) {
   return (
     <section className="ins-section ins-list">
       <div className="ins-list__head">
-        <h3 className="ins-h">Jumps in this clip</h3>
-        <span className="ins-list__col">Height</span>
-        <span className="ins-list__col">Air time</span>
+        <h3 className="ins-h">{t('ins.jumpsInClip')}</h3>
+        <span className="ins-list__col">{t('ins.height')}</span>
+        <span className="ins-list__col">{t('ins.airTime')}</span>
       </div>
       <div ref={bodyRef} className="ins-list__body" style={{ '--sel': selected } as CSSProperties}>
         <span className="ins-list__thumb" aria-hidden="true" />
@@ -103,7 +104,7 @@ export function JumpList({ rows, selected, onSelect }: Props) {
                   }}
                 >
                   <span className={cx('ins-row__num num', on && 'ins-row__num--on')}>
-                    <span className="sr-only">Jump </span>
+                    <span className="sr-only">{t('ins.jump')} </span>
                     {row.number}
                   </span>
                   <span className="ins-row__main">
@@ -117,7 +118,7 @@ export function JumpList({ rows, selected, onSelect }: Props) {
                           <span className="sr-only">, {TIER_TEXT[row.tier]}</span>
                         </>
                       )}
-                      {!row.complete && <span className="sr-only">, cut off by the clip</span>}
+                      {!row.complete && <span className="sr-only">, {t('ins.cutOffSr')}</span>}
                     </span>
                     <span className="ins-row__bar" aria-hidden="true">
                       <span
@@ -130,17 +131,15 @@ export function JumpList({ rows, selected, onSelect }: Props) {
                       />
                     </span>
                   </span>
-                  <Figure value={row.heightM} unit="m" word="meters" />
-                  <Figure value={row.flightTimeS} unit="s" word="seconds" className="ins-row__fig--time" />
+                  <Figure value={row.heightM} unit="m" word={t('unit.meters')} />
+                  <Figure value={row.flightTimeS} unit="s" word={t('unit.seconds')} className="ins-row__fig--time" />
                 </button>
               </li>
             );
           })}
         </ul>
       </div>
-      <p className="ins-list__note">
-        Bars compare jumps within this clip.{anyCutOff && ' A dashed bar is a jump cut off by the clip.'}
-      </p>
+      <p className="ins-list__note">{t(anyCutOff ? 'ins.barsNoteDashed' : 'ins.barsNote')}</p>
     </section>
   );
 }

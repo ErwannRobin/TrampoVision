@@ -1,3 +1,6 @@
+import { formatNumber, t, tp } from '../../i18n/core';
+import { elementName } from '../fig/elements';
+import { positionWord } from '../classifier';
 import {
   analyzeStages,
   candidateOf,
@@ -66,11 +69,8 @@ function comparisonOf(sig: MovementSignature, elementId: string, m: Match): Temp
   };
 }
 
-const certaintyWord: Record<Certainty, string> = {
-  confident: 'confident',
-  probable: 'probable',
-  tentative: 'tentative guess',
-};
+const certaintyWord = (c: Certainty): string => t(`certainty.${c}`);
+const two = (v: number) => formatNumber(v, 2);
 
 /**
  * Classifies a jump by its movement signature. The four structural questions (somersaults, direction, twists, position) give each
@@ -92,23 +92,23 @@ export const temporalClassifier: SkillClassifier = {
     const sig = buildSignature(input.sequence, input.twist ?? null);
     if (!sig) return hierarchicalClassifier.classify(input);
 
-    const t = cfg.temporal;
+    const tc = cfg.temporal;
     const options: DtwOptions = {
-      bandFraction: t.bandFraction,
-      warpPenalty: t.warpPenalty,
-      endSigma: t.endSigma,
-      endWeight: t.endWeight,
-      endUnderFactor: t.endUnderFactor,
+      bandFraction: tc.bandFraction,
+      warpPenalty: tc.warpPenalty,
+      endSigma: tc.endSigma,
+      endWeight: tc.endWeight,
+      endUnderFactor: tc.endUnderFactor,
       underReadFraction: cfg.classification.underReadFraction,
-      sigma: t.sigma,
-      weights: t.weights,
+      sigma: tc.sigma,
+      weights: tc.weights,
     };
     const { stages, scored, outOfTable, quality } = analyzeStages(input);
     const refs = [...modelReferences(sig.samples), ...(input.references ?? [])];
-    const matches = bestMatches(sig, refs, options, t.similarityScale);
+    const matches = bestMatches(sig, refs, options, tc.similarityScale);
     // The trajectories act as a likelihood on the structural probability of each element, and what the table does not contain gets a
     // neutral one, so a jump far from every element is not made to look certain by the normalization.
-    const gamma = Math.max(0, t.similarityExponent);
+    const gamma = Math.max(0, tc.similarityExponent);
     const neutral = 0.5 ** gamma;
     const weighted = scored.map((sc) => {
       const m = matches.get(sc.element.id);
@@ -138,14 +138,14 @@ export const temporalClassifier: SkillClassifier = {
     const offGridDeg = Math.abs(turns - Math.round(turns)) * 360;
     // Falling short of the whole somersault is tolerated further than going past it.
     const offGridLimit =
-      turns < Math.round(turns) ? t.maxOffGridDeg * cfg.classification.underRotationFactor : t.maxOffGridDeg;
+      turns < Math.round(turns) ? tc.maxOffGridDeg * cfg.classification.underRotationFactor : tc.maxOffGridDeg;
     const plausible =
-      best.sim >= t.plausibleSimilarity &&
-      best.sc.posterior >= t.plausibleStructure &&
+      best.sim >= tc.plausibleSimilarity &&
+      best.sc.posterior >= tc.plausibleStructure &&
       offGridDeg <= offGridLimit &&
       quality >= 0.25;
     const certainty: Certainty | null =
-      confidence >= t.confidentAt
+      confidence >= tc.confidentAt
         ? 'confident'
         : confidence >= cfg.minConfidence
           ? 'probable'
@@ -175,28 +175,30 @@ export const temporalClassifier: SkillClassifier = {
       ...base.evidence,
       {
         key: 'temporal_similarity',
-        label: 'Trajectory match',
+        label: t('ev.temporal.label'),
         text: pct(best.sim),
         value: best.sim,
         note: best.m
-          ? `closest reference: ${best.m.reference.kind === 'example' ? 'a labelled example' : 'the expected movement'} of ${e.name}`
+          ? t(best.m.reference.kind === 'example' ? 'ev.temporal.noteExample' : 'ev.temporal.noteModel', {
+              name: elementName(e),
+            })
           : undefined,
       },
       ...(offGridDeg > 25
         ? [
             {
               key: 'rotation_offset',
-              label: 'Rotation from the nearest whole somersault',
+              label: t('ev.offGrid.label'),
               text: `${Math.round(offGridDeg)}°`,
               value: offGridDeg,
-              note: 'an under- or over-rotated somersault, or a quarter-turn skill that is not in the table',
+              note: t('ev.offGrid.note'),
             },
           ]
         : []),
       ...(comparison?.channels ?? []).map((c) => ({
         key: `trajectory_${c.channel}`,
         label: c.label,
-        text: c.distance === null ? '–' : `${c.distance.toFixed(1)} tolerances off`,
+        text: c.distance === null ? '–' : t('ev.tolerances', { d: formatNumber(c.distance, 1) }),
         value: c.distance,
       })),
     ];
@@ -211,14 +213,18 @@ export const temporalClassifier: SkillClassifier = {
     let summary: string;
 
     const measuredText = [
-      `${measured.somersaults.toFixed(2)} somersault${measured.somersaults === 1 ? '' : 's'}`,
+      tp('label.somersaults', measured.somersaults, { n: two(measured.somersaults) }),
       measured.twists === null
-        ? 'twist not measured'
-        : `${measured.twists.toFixed(2)} twist${measured.twists === 1 ? '' : 's'}`,
+        ? t('sum.measuredTwistNone')
+        : tp('label.twists', measured.twists, { n: two(measured.twists) }),
       f.position.label === 'unknown'
-        ? 'position unclear'
-        : `${f.position.label} (hips ${Math.round(f.shape.hipAngle.atPeak ?? NaN)}°, knees ${Math.round(f.shape.kneeAngle.atPeak ?? NaN)}°)`,
-    ].join(', ');
+        ? t('sum.measuredPositionUnclear')
+        : t('sum.measuredPosition', {
+            position: positionWord(f.position.label),
+            hip: `${Math.round(f.shape.hipAngle.atPeak ?? NaN)}°`,
+            knee: `${Math.round(f.shape.kneeAngle.atPeak ?? NaN)}°`,
+          }),
+    ].join(t('list.separator'));
 
     const forced = cfg.forceGuess;
     let guess: SkillPrediction['guess'];
@@ -228,7 +234,12 @@ export const temporalClassifier: SkillClassifier = {
       outConfidence = clamp01((best.blend + twin.blend) * quality);
       outCertainty = outConfidence >= cfg.minConfidence ? 'probable' : 'tentative';
       movement = { ...movementOf(e), direction: null };
-      summary = `${e.somersaults} somersault(s), ${twistLabel(Math.round(e.twists * 2))}, ${e.position}: the direction (front or back) cannot be told (${stages.dir.report.notes[0]}).`;
+      summary = t('sum.directionUnknownTemporal', {
+        n: e.somersaults,
+        twist: twistLabel(Math.round(e.twists * 2)),
+        position: positionWord(e.position),
+        reason: stages.dir.report.notes[0],
+      });
     } else if (certainty || forced) {
       // A name is always given when `forceGuess` is on. Without the direction there are two elements that differ only by it: the likelier
       // one is named, with the confidence of the movement (both directions together), and the other stays among the candidates.
@@ -236,22 +247,38 @@ export const temporalClassifier: SkillClassifier = {
       if (assumedDirection) {
         outConfidence = clamp01((best.blend + twin.blend) * quality);
         outCertainty =
-          outConfidence >= t.confidentAt ? 'confident' : outConfidence >= cfg.minConfidence ? 'probable' : 'tentative';
+          outConfidence >= tc.confidentAt ? 'confident' : outConfidence >= cfg.minConfidence ? 'probable' : 'tentative';
       } else outCertainty = certainty ?? 'tentative';
       skill = legacyId(e);
-      label = e.name;
+      label = elementName(e);
       movement = movementOf(e);
       elementId = e.id;
       if (certainty === null) {
         failure = diagnose(f, stages, best.sc, outOfTable, quality, viewFactorOf(f, cfg));
-        summary = `Best guess ${e.name} (${pct(best.sim)} trajectory match, ${pct(best.sc.posterior)} structural). ${failure.message}`;
+        summary = t('sum.bestGuessTemporal', {
+          name: elementName(e),
+          sim: pct(best.sim),
+          structure: pct(best.sc.posterior),
+          reason: failure.message,
+        });
       } else
-        summary = `${e.name} (${certaintyWord[outCertainty]}, ${pct(outConfidence)}): measured ${measuredText}; ${pct(best.sim)} match to the expected trajectory.`;
-      if (assumedDirection) summary += ` The direction (front or back) was assumed: ${stages.dir.report.notes[0]}.`;
+        summary = t('sum.named', {
+          name: elementName(e),
+          certainty: certaintyWord(outCertainty),
+          conf: pct(outConfidence),
+          measured: measuredText,
+          sim: pct(best.sim),
+        });
+      if (assumedDirection) summary = t('sum.assumedDirection', { summary, reason: stages.dir.report.notes[0] });
       if (certainty === null || assumedDirection) guess = { closest: certainty === null, direction: assumedDirection };
     } else {
       failure = diagnose(f, stages, best.sc, outOfTable, quality, viewFactorOf(f, cfg));
-      summary = `No plausible candidate: the closest is ${e.name} (${pct(best.sim)} trajectory match, ${pct(best.sc.posterior)} structural). ${failure.message}`;
+      summary = t('sum.noPlausible', {
+        name: elementName(e),
+        sim: pct(best.sim),
+        structure: pct(best.sc.posterior),
+        reason: failure.message,
+      });
     }
 
     const scores: Partial<Record<SkillId, number>> = {};
@@ -267,9 +294,9 @@ export const temporalClassifier: SkillClassifier = {
       confidence: outConfidence,
       scores,
       confidenceParts: [
-        { name: 'structure', value: best.sc.posterior },
-        { name: 'trajectory match', value: best.sim },
-        { name: 'data quality', value: quality },
+        { name: t('part.structure'), value: best.sc.posterior },
+        { name: t('part.trajectory'), value: best.sim },
+        { name: t('part.dataQuality'), value: quality },
       ],
       evidence,
       limitations: base.limitations,

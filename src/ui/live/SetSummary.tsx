@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { formatNumber, t, tp } from '../../i18n';
 import type { Session } from '../../coaching/session';
 import { difficultyText, summaryText } from '../../coaching/summary';
 import { Button, Icon, Stat } from '../kit';
@@ -12,13 +13,13 @@ async function share(text: string): Promise<string> {
     const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
     if (touch && typeof navigator.share === 'function') {
       await navigator.share({ text });
-      return 'Shared';
+      return t('live.shared');
     }
     await navigator.clipboard.writeText(text);
-    return 'Copied';
+    return t('live.copied');
   } catch (err) {
     // Closing the share sheet is not a failure.
-    return err instanceof DOMException && err.name === 'AbortError' ? '' : 'Could not copy';
+    return err instanceof DOMException && err.name === 'AbortError' ? '' : t('live.copyFailed');
   }
 }
 
@@ -36,19 +37,23 @@ export function SetSummary({ session, title }: { session: Session; title: string
   };
 
   return (
-    <section className="live-summary" aria-label="The set">
+    <section className="live-summary" aria-label={t('live.set')}>
       <div className="live-summary__top">
         <p className="ins-count">
-          {s.skills} {s.skills === 1 ? 'skill' : 'skills'}
-          {s.pending > 0 && `, ${s.pending} to check`}
-          {s.cutOff > 0 && `, ${s.cutOff} cut off`}
+          {[
+            tp('count.skills', s.skills),
+            s.pending > 0 ? t('live.toCheck', { n: s.pending }) : null,
+            s.cutOff > 0 ? t('live.cutOffCount', { n: s.cutOff }) : null,
+          ]
+            .filter(Boolean)
+            .join(t('list.separator'))}
         </p>
         <span className="live-summary__share">
           <span role="status" className="live-summary__note">
             {note}
           </span>
-          <Button size="sm" onClick={() => void onShare()} title="Copy the skills, scores and what to work on as text">
-            Copy summary
+          <Button size="sm" onClick={() => void onShare()} title={t('live.copyTitle')}>
+            {t('live.copySummary')}
           </Button>
         </span>
       </div>
@@ -56,22 +61,22 @@ export function SetSummary({ session, title }: { session: Session; title: string
       <div className="live-figs">
         <Stat
           className="live-fig"
-          label="Difficulty"
+          label={t('live.difficulty')}
           value={s.skills > 0 ? difficultyText(s.difficulty) : '–'}
-          hint="A repeat counts once"
+          hint={t('live.repeatHint')}
         />
         <Stat
           className="live-fig"
-          label="Execution"
-          value={s.execution === null ? '–' : s.execution.toFixed(1)}
-          hint={s.execution === null ? 'Nothing judged' : 'Estimate, out of 10'}
+          label={t('live.execution')}
+          value={s.execution === null ? '–' : formatNumber(s.execution, 1)}
+          hint={s.execution === null ? t('live.nothingJudged') : t('live.estimate')}
         />
         <Stat
           className="live-fig"
-          label="In the air"
-          value={s.flightS > 0 ? s.flightS.toFixed(1) : '–'}
+          label={t('live.inTheAir')}
+          value={s.flightS > 0 ? formatNumber(s.flightS, 1) : '–'}
           unit={s.flightS > 0 ? 's' : undefined}
-          hint="All skills together"
+          hint={t('live.allSkills')}
         />
       </div>
 
@@ -84,7 +89,7 @@ export function SetSummary({ session, title }: { session: Session; title: string
 
       {s.skills > 0 && (
         <div className="live-focus">
-          <h3 className="live-h">Work on next</h3>
+          <h3 className="live-h">{t('live.workOn')}</h3>
           {s.focus.length > 0 ? (
             <ol className="live-focus__list">
               {s.focus.map((f) => (
@@ -98,10 +103,7 @@ export function SetSummary({ session, title }: { session: Session; title: string
               ))}
             </ol>
           ) : (
-            <p className="live-quiet">
-              Nothing stands out. No deduction was found in what one camera can see, and the landings were near the
-              center.
-            </p>
+            <p className="live-quiet">{t('live.nothingStands')}</p>
           )}
         </div>
       )}

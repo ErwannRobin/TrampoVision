@@ -1,4 +1,4 @@
-import { elementById, movementToElement, type FigElement } from '../skills/fig/elements';
+import { elementById, elementName, movementToElement, type FigElement } from '../skills/fig/elements';
 import type { Certainty, SkillPrediction } from '../skills/types';
 
 /**
@@ -45,7 +45,7 @@ function alternativesOf(
   const add = (elementId: string, score: number) => {
     const e = elementById(elementId);
     if (!e || e.id === chosen.id || out.some((a) => a.elementId === e.id)) return;
-    out.push({ elementId: e.id, name: e.name, difficulty: e.difficulty, score });
+    out.push({ elementId: e.id, name: elementName(e), difficulty: e.difficulty, score });
   };
   // A pose that could not be trusted (a body that seems to flip) can turn a plain jump into a somersault: the same shape without rotation is
   // offered first.

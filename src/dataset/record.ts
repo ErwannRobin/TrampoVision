@@ -1,6 +1,7 @@
 import type { AnalysisResult } from '../analysis/types';
 import { twistSequence, type TwistAnalysis } from '../pose3d/twist';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
+import type { SkillPrediction } from '../skills/types';
 import { figureOf, legacyLabel, normalizeMovement, type MovementLabel } from './movementLabel';
 import { RECORD_SCHEMA, RECORD_VERSION, type JumpRecord, type TruthLabel } from './types';
 
@@ -100,9 +101,53 @@ export function syncRecords(saved: JumpRecord[], ctx: RecordContext, only?: numb
   return indices.map((k) => buildJumpRecord(ctx, k, jumpIds[k], plan[k].prior));
 }
 
+/**
+ * A prediction without its words. The words (the name, the summary, the labels of the evidence, the limits) follow the language of the
+ * moment; the numbers, the ids and the answers do not. Two records of the same jump made in two languages must not look different.
+ */
+function withoutWords(p: SkillPrediction) {
+  const {
+    label: _label,
+    summary: _summary,
+    evidence,
+    limitations,
+    confidenceParts,
+    candidates,
+    stages,
+    failure,
+    comparison,
+    ...rest
+  } = p;
+  return {
+    ...rest,
+    evidence: evidence.map((e) => [e.key, e.value]),
+    limitations: limitations.map((l) => l.id ?? null),
+    confidenceParts: confidenceParts.map((c) => c.value),
+    candidates: candidates?.map(({ name: _name, checks, ...c }) => ({
+      ...c,
+      checks: checks.map((k) => [k.stage, k.status, k.match]),
+    })),
+    stages: stages?.map((s) => [s.stage, s.measured, s.distribution.map((d) => d.p)]),
+    failure: failure && {
+      kind: failure.kind,
+      criterion: failure.criterion,
+      ifResolved: failure.ifResolved,
+      closest: failure.closest?.elementId ?? null,
+      distances: failure.distances.map((d) => [d.stage, d.match]),
+    },
+    comparison: comparison && { ...comparison, channels: comparison.channels.map(({ label: _l, ...c }) => c) },
+  };
+}
+
 /** The measurements and the prediction of a record as one string: two records with the same string are the same result. */
 export function analysisFingerprint(r: JumpRecord): string {
-  return JSON.stringify([r.timestamps, r.features, r.prediction, r.twist?.estimate ?? null]);
+  const estimate = r.twist?.estimate;
+  return JSON.stringify([
+    r.timestamps,
+    r.features,
+    withoutWords(r.prediction),
+    estimate ? { ...estimate, limitations: estimate.limitations.map((l) => l.id ?? null) } : null,
+  ]);
 }
 
 /** True when the saved record differs from what the current settings give for the same jump. */

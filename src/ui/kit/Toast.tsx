@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 import { Button } from './Button';
 
 /** Work that runs in the background (an export): what it is, how far along, and a way to stop it. */
@@ -27,7 +28,7 @@ export function ActivityToast({
       </div>
       {onCancel && (
         <Button variant="ghost" size="sm" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       )}
     </div>

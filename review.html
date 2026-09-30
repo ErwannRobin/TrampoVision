@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>TrampoVision review</title>
+    <title data-i18n="rv.title">TrampoVision review</title>
     <style>
       :root {
         --bg: #f6f6f4;
@@ -118,6 +118,17 @@
       body.out #tabs,
       body.out #who {
         display: none;
+      }
+      #lang {
+        font: inherit;
+        padding: 5px 8px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink);
+      }
+      body.out #lang {
+        margin-left: auto;
       }
 
       /* ---- layout ---- */
@@ -493,27 +504,35 @@
   </head>
   <body class="out">
     <header>
-      <a class="back" href="/">← Home</a>
-      <h1>Review jumps</h1>
-      <div id="tabs" role="tablist" aria-label="Which jumps"></div>
-      <input id="who" type="text" placeholder="Your name" size="12" aria-label="Your name" />
+      <a class="back" href="/" data-i18n="rv.home">← Home</a>
+      <h1 data-i18n="rv.heading">Review jumps</h1>
+      <div id="tabs" role="tablist" aria-label="Which jumps" data-i18n-attr="aria-label:rv.tabs"></div>
+      <input
+        id="who"
+        type="text"
+        placeholder="Your name"
+        size="12"
+        aria-label="Your name"
+        data-i18n-attr="placeholder:rv.who;aria-label:rv.who"
+      />
+      <select id="lang" aria-label="Language" data-i18n-attr="aria-label:rv.language"></select>
     </header>
 
     <section id="login" class="card" style="margin: 16px; max-width: 420px">
-      <h2>Review unavailable</h2>
+      <h2 data-i18n="rv.unavailable">Review unavailable</h2>
       <p id="loginerr" class="muted"></p>
-      <a href="/">Back to the home page</a>
+      <a href="/" data-i18n="rv.backHome">Back to the home page</a>
     </section>
 
     <main id="app" hidden>
-      <aside id="list" class="card" aria-label="Jumps">
+      <aside id="list" class="card" aria-label="Jumps" data-i18n-attr="aria-label:rv.jumps">
         <h2 id="listtitle">To review</h2>
         <ul class="queue" id="queue"></ul>
         <p id="empty" class="muted" hidden>Nothing here. All done!</p>
       </aside>
 
       <div id="detail" hidden>
-        <section class="card answer" aria-label="Automatic answer">
+        <section class="card answer" aria-label="Automatic answer" data-i18n-attr="aria-label:rv.auto">
           <div>
             <h2 id="progress">Automatic answer</h2>
             <div id="autoname"></div>
@@ -526,9 +545,15 @@
           <div class="muted" id="ident"></div>
         </section>
 
-        <section class="card visual" aria-label="The jump">
+        <section class="card visual" aria-label="The jump" data-i18n-attr="aria-label:rv.theJump">
           <div>
-            <canvas id="skel" width="280" height="320" aria-label="Skeleton replay"></canvas>
+            <canvas
+              id="skel"
+              width="280"
+              height="320"
+              aria-label="Skeleton replay"
+              data-i18n-attr="aria-label:rv.skeleton"
+            ></canvas>
             <div class="row" style="margin-top: 8px">
               <button class="act" id="play" type="button">Play</button>
               <input
@@ -540,44 +565,78 @@
                 value="0"
                 style="flex: 1"
                 aria-label="Position in the jump"
+                data-i18n-attr="aria-label:rv.position"
               />
             </div>
           </div>
           <div>
-            <canvas id="curves" width="560" height="320" aria-label="Measured curves"></canvas>
+            <canvas
+              id="curves"
+              width="560"
+              height="320"
+              aria-label="Measured curves"
+              data-i18n-attr="aria-label:rv.curves"
+            ></canvas>
             <div class="facts" id="measured"></div>
             <p class="muted" id="summary" style="margin: 8px 0 0"></p>
           </div>
         </section>
 
-        <section class="card" id="fix" aria-label="Pick the figure">
-          <h2>Not right? Pick the figure</h2>
+        <section class="card" id="fix" aria-label="Pick the figure" data-i18n-attr="aria-label:rv.pick">
+          <h2 data-i18n="rv.notRight">Not right? Pick the figure</h2>
           <div id="cands"></div>
           <div class="builder" id="builder">
-            <span class="lab">Somersaults</span>
+            <span class="lab" data-i18n="picker.somersaults">Somersaults</span>
             <div class="chips" data-field="s"></div>
-            <span class="lab" id="dirlab">Direction</span>
+            <span class="lab" id="dirlab" data-i18n="picker.direction">Direction</span>
             <div class="chips" data-field="d"></div>
-            <span class="lab">Twists</span>
+            <span class="lab" data-i18n="picker.twists">Twists</span>
             <div class="chips" data-field="t"></div>
-            <span class="lab">Position</span>
+            <span class="lab" data-i18n="picker.position">Position</span>
             <div class="chips" data-field="p"></div>
           </div>
           <button class="act" id="savepick" type="button"></button>
         </section>
 
         <details class="card" id="debugbox">
-          <summary class="muted">Debug</summary>
+          <summary class="muted" data-i18n="rv.debug">Debug</summary>
           <pre id="debug"></pre>
         </details>
 
-        <input id="note" type="text" placeholder="Note about this jump (optional)" aria-label="Note" />
-        <div class="bar" role="group" aria-label="Verdict">
-          <button class="act" id="prev" type="button" aria-label="Previous jump" title="Previous (←)">←</button>
+        <input
+          id="note"
+          type="text"
+          placeholder="Note about this jump (optional)"
+          aria-label="Note"
+          data-i18n-attr="placeholder:rv.note;aria-label:rv.noteAria"
+        />
+        <div class="bar" role="group" aria-label="Verdict" data-i18n-attr="aria-label:rv.verdictGroup">
+          <button
+            class="act"
+            id="prev"
+            type="button"
+            aria-label="Previous jump"
+            title="Previous (←)"
+            data-i18n-attr="aria-label:rv.previous;title:rv.previousTitle"
+          >
+            ←
+          </button>
           <button class="act primary" id="confirm" type="button"></button>
-          <button class="act" id="unknown" type="button" title="Cannot tell (U)">Cannot tell <kbd>U</kbd></button>
-          <button class="act" id="baddata" type="button" title="Bad data (B)">Bad data <kbd>B</kbd></button>
-          <button class="act" id="skip" type="button" title="Next (→)">Skip <kbd>→</kbd></button>
+          <button
+            class="act"
+            id="unknown"
+            type="button"
+            title="Cannot tell (U)"
+            data-i18n-attr="title:rv.cannotTellTitle"
+          >
+            <span data-i18n="rv.cannotTell">Cannot tell</span> <kbd>U</kbd>
+          </button>
+          <button class="act" id="baddata" type="button" title="Bad data (B)" data-i18n-attr="title:rv.badDataTitle">
+            <span data-i18n="rv.badData">Bad data</span> <kbd>B</kbd>
+          </button>
+          <button class="act" id="skip" type="button" title="Next (→)" data-i18n-attr="title:rv.skipTitle">
+            <span data-i18n="rv.skip">Skip</span> <kbd>→</kbd>
+          </button>
           <p id="err" role="alert" style="flex-basis: 100%"></p>
         </div>
       </div>
