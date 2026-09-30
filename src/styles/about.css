@@ -1,0 +1,90 @@
+/* About page: one reading column. Structure by space and hairlines, like the rest of the app. */
+
+.about {
+  width: 100%;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 16px var(--gutter) 72px;
+}
+.about__title {
+  margin-top: 20px;
+  font-size: var(--fs-2xl);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  overflow-wrap: break-word;
+}
+.about__title:focus {
+  outline: none;
+}
+.about__lead {
+  margin-top: 18px;
+  color: var(--text-2);
+  font-size: var(--fs-lg);
+  line-height: 1.5;
+}
+.about__section {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.about h2 {
+  margin-bottom: 12px;
+  font-size: var(--fs-xl);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+.about h3 {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.about p,
+.about li {
+  font-size: var(--fs-md);
+  line-height: 1.55;
+}
+.about p + p {
+  margin-top: 12px;
+}
+.about__section > ul {
+  display: grid;
+  gap: 10px;
+  padding-left: 1.2em;
+  list-style: disc;
+}
+.about__steps {
+  display: grid;
+  gap: 22px;
+  margin-top: 20px;
+  padding-left: 1.6em;
+  list-style: decimal;
+}
+.about__steps li::marker {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.about__steps p {
+  margin-top: 4px;
+  color: var(--text-2);
+}
+.about__link {
+  color: var(--text);
+  font-weight: 550;
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+}
+.about__link:hover {
+  text-decoration-color: currentColor;
+}
+.about__link:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The app keeps its main part mounted behind the page (a clip and its analysis stay); `display: flex` would override `hidden`. */
+.app__main[hidden] {
+  display: none;
+}

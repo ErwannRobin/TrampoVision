@@ -26,6 +26,7 @@ export const chrome: Translation<typeof en> = {
   'topbar.export': 'エクスポート',
   'topbar.settings': '設定',
   'topbar.openAnother': '別の動画を開く',
+  'topbar.about': 'TrampoVision について',
 
   'shortcuts.title': 'キーボードショートカット',
   'shortcuts.playPause': '再生／一時停止',
@@ -51,6 +52,7 @@ export const chrome: Translation<typeof en> = {
   'landing.noteCamera':
     '最良の結果を得るには、カメラを横から水平に固定し、トランポリン全体を画角に収め、最初の技の踏み切りから最後の技の着地まで選手が映るようにしてください。',
   'landing.notePrivacy': 'ブラウザー上で動作します。動画が端末の外に出ることはありません。',
+  'landing.about': 'TrampoVision について',
   'landing.savedDataset': '保存済みデータセット',
 
   'status.warning': '要確認',

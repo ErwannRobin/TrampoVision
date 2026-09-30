@@ -1,3 +1,4 @@
+import { about } from './about';
 import { chrome } from './chrome';
 import { classifier } from './classifier';
 import { coach } from './coach';
@@ -23,4 +24,5 @@ export const en = {
   ...review,
   ...errors,
   ...reviewer,
+  ...about,
 } as const;

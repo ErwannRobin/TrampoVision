@@ -17,6 +17,9 @@ export interface TopBarProps {
   /** The settings popup is open. */
   setupOpen: boolean;
   onOpenSetup: () => void;
+  /** The About page is open; `onAbout` opens it. */
+  aboutOpen: boolean;
+  onAbout: () => void;
   /** Choose another video (null hides the button, e.g. while analyzing). */
   onFile: ((file: File) => void) | null;
   /** Go back to the first screen (the logo); null when already there. */
@@ -38,6 +41,8 @@ export function TopBar({
   exportGroups,
   setupOpen,
   onOpenSetup,
+  aboutOpen,
+  onAbout,
   onFile,
   onHome,
 }: TopBarProps) {
@@ -83,6 +88,7 @@ export function TopBar({
           aria-expanded={setupOpen}
           onClick={onOpenSetup}
         />
+        <IconButton icon="info" label={t('topbar.about')} pressed={aboutOpen} onClick={onAbout} />
         {onFile && (
           <label className="icon-btn topbar__open" data-tip={t('topbar.openAnother')}>
             <Icon name="plus" size={18} />

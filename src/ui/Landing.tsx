@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { t } from '../i18n';
 import { REVIEW_API_URL, fetchQueueCount } from '../sync/reviewSync';
 import type { DatasetApi } from '../dataset/useDataset';
+import { ABOUT_HASH } from './chrome/aboutRoute';
 import { HeroArcs } from './chrome/HeroArcs';
 import { DemoSkeleton } from './DemoSkeleton';
 import { DatasetBar, EvaluationReport } from './EvaluationView';
@@ -120,6 +121,9 @@ export function Landing({ onFile, onSample, onOpenSeries, dataset, busy, advance
             </label>
           )}
           {advanced && REVIEW_API_URL && <ReviewLink />}
+          <a className="landing__link" href={ABOUT_HASH}>
+            {t('landing.about')}
+          </a>
           <ul className="landing__notes">
             <li>
               <Icon name="video" size={17} />

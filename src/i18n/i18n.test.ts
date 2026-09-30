@@ -31,6 +31,7 @@ import {
   type Locale,
 } from './index';
 import { messages } from './messages';
+import { about } from './messages/en/about';
 import { chrome } from './messages/en/chrome';
 import { classifier } from './messages/en/classifier';
 import { coach } from './messages/en/coach';
@@ -66,7 +67,20 @@ const others = LOCALES.filter((l) => l !== 'en');
 
 describe('the messages', () => {
   it('have a key in one domain only', () => {
-    const domains = [chrome, classifier, coach, coaching, errors, insights, names, review, reviewer, twist, viewer];
+    const domains = [
+      about,
+      chrome,
+      classifier,
+      coach,
+      coaching,
+      errors,
+      insights,
+      names,
+      review,
+      reviewer,
+      twist,
+      viewer,
+    ];
     const seen = new Map<string, number>();
     domains.forEach((d, i) =>
       Object.keys(d).forEach((k) => {
@@ -130,6 +144,7 @@ describe('the messages', () => {
 /** Messages that read the same in French or in German because the word is the same there (a cognate). */
 const SAME_IN: Partial<Record<Locale, string[]>> = {
   fr: [
+    'about.inspirationTitle',
     'setup.trampoline',
     'ev.rotation.label',
     'part.structure',
@@ -163,6 +178,7 @@ const SAME_IN: Partial<Record<Locale, string[]>> = {
     'rv.somTriple',
   ],
   de: [
+    'about.inspirationTitle',
     'setup.appearanceSystem',
     'stage.region',
     'stage.viewVideo',

@@ -26,6 +26,7 @@ export const chrome: Translation<typeof en> = {
   'topbar.export': 'Exportieren',
   'topbar.settings': 'Einstellungen',
   'topbar.openAnother': 'Anderes Video öffnen',
+  'topbar.about': 'Über TrampoVision',
 
   'shortcuts.title': 'Tastenkürzel',
   'shortcuts.playPause': 'Wiedergabe oder Pause',
@@ -51,6 +52,7 @@ export const chrome: Translation<typeof en> = {
   'landing.noteCamera':
     'Die besten Ergebnisse liefert eine feststehende, waagerechte Kamera an der Seite, mit dem ganzen Trampolin im Bild und dem Athleten im Blick – vom Absprung des ersten bis zur Landung des letzten Elements.',
   'landing.notePrivacy': 'Läuft in Ihrem Browser. Das Video verlässt Ihr Gerät nie.',
+  'landing.about': 'Über TrampoVision',
   'landing.savedDataset': 'Gespeicherter Datensatz',
 
   'status.warning': 'Bitte prüfen',

@@ -1,26 +1,39 @@
 # TrampoVision (prototype)
 
-Browser-only prototype that turns a trampoline video into a **clean, normalized time series**: skeleton, center of
-mass (COM), trajectory, body orientation and rotation, plus the jump cycle (takeoff, apex, landing). **No backend,
-no database, no LLM: the video never leaves the browser and every number comes from simple, explainable math.**
+Film a trampoline set and TrampoVision tells you **what each skill was, what it is worth (FIG difficulty), a proposed execution score and what to fix**. It is a browser-only prototype: **no backend, no database, no LLM. The video never leaves the browser and every number comes from simple, explainable math.**
 
-Stage 1 asks:
+Under the hood it turns the video into a **clean, normalized time series** (skeleton, center of mass, trajectory, body orientation and rotation, and the jump cycle: takeoff, apex, landing) and reads the skills from that.
 
-> Can we reliably turn a trampoline video into a clean, normalized time series of skeleton + center of mass +
-> trajectory + body rotation?
+The same explanation, written for users, is in the app: the **About** page (the info button in the top bar, or the address `#about`). It is available in English, French, German and Japanese.
 
-Stage 2 (this version) is a first **skill-recognition prototype** for five basic skills, built to answer a different question:
+## Contents
 
+- [How it works in short](#how-it-works-in-short)
+- [Run](#run) and [Live view](#live-view-the-default) (the default screen) and [Use (advanced)](#use-advanced)
+- [Languages](#languages) and [Pipeline and code map](#pipeline-and-code-map)
+- [What is computed](#what-is-computed), [Skill recognition](#skill-recognition-prototype) and [3D pose and twist](#3d-pose-and-twist-experimental)
+- [Validation workflow](#validation-workflow-dataset-evaluation-failure-cases), [Review service](#review-service-optional) and [Accuracy](#accuracy-what-has-and-has-not-been-checked)
+- [Limitations](#limitations-please-read), [Inspiration, rules and related work](#inspiration-rules-and-related-work) and [Asset host](#asset-host)
+
+## How it works in short
+
+1. **Read** the video frame by frame (about 30 analyzed frames a second, whatever the video's rate).
+2. **Pose**: MediaPipe Pose Landmarker (BlazePose) finds 33 body points per frame, on the GPU when possible, else the CPU (WebAssembly).
+3. **Clean**: low-confidence points dropped, glitches rejected, short gaps bridged, every path smoothed.
+4. **Center of mass and jumps**: a 14-segment COM; takeoff, apex and landing from its height, where free fall starts and ends.
+5. **Rotation and shape**: unwrapped trunk angle, hip and knee angles, facing direction.
+6. **Name the skill**: a rule-based classifier against a table of FIG elements; always a best guess, flagged when unsure.
+7. **Score**: difficulty by the FIG rule (§17.1, checked against the Code's 139 examples); execution proposed from the §20.2 deductions one side camera can see.
+
+Two questions drove the work, and the app answers "not from this signal" where the signal is missing instead of guessing:
+
+> Can we reliably turn a trampoline video into a clean, normalized time series of skeleton + center of mass + trajectory + body rotation?
+>
 > Do the extracted skeleton and temporal features contain enough information to reliably distinguish trampoline movements?
 
-Where the answer is "not from this signal", the app says so and names the missing signal instead of guessing
-(see _Skill recognition_ below).
+The **live view** (the default screen, see _Live view_) is the tool for a coach or an athlete on the trampoline: each skill gets a name (always a best guess), its **difficulty**, a proposed **execution** score and what to fix, and the coach corrects any guess in one tap, which the app learns from. Everything else is behind an **Advanced** switch in the settings.
 
-The **live view** (the default screen, described in _Live view_ below) turns that into a tool for a coach or an athlete on the trampoline: film a set, and it names each skill (always a best guess), works out its **difficulty** by the FIG rule, proposes an **execution** score, and says what to fix. The coach can correct any guess in one tap, and the app learns from it. Everything else is behind an **Advanced** switch in the settings.
-
-Stage 3 (this version) is about **validating that scientifically**: you label jumps, the app saves them locally with everything it measured, and computes
-accuracy, precision, recall and a confusion matrix, with a list of the failures and the numbers behind each one. It also adds an **experimental 3D pose view
-and twist estimate** that is honest about when it cannot be trusted (see _Validation workflow_ and _3D pose and twist_ below).
+A third line of work is **validating this scientifically**: you label jumps, the app saves them locally with everything it measured, and computes accuracy, precision, recall and a confusion matrix, with the failures and the numbers behind each one. It also has an **experimental 3D pose view and twist estimate** that says when it cannot be trusted (see _Validation workflow_ and _3D pose and twist_).
 
 ## Run
 
@@ -87,11 +100,11 @@ The interface adapts from phones to wide screens and follows the system's light 
 
 ## Languages
 
-The whole interface is in **English, French, German and Japanese**: the skill names, the coaching text and tips, the classifier's explanations, the errors, the charts, the canvas labels and the review page (`review.html`). The app opens in the first language of the browser that it speaks (else English); the globe menu in the top bar changes it, and the choice is remembered. Files you export (JSON, CSV, the exported video) keep the English skill names and field names, so a dataset stays comparable whatever the language of the person who labelled it.
+The whole interface is in **English, French, German and Japanese**: the skill names, the coaching text and tips, the classifier's explanations, the errors, the charts, the canvas labels and the About page and the review page (`review.html`). The app opens in the first language of the browser that it speaks (else English); the globe menu in the top bar changes it, and the choice is remembered. Files you export (JSON, CSV, the exported video) keep the English skill names and field names, so a dataset stays comparable whatever the language of the person who labelled it.
 
 How it is built (`src/i18n/`):
 
-- **English is the source.** `src/i18n/messages/en/*.ts` hold every message, one file per part of the app; `fr/`, `de/` and `ja/` have the same files. The type `Dictionary` makes a missing key a compile error, and `src/i18n/i18n.test.ts` checks that each language has exactly the keys of English, the same `{holes}` in every form, no untranslated English (a name or a shared word is listed on purpose), and no key written twice.
+- **English is the source.** `src/i18n/messages/en/*.ts` hold every message, one file per part of the app (`about.ts` holds the About page); `fr/`, `de/` and `ja/` have the same files. The type `Dictionary` makes a missing key a compile error, and `src/i18n/i18n.test.ts` checks that each language has exactly the keys of English, the same `{holes}` in every form, no untranslated English (a name or a shared word is listed on purpose), and no key written twice.
 - **Reading a message.** `t(key, params)` fills the `{holes}`; `tp(key, count, params)` picks the singular or the plural form of the language (`Intl.PluralRules`); `tx(key, holes)` fills holes with React nodes; `formatNumber`, `formatDecimal` and `formatPercent` write numbers as the language does (0,6 in French and German). French gets its no-break spaces before `: ; ? !` from `t`, so the messages are written with plain spaces.
 - **Loading.** A language is a separate chunk of the build and the first screen waits for the one in use, so a visitor downloads the one they read. Modules that are not UI (the analysis, the classifier, the review worker) import `i18n/core`, which has no React.
 - **Text made by an analysis** (a prediction's summary, a tip, a limitation) is written in the language in use when it is made and is rebuilt when the language changes. A name stored in data (`FigElement.name`) stays English; `elementName(element)` gives the one to show. A saved record and its fingerprint do not depend on the language.
@@ -135,6 +148,7 @@ video ─► extractPoseTrack ─► PoseTrack ─► stabilizePose ─► compu
 | `src/skills/fig/difficulty.ts`, `elements.ts`             | The FIG difficulty rule (§17.1), the table of examples it is checked against, and the element table it fills.                                  |
 | `src/coaching/guess.ts`, `session.ts`, `display.ts`       | The call for every jump (the coach's label, else the classifier's guess), the set with its totals, and the names shown on the video.           |
 | `src/coaching/execution.ts`, `config.ts`, `tips.ts`       | The proposed execution (FIG §20.2 deductions from the pose), its thresholds, and the tips and the focus of a set.                              |
+| `src/ui/About.tsx`, `src/ui/chrome/aboutRoute.ts`         | The About page (how it works, privacy, limits, inspiration and links) and its `#about` address; the top bar and the first screen link to it.   |
 | `src/ui/live/*`, `styles/live.css`                        | The live rail: the set, one row per skill, the opened skill, the correction picker.                                                            |
 | `src/dataset/record.ts`, `types.ts`, `videoId.ts`         | The saved jump record (`JumpRecord`), how records are built, matched and refreshed, and the stable video id.                                   |
 | `src/dataset/store.ts`, `useDataset.ts`                   | Local storage in the browser (IndexedDB, memory fallback), merge on import.                                                                    |
@@ -487,6 +501,18 @@ cameras that are not level. Real COM estimates also move with arm and leg motion
   The exceptions are the review service, when the build is configured with `VITE_REVIEW_API_URL` (see _Review service_), and the asset host, when it has `VITE_ASSET_BASE_URL` (see _Asset host_; read only: models, wasm and the sample are downloaded, nothing is sent). Only those origins are then let through. Without those variables the app is local-only as described here.
   What is stored in the browser: the calibration corners per file name and size (`localStorage`), and the jump dataset you save (IndexedDB `trampovision`: measurements, predictions and labels, never the video). _Delete all_ in the Review tab (_Dataset on this computer_) removes the dataset.
 - Multi-person scenes: the athlete is followed by continuity; a coach walking next to the athlete can still steal the track.
+
+## Inspiration, rules and related work
+
+- **Inspiration:** the French trampoline club [Paris Trampo 12](https://paristrampo12.com/).
+- **The rules:** difficulty and execution follow the FIG Code of Points; the official rules and manuals are at [gymnastics.sport/site/rules](https://www.gymnastics.sport/site/rules/). TrampoVision is not an official FIG tool and its scores are not official.
+- **Similar projects and research** (further reading; TrampoVision has not been compared with them):
+  - [Article on J-STAGE (2025)](https://www.jstage.jst.go.jp/article/sit/2025/0/2025_A-1-6/_article/-char/en)
+  - [Record on CiNii Research](https://cir.nii.ac.jp/crid/1390870696565894656)
+  - [Article on PubMed Central (PMC12473961)](https://pmc.ncbi.nlm.nih.gov/articles/PMC12473961/)
+  - [BounceBoard, a project on Devpost](https://devpost.com/software/bounceboard)
+
+The same list is on the About page. The links are in `src/ui/About.tsx`; the texts around them are in `src/i18n/messages/*/about.ts`.
 
 ## Asset host
 
