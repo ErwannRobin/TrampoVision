@@ -364,7 +364,8 @@ Keeps every export and prop: `DatasetBar`, `EvaluatePanel`, `EvaluationReport`. 
 
 **TopBar** (56px, `<header class="topbar">`). Left: the logo (a button when `onHome`), then the clip name (truncated,
 `title` shows it whole) and its detail line in muted text (spacing, not dots). Right: the language `Menu` (`LanguageMenu`: an icon below 720px; its list lines up with the button's
-left edge, not its right, when the athlete/coach switch is shown, so it stays on screen on a phone), the athlete/coach `Segmented` when
+left edge, not its right, when the athlete/coach switch is shown, and up to 420px it hangs from the bar's gutters, so that it
+stays on screen wherever the button is), the athlete/coach `Segmented` when
 `showAudience`, the export `Menu` when `exportGroups`, a settings `IconButton` (pressed when `setupOpen`), an "Open
 video" icon button wrapping a hidden file input (accept mp4/mov; hidden when `onFile` is null), and a keyboard-shortcuts
 popover (icon button; also opened by `?`) listing: Space play or pause; left and right arrows previous and next frame;

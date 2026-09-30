@@ -78,13 +78,26 @@
   outline-offset: 2px;
 }
 
-/* The language list is the only way to change the language, so it has to fit on a 320px screen whichever edge it opens from. */
+/*
+ * The language list is the only way to change the language, so it has to fit from 320px up wherever the button is (the bar holds
+ * up to six buttons). On a phone it hangs from the bar's gutters instead of from its button.
+ */
 .langmenu {
   display: contents;
 }
 @media (max-width: 420px) {
+  .topbar {
+    position: relative;
+  }
+  .langmenu .menu {
+    position: static;
+  }
   .langmenu .menu__panel {
-    min-width: 200px;
+    top: calc(100% + 2px);
+    right: 12px;
+    left: 12px;
+    min-width: 0;
+    max-width: none;
   }
 }
 
