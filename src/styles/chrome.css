@@ -78,6 +78,16 @@
   outline-offset: 2px;
 }
 
+/* The language list is the only way to change the language, so it has to fit on a 320px screen whichever edge it opens from. */
+.langmenu {
+  display: contents;
+}
+@media (max-width: 420px) {
+  .langmenu .menu__panel {
+    min-width: 200px;
+  }
+}
+
 /* The bar's buttons sit at the right edge: their tooltips hang from the button's right edge, not its center. */
 @media (hover: hover) {
   .topbar [data-tip]::after {
