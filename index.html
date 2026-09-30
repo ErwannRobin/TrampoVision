@@ -7,6 +7,13 @@
     <meta name="theme-color" content="#eceef1" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b0c0e" media="(prefers-color-scheme: dark)" />
     <title>TrampoVision</title>
+    <!-- Add to Home Screen: a full-screen app with its own icon. iOS reads the apple-* tags, the others read the manifest. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="TrampoVision" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2314161a'/%3E%3Cpath d='M5 25Q16-3 27 25' fill='none' stroke='%23f1f2f4' stroke-width='2.6' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='11' r='3.4' fill='%23ffc933'/%3E%3C/svg%3E"

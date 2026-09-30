@@ -33,6 +33,8 @@ npm run build        # production build (adds a strict Content-Security-Policy)
 
 Link previews (Open Graph / Twitter card) use `public/og-image.png` (source: `scripts/og-image.html`, rendered at 1200×630). Crawlers need absolute URLs, so the build adds `og:url` and `og:image` from `SITE_URL`, else Vercel's `VERCEL_PROJECT_PRODUCTION_URL`, else `https://trampo-vision.vercel.app`.
 
+**Home screen.** The app can be added to a phone's or tablet's home screen (Share → Add to Home Screen on iOS, Install on Android and desktop Chrome) and then opens full screen with its own icon. It has a web manifest (`public/manifest.webmanifest`) and no service worker, so it still needs a connection to load. The icons in `public/` (`apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`) are drawn from the logo by `scripts/icons.mjs`; `make icons` re-renders them.
+
 `npm install` needs internet once (models come from Google's public MediaPipe bucket). Afterwards the app
 works offline. If the download failed, run `npm run fetch-assets`.
 
