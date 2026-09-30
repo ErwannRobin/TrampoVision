@@ -15,6 +15,7 @@ export interface ProcessingOverlayProps {
 }
 
 const LOADING_TEXT = {
+  downloading: 'Loading the sample video',
   reading: 'Reading the video',
   measuring: 'Measuring the frame rate',
   converting: 'Converting the video for this browser',
@@ -39,7 +40,7 @@ export function ProcessingOverlay({ status, ready, fileName, backend, onAnalyze,
 
   if (status.kind === 'loading') {
     const converting = status.stage === 'converting';
-    const progress = converting ? (status.progress ?? 0) : undefined;
+    const progress = converting || status.stage === 'downloading' ? (status.progress ?? 0) : undefined;
     return (
       <div className="busy" role="status">
         <div className="busy__panel">

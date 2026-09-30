@@ -16,14 +16,29 @@ export interface TranscodeOptions {
   signal?: AbortSignal;
 }
 
+const clockSeconds = (m: RegExpExecArray) => Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+
 export async function transcodeToH264(file: File, opts: TranscodeOptions = {}): Promise<Blob> {
   const { FFmpeg } = await import('@ffmpeg/ffmpeg');
   const ffmpeg = new FFmpeg();
   const abort = () => ffmpeg.terminate();
   opts.signal?.addEventListener('abort', abort);
   try {
-    ffmpeg.on('progress', ({ progress }) => {
-      if (Number.isFinite(progress)) opts.onProgress?.(Math.min(1, Math.max(0, progress)));
+    // ffmpeg's own `progress` event stays at 0 for some inputs (HEVC .mov with rotation metadata), so the
+    // log lines ("Duration: ..." once, then "time=..." per update) are read too. The bar only moves forward.
+    let duration = 0;
+    let best = 0;
+    const report = (fraction: number) => {
+      if (!Number.isFinite(fraction) || fraction <= best) return;
+      best = Math.min(1, fraction);
+      opts.onProgress?.(best);
+    };
+    ffmpeg.on('progress', ({ progress }) => report(progress));
+    ffmpeg.on('log', ({ message }) => {
+      const total = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(message);
+      if (total) duration = clockSeconds(total);
+      const now = /time=(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(message);
+      if (now && duration > 0) report(clockSeconds(now) / duration);
     });
     await ffmpeg.load({ coreURL, wasmURL });
     await ffmpeg.writeFile('input', new Uint8Array(await file.arrayBuffer()));

@@ -137,6 +137,10 @@
   animation: fade-in var(--t-med) var(--ease);
   pointer-events: auto;
 }
+.busy--page .busy {
+  position: fixed;
+  z-index: 50;
+}
 .busy__panel {
   display: grid;
   justify-items: center;

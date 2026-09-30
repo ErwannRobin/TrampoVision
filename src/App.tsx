@@ -271,9 +271,11 @@ export default function App() {
 
   async function onSample() {
     if (!samplePath) return;
-    setStatus({ kind: 'loading', stage: 'reading' });
+    setStatus({ kind: 'loading', stage: 'downloading', progress: 0 });
     try {
-      await onFile(await loadSample(samplePath));
+      await onFile(
+        await loadSample(samplePath, (progress) => setStatus({ kind: 'loading', stage: 'downloading', progress })),
+      );
     } catch (err) {
       setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
     }
@@ -818,13 +820,27 @@ export default function App() {
       <main className="app__main">
         {hasClip && <h1 className="sr-only">{result ? `Analysis of ${fileName}` : `Set up ${fileName}`}</h1>}
         {!hasClip ? (
-          <Landing
-            onFile={(f) => void onFile(f)}
-            onSample={samplePath ? () => void onSample() : null}
-            onOpenSeries={(f) => void openSeries(f)}
-            dataset={dataset}
-            busy={loading}
-          />
+          <>
+            {loading && (
+              <div className="busy--page">
+                <ProcessingOverlay
+                  status={status}
+                  ready={false}
+                  fileName=""
+                  backend=""
+                  onAnalyze={() => undefined}
+                  onCancel={() => undefined}
+                />
+              </div>
+            )}
+            <Landing
+              onFile={(f) => void onFile(f)}
+              onSample={samplePath ? () => void onSample() : null}
+              onOpenSeries={(f) => void openSeries(f)}
+              dataset={dataset}
+              busy={loading}
+            />
+          </>
         ) : (
           <>
             <div className="workspace">

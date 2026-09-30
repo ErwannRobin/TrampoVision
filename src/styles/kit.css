@@ -630,13 +630,9 @@
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
-  transition: stroke-dashoffset var(--t-med) linear;
 }
 .ring--indeterminate svg {
   animation: spin 1.1s linear infinite;
-}
-.ring--indeterminate .ring__value {
-  stroke-dasharray: 28 100;
 }
 
 /* Stat: a measurement with its label under it. ------------------------------------------------------------------- */
