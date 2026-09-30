@@ -29,7 +29,7 @@ export function DatasetBar({ dataset, baseName, onSaveAll, saveCount, canSave }:
   };
   const storage =
     dataset.kind === 'indexeddb'
-      ? 'Stored in this browser only (IndexedDB). Nothing is uploaded.'
+      ? 'Stored in this browser (IndexedDB).'
       : dataset.kind === 'memory'
         ? 'Kept in memory only.'
         : 'Opening the local database…';

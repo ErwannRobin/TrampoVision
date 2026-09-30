@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev build preview typecheck lint format format-check test test-watch check assets convert clean distclean
+.PHONY: worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets convert clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -37,7 +37,7 @@ test: node_modules ## Run unit tests once
 test-watch: node_modules ## Run tests in watch mode
 	npx vitest
 
-check: typecheck lint format-check test ## Typecheck, lint, format check, tests (what CI runs)
+check: typecheck worker-check lint format-check test ## Typecheck, lint, format check, tests (what CI runs)
 
 assets: node_modules ## Re-download MediaPipe runtime + pose models into public/
 	npm run fetch-assets
@@ -51,3 +51,12 @@ clean: ## Remove build output
 
 distclean: clean ## Also remove node_modules and downloaded assets
 	rm -rf node_modules public/mediapipe public/models
+
+worker-check: node_modules ## Typecheck the review Worker (worker/)
+	cd worker && npx tsc -p .
+
+worker-dev: node_modules ## Run the review Worker locally on :8799 (needs worker/.dev.vars with INGEST_TOKEN and REVIEW_TOKEN)
+	cd worker && npx wrangler d1 execute trampovision-review --local --file=schema.sql && npx wrangler dev --local --port 8799
+
+worker-deploy: node_modules ## Deploy the review Worker (after wrangler d1 create, and wrangler secret put INGEST_TOKEN / REVIEW_TOKEN)
+	cd worker && npx wrangler d1 execute trampovision-review --remote --file=schema.sql && npx wrangler deploy

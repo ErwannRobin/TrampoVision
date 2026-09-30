@@ -2,9 +2,13 @@ import type { ScaleSource } from '../../analysis/types';
 import type { ModelVariant, Point } from '../../pose/types';
 import { setupState } from '../chrome/setupState';
 import { Button, Field, Icon, NumberField, Segmented, SelectField, Switch } from '../kit';
+import { syncStatusText } from '../../sync/reviewSync';
+import type { SyncState } from '../../sync/useReviewSync';
 import type { Appearance } from '../types';
 
 export interface SetupPanelProps {
+  /** Present when the app has a review service to send the analyzed jumps to. */
+  review?: { enabled: boolean; onEnabled: (on: boolean) => void; state: SyncState; posted: number };
   hasVideo: boolean;
   hasResult: boolean;
   /** What the app is doing now; controls are locked while it works. */
@@ -136,6 +140,23 @@ export function SetupPanel(props: SetupPanelProps) {
           hint="Scales the measurements in meters when the trampoline is not marked."
         />
       </section>
+
+      {props.review && (
+        <section className="setup__section" aria-labelledby="setup-review">
+          <h3 className="setup__label" id="setup-review">
+            Review
+          </h3>
+          <Switch
+            checked={props.review.enabled}
+            onChange={props.review.onEnabled}
+            label="Send analyzed jumps for review"
+          />
+          <p className="setup__status">
+            Measurements and the answer of the classifier, so a person can check it. No video and no file name leave
+            this browser. {syncStatusText(props.review.state, props.review.posted)}
+          </p>
+        </section>
+      )}
 
       <section className="setup__section" aria-labelledby="setup-bed">
         <h3 className="setup__label" id="setup-bed">

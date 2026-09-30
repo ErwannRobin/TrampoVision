@@ -66,7 +66,7 @@ export function ProcessingOverlay({ status, ready, fileName, backend, onAnalyze,
             Analyzing frame <span className="num">{status.done}</span> of <span className="num">{status.total}</span>
           </p>
           {left !== null && <p className="busy__text">{formatRemaining(left)}</p>}
-          <p className="busy__text">{backend ? `Running on ${backend}` : 'Everything stays on your device.'}</p>
+          <p className="busy__text">{backend ? `Running on ${backend}` : 'The video stays on your device.'}</p>
           <Button variant="secondary" onClick={onCancel}>
             Cancel
           </Button>

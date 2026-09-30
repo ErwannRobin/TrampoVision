@@ -314,6 +314,28 @@ It does not decide who is right (the label or the measurement); it shows where t
 
 **Read the numbers with care.** One labeler, no second opinion. Few jumps give wide intervals. If you tune the thresholds while looking at the same jumps, the accuracy becomes training accuracy and will look better than it is: keep some labeled jumps you never tune on.
 
+## Review service (optional)
+
+`worker/` is a Cloudflare Worker with a D1 database. The browser stays the **only classifier**: right after an analysis, and without
+delaying it, the app posts each jump (measurements, the prediction with its candidates, the pose sequence) to the Worker. A person then
+confirms or corrects the answer. Nothing is classified on the server, and no video and no file name are ever sent.
+
+| Route                                                                                        | Token       | Does                                                                                                               |
+| -------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------ |
+| `POST /jumps`                                                                                | ingest      | Stores jumps (max 25 per call). A re-post replaces the automatic answer and keeps the review.                      |
+| `GET /references`                                                                            | ingest      | Confirmed and corrected jumps, as records with a figure: the app loads them as reference examples.                 |
+| `GET /review`                                                                                | none (page) | The reviewer page: queue (unclassified first, then least confident), skeleton replay, candidates, curves, verdict. |
+| `GET /jumps?queue=1`, `GET /jumps/:id`, `PUT /jumps/:id/review`, `GET /stats`, `GET /export` | review      | The review workflow and an NDJSON export for tuning.                                                               |
+
+Verdicts: `confirm`, `correct` (a figure of the table), `unknown`, `bad-data`. Only confirmed and corrected jumps become reference
+examples; the same video's own jumps are never used as references for itself.
+
+Set up: `cd worker && npx wrangler d1 create trampovision-review` (put the id in `wrangler.toml`), `npx wrangler secret put INGEST_TOKEN`,
+`npx wrangler secret put REVIEW_TOKEN`, then `make worker-deploy`. Build the app with `VITE_REVIEW_API_URL` and `VITE_REVIEW_INGEST_TOKEN`
+(see `.env.example`). Locally: put both tokens in `worker/.dev.vars` and run `make worker-dev`. The ingest token ships in the bundle, so it
+is not a secret: it keeps strangers from writing by accident. Put Cloudflare Access in front of `/review` and the review routes for real
+access control. A _Send analyzed jumps for review_ switch in the settings turns the upload off.
+
 ## 3D pose and twist (experimental)
 
 The stage view (_Split_ or _3D_ in the coach's interface) adds a 3D view and a twist estimate. It does **not** replace the 2D pipeline, and the classifier still uses the 2D pose only.
@@ -399,5 +421,6 @@ cameras that are not level. Real COM estimates also move with arm and leg motion
 - **Video codecs depend on the browser.** MP4 (H.264) is safest. HEVC `.mov` from iPhones plays in Safari and recent Chrome/Edge, not everywhere.
 - **Privacy note.** The MediaPipe runtime contains a usage-logging call to `odml.pa.googleapis.com`. The app blocks all cross-origin
   requests at runtime (`localOnlyGuard.ts`) and the production build enforces `connect-src 'self' blob: data:` via CSP. Video frames are never uploaded.
+  The one exception is the review service, when the build is configured with `VITE_REVIEW_API_URL` (see _Review service_): its origin is then let through, and only it. Without that variable the app is local-only as described here.
   What is stored in the browser: the calibration corners per file name and size (`localStorage`), and the jump dataset you save (IndexedDB `trampovision`: measurements, predictions and labels, never the video). _Delete all_ in the Review tab (_Dataset on this computer_) removes the dataset.
 - Multi-person scenes: the athlete is followed by continuity; a coach walking next to the athlete can still steal the track.

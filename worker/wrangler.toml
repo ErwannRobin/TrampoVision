@@ -1,0 +1,16 @@
+name = "trampovision-review"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "trampovision-review"
+database_id = "REPLACE_WITH_ID_FROM_wrangler_d1_create"
+
+[vars]
+# The origin of the app: the only one the browser may call from.
+ALLOWED_ORIGIN = "https://trampo-vision.vercel.app"
+
+# Secrets (wrangler secret put):
+#   INGEST_TOKEN  bearer token the app sends. It ships in the app bundle, so it only keeps strangers from writing by accident.
+#   REVIEW_TOKEN  bearer token of the reviewers. Put Cloudflare Access in front of /review and /admin as well.
