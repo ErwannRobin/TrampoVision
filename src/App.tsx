@@ -32,7 +32,7 @@ import { TechnicalData } from './ui/TechnicalData';
 import { Timeline } from './ui/Timeline';
 import { TopBar } from './ui/TopBar';
 import { Icon, ActivityToast, type MenuGroupDef } from './ui/kit';
-import { useLocalStorage } from './ui/hooks';
+import { useLocalStorage, useReducedMotion } from './ui/hooks';
 import { analysisWarnings } from './ui/quality';
 import { AthleteInsights } from './ui/rail/AthleteInsights';
 import { CoachRail } from './ui/rail/CoachRail';
@@ -107,6 +107,19 @@ export default function App() {
   const [audience, setAudience] = useLocalStorage<Audience>('trampovision.audience', 'athlete', AUDIENCES);
   const [appearance, setAppearance] = useLocalStorage<Appearance>('trampovision.appearance', 'system', APPEARANCES);
   const [railView, setRailView] = useState<RailView>('setup');
+  const railRef = useRef<HTMLElement>(null);
+  const reducedMotion = useReducedMotion();
+  // Below 1100px the rail sits under the timeline, out of sight: opening the settings there must bring them into view.
+  const showRail = useCallback(() => {
+    if (!window.matchMedia('(max-width: 1099px)').matches) return;
+    requestAnimationFrame(() =>
+      railRef.current?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' }),
+    );
+  }, [reducedMotion]);
+  const openSetup = useCallback(() => {
+    setRailView('setup');
+    showRail();
+  }, [showRail]);
   const [coachTab, setCoachTab] = useState<CoachTab>('skill');
   // 2D pose is the analysis; the 3D skeleton is an experimental view next to it and does not feed the classifier.
   const [stageView, setStageView] = useState<StageView>('video');
@@ -782,7 +795,7 @@ export default function App() {
         showAudience={!!result}
         exportGroups={exportGroups}
         setupOpen={!!result && railView === 'setup'}
-        onToggleSetup={() => setRailView(railView === 'setup' ? 'insights' : 'setup')}
+        onToggleSetup={() => (railView === 'setup' ? setRailView('insights') : openSetup())}
         onFile={hasClip && !analyzing ? (f) => void onFile(f) : null}
         onHome={hasClip && !analyzing ? goHome : null}
       />
@@ -874,6 +887,7 @@ export default function App() {
               </div>
 
               <aside
+                ref={railRef}
                 className="workspace__rail sheet"
                 aria-label={railView === 'setup' || !result ? 'Settings' : 'Analysis'}
               >
@@ -886,7 +900,7 @@ export default function App() {
                     selected={jumpSel}
                     onSelect={chooseJump}
                     onPlayJump={playJump}
-                    onOpenSetup={() => setRailView('setup')}
+                    onOpenSetup={openSetup}
                     onShowCoach={() => setAudience('coach')}
                     notes={notes}
                   />

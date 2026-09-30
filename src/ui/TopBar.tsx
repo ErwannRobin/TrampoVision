@@ -70,7 +70,7 @@ export function TopBar({
           />
         )}
         {exportGroups && <Menu label="Export" icon="download" groups={exportGroups} size="sm" iconOnly={narrow} />}
-        {clip && <IconButton icon="sliders" label="Settings" pressed={setupOpen} onClick={onToggleSetup} />}
+        {clip && <IconButton icon="gear" label="Settings" pressed={setupOpen} onClick={onToggleSetup} />}
         {onFile && (
           <label className="icon-btn topbar__open" data-tip="Open another video">
             <Icon name="plus" size={18} />
