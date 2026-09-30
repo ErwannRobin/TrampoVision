@@ -27,7 +27,7 @@ export interface StageProps {
   /** The user picked or dropped the clip that goes with the saved data. */
   onPickVideo: (file: File) => void;
   view: StageView;
-  /** Undefined = no view switcher (the athlete's interface only has the video). */
+  /** Undefined = no view switcher. Without a video (saved data only) the views that show it are disabled. */
   onView?: (view: StageView) => void;
   /** The 3D skeleton, shown next to the video (split) or instead of it (3d). */
   pane?: ReactNode;
@@ -324,7 +324,9 @@ export function Stage({
             size="sm"
             value={view}
             onChange={onView}
-            options={VIEW_OPTIONS.map((o) => ({ ...o }))}
+            options={VIEW_OPTIONS.map((o) =>
+              url || o.value === '3d' ? { ...o } : { ...o, disabled: true, title: 'A saved analysis has no video' },
+            )}
           />
         </div>
       )}

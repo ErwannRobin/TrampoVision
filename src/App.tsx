@@ -6,8 +6,8 @@ import { extractPoseTrack } from './analysis/extractPoseTrack';
 import { stabilizePose } from './analysis/stabilize';
 import { sampleIndexAt } from './analysis/lookup';
 import { exampleCounts, referencesFromRecords } from './dataset/references';
-import { isStale, syncRecords, withFigure, withTruth, withTwistTruth, type RecordContext } from './dataset/record';
-import type { TruthLabel } from './dataset/types';
+import type { MovementLabel } from './dataset/movementLabel';
+import { isStale, syncRecords, withMovement, withTruth, withTwistTruth, type RecordContext } from './dataset/record';
 import { useDataset } from './dataset/useDataset';
 import { useReviewedReferences, useReviewUpload, useSyncSetting } from './sync/useReviewSync';
 import { videoIdFromTrack, videoIdOf } from './dataset/videoId';
@@ -32,7 +32,7 @@ import { TechnicalData } from './ui/TechnicalData';
 import { Timeline } from './ui/Timeline';
 import { TopBar } from './ui/TopBar';
 import { Icon, ActivityToast, type MenuGroupDef } from './ui/kit';
-import { useLocalStorage } from './ui/hooks';
+import { useLocalStorage, useReducedMotion } from './ui/hooks';
 import { analysisWarnings } from './ui/quality';
 import { AthleteInsights } from './ui/rail/AthleteInsights';
 import { CoachRail } from './ui/rail/CoachRail';
@@ -107,9 +107,23 @@ export default function App() {
   const [audience, setAudience] = useLocalStorage<Audience>('trampovision.audience', 'athlete', AUDIENCES);
   const [appearance, setAppearance] = useLocalStorage<Appearance>('trampovision.appearance', 'system', APPEARANCES);
   const [railView, setRailView] = useState<RailView>('setup');
+  const railRef = useRef<HTMLElement>(null);
+  const reducedMotion = useReducedMotion();
+  // Below 1100px the rail sits under the timeline, out of sight: opening the settings there must bring them into view.
+  const showRail = useCallback(() => {
+    if (!window.matchMedia('(max-width: 1099px)').matches) return;
+    requestAnimationFrame(() =>
+      railRef.current?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' }),
+    );
+  }, [reducedMotion]);
+  const openSetup = useCallback(() => {
+    setRailView('setup');
+    showRail();
+  }, [showRail]);
   const [coachTab, setCoachTab] = useState<CoachTab>('skill');
   // 2D pose is the analysis; the 3D skeleton is an experimental view next to it and does not feed the classifier.
   const [stageView, setStageView] = useState<StageView>('video');
+  const openedSeries = useRef(false);
   const [loop, setLoop] = useState(false);
 
   // Evaluation: which video the labels belong to, and whether the report covers this video or every saved one.
@@ -191,7 +205,9 @@ export default function App() {
   useEffect(() => {
     setSelectedJump(0);
     setRailView(track ? 'insights' : 'setup');
-    setStageView('video');
+    // Saved data opens on the 3D skeleton: it is what there is to show until the clip is added.
+    setStageView(openedSeries.current ? '3d' : 'video');
+    openedSeries.current = false;
   }, [track]);
 
   // While the video plays or is scrubbed, the jump view follows the jump under the playhead.
@@ -379,6 +395,7 @@ export default function App() {
   async function openSeries(saved: File) {
     try {
       const parsed = parsePoseSeries(await saved.text());
+      openedSeries.current = true;
       setTrack(parsed.track);
       setSeriesName(parsed.source.fileName);
       setVideoId(parsed.source.videoId ?? videoId ?? videoIdFromTrack(parsed.source.fileName, parsed.track));
@@ -444,9 +461,15 @@ export default function App() {
     [fresh, videoRecords],
   );
   const { save: saveRecords } = dataset;
-  const labelJump = useCallback(
-    (k: number, label: TruthLabel | null) => {
-      if (fresh[k]) void saveRecords([withTruth(fresh[k], label)]);
+  const movementJump = useCallback(
+    (k: number, movement: MovementLabel | null) => {
+      if (fresh[k]) void saveRecords([withMovement(fresh[k], movement)]);
+    },
+    [fresh, saveRecords],
+  );
+  const unknownJump = useCallback(
+    (k: number) => {
+      if (fresh[k]) void saveRecords([withTruth(withMovement(fresh[k], null), 'unknown')]);
     },
     [fresh, saveRecords],
   );
@@ -454,12 +477,6 @@ export default function App() {
     (k: number, note: string) => {
       const r = fresh[k];
       if (r?.truth) void saveRecords([withTruth(r, r.truth.label, { note })]);
-    },
-    [fresh, saveRecords],
-  );
-  const figureJump = useCallback(
-    (k: number, elementId: string | null) => {
-      if (fresh[k]) void saveRecords([withFigure(fresh[k], elementId)]);
     },
     [fresh, saveRecords],
   );
@@ -473,6 +490,7 @@ export default function App() {
   };
   const switchStageView = (v: StageView) => {
     setStageView(v);
+    if (audience !== 'coach') return;
     if (v !== 'video') setCoachTab('twist');
     else if (coachTab === 'twist') setCoachTab('skill');
   };
@@ -665,7 +683,8 @@ export default function App() {
   }, [result, skills, track, url, base, fileName, videoId, stride, calibration, annotated]);
 
   const hasClip = !!url || !!result;
-  const view: StageView = audience === 'coach' ? stageView : 'video';
+  // Both audiences can pick the view. Without a clip only the 3D skeleton has anything to show.
+  const view: StageView = !url && twist ? '3d' : stageView;
   const clipDetail = result
     ? `${jumpCount} ${plural(jumpCount, 'jump')}, ${(result.time[result.time.length - 1] ?? 0).toFixed(1)} s`
     : '';
@@ -756,8 +775,8 @@ export default function App() {
         staleCount={staleCount}
         dataset={dataset}
         baseName={base}
-        onLabel={labelJump}
-        onFigure={figureJump}
+        onMovement={movementJump}
+        onUnknown={unknownJump}
         exampleCounts={figureCounts}
         onNote={noteJump}
         onSaveAll={() => void saveRecords(fresh)}
@@ -782,7 +801,7 @@ export default function App() {
         showAudience={!!result}
         exportGroups={exportGroups}
         setupOpen={!!result && railView === 'setup'}
-        onToggleSetup={() => setRailView(railView === 'setup' ? 'insights' : 'setup')}
+        onToggleSetup={() => (railView === 'setup' ? setRailView('insights') : openSetup())}
         onFile={hasClip && !analyzing ? (f) => void onFile(f) : null}
         onHome={hasClip && !analyzing ? goHome : null}
       />
@@ -823,7 +842,7 @@ export default function App() {
                   onError={(message) => setStatus({ kind: 'error', message })}
                   onPickVideo={(f) => void onFile(f)}
                   view={view}
-                  onView={audience === 'coach' && result && twist ? switchStageView : undefined}
+                  onView={result && twist ? switchStageView : undefined}
                   pane={pane}
                 >
                   {editingCal && (
@@ -874,6 +893,7 @@ export default function App() {
               </div>
 
               <aside
+                ref={railRef}
                 className="workspace__rail sheet"
                 aria-label={railView === 'setup' || !result ? 'Settings' : 'Analysis'}
               >
@@ -886,7 +906,7 @@ export default function App() {
                     selected={jumpSel}
                     onSelect={chooseJump}
                     onPlayJump={playJump}
-                    onOpenSetup={() => setRailView('setup')}
+                    onOpenSetup={openSetup}
                     onShowCoach={() => setAudience('coach')}
                     notes={notes}
                   />

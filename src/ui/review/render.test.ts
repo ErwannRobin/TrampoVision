@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { computeAnalysis } from '../../analysis/computeAnalysis';
-import { syncRecords, withTruth, type RecordContext } from '../../dataset/record';
+import { syncRecords, withMovement, withTruth, type RecordContext } from '../../dataset/record';
 import type { JumpRecord, TruthLabel } from '../../dataset/types';
 import type { DatasetApi } from '../../dataset/useDataset';
 import { analyzeSkills } from '../../skills/analyzeSkills';
@@ -53,8 +53,8 @@ function panel(over: Partial<EvaluatePanelProps> = {}) {
     staleCount: 0,
     dataset: api(records.filter((r) => r.truth)),
     baseName: 'clip',
-    onLabel: () => {},
-    onFigure: () => {},
+    onMovement: () => {},
+    onUnknown: () => {},
     exampleCounts: new Map(),
     onNote: () => {},
     onSaveAll: () => {},
@@ -77,11 +77,14 @@ const report = (records: JumpRecord[], over: { videoId?: string | null; scope?: 
   );
 
 describe('EvaluatePanel', () => {
-  it('offers the six labels with their keys, none chosen, and the classifier answer', () => {
+  it('offers the parts of a label, none chosen, a big confirm button, and the classifier answer', () => {
     const html = panel();
-    expect(html.match(/class="review-label"/g)).toHaveLength(6);
-    expect(html.match(/aria-pressed="false"/g)).toHaveLength(6);
-    for (const key of ['1', '2', '3', '4', '5', '6']) expect(html).toContain(`aria-keyshortcuts="${key}"`);
+    // Position (4), somersaults (0-3), half twists (0-6 at no somersault: 0-3).
+    expect(html).toContain('Confirm prediction');
+    for (const text of ['Straight', 'Tuck', 'Pike', 'Straddle', 'Position', 'Somersaults', 'Half twists'])
+      expect(html).toContain(text);
+    expect(html).not.toContain('Direction');
+    expect(html).not.toContain('aria-pressed="true"');
     expect(html).toContain('Play jump');
     expect(html).toContain('Next unlabeled');
     expect(html).toContain(skills.jumps[1].prediction.label);
@@ -94,17 +97,23 @@ describe('EvaluatePanel', () => {
     const agree = panel({ fresh: label([null, 'tuck', null, null]) });
     expect(agree).toContain('Matches the prediction');
     expect(agree).toContain('Saved in this browser.');
-    expect(agree.match(/aria-pressed="true"/g)).toHaveLength(1);
+    // The position, and the default of no somersault and no twist.
+    expect(agree.match(/aria-pressed="true"/g)).toHaveLength(3);
     expect(agree).toContain('1</span> of <span class="num">4</span> labeled');
 
     const differ = panel({ fresh: label([null, 'pike', null, null]) });
     expect(differ).toContain('Differs from the prediction');
   });
 
+  it('asks for the direction once there is a somersault', () => {
+    const back = withMovement(fresh[1], { position: 'tuck', direction: null, somersaults: 1, halfTwists: 0 });
+    expect(panel({ fresh: [fresh[0], back, fresh[2], fresh[3]] })).toContain('Direction');
+  });
+
   it('cannot label before the video id is known, and says so', () => {
     const html = panel({ videoId: null, fresh: [] });
     expect(html).toContain('Reading the video id');
-    expect(html.match(/class="review-label"[^>]*disabled/g)).toHaveLength(6);
+    expect(html.match(/class="review-label"[^>]*disabled/g)!.length).toBeGreaterThanOrEqual(6);
   });
 
   it('disables the note until a label is chosen', () => {
@@ -134,11 +143,14 @@ describe('EvaluatePanel', () => {
     expect(html).toContain('Delete all…');
   });
 
-  it('offers the figure of the table as a reference example, with the example counts', () => {
-    const html = panel({ exampleCounts: new Map([['back-1s-0t-tuck', 2]]) });
-    expect(html).toMatch(/Which figure was it\?/);
-    expect(html).toMatch(/Back somersault \(tuck\) · 2 examples/);
-    expect(html).toMatch(/2 reference examples saved/);
+  it('says which figure a finished label saved as a reference example, with the example count', () => {
+    const tuck = withMovement(fresh[1], { position: 'tuck', direction: 'back', somersaults: 1, halfTwists: 0 });
+    const html = panel({
+      fresh: [fresh[0], tuck, fresh[2], fresh[3]],
+      exampleCounts: new Map([['back-1s-0t-tuck', 2]]),
+    });
+    expect(html).toContain('Saved as a reference example of Back somersault (tuck) (2 saved)');
+    expect(panel()).not.toContain('reference example');
   });
 
   it('says there is nothing to label when no jump was found', () => {

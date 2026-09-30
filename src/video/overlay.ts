@@ -4,8 +4,8 @@ import { buildWireframe, type Side } from '../pose/skeleton';
 import type { Keypoint, Point } from '../pose/types';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { POSITIONS, type SkillPrediction } from '../skills/types';
-import { fmt, pct } from '../ui/format';
-import { confidenceTier, skillName, TIER_TEXT } from '../ui/insights';
+import { fmt } from '../ui/format';
+import { confidenceTier, skillName, type ConfidenceTier } from '../ui/insights';
 
 export interface OverlayOptions {
   skeleton: boolean;
@@ -13,7 +13,7 @@ export interface OverlayOptions {
   trail: boolean;
   /** The label chips: jump phase, predicted skill and, in full detail, body position and rotation. */
   hud: boolean;
-  /** How much the labels say: 'simple' for the athlete (phase and skill), 'full' for the coach (adds body position, rotation, percentages). */
+  /** How much the labels say: 'simple' for the athlete (phase and skill), 'full' for the coach (adds body position and rotation). */
   detail?: 'simple' | 'full';
 }
 
@@ -72,7 +72,7 @@ const markUnit = (cssWidth: number) => Math.max(0.7, cssWidth / 720);
 
 // --- Labels --------------------------------------------------------------------------------------------------
 
-export type ChipMark = 'lift' | 'drop' | 'apex' | 'neutral' | 'solid' | 'ring';
+export type ChipMark = 'lift' | 'drop' | 'apex' | 'neutral' | ConfidenceTier;
 
 export interface ChipPart {
   text: string;
@@ -82,7 +82,7 @@ export interface ChipPart {
 
 export interface ChipSpec {
   parts: ChipPart[];
-  /** A dot before the text. Phases use the data colors; a skill is a solid dot when sure and a dashed ring when not. */
+  /** A dot before the text. Phases use the data colors; a skill's dot is the classifier's confidence: green, amber or red, solid when sure and a dashed ring when not. */
   mark?: ChipMark;
   dashed?: boolean;
 }
@@ -107,8 +107,10 @@ const MARK_COLOR: Record<ChipMark, string> = {
   drop: SIDE.right,
   apex: GOLD,
   neutral: 'rgba(255, 255, 255, 0.5)',
-  solid: WHITE,
-  ring: WHITE,
+  high: '#4cd48b',
+  medium: '#f2b04c',
+  low: '#ff7b72',
+  none: 'rgba(255, 255, 255, 0.6)',
 };
 
 function phaseText(phase: Exclude<JumpPhase, 'unknown'>, jump: number): string {
@@ -125,13 +127,9 @@ function currentJump(result: AnalysisResult, sample: number): number {
   return current;
 }
 
-function skillChip(p: SkillPrediction, minConfidence: number, full: boolean): ChipSpec {
-  const tier = confidenceTier(p, minConfidence);
-  if (tier === 'none') return { parts: [{ text: TIER_TEXT.none }], mark: 'ring' };
-  return {
-    parts: [{ text: skillName(p) }, { text: full ? pct(p.confidence) : TIER_TEXT[tier], muted: true }],
-    mark: tier === 'high' ? 'solid' : 'ring',
-  };
+/** The confidence is the dot before the name, not words: the numbers live in the panel. */
+export function skillChip(p: SkillPrediction, minConfidence: number): ChipSpec {
+  return { parts: [{ text: skillName(p) }], mark: confidenceTier(p, minConfidence) };
 }
 
 /** What the label chips say at one sample. Pure: drawing them is `drawLabels`. */
@@ -149,7 +147,7 @@ export function buildLabels(
 
   if (skills) {
     const jump = skills.jumps[currentJump(result, sample)];
-    if (jump) left.push(skillChip(jump.prediction, skills.config.minConfidence, full));
+    if (jump) left.push(skillChip(jump.prediction, skills.config.minConfidence));
     if (full && flying >= 0) {
       const position = POSITIONS[skills.frames.position[sample]];
       if (position) {
@@ -257,11 +255,18 @@ function paintChip(ctx: CanvasRenderingContext2D, laid: LaidChip, x: number, y: 
     const r = t.size * 0.25;
     ctx.beginPath();
     ctx.arc(tx + r, cy, r, 0, TAU);
-    if (chip.mark === 'ring') {
+    if (chip.mark === 'medium' || chip.mark === 'low' || chip.mark === 'none') {
+      // Not sure: a dashed ring, so the meaning does not rest on the color alone. A faint fill keeps the hue readable at this size.
       const dash = Math.max(1.2, t.size * 0.14);
+      if (chip.mark !== 'none') {
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = MARK_COLOR[chip.mark];
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
       ctx.setLineDash([dash, dash]);
       ctx.lineWidth = 1.2;
-      ctx.strokeStyle = MARK_COLOR.ring;
+      ctx.strokeStyle = MARK_COLOR[chip.mark];
       ctx.stroke();
       ctx.setLineDash([]);
     } else {

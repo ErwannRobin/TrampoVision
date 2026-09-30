@@ -74,6 +74,11 @@ export interface Pose3DScene {
   i: number;
   view: View;
   colors: Pose3DColors;
+  /** Only the skeleton: no long axis, chest arrow, twist dial or axes gizmo. For showing the figure without the measurements. */
+  minimal?: boolean;
+  /** Scale of the figure (1 = the default, which fits a standing person) and the height of the hip-centered origin, as a share of the area. */
+  zoom?: number;
+  originY?: number;
 }
 
 /** Draws one frame of the 3D skeleton with the torso, the longitudinal axis and the twist dial into a width x height area. */
@@ -83,10 +88,12 @@ export function drawPose3D(ctx: CanvasRenderingContext2D, width: number, height:
   const HEIGHT = height;
   ctx.font = '11px system-ui, sans-serif';
   const frames = twist.frames;
-  ctx.fillStyle = grid;
-  ctx.globalAlpha = 0.35;
-  ctx.fillRect(0, 0, width, HEIGHT);
-  ctx.globalAlpha = 1;
+  if (!scene.minimal) {
+    ctx.fillStyle = grid;
+    ctx.globalAlpha = 0.35;
+    ctx.fillRect(0, 0, width, HEIGHT);
+    ctx.globalAlpha = 1;
+  }
   if (!world || !frames) {
     ctx.fillStyle = soft;
     ctx.textAlign = 'center';
@@ -95,8 +102,8 @@ export function drawPose3D(ctx: CanvasRenderingContext2D, width: number, height:
   }
 
   const P = (k: number): Vec3 => [world[k].x, world[k].y, world[k].z];
-  const pxPerM = Math.min(width, HEIGHT) / 2.2;
-  const project = projector(view, width / 2, HEIGHT * 0.5, pxPerM);
+  const pxPerM = (Math.min(width, HEIGHT) / 2.2) * (scene.zoom ?? 1);
+  const project = projector(view, width / 2, HEIGHT * (scene.originY ?? 0.5), pxPerM);
   const vis = (k: number) => world[k].visibility;
 
   // Skeleton, farthest bones first.
@@ -150,7 +157,7 @@ export function drawPose3D(ctx: CanvasRenderingContext2D, width: number, height:
 
   // Longitudinal axis: hips to shoulders, extended.
   const u = vectorAt(frames.torso.axis, i);
-  if (finite3(u)) {
+  if (!scene.minimal && finite3(u)) {
     const a = project(add(hipMid, scale(u, -0.3)));
     const b = project(add(shMid, scale(u, 0.6)));
     ctx.strokeStyle = AMBER;
@@ -235,6 +242,8 @@ export function drawPose3D(ctx: CanvasRenderingContext2D, width: number, height:
       }
     }
   }
+
+  if (scene.minimal) return;
 
   // Axes gizmo, so the rotated views can be read.
   const g = (v: Vec3) => project(v);

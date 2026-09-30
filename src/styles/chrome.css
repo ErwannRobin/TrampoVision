@@ -353,6 +353,24 @@
   }
 }
 
+.demo3d {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 34dvh;
+  margin: 0 auto 8px;
+}
+.demo3d__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  cursor: grab;
+  touch-action: pan-y;
+}
+.demo3d__canvas:active {
+  cursor: grabbing;
+}
+
 .landing__dataset {
   padding: 24px 28px 28px;
 }

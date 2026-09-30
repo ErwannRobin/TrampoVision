@@ -7,29 +7,12 @@ import {
   HEAT_MIN,
   heatStrength,
   jumpPlayRange,
-  labelForKey,
   labelStatus,
   nextUnlabeled,
   reportCaveats,
   sparkLayout,
   summarizeDataset,
 } from './logic';
-
-describe('labelForKey', () => {
-  it('maps keys 1 to 6 to the labels in the order they are listed', () => {
-    expect(['1', '2', '3', '4', '5', '6'].map(labelForKey)).toEqual([
-      'straight',
-      'tuck',
-      'pike',
-      'back',
-      'front',
-      'unknown',
-    ]);
-  });
-  it('ignores every other key', () => {
-    for (const key of ['0', '7', '9', 'n', 'Enter', '10', '']) expect(labelForKey(key)).toBeNull();
-  });
-});
 
 describe('nextUnlabeled', () => {
   it('goes to the next jump without a label and wraps around the clip', () => {

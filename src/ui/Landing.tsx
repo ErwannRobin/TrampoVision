@@ -1,5 +1,6 @@
 import type { DatasetApi } from '../dataset/useDataset';
 import { HeroArcs } from './chrome/HeroArcs';
+import { DemoSkeleton } from './DemoSkeleton';
 import { DatasetBar, EvaluationReport } from './EvaluationView';
 import { Button, Icon } from './kit';
 
@@ -76,6 +77,7 @@ export function Landing({ onFile, onSample, onOpenSeries, dataset, busy }: Landi
           </ul>
         </div>
         <div className="landing__art">
+          <DemoSkeleton />
           <HeroArcs />
         </div>
       </section>

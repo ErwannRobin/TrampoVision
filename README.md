@@ -33,6 +33,8 @@ npm run build        # production build (adds a strict Content-Security-Policy)
 
 Link previews (Open Graph / Twitter card) use `public/og-image.png` (source: `scripts/og-image.html`, rendered at 1200×630). Crawlers need absolute URLs, so the build adds `og:url` and `og:image` from `SITE_URL`, else Vercel's `VERCEL_PROJECT_PRODUCTION_URL`, else `https://trampo-vision.vercel.app`.
 
+**Home screen.** The app can be added to a phone's or tablet's home screen (Share → Add to Home Screen on iOS, Install on Android and desktop Chrome) and then opens full screen with its own icon. It has a web manifest (`public/manifest.webmanifest`) and no service worker, so it still needs a connection to load. The icons in `public/` (`apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`) are drawn from the logo by `scripts/icons.mjs`; `make icons` re-renders them.
+
 `npm install` needs internet once (models come from Google's public MediaPipe bucket). Afterwards the app
 works offline. If the download failed, run `npm run fetch-assets`.
 
@@ -335,6 +337,20 @@ Set up: `cd worker && npx wrangler d1 create trampovision-review` (put the id in
 (see `.env.example`). Locally: put both tokens in `worker/.dev.vars` and run `make worker-dev`. The ingest token ships in the bundle, so it
 is not a secret: it keeps strangers from writing by accident. Put Cloudflare Access in front of `/review` and the review routes for real
 access control. A _Send analyzed jumps for review_ switch in the settings turns the upload off.
+
+### Scoring the classifier on reviewed jumps
+
+`make eval FILE=eval/export.ndjson` runs the current classifier again on the stored jumps (a record holds the features, the sequence
+and the twist curve, so no video is needed) and scores it against what the reviewers said. `make eval-fetch` downloads the file from the
+review service (`REVIEW_API_URL`, `REVIEW_TOKEN` in the environment); a dataset JSON saved by the app works too. `eval/` is git-ignored: it
+holds athletes' data.
+
+It prints, twice: with the expected movements of the table only, and with the reviewed jumps of the **other videos** as examples (leave one
+video out, so a jump never sees its own clip). Each run gives top-1, top-3 and top-5 accuracy, the unclassified rate, balanced accuracy over
+the elements, confident-wrong counts, the per-element results, the commonest confusions, which part of the movement went wrong (rotation,
+twist, direction, position), why jumps stayed unclassified, and whether the confidence is honest (how often each band is right).
+`SAVE=eval/baseline.json` keeps the numbers; `BASELINE=eval/baseline.json` fails when top-1 falls or confident-wrong rises, so a change is
+scored on all real jumps at once. Jumps marked _cannot tell_ or _bad data_ and jumps nobody reviewed are counted, not scored.
 
 ## 3D pose and twist (experimental)
 
