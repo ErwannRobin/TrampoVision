@@ -14,9 +14,9 @@ export interface TopBarProps {
   showAudience: boolean;
   /** Export menu groups; null hides the menu. */
   exportGroups: MenuGroupDef[] | null;
-  /** The rail shows the settings. */
+  /** The settings popup is open. */
   setupOpen: boolean;
-  onToggleSetup: () => void;
+  onOpenSetup: () => void;
   /** Choose another video (null hides the button, e.g. while analyzing). */
   onFile: ((file: File) => void) | null;
   /** Go back to the first screen (the logo); null when already there. */
@@ -37,7 +37,7 @@ export function TopBar({
   showAudience,
   exportGroups,
   setupOpen,
-  onToggleSetup,
+  onOpenSetup,
   onFile,
   onHome,
 }: TopBarProps) {
@@ -76,7 +76,13 @@ export function TopBar({
         {exportGroups && (
           <Menu label={t('topbar.export')} icon="download" groups={exportGroups} size="sm" iconOnly={narrow} />
         )}
-        {clip && <IconButton icon="gear" label={t('topbar.settings')} pressed={setupOpen} onClick={onToggleSetup} />}
+        <IconButton
+          icon="gear"
+          label={t('topbar.settings')}
+          aria-haspopup="dialog"
+          aria-expanded={setupOpen}
+          onClick={onOpenSetup}
+        />
         {onFile && (
           <label className="icon-btn topbar__open" data-tip={t('topbar.openAnother')}>
             <Icon name="plus" size={18} />

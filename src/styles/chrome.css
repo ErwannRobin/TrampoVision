@@ -62,7 +62,7 @@
 .topbar__open input,
 .landing__pick input,
 .landing__link input,
-.setup__file-btn input {
+.settings__file-btn input {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -73,7 +73,7 @@
 .topbar__open:focus-within,
 .landing__pick:focus-within,
 .landing__link:focus-within,
-.setup__file-btn:focus-within {
+.settings__file-btn:focus-within {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
@@ -423,65 +423,158 @@
   }
 }
 
-/* Settings ---------------------------------------------------------------------------------------------------- */
+/* Settings: a popup over the app, the whole screen on a phone --------------------------------------------------- */
 
-.setup {
-  display: flex;
-  flex-direction: column;
+html:has(.settings[open]) {
+  overflow: hidden;
 }
-.setup__head {
+.settings {
+  width: min(680px, calc(100vw - 32px));
+  max-width: none;
+  height: min(860px, calc(100dvh - 48px));
+  max-height: none;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sheet);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+}
+.settings[open] {
   display: flex;
-  align-items: flex-start;
+  animation: pop-in var(--t-med) var(--ease);
+}
+.settings::backdrop {
+  background: rgba(10, 12, 16, 0.55);
+  backdrop-filter: blur(2px);
+  animation: fade-in var(--t-med) var(--ease);
+}
+.settings__panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.settings__head {
+  display: flex;
+  flex: none;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-bottom: 16px;
+  padding: 14px 14px 14px 22px;
+  border-bottom: 1px solid var(--line);
 }
-.setup__heading {
-  min-width: 0;
-}
-.setup__title {
+.settings__title {
   font-size: var(--fs-xl);
   letter-spacing: -0.015em;
 }
-.setup__file {
-  max-width: 100%;
+.settings__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 18px 22px 24px;
+  background: var(--panel-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.settings__body:focus {
+  outline: none;
+}
+
+/* The three parts: each is a card of its own, with a heading that says what it applies to. */
+.settings__group {
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pop);
+  background: var(--panel);
+}
+.settings__group-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.settings__group-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--panel-3);
+  color: var(--text-2);
+}
+.settings__group-title {
+  font-size: var(--fs-lg);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.settings__group-text {
   margin-top: 2px;
-  overflow: hidden;
   color: var(--text-2);
   font-size: var(--fs-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
 }
-.setup__section {
+.settings__group-body {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 18px 18px;
+}
+.settings__block {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 20px 0;
+  padding: 18px 0;
   border-top: 1px solid var(--line);
 }
-.setup__label {
+.settings__block:first-child {
+  border-top: 0;
+}
+.settings__label {
   font-size: var(--fs-md);
   font-weight: 600;
 }
-.setup__status {
+
+.settings__clip {
+  display: grid;
+  gap: 2px;
+  padding: 14px 0 0;
+}
+.settings__clip-name {
+  overflow: hidden;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings__clip-detail {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.settings__status {
   color: var(--text-2);
   font-size: var(--fs-sm);
   line-height: 1.5;
 }
-.setup__status--error {
+.settings__status--error {
   color: var(--danger);
 }
-.setup__buttons {
+.settings__buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-.setup__grid {
+.settings__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
-.setup__runtime {
+.settings__runtime {
   display: grid;
   gap: 6px;
   margin: 0;
@@ -489,47 +582,86 @@
   font-size: var(--fs-xs);
   line-height: 1.45;
 }
-.setup__runtime > div {
+.settings__runtime > div {
   display: grid;
   grid-template-columns: 60px minmax(0, 1fr);
   gap: 8px;
 }
-.setup__runtime dt {
+.settings__runtime dt {
   color: var(--text-3);
 }
-.setup__runtime dd {
+.settings__runtime dd {
   margin: 0;
 }
-.setup__file-btn {
+.settings__file-btn {
   position: relative;
   justify-self: start;
   cursor: pointer;
 }
-.setup__action {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
+.settings__action {
   display: grid;
   gap: 10px;
-  margin: 8px -22px -28px;
-  padding: 18px 22px 26px;
-  background: linear-gradient(to top, var(--panel) 70%, transparent);
+  padding: 14px 0 18px;
 }
-.setup__hint {
+.settings__hint {
   color: var(--text-2);
   font-size: var(--fs-sm);
   text-align: center;
 }
 
-@media (max-width: 1099px) {
-  .setup__action {
-    margin: 8px -18px -26px;
-    padding-inline: 18px;
+/* A phone: the popup takes the whole screen and keeps clear of the notch and the home bar. */
+@media (max-width: 640px) {
+  .settings {
+    width: 100vw;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .settings__head {
+    padding: calc(10px + env(safe-area-inset-top, 0px)) calc(8px + env(safe-area-inset-right, 0px)) 10px
+      calc(16px + env(safe-area-inset-left, 0px));
+  }
+  .settings__body {
+    gap: 12px;
+    padding: 12px calc(12px + env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px))
+      calc(12px + env(safe-area-inset-left, 0px));
+  }
+  .settings__group-head {
+    padding: 14px 14px 12px;
+  }
+  .settings__group-body {
+    padding: 2px 14px 16px;
   }
 }
-@media (max-width: 640px) {
-  .setup__action {
-    margin: 8px -16px -24px;
-    padding-inline: 16px;
+@media (prefers-reduced-motion: reduce) {
+  .settings[open],
+  .settings::backdrop {
+    animation: none;
   }
+}
+
+/* The rail before there is an analysis. */
+.ready {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.ready__title {
+  font-size: 30px;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+.ready__file {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ready__text {
+  color: var(--text-2);
+  line-height: 1.5;
 }

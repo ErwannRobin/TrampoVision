@@ -6,9 +6,6 @@ export type Audience = 'athlete' | 'coach';
 /** What the stage shows: the video, the video next to the 3D skeleton, or the 3D skeleton alone. */
 export type StageView = 'video' | 'split' | '3d';
 
-/** The side rail shows the insights of the selected jump, or the settings (also where a new video is set up). */
-export type RailView = 'insights' | 'setup';
-
 /** Sections of the coach's rail. */
 export type CoachTab = 'skill' | 'metrics' | 'twist' | 'review' | 'data';
 

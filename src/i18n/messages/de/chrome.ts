@@ -58,7 +58,21 @@ export const chrome: Translation<typeof en> = {
   'status.exportFailed': 'Export fehlgeschlagen',
 
   'setup.title': 'Einstellungen',
-  'setup.done': 'Fertig',
+  'setup.close': 'Einstellungen schließen',
+  'setup.groupVideo': 'Dieses Video',
+  'setup.groupVideoText': 'Das Video, das gerade geöffnet ist. Diese Einstellungen betreffen nur dieses Video.',
+  'setup.noName': 'Gespeicherte Analyse',
+  'setup.notAnalyzed': 'Noch nicht analysiert',
+  'setup.videoInfo': 'Video und Laufzeit',
+  'setup.groupAnalysis': 'Videoanalyse',
+  'setup.groupAnalysisText':
+    'Wie Videos vermessen und analysiert werden. Größe und Meter gelten sofort; alles andere braucht eine neue Analyse.',
+  'setup.groupApp': 'App',
+  'setup.groupAppText':
+    'Aussehen und Werkzeuge der App, auf diesem Gerät gespeichert. Nichts hier ändert eine Analyse.',
+  'setup.readyTitle': 'Bereit zur Analyse',
+  'setup.readyText': 'Prüfen Sie die Einstellungen und starten Sie dann die Analyse des Videos.',
+  'setup.readyBusy': 'Die Analyse läuft.',
   'setup.athlete': 'Athlet',
   'setup.height': 'Körpergröße',
   'setup.heightHint': 'Skaliert die Messungen in Metern, wenn das Trampolin nicht markiert ist.',

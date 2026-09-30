@@ -7,7 +7,7 @@ import { figureOf } from '../../dataset/movementLabel';
 import { analyzeSkills } from '../../skills/analyzeSkills';
 import { mannequinRoutine } from '../../skills/testMannequin';
 import { Landing } from '../Landing';
-import { SetupPanel, type SetupPanelProps } from '../rail/SetupPanel';
+import { SettingsDialog, type SettingsDialogProps } from '../chrome/SettingsDialog';
 import { ElementPicker, nextMovement, twistName } from './ElementPicker';
 import { LiveRail, groupJumps, type LiveRailProps } from './LiveRail';
 import { subline } from './SkillCard';
@@ -221,13 +221,16 @@ describe('the first screen', () => {
 });
 
 describe('the settings', () => {
-  const props = (advanced: boolean): SetupPanelProps => ({
+  const props = (advanced: boolean, clip = true): SettingsDialogProps => ({
+    open: true,
+    onClose: () => {},
+    clipDetail: '12 jumps, 14.0 s',
     advanced,
     onAdvanced: () => {},
-    hasVideo: true,
-    hasResult: true,
+    hasVideo: clip,
+    hasResult: clip,
     busy: 'idle',
-    fileName: 'clip.mp4',
+    fileName: clip ? 'clip.mp4' : null,
     model: 'full',
     onModel: () => {},
     numPoses: 1,
@@ -268,7 +271,7 @@ describe('the settings', () => {
   });
 
   it('keeps the athlete, the advanced switch and the appearance, and hides the engine and the trampoline', () => {
-    const html = renderToStaticMarkup(createElement(SetupPanel, props(false)));
+    const html = renderToStaticMarkup(createElement(SettingsDialog, props(false)));
     expect(html).toContain('Athlete');
     expect(html).toContain('Show the advanced tools');
     expect(html).toContain('Appearance');
@@ -276,7 +279,29 @@ describe('the settings', () => {
   });
 
   it('shows everything with the advanced tools on', () => {
-    const html = renderToStaticMarkup(createElement(SetupPanel, props(true)));
+    const html = renderToStaticMarkup(createElement(SettingsDialog, props(true)));
     for (const shown of ['Trampoline', 'Model', 'Saved data', 'Video frame rate']) expect(html).toContain(shown);
+  });
+
+  it('keeps the video, the analysis and the app apart', () => {
+    const html = renderToStaticMarkup(createElement(SettingsDialog, props(false)));
+    const at = (heading: string) => html.indexOf(`>${heading}</h3>`);
+    expect(at('This video')).toBeGreaterThan(-1);
+    expect(at('This video')).toBeLessThan(at('Video analysis'));
+    expect(at('Video analysis')).toBeLessThan(at('App'));
+    expect(html).toContain('clip.mp4');
+    expect(html).toContain('12 jumps, 14.0 s');
+  });
+
+  it('opens from the first screen without a video: no video part, no analyze button', () => {
+    const html = renderToStaticMarkup(createElement(SettingsDialog, props(true, false)));
+    expect(html).not.toContain('This video');
+    expect(html).not.toContain('Analyze video');
+    for (const shown of ['Video analysis', 'App', 'Appearance', 'Language']) expect(html).toContain(shown);
+  });
+
+  it('renders nothing inside while it is closed', () => {
+    const html = renderToStaticMarkup(createElement(SettingsDialog, { ...props(true), open: false }));
+    expect(html).not.toContain('Appearance');
   });
 });
