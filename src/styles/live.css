@@ -497,9 +497,23 @@
 .live-chip:disabled {
   opacity: 0.5;
 }
+/* Touch: every target in the live rail is 44px on a coarse pointer. The kit's small button is 40, so the rail
+   raises it here (the kit stays as it is), and the two rows that were text lines get a full-height tap area. */
 @media (pointer: coarse) {
   .live-chip {
     height: 44px;
+  }
+  .live-chip--num {
+    min-width: 44px;
+  }
+  .live .btn--sm {
+    min-height: 44px;
+  }
+  .live-bounces__toggle,
+  .live-bounce {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
   }
 }
 
