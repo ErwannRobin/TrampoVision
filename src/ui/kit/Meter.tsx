@@ -37,6 +37,7 @@ export function ProgressRing({
   children?: ReactNode;
 }) {
   const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
   const v = value === undefined ? undefined : Math.min(Math.max(value, 0), 1);
   return (
     <span
@@ -56,9 +57,8 @@ export function ProgressRing({
           cy={size / 2}
           r={r}
           strokeWidth={stroke}
-          pathLength={100}
-          strokeDasharray={v === undefined ? undefined : 100}
-          strokeDashoffset={v === undefined ? undefined : 100 * (1 - v)}
+          strokeDasharray={v === undefined ? `${c * 0.28} ${c}` : c}
+          strokeDashoffset={v === undefined ? undefined : c * (1 - v)}
         />
       </svg>
       {children}
