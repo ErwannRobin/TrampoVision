@@ -60,6 +60,8 @@ export default defineConfig(({ mode }) => ({
       },
     },
   ],
+  // The app and the reviewer page (/review.html) share the build, the CSP and the review service settings.
+  build: { rollupOptions: { input: { main: 'index.html', review: 'review.html' } } },
   optimizeDeps: { exclude: ['@ffmpeg/ffmpeg'] },
   test: { environment: 'node', include: ['src/**/*.test.ts', 'worker/src/**/*.test.ts'] },
 }));

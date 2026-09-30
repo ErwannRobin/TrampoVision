@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: icons eval eval-fetch worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets convert clean distclean
+.PHONY: icons eval eval-fetch worker-schema worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets convert clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -73,3 +73,6 @@ eval-fetch: ## Download the reviewed jumps to eval/export.ndjson (needs REVIEW_A
 	@mkdir -p eval
 	curl -sf -H "authorization: Bearer $(REVIEW_TOKEN)" "$(REVIEW_API_URL)/export" -o eval/export.ndjson
 	@wc -l eval/export.ndjson
+
+worker-schema: node_modules ## Apply worker/schema.sql to the remote D1 database (no deploy)
+	cd worker && npx wrangler d1 execute trampovision-review --remote --file=schema.sql

@@ -1,5 +1,4 @@
 import { FIG_ELEMENTS } from '../../src/skills/fig/elements';
-import reviewPage from './review.html';
 import { parseIngest, parseReview, tokenMatches, STATUSES, type JumpRow } from './logic';
 
 export interface Env {
@@ -36,7 +35,8 @@ const canWrite = (req: Request, env: Env) => {
   const h = req.headers.get('authorization');
   return tokenMatches(h, env.INGEST_TOKEN) || tokenMatches(h, env.REVIEW_TOKEN);
 };
-const canReview = (req: Request, env: Env) => tokenMatches(req.headers.get('authorization'), env.REVIEW_TOKEN);
+// Everyone who uses the app may review: the public app token is enough. REVIEW_TOKEN stays valid as a second key.
+const canReview = canWrite;
 
 const UPSERT = `INSERT INTO jumps (id, video_id, jump_id, auto_skill, auto_element_id, auto_certainty, auto_confidence, classifier, fingerprint, created_at, updated_at, record)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10, ?11)
@@ -72,18 +72,7 @@ export default {
     try {
       if (path === '/' && req.method === 'GET') return reply({ service: 'trampovision-review', ok: true });
 
-      // The reviewer page and the element table it offers as figures. Both are public: the data behind them needs the reviewer token.
-      if (path === '/review' && req.method === 'GET') {
-        return new Response(reviewPage, {
-          headers: {
-            'content-type': 'text/html; charset=utf-8',
-            'content-security-policy':
-              "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'",
-            'x-content-type-options': 'nosniff',
-            'cache-control': 'no-store',
-          },
-        });
-      }
+      // The element table the reviewer page offers as figures: public, like the page itself (served by the app, /review.html).
       if (path === '/elements' && req.method === 'GET') {
         return reply({ elements: FIG_ELEMENTS.map((e) => ({ id: e.id, name: e.name })) });
       }
@@ -171,7 +160,7 @@ export default {
 
       return reply({ error: 'not found' }, 404);
     } catch (e) {
-      console.error(e);
+      console.error(`${req.method} ${path} failed: ${e instanceof Error ? e.message : String(e)}`);
       return reply({ error: 'internal error' }, 500);
     }
   },
