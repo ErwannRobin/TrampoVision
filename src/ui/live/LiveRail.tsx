@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../../i18n';
 import type { LiveJump, Session } from '../../coaching/session';
 import { useReducedMotion } from '../hooks';
-import { Button, cx } from '../kit';
+import { Button, Icon, cx } from '../kit';
 import { EmptyState } from '../rail/insights/EmptyState';
 import { DataChecks, Folds } from '../rail/insights/WorthKnowing';
 import { focusTarget, scrollTopToReveal } from '../rail/insights/layout';
@@ -98,7 +98,8 @@ function Bounces({
   return (
     <li className="live-bounces">
       <button type="button" className="live-bounces__toggle" aria-expanded={shown} onClick={() => setOpen(!shown)}>
-        {label}
+        <span>{label}</span>
+        <Icon name="chevron-down" size={16} className="live-bounces__chevron" />
       </button>
       {shown && (
         <ul className="live-bounces__list">
