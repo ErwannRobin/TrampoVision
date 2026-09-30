@@ -54,6 +54,14 @@ export const chrome: Translation<typeof en> = {
   'landing.notePrivacy': 'Fonctionne dans votre navigateur. La vidéo ne quitte jamais votre appareil.',
   'landing.about': 'À propos de TrampoVision',
   'landing.savedDataset': 'Jeu de données enregistré',
+  'landing.recent': 'Enchaînements récents',
+  'landing.recentNote': 'Conservés sur cet appareil. La vidéo elle-même n’est pas enregistrée.',
+  'landing.recentUntitled': 'Enchaînement du {date}',
+  'landing.recentRemove': 'Retirer {name} des enchaînements récents',
+  'landing.recentClear': 'Effacer l’historique',
+  'landing.recentClearAsk': 'Retirer tous les enchaînements récents de cet appareil ?',
+  'landing.recentClearYes': 'Tout retirer',
+  'landing.recentMissing': 'Cet enchaînement n’est plus enregistré sur cet appareil.',
 
   'status.warning': 'À vérifier',
   'status.error': 'Une erreur est survenue',
@@ -203,7 +211,7 @@ export const chrome: Translation<typeof en> = {
     'Fichier {name} ouvert ({frames} images). Vérifiez que la vidéo chargée est bien le même clip.',
   'app.openedNoVideo': 'Fichier {name} ouvert ({frames} images). Ajoutez aussi la vidéo pour voir la superposition.',
   'app.closeAnalysis':
-    'Fermer cette analyse ? Enregistrez-la d’abord depuis le menu d’export si vous voulez la conserver.',
+    'Cet enchaînement n’a pas pu être enregistré sur cet appareil : le fermer en perdrait les résultats. Le fermer quand même ?',
   'app.dropBusy': 'Analyse en cours',
   'app.dropIdle': 'Déposez une vidéo pour l’analyser',
   'app.dropWait': 'Attendez d’abord la fin.',

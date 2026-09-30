@@ -54,6 +54,14 @@ export const chrome: Translation<typeof en> = {
   'landing.notePrivacy': 'Läuft in Ihrem Browser. Das Video verlässt Ihr Gerät nie.',
   'landing.about': 'Über TrampoVision',
   'landing.savedDataset': 'Gespeicherter Datensatz',
+  'landing.recent': 'Letzte Übungen',
+  'landing.recentNote': 'Nur auf diesem Gerät gespeichert. Das Video selbst wird nicht gespeichert.',
+  'landing.recentUntitled': 'Übung vom {date}',
+  'landing.recentRemove': '{name} aus den letzten Übungen entfernen',
+  'landing.recentClear': 'Verlauf löschen',
+  'landing.recentClearAsk': 'Alle letzten Übungen von diesem Gerät entfernen?',
+  'landing.recentClearYes': 'Alle entfernen',
+  'landing.recentMissing': 'Diese Übung ist nicht mehr auf diesem Gerät gespeichert.',
 
   'status.warning': 'Bitte prüfen',
   'status.error': 'Etwas ist schiefgelaufen',
@@ -204,7 +212,8 @@ export const chrome: Translation<typeof en> = {
     '{name} geöffnet ({frames} Bilder). Stellen Sie sicher, dass das geladene Video derselbe Clip ist.',
   'app.openedNoVideo':
     '{name} geöffnet ({frames} Bilder). Fügen Sie auch das Video hinzu, um die Überlagerung zu sehen.',
-  'app.closeAnalysis': 'Diese Analyse schließen? Speichern Sie sie zuvor im Exportmenü, wenn Sie sie behalten möchten.',
+  'app.closeAnalysis':
+    'Diese Übung konnte nicht auf diesem Gerät gespeichert werden. Beim Schließen gehen die Ergebnisse verloren. Trotzdem schließen?',
   'app.dropBusy': 'Analyse läuft',
   'app.dropIdle': 'Video hier ablegen, um es zu analysieren',
   'app.dropWait': 'Warten Sie, bis sie abgeschlossen ist.',

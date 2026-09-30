@@ -54,6 +54,14 @@ export const chrome: Translation<typeof en> = {
   'landing.notePrivacy': 'ブラウザー上で動作します。動画が端末の外に出ることはありません。',
   'landing.about': 'TrampoVision について',
   'landing.savedDataset': '保存済みデータセット',
+  'landing.recent': '最近の演技',
+  'landing.recentNote': 'この端末にだけ保存されます。動画そのものは保存されません。',
+  'landing.recentUntitled': '{date}の演技',
+  'landing.recentRemove': '{name}を最近の演技から削除',
+  'landing.recentClear': '履歴を消去',
+  'landing.recentClearAsk': '最近の演技をすべてこの端末から削除しますか？',
+  'landing.recentClearYes': 'すべて削除',
+  'landing.recentMissing': 'この演技はこの端末に保存されていません。',
 
   'status.warning': '要確認',
   'status.error': '問題が発生しました',
@@ -200,7 +208,7 @@ export const chrome: Translation<typeof en> = {
   'app.openedWithVideo':
     '{name} を開きました（{frames} フレーム）。読み込み済みの動画が同じクリップであることを確認してください。',
   'app.openedNoVideo': '{name} を開きました（{frames} フレーム）。オーバーレイを表示するには動画も追加してください。',
-  'app.closeAnalysis': 'この解析を閉じますか？残したい場合は、先にエクスポートメニューから保存してください。',
+  'app.closeAnalysis': 'この演技はこの端末に保存できなかったため、閉じると結果が失われます。閉じますか？',
   'app.dropBusy': '解析中',
   'app.dropIdle': '動画をドロップして解析',
   'app.dropWait': 'まず完了までお待ちください。',

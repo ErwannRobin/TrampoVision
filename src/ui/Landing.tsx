@@ -4,6 +4,7 @@ import { REVIEW_API_URL, fetchQueueCount } from '../sync/reviewSync';
 import type { DatasetApi } from '../dataset/useDataset';
 import { ABOUT_HASH } from './chrome/aboutRoute';
 import { HeroArcs } from './chrome/HeroArcs';
+import { RecentSets, type RecentSetsProps } from './chrome/RecentSets';
 import { DemoSkeleton } from './DemoSkeleton';
 import { DatasetBar, EvaluationReport } from './EvaluationView';
 import { useMediaQuery } from './hooks';
@@ -16,6 +17,8 @@ export interface LandingProps {
   onOpenSeries: (file: File) => void;
   /** The dataset saved in this browser: shown as its own section when it holds something. */
   dataset: DatasetApi;
+  /** The sets analyzed before, kept on this device: listed under the first actions, hidden when there are none. */
+  recent?: Omit<RecentSetsProps, 'busy'>;
   /** A file is being read. */
   busy: boolean;
   /** The advanced tools are on: saved analyses, the reviewer page and the saved dataset. */
@@ -80,7 +83,7 @@ function VideoButton({
 }
 
 /** The first screen: what the app does and how to start. The advanced tools add the saved analyses and the dataset kept in this browser. */
-export function Landing({ onFile, onSample, onOpenSeries, dataset, busy, advanced }: LandingProps) {
+export function Landing({ onFile, onSample, onOpenSeries, dataset, recent, busy, advanced }: LandingProps) {
   const hasDataset = advanced && dataset.records.length > 0;
   // A phone or a tablet can film right away; a computer picks a file.
   const touch = useMediaQuery('(pointer: coarse)');
@@ -124,6 +127,7 @@ export function Landing({ onFile, onSample, onOpenSeries, dataset, busy, advance
           <a className="landing__link" href={ABOUT_HASH}>
             {t('landing.about')}
           </a>
+          {recent && <RecentSets {...recent} busy={busy} />}
           <ul className="landing__notes">
             <li>
               <Icon name="video" size={17} />
