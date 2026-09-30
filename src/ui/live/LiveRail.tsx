@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../../i18n';
 import type { LiveJump, Session } from '../../coaching/session';
-import { useReducedMotion } from '../hooks';
+import { useMediaQuery, useMinWidth, useReducedMotion } from '../hooks';
 import { Button, Icon, cx } from '../kit';
 import { EmptyState } from '../rail/insights/EmptyState';
 import { DataChecks, Folds } from '../rail/insights/WorthKnowing';
@@ -40,12 +40,14 @@ export interface LiveRailProps {
 
 type Item = { kind: 'skill'; jump: LiveJump } | { kind: 'bounces'; jumps: LiveJump[] };
 
+/** A straight jump, seen whole: between the skills it is a bounce, not a skill. */
+const isBounce = (j: LiveJump) => j.complete && !!j.element && !j.isSkill && !j.other;
+
 /** Straight jumps between the skills are bounces: they are folded into one line each time, so the skills stand out. */
 export function groupJumps(jumps: readonly LiveJump[]): Item[] {
   const out: Item[] = [];
   for (const j of jumps) {
-    const bounce = j.complete && !!j.element && !j.isSkill && !j.other;
-    if (!bounce) out.push({ kind: 'skill', jump: j });
+    if (!isBounce(j)) out.push({ kind: 'skill', jump: j });
     else {
       const last = out[out.length - 1];
       if (last?.kind === 'bounces') last.jumps.push(j);
@@ -123,12 +125,32 @@ function Bounces({
 }
 
 /**
+ * A rail this wide (inside its padding) puts the set in a column of its own, beside the list, and one this wide shows the selected skill
+ * in a third column instead of under its row. Only where the rail has a height of its own to scroll in (the wide layout).
+ */
+const TWO_COLUMNS_PX = 720;
+const THREE_COLUMNS_PX = 1180;
+const WIDE_SCREEN = '(min-width: 1100px)';
+
+/**
  * The whole tool, for a coach or an athlete on the trampoline: what each skill was, how hard it is, what execution the pose earns and what
  * to fix, and the totals of the set. Tap a skill to see it on the video, say if the guess is right, or change it: the answer is saved and
  * the classifier learns from it.
  */
 export function LiveRail(props: LiveRailProps) {
+  if (props.session.jumps.length === 0) return <EmptyState notes={props.notes} onOpenSetup={props.onOpenSetup} />;
+  return <LiveSet {...props} />;
+}
+
+function LiveSet(props: LiveRailProps) {
   const { session, selected, onSelect } = props;
+  // Beside a portrait clip the rail is wide: the set, the list and the selected skill side by side, each column scrolling on its own.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const wideScreen = useMediaQuery(WIDE_SCREEN);
+  const room2 = useMinWidth(rootRef, TWO_COLUMNS_PX);
+  const room3 = useMinWidth(rootRef, THREE_COLUMNS_PX);
+  const columns = !wideScreen || !room2 ? 1 : room3 ? 3 : 2;
+  const detailBeside = columns === 3;
   const items = useMemo(() => groupJumps(session.jumps), [session.jumps]);
   const rows = useRef<(HTMLButtonElement | null)[]>([]);
   const listRef = useRef<HTMLUListElement>(null);
@@ -160,8 +182,6 @@ export function LiveRail(props: LiveRailProps) {
     if (top !== null) scroller.scrollTo({ top, behavior: 'smooth' });
   }, [selected, reduced]);
 
-  if (session.jumps.length === 0) return <EmptyState notes={props.notes} onOpenSetup={props.onOpenSetup} />;
-
   const actionsFor = (j: LiveJump): SkillActions => ({
     onPlay: props.onPlayJump,
     onConfirm: () => props.onConfirm(j.index),
@@ -172,50 +192,54 @@ export function LiveRail(props: LiveRailProps) {
     canLabel: props.canLabel,
   });
 
-  return (
-    <div className="live">
-      <SetSummary session={session} title={props.title} />
+  // Straight jumps between the skills have no detail of their own: they only show which one is playing.
+  const shown = session.jumps.find((j) => j.index === selected) ?? session.jumps[0];
 
-      <section className="live-list" aria-label={t('live.skills')}>
-        {session.summary.skills === 0 && <p className="live-quiet">{t('live.noSkill')}</p>}
-        <div className="live-list__head" aria-hidden="true">
-          <h3 className="live-h">{t('live.skills')}</h3>
-          <span className="live-list__col">{t('live.colDifficulty')}</span>
-          <span className="live-list__col">{t('live.colExecution')}</span>
-        </div>
-        <ul ref={listRef} className="live-list__body">
-          {items.map((item) =>
-            item.kind === 'bounces' ? (
-              <Bounces key={`b${item.jumps[0].index}`} jumps={item.jumps} selected={selected} onSelect={onSelect} />
-            ) : (
-              <li key={item.jump.index} className={cx('live-item', item.jump.index === selected && 'live-item--on')}>
-                <SkillRow
-                  jump={item.jump}
-                  selected={item.jump.index === selected}
-                  onSelect={() => {
-                    if (item.jump.index !== selected) tapped.current = item.jump.index;
-                    onSelect(item.jump.index);
-                  }}
-                  buttonRef={(el) => {
-                    rows.current[item.jump.index] = el;
-                  }}
-                  onKeyDown={(e) => {
-                    const at = skillIndexes.indexOf(item.jump.index);
-                    const to = focusTarget(e.key, at, skillIndexes.length);
-                    if (to === null) return;
-                    e.preventDefault();
-                    rows.current[skillIndexes[to]]?.focus();
-                  }}
-                />
-                {item.jump.index === selected && (
-                  <SkillDetail key={item.jump.index} jump={item.jump} actions={actionsFor(item.jump)} />
-                )}
-              </li>
-            ),
-          )}
-        </ul>
-      </section>
+  const list = (
+    <section className="live-list" aria-label={t('live.skills')}>
+      {session.summary.skills === 0 && <p className="live-quiet">{t('live.noSkill')}</p>}
+      <div className="live-list__head" aria-hidden="true">
+        <h3 className="live-h">{t('live.skills')}</h3>
+        <span className="live-list__col">{t('live.colDifficulty')}</span>
+        <span className="live-list__col">{t('live.colExecution')}</span>
+      </div>
+      <ul ref={listRef} className="live-list__body">
+        {items.map((item) =>
+          item.kind === 'bounces' ? (
+            <Bounces key={`b${item.jumps[0].index}`} jumps={item.jumps} selected={selected} onSelect={onSelect} />
+          ) : (
+            <li key={item.jump.index} className={cx('live-item', item.jump.index === selected && 'live-item--on')}>
+              <SkillRow
+                jump={item.jump}
+                selected={item.jump.index === selected}
+                detailBelow={!detailBeside}
+                onSelect={() => {
+                  if (item.jump.index !== selected) tapped.current = item.jump.index;
+                  onSelect(item.jump.index);
+                }}
+                buttonRef={(el) => {
+                  rows.current[item.jump.index] = el;
+                }}
+                onKeyDown={(e) => {
+                  const at = skillIndexes.indexOf(item.jump.index);
+                  const to = focusTarget(e.key, at, skillIndexes.length);
+                  if (to === null) return;
+                  e.preventDefault();
+                  rows.current[skillIndexes[to]]?.focus();
+                }}
+              />
+              {!detailBeside && item.jump.index === selected && (
+                <SkillDetail key={item.jump.index} jump={item.jump} actions={actionsFor(item.jump)} />
+              )}
+            </li>
+          ),
+        )}
+      </ul>
+    </section>
+  );
 
+  const rest = (
+    <>
       {props.notes.length > 0 && (
         <Folds>
           <DataChecks notes={props.notes} />
@@ -228,6 +252,50 @@ export function LiveRail(props: LiveRailProps) {
         </Button>
         <p className="ins-quiet">{t('live.technicalText')}</p>
       </section>
+    </>
+  );
+
+  const detail = (
+    <div className="live-col live-col--detail" key={shown.index}>
+      {isBounce(shown) ? (
+        <p className="live-h">{t('live.bounce', { n: shown.number })}</p>
+      ) : (
+        <SkillDetail jump={shown} actions={actionsFor(shown)} />
+      )}
+    </div>
+  );
+  const summary = <SetSummary session={session} title={props.title} />;
+
+  return (
+    <div
+      ref={rootRef}
+      className={cx('live', columns > 1 && 'live--split')}
+      data-columns={columns > 1 ? columns : undefined}
+    >
+      {columns === 3 ? (
+        <>
+          <div className="live-col">
+            {summary}
+            {rest}
+          </div>
+          <div className="live-col">{list}</div>
+          {detail}
+        </>
+      ) : columns === 2 ? (
+        <>
+          <div className="live-col">
+            {summary}
+            {rest}
+          </div>
+          <div className="live-col">{list}</div>
+        </>
+      ) : (
+        <>
+          {summary}
+          {list}
+          {rest}
+        </>
+      )}
     </div>
   );
 }
