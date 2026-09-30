@@ -32,6 +32,14 @@
 .stage__overlay {
   pointer-events: none;
 }
+/* Saved data without its video: the skeleton is drawn on black. */
+.stage__frame--data {
+  background: #000;
+}
+.stage__pick--corner {
+  inset: auto 8px 8px auto;
+  margin: 0;
+}
 .stage__overlay--editing {
   pointer-events: auto;
   cursor: crosshair;

@@ -10,6 +10,7 @@ import { Icon, Segmented } from '../kit';
 import type { Playhead } from '../playhead';
 import type { StageView } from '../types';
 import { DEFAULT_RATIO, fitRatio, splitLayout, type Box } from './fit';
+import { createClockVideo } from './clockVideo';
 import { createPlayer } from './player';
 
 export interface StageProps {
@@ -133,12 +134,86 @@ export function Stage({
     };
   }, [playhead, fps, url]);
 
-  // Without a clip there is nothing to play, and a stale state must not linger in the transport.
+  // Without a clip or saved data there is nothing to play, and a stale state must not linger in the transport.
+  const hasData = !!result;
   useEffect(() => {
-    if (url) return;
+    if (url || hasData) return;
     playhead.setPlaying(false);
     playhead.setDuration(0);
-  }, [url, playhead]);
+  }, [url, hasData, playhead]);
+
+  // Saved data without its video: a clock plays the analysis, through the same player the video would use.
+  const dataMeta = !url && result ? result.meta : null;
+  const dataCount = dataMeta?.count ?? 0;
+  const dataFps = dataMeta?.fps ?? 0;
+  const dataWidth = dataMeta?.width ?? 0;
+  const dataHeight = dataMeta?.height ?? 0;
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
+  useEffect(() => {
+    if (!dataCount || !dataFps) return;
+    if (dataWidth && dataHeight) setRatio(dataWidth / dataHeight);
+    const duration = dataCount / dataFps;
+    const clock = createClockVideo(
+      duration,
+      (playing) => {
+        playhead.setPlaying(playing);
+        if (!playing) player.clearRange();
+      },
+      playhead.getSnapshot(),
+    );
+    const player = createPlayer(clock, fps);
+    playhead.seekHandler = player.seek;
+    playhead.playRangeHandler = player.playRange;
+    playhead.toggleHandler = player.toggle;
+    playhead.pauseHandler = player.pause;
+    playhead.stepHandler = player.step;
+    playhead.setDuration(duration);
+    playhead.setPlaying(false);
+    playhead.setTime(clock.currentTime);
+    let raf = 0;
+    let last = performance.now();
+    let lastKey = -1;
+    const loop = (now: number) => {
+      clock.advance(((now - last) / 1000) * speedRef.current);
+      last = now;
+      playhead.setTime(clock.currentTime);
+      player.tick();
+      const canvas = canvasRef.current;
+      const { result: res, skills: sk, overlay: opts, calibration: cal, box, hidden } = live.current;
+      if (canvas && res) {
+        const dpr = window.devicePixelRatio || 1;
+        const w = Math.round(box.width * dpr);
+        const h = Math.round(box.height * dpr);
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+          dirty.current = true;
+        }
+        if (!hidden && w > 0 && h > 0 && (dirty.current || clock.currentTime !== lastKey)) {
+          lastKey = clock.currentTime;
+          dirty.current = false;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            drawOverlay(ctx, box.width, box.height, res, sampleIndexAt(res.meta, clock.currentTime), opts, sk);
+            if (cal) drawCalibration(ctx, box.width, box.height, res.meta.width, res.meta.height, cal);
+          }
+        }
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      playhead.seekHandler = null;
+      playhead.playRangeHandler = null;
+      playhead.toggleHandler = null;
+      playhead.pauseHandler = null;
+      playhead.stepHandler = null;
+      playhead.setPlaying(false);
+    };
+  }, [playhead, fps, dataCount, dataFps, dataWidth, dataHeight]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = speed;
@@ -185,7 +260,7 @@ export function Stage({
 
   // Keyboard: space = play or pause, arrows = one frame (Shift: ten).
   useEffect(() => {
-    if (!url) return;
+    if (!url && !hasData) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
       if (e.code === 'Space') {
@@ -198,7 +273,7 @@ export function Stage({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [url, playhead]);
+  }, [url, hasData, playhead]);
 
   /** Pointer position in video pixels, or null before the video size is known. */
   const toVideoPoint = (e: PointerEvent<HTMLCanvasElement>): { p: Point; cssPerPx: number } | null => {
@@ -287,6 +362,27 @@ export function Stage({
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
           />
+        </div>
+      ) : result ? (
+        <div
+          className="stage__frame stage__frame--data"
+          data-hidden={layout.hidden || undefined}
+          style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height }}
+        >
+          <canvas ref={canvasRef} className="stage__overlay" aria-hidden="true" />
+          <label className="btn btn--secondary stage__pick stage__pick--corner">
+            <Icon name="upload" size={17} />
+            {t('stage.choose')}
+            <input
+              type="file"
+              accept="video/mp4,video/quicktime,.mp4,.mov"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onPickVideo(f);
+                e.target.value = '';
+              }}
+            />
+          </label>
         </div>
       ) : (
         <div className="stage__empty">
