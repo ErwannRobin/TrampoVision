@@ -81,6 +81,16 @@
   color: #fff;
 }
 
+/* The narrow stage of a portrait clip (shell.css) has no room for words: the view switcher keeps to its icons, clear of the labels drawn on
+   the video. */
+@media (min-width: 1100px) {
+  .workspace[data-orientation='portrait']:not(:has(.stage__pane)) .stage__views .seg__opt {
+    gap: 0;
+    padding-inline: 12px;
+    font-size: 0;
+  }
+}
+
 /* Layers above the video ignore the pointer except where they have controls. */
 .stage__layer {
   position: absolute;

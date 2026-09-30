@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_RATIO, fitRatio, splitLayout, type Box, type Size } from './fit';
+import { clipOrientation, DEFAULT_RATIO, fitRatio, portraitStageWidth, splitLayout, type Box, type Size } from './fit';
 
 const inside = (box: Box, outer: Size) =>
   box.x >= 0 && box.y >= 0 && box.x + box.width <= outer.width && box.y + box.height <= outer.height;
@@ -133,5 +133,52 @@ describe('splitLayout', () => {
     const layout = splitLayout({ width: 0, height: 0 }, 16 / 9, 8);
     expect(layout.video.width).toBe(0);
     expect(layout.pane.width).toBe(0);
+  });
+});
+
+describe('clipOrientation', () => {
+  it('is portrait when the frames are taller than wide', () => {
+    expect(clipOrientation({ width: 1080, height: 1920 })).toBe('portrait');
+    expect(clipOrientation({ width: 720, height: 960 })).toBe('portrait');
+    expect(clipOrientation({ width: 999, height: 1000 })).toBe('portrait');
+  });
+
+  it('is landscape when they are wider, or square', () => {
+    expect(clipOrientation({ width: 1920, height: 1080 })).toBe('landscape');
+    expect(clipOrientation({ width: 1000, height: 999 })).toBe('landscape');
+    expect(clipOrientation({ width: 1080, height: 1080 })).toBe('landscape');
+  });
+
+  it('keeps the starting layout while the size is not known, or is not a size', () => {
+    expect(clipOrientation(null)).toBe('landscape');
+    expect(clipOrientation(undefined)).toBe('landscape');
+    expect(clipOrientation({ width: 0, height: 0 })).toBe('landscape');
+    expect(clipOrientation({ width: 0, height: 1920 })).toBe('landscape');
+    expect(clipOrientation({ width: 1080, height: 0 })).toBe('landscape');
+    expect(clipOrientation({ width: Number.NaN, height: 1920 })).toBe('landscape');
+    expect(clipOrientation({ width: 1080, height: Number.POSITIVE_INFINITY })).toBe('portrait');
+  });
+});
+
+describe('portraitStageWidth', () => {
+  it('is the width of the video at the height of the stage', () => {
+    expect(portraitStageWidth(9 / 16, 640)).toBe(360);
+    expect(portraitStageWidth(3 / 4, 562)).toBe(422);
+  });
+
+  it('leaves no letterbox: the viewport of that size fits the video exactly', () => {
+    for (const ratio of [9 / 16, 0.6, 3 / 4, 4 / 5, 0.98]) {
+      for (const height of [392, 462, 562, 742, 1010]) {
+        const width = portraitStageWidth(ratio, height);
+        const box = fitRatio(ratio, { width, height });
+        expect(box.width * box.height).toBeGreaterThanOrEqual(width * height * 0.99);
+      }
+    }
+  });
+
+  it('asks for nothing before the stage has a height, and ignores a ratio that is not one', () => {
+    expect(portraitStageWidth(9 / 16, 0)).toBe(0);
+    expect(portraitStageWidth(9 / 16, -5)).toBe(0);
+    expect(portraitStageWidth(Number.NaN, 450)).toBe(Math.round(450 * DEFAULT_RATIO));
   });
 });

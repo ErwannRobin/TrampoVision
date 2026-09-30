@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 import { sampleIndexAt } from '../../analysis/lookup';
 import { t } from '../../i18n';
 import type { AnalysisResult } from '../../analysis/types';
@@ -9,7 +19,7 @@ import { useElementSize } from '../hooks';
 import { Icon, Segmented } from '../kit';
 import type { Playhead } from '../playhead';
 import type { StageView } from '../types';
-import { DEFAULT_RATIO, fitRatio, splitLayout, type Box } from './fit';
+import { clipOrientation, DEFAULT_RATIO, fitRatio, portraitStageWidth, splitLayout, type Box, type Size } from './fit';
 import { createClockVideo } from './clockVideo';
 import { createPlayer } from './player';
 
@@ -31,6 +41,11 @@ export interface StageProps {
   view: StageView;
   /** Undefined = no view switcher. Without a video (saved data only) the views that show it are disabled. */
   onView?: (view: StageView) => void;
+  /**
+   * The size of the clip's frames once known (from the video, or from the saved analysis when there is no video), null before.
+   * The shell lays the page out for a portrait clip from it.
+   */
+  onClipSize?: (size: Size | null) => void;
   /** The 3D skeleton, shown next to the video (split) or instead of it (3d). */
   pane?: ReactNode;
   /** Layers above the video (busy state, calibration bar): each positions itself absolutely inside the stage. */
@@ -74,6 +89,7 @@ export function Stage({
   onPickVideo,
   view,
   onView,
+  onClipSize,
   pane,
   children,
 }: StageProps) {
@@ -83,8 +99,22 @@ export function Stage({
   const playerRef = useRef<ReturnType<typeof createPlayer> | null>(null);
   const dragging = useRef<number | null>(null);
   const dirty = useRef(true);
-  const [ratio, setRatio] = useState(DEFAULT_RATIO);
+  // What the video says its frames measure. Only valid for the clip it was read from.
+  const [videoSize, setVideoSize] = useState<{ url: string; width: number; height: number } | null>(null);
   const size = useElementSize(viewportRef);
+
+  // The size of the clip: from the video, or, for a saved analysis without one, from the analysis. Unknown until then: the
+  // clip is laid out as 16:9 and the page in the landscape layout.
+  const dataMeta = !url && result ? result.meta : null;
+  const fromVideo = url && videoSize?.url === url ? videoSize : null;
+  const clipWidth = fromVideo?.width ?? dataMeta?.width ?? 0;
+  const clipHeight = fromVideo?.height ?? dataMeta?.height ?? 0;
+  const ratio = clipWidth > 0 && clipHeight > 0 ? clipWidth / clipHeight : DEFAULT_RATIO;
+  const portrait = clipOrientation({ width: clipWidth, height: clipHeight }) === 'portrait';
+  useLayoutEffect(() => {
+    onClipSize?.(clipWidth > 0 && clipHeight > 0 ? { width: clipWidth, height: clipHeight } : null);
+    return () => onClipSize?.(null);
+  }, [onClipSize, clipWidth, clipHeight]);
 
   // Where the video goes: the whole viewport, or its share of the split view; in 3D it stays mounted but hidden.
   const layout = useMemo(() => {
@@ -107,11 +137,6 @@ export function Stage({
   useEffect(() => {
     dirty.current = true;
   }, [result, skills, overlay, calibration, layout.video, layout.hidden]);
-
-  // A new clip is laid out as 16:9 until its size is known.
-  useEffect(() => {
-    setRatio(DEFAULT_RATIO);
-  }, [url]);
 
   // The player bus: everything else in the interface drives the video through these.
   useEffect(() => {
@@ -143,16 +168,12 @@ export function Stage({
   }, [url, hasData, playhead]);
 
   // Saved data without its video: a clock plays the analysis, through the same player the video would use.
-  const dataMeta = !url && result ? result.meta : null;
   const dataCount = dataMeta?.count ?? 0;
   const dataFps = dataMeta?.fps ?? 0;
-  const dataWidth = dataMeta?.width ?? 0;
-  const dataHeight = dataMeta?.height ?? 0;
   const speedRef = useRef(speed);
   speedRef.current = speed;
   useEffect(() => {
     if (!dataCount || !dataFps) return;
-    if (dataWidth && dataHeight) setRatio(dataWidth / dataHeight);
     const duration = dataCount / dataFps;
     const clock = createClockVideo(
       duration,
@@ -213,7 +234,7 @@ export function Stage({
       playhead.stepHandler = null;
       playhead.setPlaying(false);
     };
-  }, [playhead, fps, dataCount, dataFps, dataWidth, dataHeight]);
+  }, [playhead, fps, dataCount, dataFps]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = speed;
@@ -322,9 +343,17 @@ export function Stage({
   const editing = !!calibration?.editing;
   const frame = layout.video;
   const showPane = !!pane && view !== 'video';
+  // In the wide layout a portrait clip has a stage of its own width (shell.css) instead of a black one: it says how wide.
+  const portraitWidth = portrait ? portraitStageWidth(ratio, size.height) : 0;
 
   return (
-    <div className="stage" ref={viewportRef} role="region" aria-label={t('stage.region')}>
+    <div
+      className="stage"
+      ref={viewportRef}
+      role="region"
+      aria-label={t('stage.region')}
+      style={portraitWidth > 0 ? ({ '--stage-w': `${portraitWidth}px` } as CSSProperties) : undefined}
+    >
       {url ? (
         <div
           className="stage__frame"
@@ -340,7 +369,7 @@ export function Stage({
             preload="auto"
             onLoadedMetadata={(e) => {
               const { videoWidth: w, videoHeight: h, duration } = e.currentTarget;
-              if (w && h) setRatio(w / h);
+              if (w && h) setVideoSize({ url, width: w, height: h });
               e.currentTarget.playbackRate = speed;
               playhead.setDuration(duration);
             }}

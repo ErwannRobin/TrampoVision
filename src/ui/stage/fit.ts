@@ -77,3 +77,24 @@ export function splitLayout(outer: Size, ratio: number, gap: number): SplitLayou
   const y = video.height + space;
   return { direction: 'column', video, pane: { x: 0, y, width, height: Math.max(0, height - y) } };
 }
+
+export type Orientation = 'portrait' | 'landscape';
+
+/**
+ * Which way a clip is filmed, from the size of its frames as they are shown (a phone's rotation included). Taller than wide is
+ * portrait. A square clip, or one whose size is not known (yet), is landscape: the layout the interface starts from.
+ */
+export function clipOrientation(size: Size | null | undefined): Orientation {
+  if (!size || !(size.width > 0) || !(size.height > 0)) return 'landscape';
+  return size.height > size.width ? 'portrait' : 'landscape';
+}
+
+/**
+ * The width the stage asks for when the clip is portrait and the page is wide, so that the rail gets the rest: the video at the
+ * height the stage has. The stage then has no letterbox beside the video; the viewport still fits it as usual (`fitRatio`), so
+ * nothing is ever cropped.
+ */
+export function portraitStageWidth(ratio: number, height: number): number {
+  const h = Math.max(0, Math.floor(height));
+  return h === 0 ? 0 : Math.round(h * validRatio(ratio));
+}

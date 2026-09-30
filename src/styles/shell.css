@@ -73,6 +73,28 @@
   padding: 4px var(--gutter) 64px;
 }
 
+/*
+ * A portrait clip on a wide screen: the stage is as wide as the video, so the black letterbox goes and the rail gets the width
+ * it frees. The stage says how wide (--stage-w, from its own height and the clip's ratio: no stylesheet can know that). A clip
+ * that is landscape, or whose size is not known yet, keeps the grid above, and so does the stage while it shows the 3D skeleton
+ * (split and 3D views): the pane needs the room, and the video stays exactly where it was.
+ */
+@media (min-width: 1100px) {
+  .workspace[data-orientation='portrait']:not(:has(.stage__pane)) {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+  .workspace[data-orientation='portrait']:not(:has(.stage__pane)) .workspace__stage > .stage {
+    flex: none;
+    width: var(--stage-w, 30vh);
+    /* The rail is never narrower than it is beside a landscape clip. */
+    max-width: calc(100vw - 3 * var(--gutter) - var(--rail-w));
+  }
+  /* The live rail makes use of the width in columns; the others are read down a page, so a line keeps to a readable length. */
+  .workspace[data-orientation='portrait'] .workspace__rail > :is(.coach, .ins, .ready) {
+    max-width: 880px;
+  }
+}
+
 @media (max-width: 1099px) {
   .workspace {
     display: flex;
@@ -128,11 +150,17 @@
   pointer-events: auto;
   box-shadow: var(--shadow-pop);
 }
-/* Wide: they float over the stage, not over the rail they would hide. */
+/* Wide: they float over the stage, not over the rail they would hide. Beside a portrait clip the stage is as narrow as the video: they
+   keep to its left edge, about its width. */
 @media (min-width: 1100px) {
   .banners {
     left: calc((100vw - var(--rail-w) - var(--gutter)) / 2);
     width: min(600px, calc(100vw - var(--rail-w) - 4 * var(--gutter)));
+  }
+  .app:has(.workspace[data-orientation='portrait']) .banners {
+    left: var(--gutter);
+    width: 340px;
+    transform: none;
   }
 }
 
