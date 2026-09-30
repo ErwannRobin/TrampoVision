@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { REVIEW_API_URL, fetchQueueCount } from '../sync/reviewSync';
 import type { DatasetApi } from '../dataset/useDataset';
 import { HeroArcs } from './chrome/HeroArcs';
 import { DemoSkeleton } from './DemoSkeleton';
@@ -13,6 +15,27 @@ export interface LandingProps {
   dataset: DatasetApi;
   /** A file is being read. */
   busy: boolean;
+}
+
+/** A link to the reviewer page, with the number of jumps waiting. Only when the build has a review service. */
+function ReviewLink() {
+  const [waiting, setWaiting] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    void fetchQueueCount().then((n) => live && setWaiting(n));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return (
+    <a className="landing__review" href="/review.html">
+      <Icon name="check" size={18} />
+      <span>
+        Review jumps
+        <small>{waiting === null ? 'Confirm or correct what the app found' : `${waiting} waiting for a check`}</small>
+      </span>
+    </a>
+  );
 }
 
 /** The first screen: what the app does, how to start, and the dataset saved on this computer. */
@@ -65,6 +88,7 @@ export function Landing({ onFile, onSample, onOpenSeries, dataset, busy }: Landi
               }}
             />
           </label>
+          {REVIEW_API_URL && <ReviewLink />}
           <ul className="landing__notes">
             <li>
               <Icon name="video" size={17} />

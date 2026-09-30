@@ -13,9 +13,13 @@
         --muted: #6b6b66;
         --line: #dcdcd6;
         --accent: #1f5eff;
+        --accent-soft: #e6edff;
         --ok: #12833b;
+        --ok-soft: #e2f4e8;
         --warn: #b26b00;
+        --warn-soft: #fbeed7;
         --bad: #b3261e;
+        --bad-soft: #fbe5e3;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -25,9 +29,13 @@
           --muted: #9a9a94;
           --line: #333;
           --accent: #6f9bff;
+          --accent-soft: #1d2a4a;
           --ok: #4cc27a;
+          --ok-soft: #173424;
           --warn: #e0a24a;
+          --warn-soft: #3a2c14;
           --bad: #ff7b72;
+          --bad-soft: #3d1c1a;
         }
       }
       * {
@@ -41,64 +49,123 @@
         background: var(--bg);
         color: var(--ink);
       }
+      [hidden] {
+        display: none !important;
+      }
+      a {
+        color: inherit;
+      }
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      /* ---- top bar ---- */
       header {
+        position: sticky;
+        top: 0;
+        z-index: 5;
         display: flex;
-        gap: 12px;
+        gap: 8px 16px;
         align-items: center;
-        padding: 10px 16px;
+        flex-wrap: wrap;
+        padding: 8px 16px;
         border-bottom: 1px solid var(--line);
         background: var(--panel);
-        flex-wrap: wrap;
+      }
+      .back {
+        text-decoration: none;
+        font-weight: 600;
+        padding: 6px 10px;
+        margin-left: -10px;
+        border-radius: 8px;
+      }
+      .back:hover {
+        background: var(--bg);
       }
       header h1 {
         font-size: 16px;
         margin: 0;
+      }
+      #tabs {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
         margin-right: auto;
       }
+      #tabs button {
+        font: inherit;
+        color: var(--muted);
+        background: none;
+        border: 1px solid transparent;
+        border-radius: 99px;
+        padding: 5px 12px;
+        cursor: pointer;
+      }
+      #tabs button:hover {
+        border-color: var(--line);
+      }
+      #tabs button[aria-selected='true'] {
+        color: var(--ink);
+        background: var(--accent-soft);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      #tabs .n {
+        margin-left: 4px;
+        font-variant-numeric: tabular-nums;
+      }
+      body.out #tabs,
+      body.out #who {
+        display: none;
+      }
+
+      /* ---- layout ---- */
       main {
         display: grid;
-        grid-template-columns: minmax(240px, 320px) 1fr;
+        grid-template-columns: minmax(230px, 300px) 1fr;
         gap: 16px;
         padding: 16px;
+        align-items: start;
       }
-      @media (max-width: 800px) {
+      @media (max-width: 860px) {
         main {
           grid-template-columns: 1fr;
         }
       }
-      .panel {
+      .card {
         background: var(--panel);
         border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 12px;
+        border-radius: 12px;
+        padding: 14px;
+      }
+      #detail {
+        display: grid;
+        gap: 12px;
+        min-width: 0;
+      }
+      /* Wide screens: the figure picker sits beside the jump, so nothing needs scrolling. */
+      @media (min-width: 1150px) {
+        #detail {
+          grid-template-columns: minmax(0, 1fr) 360px;
+        }
+        #detail > * {
+          grid-column: 1;
+        }
+        #fix {
+          grid-column: 2;
+          grid-row: 1 / span 3;
+        }
+        #detail > .bar {
+          grid-column: 1 / -1;
+        }
       }
       h2 {
-        font-size: 13px;
+        font-size: 12px;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.05em;
         color: var(--muted);
         margin: 0 0 8px;
-      }
-      ul.queue {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        max-height: 70vh;
-        overflow: auto;
-      }
-      ul.queue li button {
-        width: 100%;
-        text-align: left;
-        padding: 8px;
-        border: 0;
-        border-bottom: 1px solid var(--line);
-        background: none;
-        color: inherit;
-        cursor: pointer;
-        font: inherit;
-      }
-      ul.queue li button[aria-current='true'] {
-        background: color-mix(in srgb, var(--accent) 14%, transparent);
       }
       .muted {
         color: var(--muted);
@@ -110,61 +177,88 @@
         flex-wrap: wrap;
         align-items: center;
       }
-      button.act,
-      select,
-      input[type='text'] {
-        font: inherit;
-        padding: 7px 12px;
-        border-radius: 8px;
-        border: 1px solid var(--line);
-        background: var(--panel);
-        color: var(--ink);
+
+      /* ---- list ---- */
+      #list {
+        position: sticky;
+        top: 58px;
+        padding: 8px;
       }
-      button.act {
-        cursor: pointer;
-      }
-      button.act:hover {
-        border-color: var(--accent);
-      }
-      button.primary {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: #fff;
-      }
-      button.danger:hover {
-        border-color: var(--bad);
-      }
-      button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-      .grid {
-        display: grid;
-        grid-template-columns: 280px 1fr;
-        gap: 16px;
-      }
-      @media (max-width: 1000px) {
-        .grid {
-          grid-template-columns: 1fr;
+      @media (max-width: 860px) {
+        #list {
+          position: static;
+        }
+        ul.queue {
+          max-height: 220px !important;
         }
       }
-      canvas {
-        width: 100%;
-        height: auto;
-        display: block;
-        background: var(--bg);
-        border-radius: 8px;
+      ul.queue {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        max-height: calc(100vh - 150px);
+        overflow: auto;
       }
-      table {
-        border-collapse: collapse;
+      ul.queue li button {
+        display: grid;
+        grid-template-columns: 10px 1fr;
+        gap: 4px 10px;
+        align-items: center;
         width: 100%;
-        font-size: 14px;
-      }
-      td,
-      th {
         text-align: left;
-        padding: 4px 6px;
-        border-bottom: 1px solid var(--line);
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 8px;
+        background: none;
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+      }
+      ul.queue li button:hover {
+        background: var(--bg);
+      }
+      ul.queue li button[aria-current='true'] {
+        background: var(--accent-soft);
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--line);
+      }
+      .dot.auto {
+        background: var(--accent);
+      }
+      .dot.confirmed {
+        background: var(--ok);
+      }
+      .dot.corrected {
+        background: var(--warn);
+      }
+      .dot.unknown,
+      .dot.bad-data {
+        background: var(--bad);
+      }
+      .li-name {
+        font-weight: 550;
+        line-height: 1.25;
+      }
+      .li-sub {
+        grid-column: 2;
+        margin-top: -2px;
+      }
+
+      /* ---- answer ---- */
+      .answer {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      #autoname {
+        font-size: 24px;
+        font-weight: 650;
+        line-height: 1.2;
       }
       .tag {
         font-size: 12px;
@@ -184,65 +278,255 @@
       .tag.unclassified {
         color: var(--bad);
       }
+      #verdictnow {
+        margin-top: 10px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: 550;
+        background: var(--bg);
+      }
+      #verdictnow.confirmed {
+        background: var(--ok-soft);
+        color: var(--ok);
+      }
+      #verdictnow.corrected {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+      #verdictnow.unknown,
+      #verdictnow.bad-data {
+        background: var(--bad-soft);
+        color: var(--bad);
+      }
+      #ident {
+        text-align: right;
+      }
+
+      /* ---- replay ---- */
+      .visual {
+        display: grid;
+        grid-template-columns: minmax(180px, 260px) 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 700px) {
+        .visual {
+          grid-template-columns: 1fr;
+        }
+      }
+      canvas {
+        width: 100%;
+        height: auto;
+        display: block;
+        background: var(--bg);
+        border-radius: 8px;
+      }
+      .facts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .fact {
+        background: var(--bg);
+        border-radius: 8px;
+        padding: 6px 10px;
+      }
+      .fact b {
+        display: block;
+        font-size: 16px;
+      }
+
+      /* ---- fix: pick another figure ---- */
+      button.act,
+      input[type='text'] {
+        font: inherit;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink);
+      }
+      button.act {
+        cursor: pointer;
+      }
+      button.act:hover:not(:disabled) {
+        border-color: var(--accent);
+      }
+      button.primary {
+        background: var(--ok);
+        border-color: var(--ok);
+        color: #fff;
+        font-weight: 650;
+      }
+      button.primary:hover:not(:disabled) {
+        border-color: var(--ok);
+        filter: brightness(1.08);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      #cands {
+        display: grid;
+        gap: 6px;
+      }
+      #cands button {
+        display: grid;
+        grid-template-columns: 22px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        text-align: left;
+        padding: 9px 12px;
+      }
+      kbd {
+        font:
+          12px/1 ui-monospace,
+          monospace;
+        padding: 3px 6px;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 5px;
+        background: var(--bg);
+        color: var(--muted);
+      }
+      .builder {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 8px 12px;
+        align-items: center;
+        margin-top: 12px;
+      }
+      .builder .lab {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .chips {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .chips button {
+        min-width: 44px;
+        padding: 7px 12px;
+      }
+      .chips button[aria-pressed='true'] {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 600;
+      }
+      #savepick {
+        margin-top: 12px;
+        width: 100%;
+      }
+
+      /* ---- sticky action bar ---- */
+      .bar {
+        position: sticky;
+        bottom: 0;
+        z-index: 4;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 10px 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.08);
+      }
+      .bar #confirm {
+        padding: 12px 22px;
+        font-size: 16px;
+      }
+      #note {
+        width: 100%;
+      }
+      @media (max-width: 700px) {
+        .bar #confirm {
+          flex: 1 1 100%;
+          order: -1;
+        }
+        .bar {
+          padding: 8px;
+        }
+        .bar .act {
+          padding: 8px 10px;
+        }
+      }
+      @media (hover: none) {
+        kbd {
+          display: none;
+        }
+      }
       #err {
         color: var(--bad);
+        margin: 0;
+      }
+      #toast {
+        position: fixed;
+        left: 50%;
+        top: 64px;
+        transform: translateX(-50%);
+        z-index: 10;
+        padding: 10px 18px;
+        border-radius: 99px;
+        background: var(--ink);
+        color: var(--bg);
+        font-weight: 550;
+        width: max-content;
+        max-width: 90vw;
+        text-align: center;
       }
       pre {
         white-space: pre-wrap;
         font-size: 12px;
         margin: 0;
       }
-      [hidden] {
-        display: none !important;
+      .hints {
+        margin: 0;
       }
-      body.out #mode,
-      body.out #who,
-      body.out #counts {
-        display: none;
+      .hints kbd {
+        margin-left: 6px;
       }
     </style>
   </head>
   <body class="out">
-    <header id="bar">
-      <h1>TrampoVision review</h1>
-      <span id="counts" class="muted"></span>
-      <select id="mode" aria-label="List">
-        <option value="queue">To review</option>
-        <option value="confirmed">Confirmed</option>
-        <option value="corrected">Corrected</option>
-        <option value="unknown">Unknown</option>
-        <option value="bad-data">Bad data</option>
-      </select>
+    <header>
+      <a class="back" href="/">← Home</a>
+      <h1>Review jumps</h1>
+      <div id="tabs" role="tablist" aria-label="Which jumps"></div>
       <input id="who" type="text" placeholder="Your name" size="12" aria-label="Your name" />
     </header>
 
-    <section id="login" class="panel" style="margin: 16px; max-width: 420px">
+    <section id="login" class="card" style="margin: 16px; max-width: 420px">
       <h2>Review unavailable</h2>
       <p id="loginerr" class="muted"></p>
+      <a href="/">Back to the home page</a>
     </section>
 
     <main id="app" hidden>
-      <div class="panel">
+      <aside id="list" class="card" aria-label="Jumps">
         <h2 id="listtitle">To review</h2>
         <ul class="queue" id="queue"></ul>
-        <p id="empty" class="muted" hidden>Nothing here.</p>
-      </div>
+        <p id="empty" class="muted" hidden>Nothing here. All done!</p>
+      </aside>
 
-      <div id="detail" class="panel" hidden>
-        <div class="row" style="justify-content: space-between">
+      <div id="detail" hidden>
+        <section class="card answer" aria-label="Automatic answer">
           <div>
-            <h2 style="margin: 0">Automatic answer</h2>
-            <div style="font-size: 20px; font-weight: 600" id="autoname"></div>
+            <h2 id="progress">Automatic answer</h2>
+            <div id="autoname"></div>
             <div class="row">
               <span id="autotag" class="tag"></span><span id="autoconf" class="muted"></span
               ><span id="autoclf" class="muted"></span>
             </div>
+            <div id="verdictnow" hidden></div>
           </div>
           <div class="muted" id="ident"></div>
-        </div>
-        <p id="summary" class="muted"></p>
+        </section>
 
-        <div class="grid">
+        <section class="card visual" aria-label="The jump">
           <div>
             <canvas id="skel" width="280" height="320" aria-label="Skeleton replay"></canvas>
             <div class="row" style="margin-top: 8px">
@@ -258,39 +542,47 @@
                 aria-label="Position in the jump"
               />
             </div>
-            <p class="muted">
-              The body is drawn upright in its own frame, so the shape (tuck, pike, twist) reads clearly. The rotation
-              is in the curves.
-            </p>
           </div>
           <div>
             <canvas id="curves" width="560" height="320" aria-label="Measured curves"></canvas>
-            <table id="measured" style="margin-top: 8px"></table>
+            <div class="facts" id="measured"></div>
+            <p class="muted" id="summary" style="margin: 8px 0 0"></p>
           </div>
-        </div>
+        </section>
 
-        <h2 style="margin-top: 16px">Candidates</h2>
-        <table id="cands"></table>
+        <section class="card" id="fix" aria-label="Pick the figure">
+          <h2>Not right? Pick the figure</h2>
+          <div id="cands"></div>
+          <div class="builder" id="builder">
+            <span class="lab">Somersaults</span>
+            <div class="chips" data-field="s"></div>
+            <span class="lab" id="dirlab">Direction</span>
+            <div class="chips" data-field="d"></div>
+            <span class="lab">Twists</span>
+            <div class="chips" data-field="t"></div>
+            <span class="lab">Position</span>
+            <div class="chips" data-field="p"></div>
+          </div>
+          <button class="act" id="savepick" type="button"></button>
+        </section>
 
-        <h2 style="margin-top: 16px">Your verdict</h2>
-        <div class="row">
-          <button class="act primary" id="confirm" type="button">Confirm the automatic answer (Enter)</button>
-          <select id="figure" aria-label="Figure"></select>
-          <button class="act" id="correct" type="button">It was this figure</button>
-          <button class="act" id="unknown" type="button">Cannot tell</button>
-          <button class="act danger" id="baddata" type="button">Bad data</button>
-        </div>
-        <div class="row" style="margin-top: 8px">
-          <input id="note" type="text" placeholder="Note (optional)" style="flex: 1" aria-label="Note" />
-          <button class="act" id="skip" type="button">Skip (N)</button>
-        </div>
-        <p id="err" role="alert"></p>
-        <details style="margin-top: 8px">
+        <details class="card" id="debugbox">
           <summary class="muted">Debug</summary>
           <pre id="debug"></pre>
         </details>
+
+        <input id="note" type="text" placeholder="Note about this jump (optional)" aria-label="Note" />
+        <div class="bar" role="group" aria-label="Verdict">
+          <button class="act" id="prev" type="button" aria-label="Previous jump" title="Previous (←)">←</button>
+          <button class="act primary" id="confirm" type="button"></button>
+          <button class="act" id="unknown" type="button" title="Cannot tell (U)">Cannot tell <kbd>U</kbd></button>
+          <button class="act" id="baddata" type="button" title="Bad data (B)">Bad data <kbd>B</kbd></button>
+          <button class="act" id="skip" type="button" title="Next (→)">Skip <kbd>→</kbd></button>
+          <p id="err" role="alert" style="flex-basis: 100%"></p>
+        </div>
       </div>
     </main>
+    <div id="toast" role="status" hidden></div>
 
     <script type="module" src="/src/reviewPage/main.js"></script>
   </body>

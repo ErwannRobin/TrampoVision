@@ -267,6 +267,32 @@
 .landing__link:hover {
   text-decoration-color: currentColor;
 }
+.landing__review {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 10px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.landing__review small {
+  display: block;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+}
+.landing__review:hover {
+  border-color: currentColor;
+}
+.landing__review:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
 .landing__notes {
   display: grid;
   gap: 12px;

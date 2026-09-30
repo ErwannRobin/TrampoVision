@@ -338,6 +338,8 @@ Set up: `cd worker && npx wrangler d1 create trampovision-review` (put the id in
 is not a secret: it keeps strangers from writing by accident. Everyone who uses the app may review: the reviewer page (`/review.html`, part of the app build) uses the
 same token, so it asks for nothing. `REVIEW_TOKEN` is optional. For real access control, put Cloudflare Access in front of the worker. A _Send analyzed jumps for review_ switch in the settings turns the upload off.
 
+**The reviewer page.** The home page links to it (_Review jumps_, with the number of jumps waiting; the link only shows when the build has a review service). For the jump on screen it shows the automatic answer, the skeleton replay (it plays by itself) and the measured curves. A bar that stays at the bottom holds the verdict: **Confirm** (Enter), _Cannot tell_ (U), _Bad data_ (B), _Skip_ (→), _Back_ (←). To correct, everything is on the same screen: the classifier's alternatives (one click, or keys 1 to 5), and four rows of buttons (somersaults, direction, twists, position) that always land on a figure of the table, then _It was: …_. After each verdict the page moves to the next jump. The tabs (_To review_, _Confirmed_, _Corrected_, _Unknown_, _Bad data_) show the counts, and any jump can be re-classified again from its tab.
+
 ### Scoring the classifier on reviewed jumps
 
 `make eval FILE=eval/export.ndjson` runs the current classifier again on the stored jumps (a record holds the features, the sequence

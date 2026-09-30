@@ -73,6 +73,16 @@ export async function fetchReferenceRecords(): Promise<JumpRecord[]> {
   return (body.records ?? []).filter((r) => r.schema === RECORD_SCHEMA && r.figure && r.sequence);
 }
 
+/** How many jumps wait for a reviewer, or null when the service cannot be reached. */
+export async function fetchQueueCount(): Promise<number | null> {
+  try {
+    const body = (await (await call('/stats')).json()) as { stats?: { status: string; n: number }[] };
+    return body.stats?.find((s) => s.status === 'auto')?.n ?? 0;
+  } catch {
+    return null;
+  }
+}
+
 /** What the person is told about the upload. */
 export function syncStatusText(
   state: 'unavailable' | 'off' | 'idle' | 'sending' | 'sent' | 'failed',
