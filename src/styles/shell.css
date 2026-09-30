@@ -13,6 +13,9 @@
   display: flex;
   flex-direction: column;
   min-width: 320px;
+  /* Opened from the home screen the page runs edge to edge: keep clear of the notch, the rounded corners and the home bar. */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px);
   /* Tooltips that are hidden still count as overflow: nothing here may make the page scroll sideways. */
   overflow-x: clip;
   min-height: 100dvh;
@@ -32,7 +35,7 @@
     'stage rail'
     'dock dock';
   gap: var(--gutter);
-  height: calc(100dvh - var(--topbar-h));
+  height: calc(100dvh - var(--topbar-h) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   min-height: 620px;
   padding: 0 var(--gutter) var(--gutter);
   animation: fade-in var(--t-slow) var(--ease) both;

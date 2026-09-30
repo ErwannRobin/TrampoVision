@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: eval eval-fetch worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets convert clean distclean
+.PHONY: icons eval eval-fetch worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets convert clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -41,6 +41,9 @@ check: typecheck worker-check lint format-check test ## Typecheck, lint, format 
 
 assets: node_modules ## Re-download MediaPipe runtime + pose models into public/
 	npm run fetch-assets
+
+icons: node_modules ## Re-render the home-screen icons in public/ from the logo
+	node scripts/icons.mjs
 
 convert: ## Re-encode VIDEO=path/to.MOV to a Chrome-friendly H.264 .mp4 next to it (needs ffmpeg)
 	@test -n "$(VIDEO)" || { echo "usage: make convert VIDEO=path/to/file.MOV"; exit 1; }
