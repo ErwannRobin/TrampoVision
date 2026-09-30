@@ -52,17 +52,18 @@ import { TechnicalData } from './ui/TechnicalData';
 import { Timeline } from './ui/Timeline';
 import { TopBar } from './ui/TopBar';
 import { Icon, ActivityToast, type MenuGroupDef } from './ui/kit';
-import { useLocalStorage, useReducedMotion } from './ui/hooks';
+import { useLocalStorage } from './ui/hooks';
 import { analysisWarnings } from './ui/quality';
 import { AthleteInsights } from './ui/rail/AthleteInsights';
 import { CoachRail } from './ui/rail/CoachRail';
 import { LiveRail } from './ui/live/LiveRail';
-import { SetupPanel } from './ui/rail/SetupPanel';
+import { SettingsDialog } from './ui/chrome/SettingsDialog';
+import { ReadyCard } from './ui/rail/ReadyCard';
 import { CalibrationBar } from './ui/stage/CalibrationBar';
 import { ProcessingOverlay } from './ui/stage/ProcessingOverlay';
 import { Stage } from './ui/stage/Stage';
 import { Transport } from './ui/stage/Transport';
-import type { Appearance, Audience, CoachTab, RailView, StageView, Status } from './ui/types';
+import type { Appearance, Audience, CoachTab, StageView, Status } from './ui/types';
 import { useAnnotatedExport } from './ui/useAnnotatedExport';
 import { formatNumber, t, tp, useLocale } from './i18n';
 import { fmt } from './ui/format';
@@ -135,20 +136,10 @@ export default function App() {
   const [advancedFlag, setAdvancedFlag] = useLocalStorage<'on' | 'off'>('trampovision.advanced', 'off', ADVANCED);
   const advanced = advancedFlag === 'on';
   const [appearance, setAppearance] = useLocalStorage<Appearance>('trampovision.appearance', 'system', APPEARANCES);
-  const [railView, setRailView] = useState<RailView>('setup');
-  const railRef = useRef<HTMLElement>(null);
-  const reducedMotion = useReducedMotion();
-  // Below 1100px the rail sits under the timeline, out of sight: opening the settings there must bring them into view.
-  const showRail = useCallback(() => {
-    if (!window.matchMedia('(max-width: 1099px)').matches) return;
-    requestAnimationFrame(() =>
-      railRef.current?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' }),
-    );
-  }, [reducedMotion]);
-  const openSetup = useCallback(() => {
-    setRailView('setup');
-    showRail();
-  }, [showRail]);
+  // The settings are a popup over the app: from the first screen as well as from an open clip.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const openSetup = useCallback(() => setSettingsOpen(true), []);
+  const closeSetup = useCallback(() => setSettingsOpen(false), []);
   const [coachTab, setCoachTab] = useState<CoachTab>('skill');
   // 2D pose is the analysis; the 3D skeleton is an experimental view next to it and does not feed the classifier.
   const [stageView, setStageView] = useState<StageView>('video');
@@ -232,12 +223,11 @@ export default function App() {
 
   useEffect(() => () => abort.current?.abort(), []);
 
-  // A new analysis starts at the first jump and shows its insights; no analysis shows the setup.
+  // A new analysis starts at the first jump.
   const firstSkillPending = useRef(false);
   useEffect(() => {
     firstSkillPending.current = true;
     setSelectedJump(0);
-    setRailView(track ? 'insights' : 'setup');
     // Saved data opens on the 3D skeleton: it is what there is to show until the clip is added.
     setStageView(openedSeries.current ? '3d' : 'video');
     openedSeries.current = false;
@@ -808,8 +798,11 @@ export default function App() {
       />
     ) : null;
 
-  const setup = (
-    <SetupPanel
+  const settings = (
+    <SettingsDialog
+      open={settingsOpen}
+      onClose={closeSetup}
+      clipDetail={clipDetail}
       advanced={advanced}
       onAdvanced={(on) => setAdvancedFlag(on ? 'on' : 'off')}
       review={
@@ -837,7 +830,10 @@ export default function App() {
       }}
       backend={backend}
       webgpu={webgpu}
-      onAnalyze={() => void analyze()}
+      onAnalyze={() => {
+        closeSetup();
+        void analyze();
+      }}
       onCancel={() => abort.current?.abort()}
       height={height}
       onHeight={(m) => setHeight(m || 1.75)}
@@ -851,21 +847,35 @@ export default function App() {
         status: calStatus,
         error: !!calibrationModel && !calibrationModel.ok,
       }}
-      onEditCalibration={setEditingCal}
+      onEditCalibration={(editing) => {
+        // The corners are placed on the video: the popup steps aside, and the bar on the video finishes the job.
+        if (editing) closeSetup();
+        setEditingCal(editing);
+      }}
       onUndoCorner={() => setCorners(corners.slice(0, -1))}
       onClearCalibration={() => {
         setCorners([]);
+        closeSetup();
         setEditingCal(true);
       }}
       onBedLong={(m) => setBedLong(m || DEFAULT_BED_M.long)}
       onBedShort={(m) => setBedShort(m || DEFAULT_BED_M.short)}
       onFirstSide={setFirstSide}
       onScaleSource={setScaleSource}
-      onSample={samplePath ? () => void onSample() : null}
-      onOpenSeries={(f) => void openSeries(f)}
+      onSample={
+        samplePath
+          ? () => {
+              closeSetup();
+              void onSample();
+            }
+          : null
+      }
+      onOpenSeries={(f) => {
+        closeSetup();
+        void openSeries(f);
+      }}
       appearance={appearance}
       onAppearance={setAppearance}
-      onClose={result ? () => setRailView('insights') : undefined}
     />
   );
 
@@ -907,11 +917,13 @@ export default function App() {
         onAudience={setAudience}
         showAudience={!!result && advanced}
         exportGroups={advanced ? exportGroups : null}
-        setupOpen={!!result && railView === 'setup'}
-        onToggleSetup={() => (railView === 'setup' ? setRailView('insights') : openSetup())}
+        setupOpen={settingsOpen}
+        onOpenSetup={openSetup}
         onFile={hasClip && !analyzing ? (f) => void onFile(f) : null}
         onHome={hasClip && !analyzing ? goHome : null}
       />
+
+      {settings}
 
       <StatusBanners
         status={status}
@@ -1019,13 +1031,13 @@ export default function App() {
                 )}
               </div>
 
-              <aside
-                ref={railRef}
-                className="workspace__rail sheet"
-                aria-label={railView === 'setup' || !result ? t('setup.title') : t('app.analysis')}
-              >
-                {!result || !skills || railView === 'setup' ? (
-                  setup
+              <aside className="workspace__rail sheet" aria-label={result ? t('app.analysis') : t('setup.readyTitle')}>
+                {!result || !skills ? (
+                  <ReadyCard
+                    fileName={file?.name ?? seriesName}
+                    busy={analyzing ? 'analyzing' : loading ? 'loading' : 'idle'}
+                    onOpenSetup={openSetup}
+                  />
                 ) : !advanced && session ? (
                   <LiveRail
                     session={session}

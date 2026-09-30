@@ -58,7 +58,21 @@ export const chrome: Translation<typeof en> = {
   'status.exportFailed': 'Échec de l’export',
 
   'setup.title': 'Réglages',
-  'setup.done': 'Terminé',
+  'setup.close': 'Fermer les réglages',
+  'setup.groupVideo': 'Cette vidéo',
+  'setup.groupVideoText': 'La vidéo ouverte en ce moment. Ces réglages ne concernent que cette vidéo.',
+  'setup.noName': 'Analyse enregistrée',
+  'setup.notAnalyzed': 'Pas encore analysée',
+  'setup.videoInfo': 'Vidéo et exécution',
+  'setup.groupAnalysis': 'Analyse vidéo',
+  'setup.groupAnalysisText':
+    'Comment les vidéos sont mesurées et analysées. La taille et les mètres s’appliquent tout de suite ; le reste demande une nouvelle analyse.',
+  'setup.groupApp': 'Application',
+  'setup.groupAppText':
+    'L’apparence de l’application et ses outils, gardés sur cet appareil. Rien ici ne change une analyse.',
+  'setup.readyTitle': 'Prêt à analyser',
+  'setup.readyText': 'Vérifiez les réglages, puis lancez l’analyse de la vidéo.',
+  'setup.readyBusy': 'L’analyse est en cours.',
   'setup.athlete': 'Athlète',
   'setup.height': 'Taille',
   'setup.heightHint': 'Sert à mettre les mesures à l’échelle (en mètres) quand le trampoline n’est pas marqué.',

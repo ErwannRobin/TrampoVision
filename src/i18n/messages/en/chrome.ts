@@ -67,7 +67,20 @@ export const chrome = {
 
   // Settings
   'setup.title': 'Settings',
-  'setup.done': 'Done',
+  'setup.close': 'Close settings',
+  'setup.groupVideo': 'This video',
+  'setup.groupVideoText': 'The video that is open now. Changes here only concern this video.',
+  'setup.noName': 'Saved analysis',
+  'setup.notAnalyzed': 'Not analyzed yet',
+  'setup.videoInfo': 'Video and runtime',
+  'setup.groupAnalysis': 'Video analysis',
+  'setup.groupAnalysisText':
+    'How videos are measured and analyzed. Height and meters apply at once; the rest needs a new analysis.',
+  'setup.groupApp': 'App',
+  'setup.groupAppText': 'The look of the app and its tools, kept on this device. Nothing here changes an analysis.',
+  'setup.readyTitle': 'Ready to analyze',
+  'setup.readyText': 'Check the settings, then start the analysis on the video.',
+  'setup.readyBusy': 'The analysis is running.',
   'setup.athlete': 'Athlete',
   'setup.height': 'Height',
   'setup.heightHint': 'Scales the measurements in meters when the trampoline is not marked.',
