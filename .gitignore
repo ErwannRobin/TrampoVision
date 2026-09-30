@@ -9,3 +9,4 @@ public/models
 /eval/
 .vercel
 .env*
+/video-sample/

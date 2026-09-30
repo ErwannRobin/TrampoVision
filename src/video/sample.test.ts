@@ -9,7 +9,7 @@ const IOS_CHROME =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0 Mobile/15E148 Safari/604.1';
 const IOS_SAFARI =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
-const paths = ['../../video-sample/IMG_8368.MOV', '../../video-sample/IMG_8368.mp4'];
+const paths = ['https://blob.example/IMG_8368.MOV', 'https://blob.example/IMG_8368.mp4'];
 
 describe('sample video choice', () => {
   it('detects desktop Safari only', () => {
