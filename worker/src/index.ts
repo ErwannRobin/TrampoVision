@@ -36,7 +36,8 @@ const canWrite = (req: Request, env: Env) => {
   const h = req.headers.get('authorization');
   return tokenMatches(h, env.INGEST_TOKEN) || tokenMatches(h, env.REVIEW_TOKEN);
 };
-const canReview = (req: Request, env: Env) => tokenMatches(req.headers.get('authorization'), env.REVIEW_TOKEN);
+// Everyone who uses the app may review: the public app token is enough. REVIEW_TOKEN stays valid as a second key.
+const canReview = canWrite;
 
 const UPSERT = `INSERT INTO jumps (id, video_id, jump_id, auto_skill, auto_element_id, auto_certainty, auto_confidence, classifier, fingerprint, created_at, updated_at, record)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10, ?11)
