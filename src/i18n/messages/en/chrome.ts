@@ -30,6 +30,7 @@ export const chrome = {
   'topbar.coachHint': 'Every measurement, chart and threshold',
   'topbar.export': 'Export',
   'topbar.settings': 'Settings',
+  'topbar.open': 'Open video',
   'topbar.openAnother': 'Open another video',
   'topbar.about': 'About TrampoVision',
 

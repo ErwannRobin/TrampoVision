@@ -25,6 +25,7 @@ export const chrome: Translation<typeof en> = {
   'topbar.coachHint': 'Alle Messwerte, Diagramme und Schwellenwerte',
   'topbar.export': 'Exportieren',
   'topbar.settings': 'Einstellungen',
+  'topbar.open': 'Video öffnen',
   'topbar.openAnother': 'Anderes Video öffnen',
   'topbar.about': 'Über TrampoVision',
 
