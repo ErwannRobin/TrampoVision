@@ -70,9 +70,42 @@ export interface JevState {
     peakAngularVelocityDps: number | null;
     shoulderHipAxisMaxDeg: number | null;
   };
-  quality: { pose: number; twistTrust: number };
+  quality: { pose: number; twistTrust: number; problems: string[] };
   /** Time series over the flight (takeoff to landing, equally spaced); null = not measured. Rotation and twist in turns, angles /180, height / peak. */
   trajectories: Partial<Record<Channel, (number | null)[]>>;
+}
+
+/** The lowest the height may fall below takeoff (in peak heights) and the most the rotation may run backwards (in turns) before the curves are doubted. */
+const MAX_HEIGHT_BELOW_TAKEOFF = 0.75;
+const MAX_ROTATION_BACKSTEP = 0.2;
+/** Under this many measured somersault turns, a dip is wobble, not a broken curve. */
+const MIN_TURNS_FOR_BACKSTEP = 0.75;
+
+/**
+ * Signs that the measured curves cannot be trusted: a panning or cutting camera moves the center of mass and the trunk angle in
+ * ways no jump does. Jev cannot see this from the numbers alone, and it answers with the same confidence on broken input.
+ */
+export function signalProblems(sig: Pick<MovementSignature, 'channels' | 'trust'>): string[] {
+  const out: string[] = [];
+  const height = sig.channels.comHeight.filter(Number.isFinite);
+  if (sig.trust.comHeight > 0 && height.length && Math.min(...height) < -MAX_HEIGHT_BELOW_TAKEOFF) {
+    out.push(
+      `center of mass falls ${Math.abs(Math.min(...height)).toFixed(1)} peak heights below takeoff (camera moved?)`,
+    );
+  }
+  const rot = sig.channels.somersault.filter(Number.isFinite);
+  if (sig.trust.somersault > 0 && rot.length && Math.max(...rot.map(Math.abs)) >= MIN_TURNS_FOR_BACKSTEP) {
+    const sign = Math.sign(rot.reduce((a, v) => (Math.abs(v) > Math.abs(a) ? v : a), 0));
+    let peak = 0;
+    let back = 0;
+    for (const v of rot) {
+      peak = Math.max(peak, v * sign);
+      back = Math.max(back, peak - v * sign);
+    }
+    if (back > MAX_ROTATION_BACKSTEP)
+      out.push(`rotation runs back ${back.toFixed(2)} turns (camera moved or rotation cut off?)`);
+  }
+  return out;
 }
 
 export function buildJevState(f: JumpFeatures, sig: MovementSignature, measured: MeasuredMovement): JevState {
@@ -116,7 +149,11 @@ export function buildJevState(f: JumpFeatures, sig: MovementSignature, measured:
       peakAngularVelocityDps: round(f.orientation.peakAngularVelocityDps, 0),
       shoulderHipAxisMaxDeg: round(f.shape.shoulderHipAxis.max, 0),
     },
-    quality: { pose: round(f.quality.pose) ?? 0, twistTrust: round(sig.trust.twist) ?? 0 },
+    quality: {
+      pose: round(f.quality.pose) ?? 0,
+      twistTrust: round(sig.trust.twist) ?? 0,
+      problems: signalProblems(sig),
+    },
     trajectories,
   };
 }
@@ -129,7 +166,9 @@ export const QUESTIONS: Record<'somersaults' | 'twists' | 'direction' | 'positio
     type: 'choice',
     instructions:
       'How many full somersaults (whole-body rotations about the hip axis) did the athlete perform in this flight? ' +
-      'Use measured.somersaultTurns, rotation and the somersault trajectory (turns since takeoff). A rotation under about a quarter turn is no somersault.',
+      'Use measured.somersaultTurns, rotation and the somersault trajectory (turns since takeoff). A rotation under about a quarter turn is no somersault. ' +
+      'A count just under a whole number (such as 1.4 or 1.9) can be a rotation the camera lost before landing: weigh it with motion.flightTimeS and the peak angular velocity, ' +
+      'and distrust it when quality.problems is not empty.',
     criteria: {
       '0': 'No somersault: a plain or twisting jump',
       '1': 'Single somersault, about 1 turn',
@@ -180,6 +219,8 @@ export interface JevCandidate {
   name: string;
   /** Share of the table's probability mass, from the four answers multiplied. */
   probability: number;
+  /** The four answers multiplied, before normalizing: low when no element fits what Jev said, whatever the share. */
+  mass: number;
   /** The probability each answer gave to this element's value. */
   parts: Record<QuestionId, number>;
 }
@@ -209,8 +250,22 @@ export function rankElements(
       elementId: r.e.id,
       name: r.e.name,
       probability: total > 0 ? r.mass / total : 0,
+      mass: r.mass,
       parts: r.parts,
     }));
+}
+
+/** What Jev answered when the best option of each question together is not a FIG element (null when it is one). */
+export function outOfTable(answers: Record<QuestionId, JevChoiceAnswer>): string | null {
+  const som = Number(answers.somersaults.choice);
+  const tw = Number(answers.twists.choice);
+  const { position, direction } = { position: answers.position.choice, direction: answers.direction.choice };
+  const exists = FIG_ELEMENTS.some(
+    (e) =>
+      e.somersaults === som && e.twists === tw && e.position === position && (som === 0 || e.direction === direction),
+  );
+  if (exists) return null;
+  return `${som ? `${direction} ` : ''}${som} somersault${som === 1 ? '' : 's'}, ${tw} twist${tw === 1 ? '' : 's'}, ${position}`;
 }
 
 export interface JevResult {
@@ -226,6 +281,10 @@ export interface JevResult {
   candidates: JevCandidate[];
   /** Jev's best element, or null. */
   jevElementId: string | null;
+  /** Why the curves were doubted (empty when they look like a jump). */
+  problems: string[];
+  /** Jev's own best answers, when together they are no FIG element: the element named is then only the closest one. */
+  outOfTable: string | null;
   /** The existing classifier on the same jump, untouched. */
   local: SkillPrediction;
   /** The answer to use: Jev's when it answered, else the local one. */
@@ -258,6 +317,8 @@ export async function classifyWithJev(input: ClassifierInput, o: JevClassifyOpti
     measured,
     candidates: [],
     jevElementId: null,
+    problems: state?.quality.problems ?? [],
+    outOfTable: null,
     local,
     final: { elementId: local.elementId ?? null, source: 'local', confidence: local.confidence },
     reason: `Jev unavailable (${error}); local ${local.classifier.id} classifier used.`,
@@ -280,6 +341,10 @@ export async function classifyWithJev(input: ClassifierInput, o: JevClassifyOpti
   }
   const candidates = rankElements(answers);
   const best = candidates[0];
+  const problems = state.quality.problems;
+  const off = outOfTable(answers);
+  // Jev answers as confidently on a broken signal as on a clean one, so on a doubtful signal the existing classifier stands.
+  const useLocal = problems.length > 0;
   const a = (q: QuestionId) => `${q} ${answers[q].choice} (${pct(answers[q].probabilities[answers[q].choice] ?? 0)})`;
   return {
     status: 'ok',
@@ -290,8 +355,17 @@ export async function classifyWithJev(input: ClassifierInput, o: JevClassifyOpti
     candidates,
     jevElementId: best?.elementId ?? null,
     local,
-    final: { elementId: best?.elementId ?? null, source: 'jev', confidence: best?.probability ?? 0 },
-    reason: `${(Object.keys(QUESTIONS) as QuestionId[]).map(a).join(', ')}; the four answers together give ${best ? `${best.name} ${pct(best.probability)}` : 'no element'}.`,
+    problems,
+    outOfTable: off,
+    final: useLocal
+      ? { elementId: local.elementId ?? null, source: 'local', confidence: local.confidence }
+      : { elementId: best?.elementId ?? null, source: 'jev', confidence: best?.mass ?? 0 },
+    reason:
+      `${(Object.keys(QUESTIONS) as QuestionId[]).map(a).join(', ')}; the four answers together give ${best ? `${best.name} ${pct(best.mass)}` : 'no element'}.` +
+      (off ? ` Jev's own answers (${off}) are no FIG element, so this is only the closest one.` : '') +
+      (useLocal
+        ? ` The signal is doubtful (${problems.join('; ')}): local ${local.classifier.id} classifier used.`
+        : ''),
     usage: response.usage,
     latencyMs,
   };
@@ -312,6 +386,7 @@ export function formatJevDebug(r: JevResult): string {
   } else out.push('  none');
   out.push(
     '',
+    ...(r.problems.length ? [`Signal doubtful: ${r.problems.join('; ')}`] : []),
     `Jev: ${r.status}${r.error ? ` (${r.error})` : ''}   ${r.latencyMs} ms${r.usage ? `   ${r.usage.input_tokens} tokens in` : ''}`,
   );
   if (r.answers) {
@@ -326,7 +401,9 @@ export function formatJevDebug(r: JevResult): string {
     }
   }
   out.push('', 'Top 5 (Jev)');
-  r.candidates.forEach((c, i) => out.push(`  ${i + 1}. ${c.name.padEnd(36)} ${pct(c.probability)}`));
+  r.candidates.forEach((c, i) =>
+    out.push(`  ${i + 1}. ${c.name.padEnd(36)} ${pct(c.mass)}  (share ${pct(c.probability)})`),
+  );
   out.push('Top 5 (local)');
   (r.local.candidates ?? [])
     .slice(0, 5)

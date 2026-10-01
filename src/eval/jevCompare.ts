@@ -42,15 +42,19 @@ export interface CompareOptions {
   client: JevClientOptions | null;
   references: 'none' | 'leave-one-video-out';
   concurrency?: number;
+  /** Also run the jumps nobody labelled (truth ''), to see where the two classifiers disagree. */
+  unlabelled?: boolean;
   onRow?: (row: CompareRow) => void;
 }
 
 export async function runJevCompare(jumps: readonly LabelledJump[], o: CompareOptions): Promise<CompareRow[]> {
   const config = mergeSkillConfig();
-  const labelled = jumps.filter((j): j is LabelledJump & { truth: string } => j.truth !== null);
+  const labelled = jumps.filter((j) => o.unlabelled || j.truth !== null).map((j) => ({ ...j, truth: j.truth ?? '' }));
   const examples =
     o.references === 'leave-one-video-out'
-      ? referencesFromRecords(labelled.map((j) => ({ ...j.record, figure: { elementId: j.truth, labeledAt: '' } })))
+      ? referencesFromRecords(
+          labelled.filter((j) => j.truth).map((j) => ({ ...j.record, figure: { elementId: j.truth, labeledAt: '' } })),
+        )
       : [];
   const rows: CompareRow[] = new Array(labelled.length);
   let next = 0;
@@ -72,7 +76,7 @@ export async function runJevCompare(jumps: readonly LabelledJump[], o: CompareOp
         },
         jev: {
           ...side(result.jevElementId, jevTop, j.truth),
-          confidence: result.candidates[0]?.probability ?? 0,
+          confidence: result.candidates[0]?.mass ?? 0,
           status: result.status,
         },
         final: side(result.final.elementId, result.final.source === 'jev' ? jevTop : localTop, j.truth),
@@ -179,5 +183,33 @@ export function formatCompare(rows: readonly CompareRow[]): string {
   const failed = rows.filter((r) => r.jev.status !== 'ok');
   if (failed.length)
     out.push(`Jev unavailable for ${failed.length}: ${[...new Set(failed.map((r) => r.result.error))].join('; ')}`);
+  return out.join('\n');
+}
+
+/** Without labels there is no accuracy to compute: list what each classifier said, jump by jump. */
+export function formatAgreement(rows: readonly CompareRow[]): string {
+  const name = (id: string | null) => (id ? (elementById(id)?.name ?? id) : '–');
+  const out = ['jump  local                                  Jev                                    ', ''];
+  for (const r of rows) {
+    const same = r.local.predicted === r.jev.predicted;
+    const note =
+      r.jev.status !== 'ok'
+        ? 'no Jev'
+        : r.result.problems.length
+          ? 'doubtful signal: local kept'
+          : r.result.outOfTable
+            ? 'Jev: no such element'
+            : same
+              ? ''
+              : '≠';
+    out.push(
+      `${r.id.padEnd(8)}${`${name(r.local.predicted)} ${Math.round(r.local.confidence * 100)}%`.padEnd(39)}${`${name(r.jev.predicted)} ${Math.round(r.jev.confidence * 100)}%`.padEnd(39)}${note}`,
+    );
+  }
+  const jevOk = rows.filter((r) => r.jev.status === 'ok');
+  out.push(
+    '',
+    `Jev answered ${jevOk.length}/${rows.length}; differs from local on ${jevOk.filter((r) => r.local.predicted !== r.jev.predicted).length}.`,
+  );
   return out.join('\n');
 }

@@ -5,7 +5,16 @@ import { inputOfRecord } from '../../eval/replay';
 import { analyzeSkills } from '../analyzeSkills';
 import { mergeSkillConfig } from '../config';
 import { mannequinRoutine } from '../testMannequin';
-import { QUESTIONS, classifyWithJev, formatJevDebug, rankElements, type QuestionId } from './classify';
+import {
+  QUESTIONS,
+  classifyWithJev,
+  formatJevDebug,
+  outOfTable,
+  rankElements,
+  signalProblems,
+  type QuestionId,
+} from './classify';
+import type { MovementSignature } from '../temporal/signature';
 import { jevSystemOne, type JevChoiceAnswer } from './client';
 
 const { track } = mannequinRoutine({ jumps: [{ v0: 4.8, turns: -1, shape: 'tuck', facing: 1 }], facing: 1 });
@@ -50,6 +59,56 @@ describe('rankElements', () => {
   });
 });
 
+const sigOf = (channels: Partial<Record<'somersault' | 'comHeight', number[]>>) =>
+  ({
+    channels: { somersault: [0, 0], comHeight: [0, 0], ...channels },
+    trust: { somersault: 1, comHeight: 1 },
+  }) as unknown as MovementSignature;
+
+describe('signalProblems', () => {
+  it('accepts a clean jump and a somersault', () => {
+    expect(signalProblems(sigOf({ comHeight: [0, 0.6, 1, 0.6, -0.1], somersault: [0, 0.3, 0.6, 0.9, 1] }))).toEqual([]);
+  });
+
+  it('doubts a height far below takeoff and a rotation that runs back', () => {
+    expect(signalProblems(sigOf({ comHeight: [0, 1, 0.2, -1, -3.4] }))).toHaveLength(1);
+    expect(signalProblems(sigOf({ somersault: [0, 0.7, 1.55, 1.27, 1.41] }))).toHaveLength(1);
+    expect(signalProblems(sigOf({ somersault: [0, -0.7, -1.55, -1.27, -1.41] }))).toHaveLength(1);
+  });
+
+  it('does not take the wobble of a jump without somersault for a broken curve', () => {
+    expect(signalProblems(sigOf({ somersault: [0, 0.2, 0.05, 0.1, 0.05] }))).toEqual([]);
+  });
+});
+
+describe('outOfTable', () => {
+  it('names the combination when it is no FIG element, and says nothing when it is one', () => {
+    expect(
+      outOfTable({
+        ...backTuck,
+        somersaults: answer({ '0': 1 }),
+        twists: answer({ '0.5': 1 }),
+        position: answer({ pike: 1 }),
+      }),
+    ).toBe('0 somersaults, 0.5 twists, pike');
+    expect(outOfTable(backTuck)).toBeNull();
+  });
+
+  it('gives a low confidence to the closest element instead of a share of what is left', async () => {
+    const off = {
+      ...backTuck,
+      somersaults: answer({ '0': 1 }),
+      twists: answer({ '0.5': 1 }),
+      position: answer({ pike: 1 }),
+    };
+    const r = await classifyWithJev(input, { client: { apiKey: 'k', fetch: async () => reply(off) } });
+    expect(r.outOfTable).toContain('pike');
+    expect(r.candidates[0].mass).toBeLessThan(0.1);
+    expect(r.final.confidence).toBeLessThan(0.1);
+    expect(r.reason).toContain('no FIG element');
+  });
+});
+
 describe('classifyWithJev', () => {
   it('names the element from Jev and sends measurements only', async () => {
     let sent = '';
@@ -65,6 +124,7 @@ describe('classifyWithJev', () => {
     expect(r.status).toBe('ok');
     expect(r.final).toMatchObject({ elementId: 'back-1s-0t-tuck', source: 'jev' });
     expect(r.candidates).toHaveLength(5);
+    expect(r.problems).toEqual([]);
     const body = JSON.parse(sent);
     expect(Object.keys(body).sort()).toEqual(['model', 'questions', 'state']);
     expect(Object.keys(body.questions)).toEqual(Object.keys(QUESTIONS));
