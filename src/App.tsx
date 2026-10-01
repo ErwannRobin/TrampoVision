@@ -367,8 +367,9 @@ export default function App() {
   const playJump = () => {
     const c = result?.jumps.cycles[jumpSel];
     if (!c) return;
-    const from = (c.takeoffTimeS ?? c.apexTimeS) - 0.4;
-    const to = (c.landingTimeS ?? c.apexTimeS) + 0.3;
+    // Looping starts right at takeoff and a boomerang turns right at landing; a single play keeps the run-up and landing.
+    const from = (c.takeoffTimeS ?? c.apexTimeS) - (loop ? 0 : 0.4);
+    const to = (c.landingTimeS ?? c.apexTimeS) + (boomerang ? 0 : 0.3);
     rangeLock.current = { from, to };
     playhead.playRange(from, to, loop, boomerang);
   };
