@@ -31,6 +31,7 @@ export const chrome: Translation<typeof en> = {
 
   'shortcuts.title': 'Tastenkürzel',
   'shortcuts.playPause': 'Wiedergabe oder Pause',
+  'shortcuts.reverse': 'Rückwärts abspielen',
   'shortcuts.frame': 'Vorheriges oder nächstes Bild',
   'shortcuts.tenFrames': 'Zehn Bilder auf einmal',
   'shortcuts.jump': 'Vorheriger oder nächster Sprung',
@@ -196,6 +197,9 @@ export const chrome: Translation<typeof en> = {
   'transport.prev': 'Vorheriges Bild (←)',
   'transport.pause': 'Pause (Leertaste)',
   'transport.play': 'Wiedergabe (Leertaste)',
+  'transport.startRoutine': 'Zurück zum Anfang der Übung',
+  'transport.startClip': 'Zurück zum Anfang des Clips',
+  'transport.reverse': 'Rückwärts abspielen (Umschalt + Leertaste)',
   'transport.next': 'Nächstes Bild (→)',
   'transport.forward10': '10 Bilder vor (Umschalt + →)',
   'transport.frame': 'Bild {n} von {total}',

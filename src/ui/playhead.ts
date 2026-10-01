@@ -10,6 +10,7 @@ export class Playhead {
   private t = 0;
   private playing = false;
   private duration = 0;
+  private reversing = false;
   private timeListeners = new Set<() => void>();
   private stateListeners = new Set<() => void>();
 
@@ -21,6 +22,8 @@ export class Playhead {
   toggleHandler: (() => void) | null = null;
   /** Installed by the stage: pause. */
   pauseHandler: (() => void) | null = null;
+  /** Installed by the stage: play backwards, or stop doing it. */
+  reverseHandler: (() => void) | null = null;
   /** Installed by the stage: pause and move by whole frames (negative = back). */
   stepHandler: ((frames: number) => void) | null = null;
 
@@ -42,6 +45,8 @@ export class Playhead {
   };
   getPlaying = () => this.playing;
   getDuration = () => this.duration;
+  /** The video is playing backwards (`getPlaying` is true then too). */
+  getReverse = () => this.reversing;
 
   setTime(t: number) {
     if (t === this.t) return;
@@ -51,6 +56,11 @@ export class Playhead {
   setPlaying(playing: boolean) {
     if (playing === this.playing) return;
     this.playing = playing;
+    this.stateListeners.forEach((l) => l());
+  }
+  setReverse(reversing: boolean) {
+    if (reversing === this.reversing) return;
+    this.reversing = reversing;
     this.stateListeners.forEach((l) => l());
   }
   setDuration(seconds: number) {
@@ -75,8 +85,13 @@ export class Playhead {
   step(frames: number) {
     this.stepHandler?.(frames);
   }
+  /** Play backwards; again to stop. */
+  reverse() {
+    this.reverseHandler?.();
+  }
 }
 
 export const usePlayheadTime = (p: Playhead) => useSyncExternalStore(p.subscribe, p.getSnapshot);
 export const usePlaying = (p: Playhead) => useSyncExternalStore(p.subscribeState, p.getPlaying);
+export const useReverse = (p: Playhead) => useSyncExternalStore(p.subscribeState, p.getReverse);
 export const useDuration = (p: Playhead) => useSyncExternalStore(p.subscribeState, p.getDuration);

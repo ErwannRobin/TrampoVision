@@ -7,7 +7,7 @@ import { EmptyState } from '../rail/insights/EmptyState';
 import { DataChecks, Folds } from '../rail/insights/WorthKnowing';
 import { focusTarget, scrollTopToReveal } from '../rail/insights/layout';
 import { SetSummary } from './SetSummary';
-import { SkillDetail, SkillRow, type SkillActions } from './SkillCard';
+import { RoutineFlag, SkillDetail, SkillRow, type SkillActions } from './SkillCard';
 
 export interface LiveRailProps {
   session: Session;
@@ -28,6 +28,8 @@ export interface LiveRailProps {
   onDeduction: (jump: number, deduction: number | null) => void;
   /** Labels can be saved (the video is identified). */
   canLabel: boolean;
+  /** The jump the routine starts at (marked in the list); null when it has no start. */
+  routineStart?: number | null;
   /** Open the settings. */
   onOpenSetup: () => void;
   /** Show the athlete's and the coach's views, with every measurement. */
@@ -84,14 +86,16 @@ function revealInPage(list: HTMLElement, row: HTMLElement, smooth: boolean) {
 function Bounces({
   jumps,
   selected,
+  routineStart,
   onSelect,
 }: {
   jumps: LiveJump[];
   selected: number;
+  routineStart: number | null;
   onSelect: (jump: number) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const inside = jumps.some((j) => j.index === selected);
+  const inside = jumps.some((j) => j.index === selected || j.index === routineStart);
   const shown = open || inside;
   const label =
     jumps.length === 1
@@ -115,6 +119,7 @@ function Bounces({
               >
                 <span className="num">{j.number}</span>
                 <span>{t('live.bounceItem')}</span>
+                {j.index === routineStart && <RoutineFlag />}
               </button>
             </li>
           ))}
@@ -144,6 +149,7 @@ export function LiveRail(props: LiveRailProps) {
 
 function LiveSet(props: LiveRailProps) {
   const { session, selected, onSelect } = props;
+  const routineStart = props.routineStart ?? null;
   // Beside a portrait clip the rail is wide: the set, the list and the selected skill side by side, each column scrolling on its own.
   const rootRef = useRef<HTMLDivElement>(null);
   const wideScreen = useMediaQuery(WIDE_SCREEN);
@@ -206,12 +212,19 @@ function LiveSet(props: LiveRailProps) {
       <ul ref={listRef} className="live-list__body">
         {items.map((item) =>
           item.kind === 'bounces' ? (
-            <Bounces key={`b${item.jumps[0].index}`} jumps={item.jumps} selected={selected} onSelect={onSelect} />
+            <Bounces
+              key={`b${item.jumps[0].index}`}
+              jumps={item.jumps}
+              selected={selected}
+              routineStart={routineStart}
+              onSelect={onSelect}
+            />
           ) : (
             <li key={item.jump.index} className={cx('live-item', item.jump.index === selected && 'live-item--on')}>
               <SkillRow
                 jump={item.jump}
                 selected={item.jump.index === selected}
+                startsRoutine={item.jump.index === routineStart}
                 detailBelow={!detailBeside}
                 onSelect={() => {
                   if (item.jump.index !== selected) tapped.current = item.jump.index;

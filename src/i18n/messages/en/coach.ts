@@ -141,6 +141,9 @@ export const coach = {
   'row.jointsHint': 'Corrected means a glitch was replaced.',
   'row.maxHeight': 'Max height {reference}',
   'row.rise': 'Height gained',
+  'row.airRise': 'Height gained, from the time in the air',
+  'row.airRiseHint':
+    'Gravity × time² ÷ 8, from the flight time alone: no scale needed. Compare it with the height gained measured on the video.',
   'row.drift': 'Horizontal displacement',
   'row.driftHint': 'Landing minus takeoff position, + is right in the image.',
   'row.bedTakeoff': 'Bed position at takeoff',

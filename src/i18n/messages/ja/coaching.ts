@@ -117,6 +117,11 @@ export const coaching: Translation<typeof en> = {
   'live.cannotLabel': '動画が識別されると、ラベルを保存できます。',
   'live.partTitle': 'FIG採点規則 2025-2028、§{rule}',
   'live.noElement': '伸身ジャンプは技（要素）ではないため、難度はありません。',
+  'live.routineStart': 'ここから演技が始まります',
+  'live.air': '滞空時間',
+  'live.airRise': '上昇量',
+  'live.airRiseTitle': '踏み切りからの高さ（滞空時間から算出）',
+  'live.airNote': '滞空時間だけから推定（重力 × 時間² ÷ 8）。映像のスケールには左右されません。',
   'live.easier': '体の形は{measured}に見えました。審判は最も難度の低い形を採用します：{element} は {value} です。',
   'live.easierDetail':
     '体の形は{measured}に見えました（股関節 {hip}、膝 {knee}）。審判は最も難度の低い形を採用します：{element} は {value} です。',

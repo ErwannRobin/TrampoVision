@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { lower, t, tx } from '../../i18n';
+import { formatNumber, lower, t, tx } from '../../i18n';
 import { difficultyRange } from '../../skills/fig/difficulty';
 import { elementName } from '../../skills/fig/elements';
 import type { LiveJump } from '../../coaching/session';
 import { otherLabel } from '../../coaching/display';
 import { deductionText, difficultyText } from '../../coaching/summary';
-import { Button, Disclosure, cx } from '../kit';
+import { Button, Disclosure, Icon, cx } from '../kit';
 import { ElementPicker } from './ElementPicker';
 
 /** The deductions a person can give a skill, in points (§20.1: 0.0 to 0.5). */
@@ -57,10 +57,21 @@ const tone = (deduction: number | null) =>
         ? 'live-row__fig--warn'
         : undefined;
 
+/** A small flag: the routine starts here. */
+export function RoutineFlag() {
+  return (
+    <span className="live-flag" title={t('live.routineStart')}>
+      <Icon name="flag" size={13} />
+      <span className="sr-only">{t('live.routineStart')}</span>
+    </span>
+  );
+}
+
 /** One skill of the set on one line: its number, name, difficulty and execution. */
 export function SkillRow({
   jump,
   selected,
+  startsRoutine = false,
   detailBelow = true,
   onSelect,
   onKeyDown,
@@ -68,6 +79,8 @@ export function SkillRow({
 }: {
   jump: LiveJump;
   selected: boolean;
+  /** The routine starts with this skill. */
+  startsRoutine?: boolean;
   /** The selected row opens its detail under it (the default), rather than the detail being somewhere else on the page. */
   detailBelow?: boolean;
   onSelect: () => void;
@@ -96,6 +109,7 @@ export function SkillRow({
             {nameOf(jump)}
           </span>
           {unsure && <span className="live-row__unsure" aria-hidden="true" />}
+          {startsRoutine && <RoutineFlag />}
         </span>
         {sub && <span className="live-row__sub">{sub}</span>}
       </span>
@@ -240,6 +254,30 @@ function DifficultyBlock({ jump }: { jump: LiveJump }) {
   );
 }
 
+/** The time in the air, and how high it says the jump went: the height needs no scale, only gravity. */
+function AirBlock({ jump }: { jump: LiveJump }) {
+  if (jump.flightS === null || jump.airRiseM === null) return null;
+  return (
+    <section className="live-block">
+      <div className="live-block__head">
+        <h4 className="live-h">{t('live.air')}</h4>
+        <span className="live-block__val num">
+          {formatNumber(jump.flightS, 2)} <span className="unit">s</span>
+        </span>
+      </div>
+      <dl className="live-parts">
+        <div title={t('live.airRiseTitle')}>
+          <dt>{t('live.airRise')}</dt>
+          <dd className="num">
+            ≈ {formatNumber(jump.airRiseM, 1)} <span className="unit">m</span>
+          </dd>
+        </div>
+      </dl>
+      <p className="live-quiet">{t('live.airNote')}</p>
+    </section>
+  );
+}
+
 function ExecutionBlock({ jump, actions }: { jump: LiveJump; actions: SkillActions }) {
   const x = jump.execution;
   return (
@@ -329,6 +367,7 @@ export function SkillDetail({ jump, actions }: { jump: LiveJump; actions: SkillA
         <>
           <CallBlock jump={jump} actions={actions} />
           <DifficultyBlock jump={jump} />
+          <AirBlock jump={jump} />
           {jump.isSkill && <ExecutionBlock jump={jump} actions={actions} />}
           <TipsBlock jump={jump} />
         </>

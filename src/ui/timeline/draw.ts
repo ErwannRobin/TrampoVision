@@ -51,6 +51,8 @@ export interface TimelineScene {
   reveal: number;
   compact: boolean;
   colors: TimelineColors;
+  /** Where the routine starts, seconds; null when it has no start. */
+  routineStartS: number | null;
 }
 
 const TAU = Math.PI * 2;
@@ -266,6 +268,29 @@ export function drawStatic(ctx: CanvasRenderingContext2D, w: number, h: number, 
   ctx.lineWidth = 1;
   ctx.strokeStyle = colors.line2;
   ctx.stroke();
+
+  // Where the routine starts: a dashed line with a pennant, under everything else.
+  if (scene.routineStartS !== null) {
+    const rx = Math.round(tx(scene.routineStartS)) + 0.5;
+    if (rx >= plot.left - 1 && rx <= plot.left + plot.width + 1) {
+      const top = lane.top - 9;
+      ctx.beginPath();
+      ctx.moveTo(rx, top);
+      ctx.lineTo(rx, lane.bottom);
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = colors.text2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(rx, top);
+      ctx.lineTo(rx + 9, top + 3.5);
+      ctx.lineTo(rx, top + 7);
+      ctx.closePath();
+      ctx.fillStyle = colors.text2;
+      ctx.fill();
+    }
+  }
 
   // Where the pose was unclear: hatched along the bed. Solid means sure, hatched means not sure.
   const unclear = lowConfidenceSpans(result.time, result.confidence);

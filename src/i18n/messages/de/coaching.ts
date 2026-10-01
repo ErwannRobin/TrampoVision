@@ -128,6 +128,12 @@ export const coaching: Translation<typeof en> = {
   'live.cannotLabel': 'Beschriftungen lassen sich speichern, sobald das Video identifiziert ist.',
   'live.partTitle': 'FIG-Wertungsvorschriften 2025–2028, §{rule}',
   'live.noElement': 'Ein Strecksprung ist kein Element: Er hat keine Schwierigkeit.',
+  'live.routineStart': 'Hier beginnt die Übung',
+  'live.air': 'Flugzeit',
+  'live.airRise': 'Höhengewinn',
+  'live.airRiseTitle': 'Höhe über dem Absprung, aus der Flugzeit berechnet',
+  'live.airNote':
+    'Allein aus der Flugzeit geschätzt (Erdbeschleunigung × Zeit² ÷ 8), also unabhängig vom Maßstab des Videos.',
   'live.easier':
     'Der Körper sah {measured} aus. Ein Kampfrichter wertet die am wenigsten schwierige Form: {element} ist {value} wert.',
   'live.easierDetail':

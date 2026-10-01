@@ -138,6 +138,9 @@ export const coach: Translation<typeof en> = {
   'row.jointsHint': '„Korrigiert“ bedeutet, dass ein Ausreißer ersetzt wurde.',
   'row.maxHeight': 'Max. Höhe {reference}',
   'row.rise': 'Höhengewinn',
+  'row.airRise': 'Höhengewinn, aus der Flugzeit',
+  'row.airRiseHint':
+    'Erdbeschleunigung × Zeit² ÷ 8, allein aus der Flugzeit: kein Maßstab nötig. Vergleichen Sie mit dem im Video gemessenen Höhengewinn.',
   'row.drift': 'Horizontale Verschiebung',
   'row.driftHint': 'Landeposition minus Absprungposition, + ist rechts im Bild.',
   'row.bedTakeoff': 'Position auf dem Sprungtuch beim Absprung',

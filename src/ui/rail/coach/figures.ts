@@ -1,4 +1,4 @@
-import { JUMP_PHASES, type JumpCycle, type JumpPhase } from '../../../analysis/jumpCycles';
+import { JUMP_PHASES, riseFromFlightTime, type JumpCycle, type JumpPhase } from '../../../analysis/jumpCycles';
 import { JOINT_STATE_NAMES } from '../../../analysis/stabilize';
 import type { AnalysisResult } from '../../../analysis/types';
 import type { SkillAnalysis } from '../../../skills/analyzeSkills';
@@ -186,6 +186,7 @@ export function jumpFigures(
       fig(fmt(tr.riseM, 2), 'm'),
       ...(tr.riseBodyLengths !== null ? [fig(fmt(tr.riseBodyLengths, 2), t('u.bodyLengths'), true)] : []),
     ]),
+    row('air-rise', t('row.airRise'), fig(fmt(riseFromFlightTime(tm.flightTimeS), 2), 'm'), t('row.airRiseHint')),
     row('drift', t('row.drift'), fig(signed(tr.horizontalDisplacementM, 2), 'm'), t('row.driftHint')),
   ];
   if (meta.calibrated)

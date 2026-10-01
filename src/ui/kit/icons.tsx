@@ -25,6 +25,20 @@ const ICONS = {
       <polyline points="6 5 14 12 6 19" />
     </>
   ),
+  'play-reverse': <polygon points="17 4.5 4.5 12 17 19.5" fill="currentColor" strokeWidth="1.6" />,
+  'skip-start': (
+    <>
+      <line x1="4.5" y1="5" x2="4.5" y2="19" />
+      <polyline points="12.5 5 6.5 12 12.5 19" />
+      <polyline points="19.5 5 13.5 12 19.5 19" />
+    </>
+  ),
+  flag: (
+    <>
+      <line x1="5.5" y1="21" x2="5.5" y2="3.5" />
+      <path d="M5.5 4.5h12l-2.6 4 2.6 4h-12" fill="currentColor" strokeWidth="1.6" />
+    </>
+  ),
   'chevron-left': <polyline points="15 5 8 12 15 19" />,
   'chevron-right': <polyline points="9 5 16 12 9 19" />,
   'chevron-up': <polyline points="5 15 12 8 19 15" />,

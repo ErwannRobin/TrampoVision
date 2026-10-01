@@ -14,6 +14,16 @@ export const viewer = {
   'tl.tipJump': 'Jump {n}',
   'tl.tipJumpLabel': 'Jump {n}, {label}',
   'tl.valueText': '{time}, jump {n}',
+  'tl.routine': 'Routine start',
+  'tl.routineNone': 'No routine start: the whole clip',
+  'tl.routineAt': 'The routine starts at jump {n}',
+  'tl.routineHere': 'Start the routine at this jump',
+  'tl.routineHereHint': 'Jump {n}',
+  'tl.routineDetected': 'Use the detected start',
+  'tl.routineDetectedHint': 'Jump {n}',
+  'tl.routineDetectedNone': 'No jump qualifies',
+  'tl.routineClear': 'No routine start',
+  'tl.routineClearHint': 'The whole clip counts',
 
   // What is drawn on the video
   'overlay.jumpPhase': 'Jump {n}, {phase}',

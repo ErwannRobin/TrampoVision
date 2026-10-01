@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectJumps, GRAVITY, JUMP_PHASES, PHASE, type JumpInput } from './jumpCycles';
+import { detectJumps, GRAVITY, JUMP_PHASES, PHASE, riseFromFlightTime, type JumpInput } from './jumpCycles';
 import { localPolyFit, oddWindow } from './signal';
 import { makeRng, syntheticRoutine, type RoutineOptions } from './testTracks';
 
@@ -188,5 +188,30 @@ describe('detectJumps', () => {
     expect(Math.abs(r.turnsSinceTakeoff[b.takeoff!])).toBeLessThan(0.05); // reset
     expect(r.completedRotations[b.landing!]).toBe(2);
     expect(Number.isNaN(r.turnsSinceTakeoff[0])).toBe(true); // before any takeoff
+  });
+});
+
+describe('riseFromFlightTime', () => {
+  it('is g T² / 8: the climb takes half of the flight', () => {
+    expect(riseFromFlightTime(1.6)).toBeCloseTo((GRAVITY * 1.6 ** 2) / 8, 9);
+    expect(riseFromFlightTime(1)).toBeCloseTo(1.226, 3);
+    expect(riseFromFlightTime(2)).toBeCloseTo(4.905, 3);
+  });
+  it('follows the gravity it is given', () => {
+    expect(riseFromFlightTime(2, 10)).toBeCloseTo(5, 9);
+  });
+  it('is null when there is no flight time to go on', () => {
+    expect(riseFromFlightTime(null)).toBeNull();
+    expect(riseFromFlightTime(undefined)).toBeNull();
+    expect(riseFromFlightTime(NaN)).toBeNull();
+    expect(riseFromFlightTime(0)).toBeNull();
+    expect(riseFromFlightTime(-1)).toBeNull();
+  });
+  it('matches the rise of the simulated jumps', () => {
+    const { input, truth } = inputFrom({ jumps: [{ v0: 4 }, { v0: 5.5 }, { v0: 4.5 }] });
+    detectJumps(input).cycles.forEach((c, k) => {
+      if (c.flightTimeS !== null)
+        expect(Math.abs(riseFromFlightTime(c.flightTimeS)! / truth.rise[k] - 1)).toBeLessThan(0.1);
+    });
   });
 });

@@ -4,7 +4,7 @@ import type { OverlayOptions } from '../../video/overlay';
 import { timecode } from '../format';
 import { useMediaQuery } from '../hooks';
 import { IconButton, Segmented, type IconName } from '../kit';
-import { useDuration, usePlaying, usePlayheadTime, type Playhead } from '../playhead';
+import { useDuration, usePlaying, usePlayheadTime, useReverse, type Playhead } from '../playhead';
 import { frameCount } from './player';
 
 export const SPEEDS = [0.1, 0.25, 0.5, 1, 2];
@@ -22,6 +22,10 @@ export interface TransportProps {
   hasResult: boolean;
   /** Only what a coach on the trampoline needs: play, the frame steps and the speed. No ten-frame jumps, frame counter or layers. */
   simple?: boolean;
+  /** Back to the start: of the routine when it has one, else of the clip. */
+  onStart: () => void;
+  /** The start is the start of the routine (it says so in the button's name). */
+  startsAtRoutine: boolean;
 }
 
 const layers = (): { key: 'skeleton' | 'com' | 'trail' | 'hud'; label: string; icon: IconName }[] => [
@@ -59,8 +63,11 @@ export function Transport({
   hasVideo,
   hasResult,
   simple,
+  onStart,
+  startsAtRoutine,
 }: TransportProps) {
   const playing = usePlaying(playhead);
+  const reverse = useReverse(playhead);
   // The speed is a select where the bar is narrow: a phone upright, or on its side, where the transport has a column of its own.
   const narrow = useMediaQuery(
     '(max-width: 720px), (max-width: 1099px) and (max-height: 520px) and (orientation: landscape)',
@@ -70,6 +77,13 @@ export function Transport({
   return (
     <div className="transport">
       <div className="transport__buttons">
+        <IconButton
+          className="transport__start"
+          icon="skip-start"
+          label={startsAtRoutine ? t('transport.startRoutine') : t('transport.startClip')}
+          disabled={off}
+          onClick={onStart}
+        />
         {!simple && (
           <IconButton
             className="transport__far"
@@ -80,6 +94,13 @@ export function Transport({
           />
         )}
         <IconButton icon="step-back" label={t('transport.prev')} disabled={off} onClick={() => playhead.step(-1)} />
+        <IconButton
+          icon="play-reverse"
+          label={playing && reverse ? t('transport.pause') : t('transport.reverse')}
+          pressed={playing && reverse}
+          disabled={off}
+          onClick={() => playhead.reverse()}
+        />
         <IconButton
           className="transport__play"
           icon={playing ? 'pause' : 'play'}

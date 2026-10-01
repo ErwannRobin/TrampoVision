@@ -1,3 +1,4 @@
+import { riseFromFlightTime } from '../analysis/jumpCycles';
 import type { AnalysisResult } from '../analysis/types';
 import { formatNumber, t } from '../i18n/core';
 import type { JumpRecord } from '../dataset/types';
@@ -77,6 +78,8 @@ export interface LiveJump {
   deduction: number | null;
   flightS: number | null;
   heightM: number;
+  /** How high the jump rose above its takeoff, estimated from the time in the air alone (no scale needed); null without a flight time. */
+  airRiseM: number | null;
   tips: Tip[];
 }
 
@@ -181,6 +184,7 @@ export function buildSession(input: {
       deduction,
       flightS: f.timing.flightTimeS,
       heightM: f.trajectory.maxHeightM,
+      airRiseM: riseFromFlightTime(f.timing.flightTimeS),
       tips: isSkill ? tipsForJump(index, execution, f) : [],
     };
   });

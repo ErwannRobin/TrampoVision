@@ -7,7 +7,8 @@ import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { fmt, timecode } from './format';
 import { skillName } from './insights';
 import { useElementSize, useReducedMotion } from './hooks';
-import { Button, IconButton, Segmented } from './kit';
+import type { RoutineMark } from '../coaching/routine';
+import { Button, IconButton, Menu, Segmented } from './kit';
 import type { Playhead } from './playhead';
 import { useThemeVersion } from './theme';
 import {
@@ -47,6 +48,14 @@ export interface TimelineProps {
   onPlayJump: () => void;
   loop: boolean;
   onLoop: (loop: boolean) => void;
+  /** Where the routine starts: the jump and its time (null: no start), the detected jump, and a way to change it. */
+  routine: {
+    jump: number | null;
+    startS: number | null;
+    detected: number | null;
+    /** A jump, `undefined` for the detected start, or null for none. */
+    onMark: (mark: RoutineMark) => void;
+  };
 }
 
 /** The strip draws itself in once when an analysis arrives; the zoom eases toward its window. */
@@ -97,6 +106,7 @@ export function Timeline({
   onPlayJump,
   loop,
   onLoop,
+  routine,
 }: TimelineProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const staticRef = useRef<HTMLCanvasElement>(null);
@@ -129,8 +139,9 @@ export function Timeline({
   const colorsRef = useRef<TimelineColors | null>(null);
   const hoverRef = useRef<number | null>(null);
   const dragging = useRef(false);
-  const latest = useRef({ result, skills, selected, plot, compact, width, height, cycles, clip });
-  latest.current = { result, skills, selected, plot, compact, width, height, cycles, clip };
+  const routineStartS = routine.startS;
+  const latest = useRef({ result, skills, selected, plot, compact, width, height, cycles, clip, routineStartS });
+  latest.current = { result, skills, selected, plot, compact, width, height, cycles, clip, routineStartS };
 
   const scene = useCallback((): TimelineScene => {
     const l = latest.current;
@@ -144,6 +155,7 @@ export function Timeline({
       reveal: revealRef.current,
       compact: l.compact,
       colors: colorsRef.current,
+      routineStartS: l.routineStartS,
     };
   }, []);
 
@@ -174,7 +186,7 @@ export function Timeline({
   useEffect(() => {
     paintStatic();
     paintCursor();
-  }, [result, skills, selected, width, height, compact, locale, paintStatic, paintCursor]);
+  }, [result, skills, selected, width, height, compact, locale, routineStartS, paintStatic, paintCursor]);
 
   // A new analysis: the window starts on the clip and the strip draws itself in.
   useEffect(() => {
@@ -325,6 +337,45 @@ export function Timeline({
             pressed={loop}
             disabled={selected === null}
             onClick={() => onLoop(!loop)}
+          />
+          <Menu
+            label={t('tl.routine')}
+            icon="flag"
+            iconOnly
+            size="sm"
+            align="start"
+            groups={[
+              {
+                id: 'routine',
+                title: routine.jump === null ? t('tl.routineNone') : t('tl.routineAt', { n: routine.jump + 1 }),
+                items: [
+                  {
+                    id: 'here',
+                    label: t('tl.routineHere'),
+                    hint: selected === null ? undefined : t('tl.routineHereHint', { n: selected + 1 }),
+                    disabled: selected === null || selected === routine.jump,
+                    onSelect: () => selected !== null && routine.onMark(selected),
+                  },
+                  {
+                    id: 'detected',
+                    label: t('tl.routineDetected'),
+                    hint:
+                      routine.detected === null
+                        ? t('tl.routineDetectedNone')
+                        : t('tl.routineDetectedHint', { n: routine.detected + 1 }),
+                    disabled: routine.jump === routine.detected,
+                    onSelect: () => routine.onMark(undefined),
+                  },
+                  {
+                    id: 'none',
+                    label: t('tl.routineClear'),
+                    hint: t('tl.routineClearHint'),
+                    disabled: routine.jump === null,
+                    onSelect: () => routine.onMark(null),
+                  },
+                ],
+              },
+            ]}
           />
         </div>
         <div className="tl__zoom">

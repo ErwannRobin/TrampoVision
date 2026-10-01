@@ -29,6 +29,12 @@
   object-fit: contain;
   background: #000;
 }
+/* A click or a tap on the picture plays or pauses it. */
+.stage__video,
+.stage__frame--data {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
 .stage__overlay {
   pointer-events: none;
 }
@@ -366,6 +372,41 @@
 }
 .transport__speed {
   width: auto;
+}
+
+/*
+ * On a phone the bar has to hold the start, the frame steps, both ways of playing, the time and the speed in a column that may be
+ * 320px wide: it measures itself (a container query, only where the page stacks: in the wide dock its width comes from its content)
+ * and gives up air, then the milliseconds' size, then the time, in that order.
+ */
+@media (max-width: 1099px) {
+  .transport {
+    container-type: inline-size;
+  }
+}
+@container (max-width: 440px) {
+  .transport__buttons {
+    gap: 0;
+  }
+  .transport__buttons .icon-btn {
+    min-width: 40px;
+  }
+  .transport__play {
+    margin: 0 2px;
+  }
+  .transport__code {
+    font-size: 16px;
+  }
+  .transport__speed {
+    padding-right: 26px;
+    padding-left: 10px;
+    background-position: right 8px center;
+  }
+}
+@container (max-width: 350px) {
+  .transport__time {
+    display: none;
+  }
 }
 
 @media (max-width: 720px) {

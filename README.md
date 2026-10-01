@@ -87,7 +87,12 @@ Open the app, film a set (a phone opens its camera; a computer picks a file) or 
 5. The result opens on the **timeline**: one strip of arches for the whole clip, with takeoff (▲), apex (●) and landing (▼)
    of every detected jump, a chip per jump with its skill, and the playhead. Press or drag on it to scrub, press inside a
    flight to select that jump, zoom to one jump, or play it with a loop. `[` and `]` go to the previous and next jump.
-   Play, slow down (0.1×–2×), step frame by frame (`←` `→`, `Shift` = 10 frames, `Space` = play/pause) or click/drag on any chart to seek.
+   Play, slow down (0.1×–2×), step frame by frame (`←` `→`, `Shift` = 10 frames, `Space` = play/pause, `Shift` + `Space` = play backwards) or click/drag on any chart to seek.
+   A click or a tap on the video plays or pauses it, the reverse button plays it backwards, and the first button goes back to the
+   start of the routine, or of the clip. The **routine start** is detected (the first jump that is not a straight jump, or that was
+   given an execution point), shown by a flag on the timeline and in the list of skills, and can be moved to the selected jump
+   or taken off from the flag menu of the timeline. On a wide screen the controls of the video and those of the selected jump share one row.
+   A skill's detail gives the time in the air and the height gained that follows from it (g × time² / 8: no scale needed).
    The video shows the skeleton, the center of mass with its trajectory, the bed outline and labels; the layers can be toggled.
 6. With the advanced tools on, the top bar switches the interface between **Athlete** and **Coach**:
    - _Athlete_: the plain answers for the selected jump (skill and how sure the classifier is, peak height, time in the air, rotation, body shape, where it landed on the bed) and every jump of the clip compared with the others of that clip.
