@@ -8,7 +8,8 @@ import {
 } from './analysis/calibration';
 import { computeAnalysis } from './analysis/computeAnalysis';
 import { download, toCsv, toJumpsCsv } from './analysis/export';
-import { extractPoseTrack } from './analysis/extractPoseTrack';
+import { keepAthletes } from './analysis/athletes';
+import { extractPoseTracks } from './analysis/extractPoseTrack';
 import { analysisStride } from './analysis/stride';
 import { stabilizePose } from './analysis/stabilize';
 import { sampleIndexAt } from './analysis/lookup';
@@ -61,6 +62,8 @@ import { Icon, ActivityToast, type MenuGroupDef } from './ui/kit';
 import { useLocalStorage } from './ui/hooks';
 import { analysisWarnings } from './ui/quality';
 import { AthleteInsights } from './ui/rail/AthleteInsights';
+import { AthleteCompare } from './ui/rail/compare/AthleteCompare';
+import { ATHLETE_TINTS, type AthleteView } from './ui/rail/compare/compare';
 import { CoachRail } from './ui/rail/CoachRail';
 import { LiveRail } from './ui/live/LiveRail';
 import { SettingsDialog } from './ui/chrome/SettingsDialog';
@@ -68,7 +71,7 @@ import { ReadyCard } from './ui/rail/ReadyCard';
 import { CalibrationBar } from './ui/stage/CalibrationBar';
 import { ProcessingOverlay } from './ui/stage/ProcessingOverlay';
 import { clipOrientation, type Size } from './ui/stage/fit';
-import { Stage } from './ui/stage/Stage';
+import { Stage, type OtherAthlete } from './ui/stage/Stage';
 import { Transport } from './ui/stage/Transport';
 import type { Appearance, Audience, CoachTab, StageView, Status } from './ui/types';
 import { useAnnotatedExport } from './ui/useAnnotatedExport';
@@ -106,6 +109,11 @@ function saveCalibration(file: File | null, cal: SavedCalibration) {
   }
 }
 
+/** Each athlete of a clip is a video of their own for the labels: the first keeps the id of the clip. */
+function athleteVideoId(base: string | null, index: number): string | null {
+  return base && index > 0 ? `${base}#${index + 1}` : base;
+}
+
 export default function App() {
   // Text made while analyzing (skill names, tips, warnings) follows the language: it is made again when the language changes.
   const locale = useLocale();
@@ -113,7 +121,8 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [fps, setFps] = useState(30);
   const [model, setModel] = useState<ModelVariant>('full');
-  const [numPoses, setNumPoses] = useState(1);
+  // Athletes to follow; 0 = the app decides: everybody who jumps.
+  const [numPoses, setNumPoses] = useState(0);
   const [stride, setStride] = useState(1);
   const [preferGpu, setPreferGpu] = useState(true);
   const [height, setHeight] = useState(1.75);
@@ -123,7 +132,11 @@ export default function App() {
   const [overlay, setOverlay] = useState<OverlayOptions>({ skeleton: true, com: true, trail: true, hud: true });
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [backend, setBackend] = useState('');
-  const [track, setTrack] = useState<PoseTrack | null>(null);
+  // One track per athlete followed in the clip; everything below (analysis, skills, exports) is about the one chosen.
+  const [tracks, setTracks] = useState<PoseTrack[]>([]);
+  const [athleteIdx, setAthleteIdx] = useState(0);
+  const athleteCount = tracks.length;
+  const track = tracks[Math.min(athleteIdx, Math.max(0, athleteCount - 1))] ?? null;
   const [notice, setNotice] = useState('');
 
   // Trampoline calibration (manual): four corners, bed size, and where meters come from.
@@ -161,7 +174,12 @@ export default function App() {
   const [autoUrl, setAutoUrl] = useState<string | null>(null);
 
   // Evaluation: which video the labels belong to, and whether the report covers this video or every saved one.
-  const [videoId, setVideoId] = useState<string | null>(null);
+  const [fileVideoId, setVideoId] = useState<string | null>(null);
+  // Labels are kept per video: each athlete of a clip is a video of their own, so their jumps never mix.
+  const videoId = athleteVideoId(fileVideoId, athleteIdx);
+  // All the athletes next to each other, instead of one at a time.
+  const [compare, setCompare] = useState(false);
+  const comparing = compare && athleteCount > 1;
   const [seriesName, setSeriesName] = useState<string | null>(null);
   const [evalScope, setEvalScope] = useState<'video' | 'all'>('video');
   const dataset = useDataset();
@@ -229,6 +247,48 @@ export default function App() {
   const skills = useMemo(
     () => (result ? analyzeSkills(result, { config: skillConfig, twist, references, videoId }) : null),
     [result, skillConfig, twist, references, videoId, locale], // oxlint-disable-line react-hooks/exhaustive-deps
+  );
+  // The side by side view needs every athlete analyzed; the chosen one is already done.
+  const athleteViews = useMemo<AthleteView[]>(() => {
+    if (!comparing) return [];
+    return tracks.map((tr, i) => {
+      if (i === athleteIdx && result && skills) return { result, skills };
+      const r = computeAnalysis(
+        tr,
+        { athleteHeightM: height, calibration: analysisCalibration, scaleSource },
+        stabilizePose(tr),
+      );
+      const tw = analyzeTwist({ world: tr.world, time: r.time, fps: r.meta.fps, cycles: r.jumps.cycles });
+      return {
+        result: r,
+        skills: analyzeSkills(r, {
+          config: skillConfig,
+          twist: tw,
+          references,
+          videoId: athleteVideoId(fileVideoId, i),
+        }),
+      };
+    });
+  }, [
+    comparing,
+    tracks,
+    athleteIdx,
+    result,
+    skills,
+    height,
+    analysisCalibration,
+    scaleSource,
+    skillConfig,
+    references,
+    fileVideoId,
+    locale,
+  ]); // oxlint-disable-line react-hooks/exhaustive-deps
+  const others = useMemo<OtherAthlete[]>(
+    () =>
+      athleteViews.flatMap((v, i) =>
+        i === athleteIdx ? [] : [{ result: v.result, tint: ATHLETE_TINTS[i % ATHLETE_TINTS.length] }],
+      ),
+    [athleteViews, athleteIdx],
   );
   const jumpCount = skills?.jumps.length ?? 0;
   const jumpSel = Math.min(selectedJump, Math.max(0, jumpCount - 1));
@@ -322,7 +382,7 @@ export default function App() {
     abort.current?.abort();
     if (url) URL.revokeObjectURL(url);
     const nextUrl = URL.createObjectURL(next);
-    setTrack(null);
+    setTracks([]);
     setBackend('');
     setNotice('');
     setFile(next);
@@ -409,14 +469,14 @@ export default function App() {
     abort.current?.abort();
     const ctl = new AbortController();
     abort.current = ctl;
-    setTrack(null);
+    setTracks([]);
     setNotice('');
     setStatus({ kind: 'analyzing', done: 0, total: 1 });
     // The live view analyzes about 30 frames a second, so a phone film at 60 or 120 fps does not make the wait longer.
     const strideNow = advanced ? stride : analysisStride(fps);
     if (strideNow !== stride) setStride(strideNow);
     try {
-      const t = await extractPoseTrack(url, {
+      const ts = await extractPoseTracks(url, {
         model,
         numPoses,
         preferGpu,
@@ -426,7 +486,23 @@ export default function App() {
         onBackend: setBackend,
         onProgress: (done, total) => setStatus({ kind: 'analyzing', done, total }),
       });
-      setTrack(t);
+      // Left to the app, the people who do not jump (a coach, a judge) are not athletes.
+      const athletes =
+        numPoses > 0
+          ? ts
+          : keepAthletes(
+              ts,
+              (tr) =>
+                computeAnalysis(
+                  tr,
+                  { athleteHeightM: height, calibration: null, scaleSource: 'athlete' },
+                  stabilizePose(tr),
+                ).summary.jumpCount,
+            );
+      setAthleteIdx(0);
+      // Several athletes are shown together first: that is what they were filmed for.
+      setCompare(athletes.length > 1);
+      setTracks(athletes);
       setStatus({ kind: 'idle' });
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -450,9 +526,10 @@ export default function App() {
     try {
       const parsed = parsePoseSeries(text);
       openedSeries.current = true;
-      setTrack(parsed.track);
+      setAthleteIdx(0);
+      setTracks([parsed.track]);
       setSeriesName(parsed.source.fileName);
-      setVideoId(parsed.source.videoId ?? videoId ?? videoIdFromTrack(parsed.source.fileName, parsed.track));
+      setVideoId(parsed.source.videoId ?? fileVideoId ?? videoIdFromTrack(parsed.source.fileName, parsed.track));
       setBackend(t('app.fromFile', { backend: parsed.source.backend }));
       setHeight(parsed.settings.athleteHeightM);
       setScaleSource(parsed.settings.scaleSource);
@@ -494,7 +571,7 @@ export default function App() {
     fileRef.current = null;
     setUrl(null);
     setFile(null);
-    setTrack(null);
+    setTracks([]);
     setBackend('');
     setNotice('');
     setStatus({ kind: 'idle' });
@@ -722,7 +799,8 @@ export default function App() {
   }, []);
 
   const fileName = file?.name ?? seriesName ?? 'trampovision';
-  const base = fileName.replace(/\.[^.]+$/, '') || 'trampovision';
+  const clipBase = fileName.replace(/\.[^.]+$/, '') || 'trampovision';
+  const base = athleteCount > 1 ? `${clipBase}-athlete${athleteIdx + 1}` : clipBase;
 
   useEffect(() => {
     document.title = url || result ? `${base} – TrampoVision` : 'TrampoVision';
@@ -745,6 +823,13 @@ export default function App() {
   const overlayOpts = useMemo<OverlayOptions>(
     () => ({ ...overlay, detail: advanced && audience === 'coach' ? 'full' : 'simple' }),
     [overlay, audience, advanced],
+  );
+
+  // Side by side, every athlete is one color on the video, the same as in the panel.
+  const stageOverlay = useMemo<OverlayOptions>(
+    () =>
+      comparing ? { ...overlayOpts, hud: false, tint: ATHLETE_TINTS[athleteIdx % ATHLETE_TINTS.length] } : overlayOpts,
+    [overlayOpts, comparing, athleteIdx],
   );
 
   const annotated = useAnnotatedExport({
@@ -915,7 +1000,7 @@ export default function App() {
       onFps={(next) => {
         if (next === fps) return;
         setFps(next);
-        setTrack(null);
+        setTracks([]);
       }}
       backend={backend}
       webgpu={webgpu}
@@ -1074,7 +1159,8 @@ export default function App() {
                   fps={fps}
                   result={result}
                   skills={shownSkills}
-                  overlay={overlayOpts}
+                  overlay={stageOverlay}
+                  others={others}
                   playhead={playhead}
                   speed={speed}
                   calibration={calDraw}
@@ -1085,6 +1171,20 @@ export default function App() {
                   onView={advanced && result && twist ? switchStageView : undefined}
                   onClipSize={setClipSize}
                   pane={pane}
+                  athletes={
+                    athleteCount > 1
+                      ? {
+                          count: athleteCount,
+                          value: athleteIdx,
+                          onChange: (i) => {
+                            setCompare(false);
+                            setAthleteIdx(i);
+                          },
+                          compare: comparing,
+                          onCompare: () => setCompare(true),
+                        }
+                      : undefined
+                  }
                 >
                   {editingCal && (
                     <CalibrationBar
@@ -1144,7 +1244,9 @@ export default function App() {
               </div>
 
               <aside className="workspace__rail sheet" aria-label={result ? t('app.analysis') : t('setup.readyTitle')}>
-                {!result || !skills ? (
+                {comparing && athleteViews.length > 1 ? (
+                  <AthleteCompare athletes={athleteViews} playhead={playhead} />
+                ) : !result || !skills ? (
                   <ReadyCard
                     fileName={file?.name ?? seriesName}
                     busy={analyzing ? 'analyzing' : loading ? 'loading' : 'idle'}

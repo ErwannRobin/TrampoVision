@@ -47,12 +47,39 @@ export interface StageProps {
    * The shell lays the page out for a portrait clip from it.
    */
   onClipSize?: (size: Size | null) => void;
+  /** Several athletes were followed: which one the analysis shows, or all of them side by side. Undefined = a single athlete, no switcher. */
+  athletes?: {
+    count: number;
+    value: number;
+    onChange: (index: number) => void;
+    compare: boolean;
+    onCompare: () => void;
+  };
+  /** The other athletes, drawn on the video next to the main one (side by side view). */
+  others?: OtherAthlete[];
   /** The 3D skeleton, shown next to the video (split) or instead of it (3d). */
   pane?: ReactNode;
   /** Layers above the video (busy state, calibration bar): each positions itself absolutely inside the stage. */
   children?: ReactNode;
 }
 
+/** An athlete drawn on the video next to the main one: their analysis and the one color of their skeleton. */
+export interface OtherAthlete {
+  result: AnalysisResult;
+  tint: string;
+}
+
+/** Draws the skeletons of the other athletes over what `drawOverlay` painted. */
+function drawOthers(ctx: CanvasRenderingContext2D, w: number, h: number, others: OtherAthlete[], time: number) {
+  for (const o of others) {
+    const opts = { skeleton: true, com: false, trail: false, hud: false, tint: o.tint };
+    drawOverlay(ctx, w, h, o.result, sampleIndexAt(o.result.meta, time), opts, null, false);
+  }
+}
+
+/** The value of the switcher's "all athletes side by side" choice. */
+const COMPARE = 'compare';
+const NO_OTHERS: OtherAthlete[] = [];
 const PICK_RADIUS_PX = 16;
 /** Space between the video and the pane in the split view. */
 const SPLIT_GAP_PX = 12;
@@ -91,6 +118,8 @@ export function Stage({
   view,
   onView,
   onClipSize,
+  athletes,
+  others = NO_OTHERS,
   pane,
   children,
 }: StageProps) {
@@ -143,11 +172,11 @@ export function Stage({
   }, [view, pane, ratio, size]);
 
   // The latest inputs for the animation loop, which must not restart on every change.
-  const live = useRef({ result, skills, overlay, fps, calibration, box: layout.video, hidden: layout.hidden });
-  live.current = { result, skills, overlay, fps, calibration, box: layout.video, hidden: layout.hidden };
+  const live = useRef({ result, skills, overlay, fps, calibration, box: layout.video, hidden: layout.hidden, others });
+  live.current = { result, skills, overlay, fps, calibration, box: layout.video, hidden: layout.hidden, others };
   useEffect(() => {
     dirty.current = true;
-  }, [result, skills, overlay, calibration, layout.video, layout.hidden]);
+  }, [result, skills, overlay, calibration, layout.video, layout.hidden, others]);
 
   // The player bus: everything else in the interface drives the video through these.
   useEffect(() => {
@@ -214,7 +243,7 @@ export function Stage({
       playhead.setTime(clock.currentTime);
       player.tick();
       const canvas = canvasRef.current;
-      const { result: res, skills: sk, overlay: opts, calibration: cal, box, hidden } = live.current;
+      const { result: res, skills: sk, overlay: opts, calibration: cal, box, hidden, others: more } = live.current;
       if (canvas && res) {
         const dpr = window.devicePixelRatio || 1;
         const w = Math.round(box.width * dpr);
@@ -231,6 +260,7 @@ export function Stage({
           if (ctx) {
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             drawOverlay(ctx, box.width, box.height, res, sampleIndexAt(res.meta, clock.currentTime), opts, sk);
+            drawOthers(ctx, box.width, box.height, more, clock.currentTime);
             if (cal) drawCalibration(ctx, box.width, box.height, res.meta.width, res.meta.height, cal);
           }
         }
@@ -265,7 +295,7 @@ export function Stage({
       if (video && canvas) {
         playhead.setTime(video.currentTime);
         playerRef.current?.tick();
-        const { result: res, skills: sk, overlay: opts, calibration: cal, box, hidden } = live.current;
+        const { result: res, skills: sk, overlay: opts, calibration: cal, box, hidden, others: more } = live.current;
         const dpr = window.devicePixelRatio || 1;
         const w = Math.round(box.width * dpr);
         const h = Math.round(box.height * dpr);
@@ -281,8 +311,10 @@ export function Stage({
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            if (res) drawOverlay(ctx, box.width, box.height, res, sampleIndexAt(res.meta, video.currentTime), opts, sk);
-            else ctx.clearRect(0, 0, box.width, box.height);
+            if (res) {
+              drawOverlay(ctx, box.width, box.height, res, sampleIndexAt(res.meta, video.currentTime), opts, sk);
+              drawOthers(ctx, box.width, box.height, more, video.currentTime);
+            } else ctx.clearRect(0, 0, box.width, box.height);
             if (cal && video.videoWidth)
               drawCalibration(ctx, box.width, box.height, video.videoWidth, video.videoHeight, cal);
           }
@@ -466,6 +498,25 @@ export function Stage({
           data-stacked={layout.stacked || undefined}
         >
           {pane}
+        </div>
+      )}
+
+      {athletes && (
+        <div className="stage__views stage__athletes">
+          <Segmented<string>
+            ariaLabel={t('stage.athletes')}
+            size="sm"
+            value={athletes.compare ? COMPARE : String(athletes.value)}
+            onChange={(v) => (v === COMPARE ? athletes.onCompare() : athletes.onChange(Number(v)))}
+            options={[
+              ...Array.from({ length: athletes.count }, (_, i) => ({
+                value: String(i),
+                label: t('stage.athlete', { n: i + 1 }),
+                title: t('stage.athleteTitle', { n: i + 1 }),
+              })),
+              { value: COMPARE, label: t('stage.compare'), title: t('stage.compareTitle') },
+            ]}
+          />
         </div>
       )}
 
