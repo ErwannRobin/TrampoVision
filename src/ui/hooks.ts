@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState, type RefObject } from 'react';
 
 /** State kept in localStorage for one viewer's convenience. Storage can be missing or full: then it just is not remembered. */
 export function useLocalStorage<T extends string>(key: string, initial: T, allowed?: readonly T[]) {
@@ -55,6 +55,21 @@ export function useElementSize<T extends HTMLElement>(ref: RefObject<T | null>):
     return () => ro.disconnect();
   }, [ref]);
   return size;
+}
+
+/** Whether an element is at least `min` pixels wide. Known before the first paint, so a layout chosen by it does not flash. */
+export function useMinWidth<T extends HTMLElement>(ref: RefObject<T | null>, min: number): boolean {
+  const [wide, setWide] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setWide(el.getBoundingClientRect().width >= min);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, min]);
+  return wide;
 }
 
 /** Calls `onClose` for a pointer press outside `ref` and for Escape, while `active`. */

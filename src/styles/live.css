@@ -536,6 +536,48 @@
   margin-top: 8px;
 }
 
+/* A wide rail (beside a portrait clip): the set in a column of its own beside the list, and on a wider one the selected skill in a third.
+   The columns scroll on their own, so the list stays in place while the detail is read. */
+@media (min-width: 1100px) {
+  .live--split {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+    column-gap: 28px;
+    /* The columns scroll all the way to the edges of the rail (whose padding is 20px above and 28px below), not to its padding. */
+    height: calc(100% + 48px);
+    margin-block: -20px -28px;
+    max-width: 1320px;
+  }
+  .live--split[data-columns='3'] {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1.15fr);
+  }
+  .live-col {
+    min-width: 0;
+    min-height: 0;
+    padding-block: 20px 28px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .live-col + .live-col {
+    padding-left: 28px;
+    border-left: 1px solid var(--line);
+  }
+  .live--split .live-list {
+    padding-top: 0;
+    border-top: 0;
+  }
+  /* A column clips what pokes out of it: the rows keep their 10px inside instead of bleeding past the edge. */
+  .live--split .live-list__head {
+    padding-inline: 10px;
+  }
+  .live--split .live-list__body {
+    margin-inline: 0;
+  }
+  .live-col--detail .live-detail {
+    padding: 0 0 16px;
+  }
+}
+
 @media (max-width: 420px) {
   .live-fig .stat__value {
     font-size: 32px;

@@ -120,8 +120,20 @@ wide (>= 1100px)                      narrow, live view with results
   keep the set and the first skill in the first screen, and on a phone the list of skills comes before "Work on next". Before there
   is a result nothing is pinned (analyzing needs the whole stage), and the advanced tools keep the plain stack. All of it is in
   `styles/live.css`, scoped with `:has(.tl)`.
-- The sample clip is a 1080x1920 portrait video, so a portrait video in a wide stage is the normal case: it is fitted
-  by height and centered, and the black stage is the letterbox.
+- The sample clip is a 1080x1920 portrait video, so a portrait clip is the normal case. The workspace says which it is:
+  `data-orientation="portrait|landscape"` (App, from `Stage`'s `onClipSize` and `clipOrientation` in `ui/stage/fit.ts`; a clip
+  whose size is not known yet, and a square one, are `landscape`). At >= 1100px a **portrait** workspace is
+  `max-content | 1fr`: the stage is as wide as the video (the stage sets `--stage-w` on itself, `portraitStageWidth`: its own
+  height times the clip's ratio, which no stylesheet can know), so there is no black letterbox, and the rail gets the width that
+  frees. The rail is capped to its landscape width at the least (`max-width` on the stage). While the stage shows the 3D
+  skeleton (split and 3D views, `.stage__pane`) the grid is the landscape one again: the pane needs the room, and the video
+  keeps its place at the left. A landscape clip keeps `stage | var(--rail-w)`. The video is still fitted (`fitRatio`), never
+  cropped.
+- In the narrow portrait stage the view switcher keeps to its icons (the labels drawn on the video need the room), the banners
+  keep to its left edge, and the coach and athlete rails read in a column of at most 880px. The live rail uses the width
+  itself, by its own width: at 720px and more the set sits in a column of its own beside the list (two columns, the selected
+  skill opens under its row as before); at 1180px and more the selected skill is a third column (`data-columns`). The columns
+  scroll on their own, so the list stays in place while the detail is read.
 
 ### Live and advanced
 

@@ -66,6 +66,7 @@ import { SettingsDialog } from './ui/chrome/SettingsDialog';
 import { ReadyCard } from './ui/rail/ReadyCard';
 import { CalibrationBar } from './ui/stage/CalibrationBar';
 import { ProcessingOverlay } from './ui/stage/ProcessingOverlay';
+import { clipOrientation, type Size } from './ui/stage/fit';
 import { Stage } from './ui/stage/Stage';
 import { Transport } from './ui/stage/Transport';
 import type { Appearance, Audience, CoachTab, StageView, Status } from './ui/types';
@@ -149,6 +150,8 @@ export default function App() {
   const [coachTab, setCoachTab] = useState<CoachTab>('skill');
   // 2D pose is the analysis; the 3D skeleton is an experimental view next to it and does not feed the classifier.
   const [stageView, setStageView] = useState<StageView>('video');
+  // The size of the clip's frames, once the stage knows it: a wide screen lays the page out for a portrait clip.
+  const [clipSize, setClipSize] = useState<Size | null>(null);
   const openedSeries = useRef(false);
   const [loop, setLoop] = useState(false);
   // The video whose analysis starts by itself once it is ready (the live view).
@@ -1052,7 +1055,7 @@ export default function App() {
           </>
         ) : (
           <>
-            <div className="workspace">
+            <div className="workspace" data-orientation={clipOrientation(clipSize)}>
               <div className="workspace__stage">
                 <Stage
                   url={url}
@@ -1068,6 +1071,7 @@ export default function App() {
                   onPickVideo={(f) => void onFile(f)}
                   view={view}
                   onView={advanced && result && twist ? switchStageView : undefined}
+                  onClipSize={setClipSize}
                   pane={pane}
                 >
                   {editingCal && (

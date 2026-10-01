@@ -61,12 +61,15 @@ const tone = (deduction: number | null) =>
 export function SkillRow({
   jump,
   selected,
+  detailBelow = true,
   onSelect,
   onKeyDown,
   buttonRef,
 }: {
   jump: LiveJump;
   selected: boolean;
+  /** The selected row opens its detail under it (the default), rather than the detail being somewhere else on the page. */
+  detailBelow?: boolean;
   onSelect: () => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>) => void;
   buttonRef: (el: HTMLButtonElement | null) => void;
@@ -79,7 +82,7 @@ export function SkillRow({
       ref={buttonRef}
       className="live-row"
       aria-current={selected ? 'true' : undefined}
-      aria-expanded={selected}
+      aria-expanded={detailBelow ? selected : undefined}
       onClick={onSelect}
       onKeyDown={onKeyDown}
     >
