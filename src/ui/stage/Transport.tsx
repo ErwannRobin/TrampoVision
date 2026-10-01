@@ -61,7 +61,10 @@ export function Transport({
   simple,
 }: TransportProps) {
   const playing = usePlaying(playhead);
-  const narrow = useMediaQuery('(max-width: 720px)');
+  // The speed is a select where the bar is narrow: a phone upright, or on its side, where the transport has a column of its own.
+  const narrow = useMediaQuery(
+    '(max-width: 720px), (max-width: 1099px) and (max-height: 520px) and (orientation: landscape)',
+  );
   const off = !hasVideo;
 
   return (
