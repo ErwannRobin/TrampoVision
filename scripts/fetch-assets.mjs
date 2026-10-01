@@ -63,8 +63,8 @@ const EXPERIMENTAL = [
     `${OPENMMLAB}/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip`,
     'end2end.onnx',
   ],
-  // ViTPose-B, COCO 17 points (ONNX export for transformers.js).
-  ['vitpose_base_simple.onnx', 'https://huggingface.co/Xenova/vitpose-base-simple/resolve/main/onnx/model.onnx'],
+  // ViTPose-B, COCO 17 points (ONNX export from onnx-community, 344 MB).
+  ['vitpose_base_simple.onnx', 'https://huggingface.co/onnx-community/vitpose-base-simple/resolve/main/onnx/model.onnx'],
 ];
 for (const [name, url, inZip] of EXPERIMENTAL) {
   const file = join(modelDir, name);
