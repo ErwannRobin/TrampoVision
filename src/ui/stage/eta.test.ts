@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { estimateRemaining, formatRemaining } from './eta';
+import { estimateRemaining, formatRemaining, progressMilestone } from './eta';
 
 describe('estimateRemaining', () => {
   it('says nothing before 8% or before 4 seconds', () => {
@@ -42,5 +42,13 @@ describe('formatRemaining', () => {
 
   it('does not count down to nothing', () => {
     expect(formatRemaining(0)).toBe('Almost done');
+  });
+});
+
+describe('progressMilestone', () => {
+  it('tells a screen reader about the start, the half and the near end, not each percent', () => {
+    expect([0, 0.01, 0.3, 0.49].map(progressMilestone)).toEqual(['start', 'start', 'start', 'start']);
+    expect([0.5, 0.62, 0.89].map(progressMilestone)).toEqual(['half', 'half', 'half']);
+    expect([0.9, 0.97, 1].map(progressMilestone)).toEqual(['almost', 'almost', 'almost']);
   });
 });

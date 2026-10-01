@@ -1,16 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { t, tx } from '../../i18n';
 import { Button, ProgressRing } from '../kit';
 import type { Status } from '../types';
-import { estimateRemaining, formatRemaining } from './eta';
+import { estimateRemaining, formatRemaining, progressMilestone } from './eta';
 
 export interface ProcessingOverlayProps {
   status: Status;
   /** A video is loaded and waiting to be analyzed (there is no result yet). */
   ready: boolean;
   fileName: string;
-  /** Runtime of the pose model once analysis started, e.g. "MediaPipe (GPU delegate)". */
+  /** Runtime of the pose model once analysis started, e.g. "MediaPipe Pose Landmarker · GPU". Only the advanced view shows it. */
   backend: string;
+  /**
+   * The advanced tools are on: the analysis counts frames and names its runtime. The live view says what is happening
+   * in plain words, which is all a coach on the trampoline needs.
+   */
+  advanced: boolean;
   onAnalyze: () => void;
   onCancel: () => void;
 }
@@ -32,24 +37,70 @@ function useElapsed(active: boolean) {
 }
 
 /**
+ * What a screen reader is told while the app is busy: the stage when it begins (and why, for a conversion), then "halfway"
+ * and "almost done". Never each percent, and never the frame count of the advanced view.
+ */
+export function announcement(status: Status): string {
+  if (status.kind === 'loading') {
+    const converting = status.stage === 'converting';
+    const start = converting ? `${t('busy.converting')} ${t('busy.convertingText')}` : loadingText()[status.stage];
+    const progress = converting || status.stage === 'downloading' ? (status.progress ?? 0) : 0;
+    return milestoneText(progress, start);
+  }
+  if (status.kind === 'analyzing') {
+    return milestoneText(status.total > 0 ? status.done / status.total : 0, t('busy.analyzingLive'));
+  }
+  return '';
+}
+
+function milestoneText(progress: number, start: string): string {
+  const milestone = progressMilestone(progress);
+  return milestone === 'half' ? t('busy.half') : milestone === 'almost' ? t('eta.almost') : start;
+}
+
+/**
+ * A live region that is in the page before it speaks (one that appears already filled is often not read), and that only
+ * changes when `text` does. The progress around it changes all the time and is not announced.
+ */
+function Announce({ text }: { text: string }) {
+  const [said, setSaid] = useState('');
+  useEffect(() => setSaid(text), [text]);
+  return (
+    <p className="sr-only" role="status">
+      {said}
+    </p>
+  );
+}
+
+/**
  * What covers the video while the app is busy: reading, converting or analyzing with progress, or, once a clip is
  * loaded and waiting, the invitation to analyze it. A scrim keeps the video visible behind it.
  */
-export function ProcessingOverlay({ status, ready, fileName, backend, onAnalyze, onCancel }: ProcessingOverlayProps) {
+export function ProcessingOverlay({
+  status,
+  ready,
+  fileName,
+  backend,
+  advanced,
+  onAnalyze,
+  onCancel,
+}: ProcessingOverlayProps) {
   const analyzing = status.kind === 'analyzing';
   const elapsed = useElapsed(analyzing);
 
   if (status.kind === 'loading') {
     const converting = status.stage === 'converting';
     const progress = converting || status.stage === 'downloading' ? (status.progress ?? 0) : undefined;
+    const title = loadingText()[status.stage];
     return (
-      <div className="busy" role="status">
+      <div className="busy">
         <div className="busy__panel">
-          <ProgressRing value={progress} size={56} label={loadingText()[status.stage]}>
+          <ProgressRing value={progress} size={56} label={title}>
             {progress !== undefined && <span className="busy__percent num">{Math.round(progress * 100)}%</span>}
           </ProgressRing>
-          <p className="busy__title">{loadingText()[status.stage]}</p>
+          <p className="busy__title">{title}</p>
           {converting && <p className="busy__text">{t('busy.convertingText')}</p>}
+          <Announce text={announcement(status)} />
         </div>
       </div>
     );
@@ -59,22 +110,28 @@ export function ProcessingOverlay({ status, ready, fileName, backend, onAnalyze,
     const progress = status.total > 0 ? status.done / status.total : 0;
     const left = estimateRemaining(elapsed(), progress);
     return (
-      <div className="busy" role="status">
+      <div className="busy">
         <div className="busy__panel">
           <ProgressRing value={progress} size={104} stroke={5} label={t('busy.progress')}>
             <span className="busy__percent busy__percent--big num">{Math.round(progress * 100)}%</span>
           </ProgressRing>
           <p className="busy__title">
-            {tx('busy.analyzing', {
-              done: <span className="num">{status.done}</span>,
-              total: <span className="num">{status.total}</span>,
-            })}
+            {advanced
+              ? tx('busy.analyzing', {
+                  done: <span className="num">{status.done}</span>,
+                  total: <span className="num">{status.total}</span>,
+                })
+              : t('busy.analyzingLive')}
           </p>
-          {left !== null && <p className="busy__text">{formatRemaining(left)}</p>}
-          <p className="busy__text">{backend ? t('busy.runningOn', { backend }) : t('busy.stays')}</p>
+          {/* The line keeps its place while there is nothing to say yet, so the panel does not jump when the estimate comes. */}
+          <p className="busy__text" aria-hidden={left === null || undefined}>
+            {left === null ? '\u00a0' : formatRemaining(left)}
+          </p>
+          <p className="busy__text">{advanced && backend ? t('busy.runningOn', { backend }) : t('busy.stays')}</p>
           <Button variant="secondary" onClick={onCancel}>
             {t('common.cancel')}
           </Button>
+          <Announce text={announcement(status)} />
         </div>
       </div>
     );

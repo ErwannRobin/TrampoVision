@@ -960,6 +960,7 @@ export default function App() {
                   ready={false}
                   fileName=""
                   backend=""
+                  advanced={advanced}
                   onAnalyze={() => undefined}
                   onCancel={() => undefined}
                 />
@@ -1007,6 +1008,7 @@ export default function App() {
                     ready={!!url && !result && !editingCal && !autoUrl}
                     fileName={file?.name ?? ''}
                     backend={backend}
+                    advanced={advanced}
                     onAnalyze={() => void analyze()}
                     onCancel={() => abort.current?.abort()}
                   />
