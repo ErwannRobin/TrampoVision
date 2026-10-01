@@ -126,46 +126,46 @@ video ─► extractPoseTrack ─► PoseTrack ─► stabilizePose ─► compu
                                                                                   └─► UI / exports (PoseSeries JSON, CSV, skills JSON/CSV)
 ```
 
-| Module                                                    | Role                                                                                                                                           |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/pose/types.ts`                                       | `PoseEstimator` interface. Any backend that returns the 33-point BlazePose topology can be plugged in.                                         |
-| `src/pose/MediaPipePoseEstimator.ts`                      | MediaPipe Pose Landmarker, GPU delegate first, CPU (WASM) fallback.                                                                            |
-| `src/analysis/stabilize.ts`                               | Low-confidence gating, glitch rejection, gap filling, confidence-weighted smoothing, per-joint state.                                          |
-| `src/analysis/signal.ts`                                  | Median, spike mask, gap filling (linear / quadratic), weighted Savitzky–Golay-style fits, peak finder, angle unwrapping.                       |
-| `src/analysis/com.ts`                                     | Segment-based COM (14 segments, de Leva-style mass fractions).                                                                                 |
-| `src/analysis/calibration.ts`                             | Four bed corners → scale, bed center, position normalized to the trampoline.                                                                   |
-| `src/analysis/jumpCycles.ts`                              | Apex / takeoff / landing detection, per-frame phase, jump metrics, rotation counting.                                                          |
-| `src/analysis/computeAnalysis.ts`                         | Orchestrates the above and derives height, velocity, joint angles, body orientation.                                                           |
-| `src/analysis/orientation.ts`                             | Continuous body orientation that puts back head/feet flips of the pose model (two readings per frame, smoothest path wins).                    |
-| `src/analysis/timeSeries.ts`                              | The frame-by-frame store (`PoseSeries` JSON, import/export) and a numeric feature matrix.                                                      |
-| `src/video/overlay.ts`                                    | Canvas overlay drawn on the video and in the exported video: skeleton, center of mass, trajectory comet, label chips, bed outline.             |
-| `src/ui/*`, `src/styles/*`                                | The interface (see `docs/ui-design.md`): design tokens and kit, stage and transport, timeline, athlete and coach rails, charts, settings.      |
-| `src/i18n/*`                                              | `t`, `tp`, `tx`, the number formats, the language in use and its loading, and the messages (English is the source, the others are checked).    |
-| `src/localOnlyGuard.ts` + CSP in `vite.config.ts`         | Blocks any cross-origin network request (see below).                                                                                           |
-| `src/analysis/testTracks.ts`                              | Test-only synthetic routines with analytic ground truth.                                                                                       |
-| `src/skills/frameShape.ts`                                | Per-sample pose measurements: hip/knee angles, knee-to-torso distance, compactness, leg separation, body-frame joint coordinates, facing cues. |
-| `src/skills/jumpFeatures.ts`                              | One normalized sequence and one feature object (`JumpFeatures`) per detected jump.                                                             |
-| `src/skills/bodyPosition.ts`, `rotation.ts`, `facing.ts`  | Rule-based body position, rotation in half turns with confidence, facing direction.                                                            |
-| `src/skills/classifier.ts`                                | `SkillClassifier` interface + the rule-based classifier (evidence, limitations). A learned model can replace it.                               |
-| `src/skills/config.ts`                                    | Every threshold in one object (editable in the UI, saved in the export).                                                                       |
-| `src/skills/export.ts`                                    | Skills JSON, per-jump CSV, per-sample sequences CSV.                                                                                           |
-| `src/skills/testMannequin.ts`, `evaluation.ts`            | Test-only articulated athlete (known joint angles) and the synthetic evaluation harness.                                                       |
-| `src/ui/Timeline.tsx`, `JumpView.tsx`, `rail/*`           | Event timeline, per-jump normalized charts, the athlete's insights and the coach's tabs (prediction with evidence).                            |
-| `src/skills/fig/difficulty.ts`, `elements.ts`             | The FIG difficulty rule (§17.1), the table of examples it is checked against, and the element table it fills.                                  |
-| `src/coaching/guess.ts`, `session.ts`, `display.ts`       | The call for every jump (the coach's label, else the classifier's guess), the set with its totals, and the names shown on the video.           |
-| `src/coaching/execution.ts`, `config.ts`, `tips.ts`       | The proposed execution (FIG §20.2 deductions from the pose), its thresholds, and the tips and the focus of a set.                              |
-| `src/ui/About.tsx`, `src/ui/chrome/aboutRoute.ts`         | The About page (how it works, privacy, limits, inspiration and links) and its `#about` address; the top bar and the first screen link to it.   |
-| `src/ui/live/*`, `styles/live.css`                        | The live rail: the set, one row per skill, the opened skill, the correction picker.                                                            |
-| `src/dataset/record.ts`, `types.ts`, `videoId.ts`         | The saved jump record (`JumpRecord`), how records are built, matched and refreshed, and the stable video id.                                   |
-| `src/dataset/store.ts`, `useDataset.ts`                   | Local storage in the browser (IndexedDB, memory fallback), merge on import.                                                                    |
-| `src/dataset/metrics.ts`, `failures.ts`, `export.ts`      | Accuracy / precision / recall / confusion matrix, label-vs-measurement checks for failures, dataset and evaluation JSON/CSV.                   |
-| `src/ui/EvaluationView.tsx`, `src/ui/review/*`            | The _Review_ tab (label the jumps), the metrics report and the failure cards.                                                                  |
-| `src/ui/review/mode/*`, `src/dataset/stageLabel.ts`       | The review mode (one jump at a time, stage by stage) and how its answers are stored, exported and imported as a label file.                    |
-| `src/pose3d/torso.ts`, `twist.ts`, `config.ts`, `vec3.ts` | Experimental 3D: torso frame from the 3D landmarks, twist about the longitudinal axis with reliability checks.                                 |
-| `src/pose3d/capabilities.ts`                              | Measures what this browser can run (WebGPU, WebGL 2, WASM SIMD / threads).                                                                     |
+| Module                                                    | Role                                                                                                                                              |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/pose/types.ts`                                       | `PoseEstimator` interface. Any backend that returns the 33-point BlazePose topology can be plugged in.                                            |
+| `src/pose/MediaPipePoseEstimator.ts`                      | MediaPipe Pose Landmarker, GPU delegate first, CPU (WASM) fallback.                                                                               |
+| `src/analysis/stabilize.ts`                               | Low-confidence gating, glitch rejection, gap filling, confidence-weighted smoothing, per-joint state.                                             |
+| `src/analysis/signal.ts`                                  | Median, spike mask, gap filling (linear / quadratic), weighted Savitzky–Golay-style fits, peak finder, angle unwrapping.                          |
+| `src/analysis/com.ts`                                     | Segment-based COM (14 segments, de Leva-style mass fractions).                                                                                    |
+| `src/analysis/calibration.ts`                             | Four bed corners → scale, bed center, position normalized to the trampoline.                                                                      |
+| `src/analysis/jumpCycles.ts`                              | Apex / takeoff / landing detection, per-frame phase, jump metrics, rotation counting.                                                             |
+| `src/analysis/computeAnalysis.ts`                         | Orchestrates the above and derives height, velocity, joint angles, body orientation.                                                              |
+| `src/analysis/orientation.ts`                             | Continuous body orientation that puts back head/feet flips of the pose model (two readings per frame, smoothest path wins).                       |
+| `src/analysis/timeSeries.ts`                              | The frame-by-frame store (`PoseSeries` JSON, import/export) and a numeric feature matrix.                                                         |
+| `src/video/overlay.ts`                                    | Canvas overlay drawn on the video and in the exported video: skeleton, center of mass, trajectory comet, label chips, bed outline.                |
+| `src/ui/*`, `src/styles/*`                                | The interface (see `docs/ui-design.md`): design tokens and kit, stage and transport, timeline, athlete and coach rails, charts, settings.         |
+| `src/i18n/*`                                              | `t`, `tp`, `tx`, the number formats, the language in use and its loading, and the messages (English is the source, the others are checked).       |
+| `src/localOnlyGuard.ts` + CSP in `vite.config.ts`         | Blocks any cross-origin network request (see below).                                                                                              |
+| `src/analysis/testTracks.ts`                              | Test-only synthetic routines with analytic ground truth.                                                                                          |
+| `src/skills/frameShape.ts`                                | Per-sample pose measurements: hip/knee angles, knee-to-torso distance, compactness, leg separation, body-frame joint coordinates, facing cues.    |
+| `src/skills/jumpFeatures.ts`                              | One normalized sequence and one feature object (`JumpFeatures`) per detected jump.                                                                |
+| `src/skills/bodyPosition.ts`, `rotation.ts`, `facing.ts`  | Rule-based body position, rotation in half turns with confidence, facing direction.                                                               |
+| `src/skills/classifier.ts`                                | `SkillClassifier` interface + the rule-based classifier (evidence, limitations). A learned model can replace it.                                  |
+| `src/skills/config.ts`                                    | Every threshold in one object (editable in the UI, saved in the export).                                                                          |
+| `src/skills/export.ts`                                    | Skills JSON, per-jump CSV, per-sample sequences CSV.                                                                                              |
+| `src/skills/testMannequin.ts`, `evaluation.ts`            | Test-only articulated athlete (known joint angles) and the synthetic evaluation harness.                                                          |
+| `src/ui/Timeline.tsx`, `JumpView.tsx`, `rail/*`           | Event timeline, per-jump normalized charts, the athlete's insights and the coach's tabs (prediction with evidence).                               |
+| `src/skills/fig/difficulty.ts`, `elements.ts`             | The FIG difficulty rule (§17.1), the table of examples it is checked against, and the element table it fills.                                     |
+| `src/coaching/guess.ts`, `session.ts`, `display.ts`       | The call for every jump (the coach's label, else the classifier's guess), the set with its totals, and the names shown on the video.              |
+| `src/coaching/execution.ts`, `config.ts`, `tips.ts`       | The proposed execution (FIG §20.2 deductions from the pose), its thresholds, and the tips and the focus of a set.                                 |
+| `src/ui/About.tsx`, `src/ui/chrome/aboutRoute.ts`         | The About page (how it works, privacy, limits, inspiration and links) and its `#about` address; the top bar and the first screen link to it.      |
+| `src/ui/live/*`, `styles/live.css`                        | The live rail: the set, one row per skill, the opened skill, the correction picker.                                                               |
+| `src/dataset/record.ts`, `types.ts`, `videoId.ts`         | The saved jump record (`JumpRecord`), how records are built, matched and refreshed, and the stable video id.                                      |
+| `src/dataset/store.ts`, `useDataset.ts`                   | Local storage in the browser (IndexedDB, memory fallback), merge on import.                                                                       |
+| `src/dataset/metrics.ts`, `failures.ts`, `export.ts`      | Accuracy / precision / recall / confusion matrix, label-vs-measurement checks for failures, dataset and evaluation JSON/CSV.                      |
+| `src/ui/EvaluationView.tsx`, `src/ui/review/*`            | The _Review_ tab (label the jumps), the metrics report and the failure cards.                                                                     |
+| `src/ui/review/mode/*`, `src/dataset/stageLabel.ts`       | The review mode (one jump at a time, stage by stage) and how its answers are stored, exported and imported as a label file.                       |
+| `src/pose3d/torso.ts`, `twist.ts`, `config.ts`, `vec3.ts` | Experimental 3D: torso frame from the 3D landmarks, twist about the longitudinal axis with reliability checks.                                    |
+| `src/pose3d/capabilities.ts`                              | Measures what this browser can run (WebGPU, WebGL 2, WASM SIMD / threads).                                                                        |
 | `src/skills/twist2d.ts`, `twistContext.ts`                | Twist counted from the 2D skeleton (shoulder and hip width, left/right order, face), and which twist (3D, 2D, both) the classifier is told about. |
-| `src/pose3d/testTwistMannequin.ts`, `evaluation.ts`       | Test-only 3D athlete with known somersault and twist, and its degradations.                                                                    |
-| `src/ui/Pose3DView.tsx`, `rail/coach/TwistTab.tsx`        | 3D skeleton view (torso, axis, twist dial), twist curves, twist numbers and limits.                                                            |
+| `src/pose3d/testTwistMannequin.ts`, `evaluation.ts`       | Test-only 3D athlete with known somersault and twist, and its degradations.                                                                       |
+| `src/ui/Pose3DView.tsx`, `rail/coach/TwistTab.tsx`        | 3D skeleton view (torso, axis, twist dial), twist curves, twist numbers and limits.                                                               |
 
 ## What is computed
 
