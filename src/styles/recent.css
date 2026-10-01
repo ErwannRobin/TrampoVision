@@ -1,0 +1,121 @@
+/* Recent sets: the sets analyzed before, under the first actions of the landing. Hairlines and space, no cards. ------------ */
+
+.recent {
+  max-width: 30em;
+  margin-top: 36px;
+}
+.recent__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 6px;
+}
+.recent__title {
+  font-size: var(--fs-md);
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+.recent__ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 8px 0 12px;
+  border-top: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.recent__ask-actions {
+  display: flex;
+  gap: 4px;
+}
+.recent__list {
+  border-top: 1px solid var(--line);
+}
+.recent__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.recent__open {
+  display: grid;
+  flex: 1 1 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 16px;
+  row-gap: 2px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 10px 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.recent__item .icon-btn {
+  flex: none;
+}
+.recent__open:disabled {
+  opacity: 0.5;
+}
+.recent__open:hover:not(:disabled) .recent__name {
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 4px;
+}
+.recent__name {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  font-size: var(--fs-md);
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent__when,
+.recent__skills,
+.recent__difficulty {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.recent__when {
+  grid-area: 2 / 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent__skills {
+  grid-area: 1 / 2;
+  text-align: right;
+}
+.recent__difficulty {
+  grid-area: 2 / 2;
+  text-align: right;
+}
+.recent__difficulty .num {
+  color: var(--text);
+  font-size: var(--fs-md);
+}
+.recent__note {
+  margin-top: 10px;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+@media (pointer: coarse) {
+  .recent .btn {
+    min-height: 44px;
+  }
+}
+@media (max-width: 520px) {
+  .recent {
+    max-width: none;
+    margin-top: 32px;
+  }
+}

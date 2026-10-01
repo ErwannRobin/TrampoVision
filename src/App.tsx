@@ -24,6 +24,8 @@ import {
   type RecordContext,
 } from './dataset/record';
 import { useDataset } from './dataset/useDataset';
+import type { SetSnapshot } from './history/autosave';
+import { useAutosave, useHistory } from './history/useHistory';
 import { useReviewedReferences, useReviewUpload, useSyncSetting, useVerdictOutbox } from './sync/useReviewSync';
 import { EXECUTION_RULESET } from './coaching/config';
 import { withCalls } from './coaching/display';
@@ -35,7 +37,7 @@ import { analyzeTwist } from './pose3d/twist';
 import { analyzeSkills } from './skills/analyzeSkills';
 import { DEFAULT_SKILL_CONFIG, type SkillConfig } from './skills/config';
 import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from './skills/export';
-import { buildPoseSeries, parsePoseSeries, toSeriesJson } from './analysis/timeSeries';
+import { buildPoseSeries, parsePoseSeries, toSeriesJson, type ParsedSeries } from './analysis/timeSeries';
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
@@ -44,6 +46,7 @@ import { dragHasFiles, pickDroppedVideo } from './video/drop';
 import { transcodeToH264 } from './video/transcode';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
 import { EvaluatePanel, EvaluationReport } from './ui/EvaluationView';
+import { setName } from './ui/chrome/RecentSets';
 import { Landing } from './ui/Landing';
 import { Pose3DView } from './ui/Pose3DView';
 import { Playhead } from './ui/playhead';
@@ -156,6 +159,8 @@ export default function App() {
   const [seriesName, setSeriesName] = useState<string | null>(null);
   const [evalScope, setEvalScope] = useState<'video' | 'all'>('video');
   const dataset = useDataset();
+  // Every finished analysis is kept on this device, so a set survives leaving it (see history/).
+  const history = useHistory();
 
   const playhead = useMemo(() => new Playhead(), []);
   const abort = useRef<AbortController | null>(null);
@@ -434,10 +439,10 @@ export default function App() {
     void analyze();
   }, [autoUrl, url, status.kind]); // oxlint-disable-line react-hooks/exhaustive-deps
 
-  /** Opens a saved analysis (JSON): no need to run the pose model again. */
-  async function openSeries(saved: File) {
+  /** Opens a saved analysis (JSON): no need to run the pose model again. Null when the text is not one (the error is shown). */
+  function openSeriesText(text: string, name: string): ParsedSeries | null {
     try {
-      const parsed = parsePoseSeries(await saved.text());
+      const parsed = parsePoseSeries(text);
       openedSeries.current = true;
       setTrack(parsed.track);
       setSeriesName(parsed.source.fileName);
@@ -455,17 +460,29 @@ export default function App() {
         setBedShort(Math.min(firstSideM, secondSideM));
       }
       setStatus({ kind: 'idle' });
-      setNotice(
-        t(url ? 'app.openedWithVideo' : 'app.openedNoVideo', { name: saved.name, frames: parsed.track.frames.length }),
-      );
+      setNotice(t(url ? 'app.openedWithVideo' : 'app.openedNoVideo', { name, frames: parsed.track.frames.length }));
+      return parsed;
     } catch (err) {
       setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      return null;
     }
   }
 
-  /** Back to the first screen. Closing an analysis is asked for first: the numbers are not stored anywhere else. */
-  function goHome() {
-    if (result && !window.confirm(t('app.closeAnalysis'))) return;
+  async function openSeries(saved: File) {
+    let text: string;
+    try {
+      text = await saved.text();
+    } catch (err) {
+      setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      return;
+    }
+    openSeriesText(text, saved.name);
+  }
+
+  /** Back to the first screen. The set is stored by then (autosave): only when that did not work is the coach asked first. */
+  async function goHome() {
+    if (result && !(await autosave.flush()) && !window.confirm(t('app.closeAnalysis'))) return;
+    autosave.reset();
     abort.current?.abort();
     if (url) URL.revokeObjectURL(url);
     fileRef.current = null;
@@ -531,6 +548,58 @@ export default function App() {
     () => (result && skills ? buildSession({ skills, result, twist, labels }) : null),
     [result, skills, twist, labels, locale], // oxlint-disable-line react-hooks/exhaustive-deps
   );
+  // The set on screen, as the recent sets keep it: stored when the analysis completes, and again whenever what the live view says about
+  // it changes (a skill the coach confirms, changes or deletes). Only when the saved records are read, so a set that is reopened has its labels.
+  const setSnapshot = useMemo<SetSnapshot | null>(() => {
+    if (!track || !result || !session || !videoId || !dataset.ready) return null;
+    const name = file?.name ?? seriesName ?? '';
+    return {
+      id: videoId,
+      fileName: name,
+      track,
+      settingsKey: JSON.stringify([height, scaleSource, stride, analysisCalibration]),
+      skills: session.summary.skills,
+      pending: session.summary.pending,
+      difficulty: session.summary.difficulty,
+      jumps: session.jumps.length,
+      serialize: () =>
+        toSeriesJson(
+          buildPoseSeries(result, track, {
+            fileName: name,
+            videoId,
+            stride,
+            minVisibility: 0.4,
+            calibration: analysisCalibration,
+          }),
+        ),
+    };
+  }, [
+    track,
+    result,
+    session,
+    videoId,
+    dataset.ready,
+    file,
+    seriesName,
+    height,
+    scaleSource,
+    stride,
+    analysisCalibration,
+  ]);
+  const autosave = useAutosave(history, setSnapshot);
+
+  /** Reopens a recent set: the same analysis, with no video. Its line in the list is already up to date, so nothing is written. */
+  async function openRecent(id: string) {
+    const stored = await history.load(id);
+    if (!stored) {
+      setStatus({ kind: 'error', severity: 'warning', message: t('landing.recentMissing') });
+      void history.remove(id);
+      return;
+    }
+    const parsed = openSeriesText(stored.series, setName(stored));
+    if (parsed) autosave.adopt(stored, parsed.track);
+  }
+
   // A new analysis of the live view opens on its first skill, not on a warm-up bounce.
   useEffect(() => {
     if (!firstSkillPending.current || !session) return;
@@ -924,7 +993,7 @@ export default function App() {
         aboutOpen={aboutOpen}
         onAbout={() => setAboutOpen(!aboutOpen)}
         onFile={hasClip && !analyzing ? (f) => void onFile(f) : null}
-        onHome={aboutOpen ? () => setAboutOpen(false) : hasClip && !analyzing ? goHome : null}
+        onHome={aboutOpen ? () => setAboutOpen(false) : hasClip && !analyzing ? () => void goHome() : null}
       />
 
       {settings}
@@ -971,6 +1040,12 @@ export default function App() {
               onSample={samplePath ? () => void onSample() : null}
               onOpenSeries={(f) => void openSeries(f)}
               dataset={dataset}
+              recent={{
+                sets: history.sets,
+                onOpen: (id) => void openRecent(id),
+                onRemove: (id) => void history.remove(id),
+                onClear: () => void history.clear(),
+              }}
               busy={loading}
               advanced={advanced}
             />

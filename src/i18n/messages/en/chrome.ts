@@ -61,6 +61,14 @@ export const chrome = {
   'landing.notePrivacy': 'Runs in your browser. The video never leaves your device.',
   'landing.about': 'About TrampoVision',
   'landing.savedDataset': 'Saved dataset',
+  'landing.recent': 'Recent sets',
+  'landing.recentNote': 'Kept on this device. The video itself is not stored.',
+  'landing.recentUntitled': 'Set of {date}',
+  'landing.recentRemove': 'Remove {name} from recent sets',
+  'landing.recentClear': 'Clear history',
+  'landing.recentClearAsk': 'Remove every recent set from this device?',
+  'landing.recentClearYes': 'Remove all',
+  'landing.recentMissing': 'This set is no longer stored on this device.',
 
   // Banners
   'status.warning': 'Worth checking',
@@ -217,7 +225,7 @@ export const chrome = {
   'app.openedWithVideo': 'Opened {name} ({frames} frames). Make sure the loaded video is the same clip.',
   'app.openedNoVideo': 'Opened {name} ({frames} frames). Add the video too to see the overlay.',
 
-  'app.closeAnalysis': 'Close this analysis? Save it from the export menu first if you want to keep it.',
+  'app.closeAnalysis': 'This set could not be saved on this device, so closing it loses its numbers. Close it anyway?',
   'app.dropBusy': 'Analysis in progress',
   'app.dropIdle': 'Drop a video to analyze it',
   'app.dropWait': 'Wait for it to finish first.',

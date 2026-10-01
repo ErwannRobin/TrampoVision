@@ -398,6 +398,16 @@ visual interest: a large set of flight arcs (SVG, `--lift` rising and `--drop` f
 once, the product's own signature. When `dataset.records.length > 0`, a "Saved dataset" section below with `DatasetBar`
 and `EvaluationReport` (`scope="all"`, `videoId={null}`, no-op `onScope`/`onGoTo`), as the old first screen had.
 
+**Recent sets** (`ui/chrome/RecentSets.tsx`, `src/history/`, `styles/recent.css`). Every finished analysis is stored on this device
+without asking, so leaving a set never loses it and the old confirm is gone (it only comes back when the write failed). The
+landing lists the five newest under the first actions, hidden when there are none: the clip's name (else "Set of {date}"),
+the date, the skills and the difficulty, one tap to reopen, a delete control on each row and "Clear history" behind a second
+tap. A set is the text of the "Save analysis" JSON (same format, `parsePoseSeries` reads it) plus one line of figures, kept
+in the `trampovision` IndexedDB (stores `recent-sets` and `recent-set-data`, at most 20, the oldest evicted, memory when
+IndexedDB is missing). The video is never stored, so a reopened set has no video until the clip is added. The coach's
+corrections stay in the dataset (by video) and apply to the set when it reopens. `Autosaver` writes when an analysis
+completes and again, after a short wait, when the set changes: a correction only updates the line of the list.
+
 **SetupPanel** (the rail's settings page). A header "Settings" with a close button when `onClose`. Sections separated by
 hairlines, each with a quiet heading:
 

@@ -1,4 +1,5 @@
 import { t } from '../i18n/core';
+import { done, openDatabase, STORE_RECORDS as STORE, wrap } from './db';
 import type { JumpRecord } from './types';
 
 /** Where the dataset lives. Everything stays in this browser: IndexedDB when it works, memory when it does not. */
@@ -29,39 +30,10 @@ export function createMemoryStore(initial: JumpRecord[] = []): DatasetStore {
   };
 }
 
-const DB_NAME = 'trampovision';
-const STORE = 'jump-records';
-
-const wrap = <T>(req: IDBRequest<T>): Promise<T> =>
-  new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error(t('err.idbRequest')));
-  });
-
-const done = (tx: IDBTransaction): Promise<void> =>
-  new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error(t('err.idbTransaction')));
-    tx.onabort = () => reject(tx.error ?? new Error(t('err.idbAborted')));
-  });
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE, { keyPath: 'id' });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error(t('err.idbOpen')));
-    req.onblocked = () => reject(new Error(t('err.idbBlocked')));
-  });
-}
-
 /** Opens the browser's local database. When it is unavailable (private mode, blocked storage) the dataset lives in memory and `warning` says so. */
 export async function openDatasetStore(): Promise<{ store: DatasetStore; warning?: string }> {
   try {
-    if (typeof indexedDB === 'undefined') throw new Error(t('err.idbMissing'));
-    const db = await openDb();
+    const db = await openDatabase();
     const store: DatasetStore = {
       kind: 'indexeddb',
       async all() {

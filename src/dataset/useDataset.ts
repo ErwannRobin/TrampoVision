@@ -5,6 +5,7 @@ import { mergeRecords, openDatasetStore, type DatasetStore } from './store';
 import type { JumpRecord } from './types';
 
 export interface DatasetApi {
+  /** The saved records have been read (or could not be): what is in `records` is all there is. */
   ready: boolean;
   kind: DatasetStore['kind'] | null;
   /** Set when the browser's local storage could not be used. */
@@ -25,6 +26,7 @@ export function useDataset(): DatasetApi {
   const [kind, setKind] = useState<DatasetApi['kind']>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [read, setRead] = useState(false);
   const storeP = useRef<Promise<DatasetStore> | null>(null);
   const recordsRef = useRef<JumpRecord[]>([]);
   recordsRef.current = records;
@@ -44,7 +46,10 @@ export function useDataset(): DatasetApi {
       .then((all) => {
         if (!cancelled) setRecords(all);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => {
+        if (!cancelled) setRead(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -89,5 +94,5 @@ export function useDataset(): DatasetApi {
     [save],
   );
 
-  return { ready: kind !== null, kind, warning, error, records, save, remove, clear, importText };
+  return { ready: read, kind, warning, error, records, save, remove, clear, importText };
 }
