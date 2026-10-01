@@ -249,7 +249,10 @@
   padding: 0 10px;
 }
 .live-bounces__toggle {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   width: 100%;
   padding: 8px 0;
   border: 0;
@@ -260,6 +263,13 @@
 }
 .live-bounces__toggle:hover {
   color: var(--text-2);
+}
+/* The chevron says the line opens, the way the kit's disclosures do: it turns over when it is open. */
+.live-bounces__chevron {
+  transition: transform var(--t-med) var(--ease);
+}
+.live-bounces__toggle[aria-expanded='true'] .live-bounces__chevron {
+  transform: rotate(180deg);
 }
 .live-bounces__list {
   display: grid;
@@ -427,7 +437,7 @@
   font-weight: 550;
 }
 
-/* What to fix. */
+/* What to fix. A tip is one deduction the pose earned and its cue, not a doubt: a solid rule, where what the data could not settle is dashed. */
 .live-tips {
   display: grid;
   gap: 16px;
@@ -436,7 +446,7 @@
   display: grid;
   gap: 2px;
   padding-left: 14px;
-  border-left: 2px dashed var(--line-2);
+  border-left: 2px solid var(--line-2);
 }
 .live-tip__title {
   font-weight: 600;

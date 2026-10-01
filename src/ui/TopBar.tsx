@@ -47,6 +47,10 @@ export function TopBar({
   onHome,
 }: TopBarProps) {
   const narrow = useMediaQuery('(max-width: 720px)');
+  const roomy = useMediaQuery('(min-width: 900px)');
+  // The text next to the plus is worth its width when there is room: always above 720px, and with the audience switch and the export
+  // menu (the advanced tools) only from 900px, where the clip name has already given up its detail line.
+  const labeled = !narrow && (roomy || (!showAudience && !exportGroups));
   return (
     <header className={clip ? 'topbar topbar--clip' : 'topbar'}>
       <div className="topbar__left">
@@ -90,12 +94,16 @@ export function TopBar({
         />
         <IconButton icon="info" label={t('topbar.about')} pressed={aboutOpen} onClick={onAbout} />
         {onFile && (
-          <label className="icon-btn topbar__open" data-tip={t('topbar.openAnother')}>
-            <Icon name="plus" size={18} />
+          <label
+            className={labeled ? 'btn btn--ghost btn--sm topbar__open' : 'icon-btn topbar__open'}
+            data-tip={labeled ? undefined : t('topbar.openAnother')}
+          >
+            <Icon name="plus" size={labeled ? 15 : 18} />
+            {labeled && t('topbar.open')}
             <input
               type="file"
               accept="video/mp4,video/quicktime,.mp4,.mov"
-              aria-label={t('topbar.openAnother')}
+              aria-label={labeled ? t('topbar.open') : t('topbar.openAnother')}
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) onFile(f);

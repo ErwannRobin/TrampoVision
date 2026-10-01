@@ -25,6 +25,7 @@ export const chrome: Translation<typeof en> = {
   'topbar.coachHint': 'すべての測定値、グラフ、閾値',
   'topbar.export': 'エクスポート',
   'topbar.settings': '設定',
+  'topbar.open': '動画を開く',
   'topbar.openAnother': '別の動画を開く',
   'topbar.about': 'TrampoVision について',
 
