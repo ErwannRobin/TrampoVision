@@ -49,6 +49,11 @@ import { boundsLimit, knownLimits, positionWord, ruleBasedClassifier } from './c
 
 const ID = { id: 'hierarchical', version: '1' } as const;
 
+/** Tolerance of a twist counted from 2D cues, degrees: the count can be a half twist off, so its neighbours keep some of the mass. */
+const TWIST_2D_SIGMA_DEG = 80;
+/** A reliable 3D twist keeps this share of its weight when the 2D count disagrees with it by a half twist or more. */
+const SECOND_OPINION_DISAGREES = 0.8;
+
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 const gauss = (x: number, mean: number, sigma: number) => Math.exp(-0.5 * ((x - mean) / sigma) ** 2);
 export const pct = (v: number) => formatPercent(clamp01(v));
@@ -328,8 +333,9 @@ function twistStage(f: JumpFeatures, tw: TwistContext | null, tm: Temporal, cfg:
   }
 
   const obsDeg = Math.abs(est.totalDeg);
+  const from2d = tw?.source === 'pose2d';
   // Trust: the twist estimate's own confidence, and whether the trajectory has settled by landing.
-  let sigma = c.twistSigmaDeg / Math.sqrt(Math.max(est.confidence, 0.25));
+  let sigma = from2d ? TWIST_2D_SIGMA_DEG : c.twistSigmaDeg / Math.sqrt(Math.max(est.confidence, 0.25));
   if (tm.twistEndDrift !== null && tm.twistEndDrift > c.twistSettleDeg) {
     sigma *= 1.5;
     notes.push(t('stage.twists.stillTwisting', { deg: Math.round(tm.twistEndDrift) }));
@@ -337,15 +343,30 @@ function twistStage(f: JumpFeatures, tw: TwistContext | null, tm: Temporal, cfg:
   const measuredDist = new Map<number, number>();
   for (const h of HALF_TWISTS) measuredDist.set(h, gauss(obsDeg, 180 * h, sigma) * TWIST_PRIOR(h) + 1e-9);
   const meas = normalize(measuredDist);
-  // A twist estimate below its own reliability limit only counts for part: it is mixed with the no-measurement prior.
-  const trust = est.reliable ? 1 : 0.5 * clamp01(est.confidence);
+  // A twist estimate below its own reliability limit only counts for part: it is mixed with the no-measurement prior. A count from 2D
+  // cues is mixed with it in proportion to its own confidence.
+  let trust = from2d ? clamp01(est.confidence) : est.reliable ? 1 : 0.5 * clamp01(est.confidence);
+  const second = tw?.second;
+  if (!from2d && est.reliable && second?.available && second.reliable && second.halfTwists !== null) {
+    // The 2D count is a second opinion: it never replaces a reliable 3D twist, but a disagreement lowers the weight given to it.
+    const agrees = second.halfTwists === Math.round(obsDeg / 180);
+    if (!agrees) trust *= SECOND_OPINION_DISAGREES;
+    notes.push(
+      t(agrees ? 'stage.twists.secondAgrees' : 'stage.twists.secondDisagrees', {
+        n: second.halfTwists,
+        conf: pct(second.confidence),
+      }),
+    );
+  }
   const dist = new Map<number, number>();
   for (const h of HALF_TWISTS) dist.set(h, trust * (meas.get(h) ?? 0) + (1 - trust) * (prior.get(h) ?? 0));
   notes.push(
-    t(est.reliable ? 'stage.twists.tolerance' : 'stage.twists.toleranceDiscounted', {
-      deg: Math.round(sigma),
-      conf: pct(est.confidence),
-    }),
+    from2d
+      ? t('stage.twists.source2d', { n: est.halfTwists ?? 0, conf: pct(est.confidence), deg: Math.round(sigma) })
+      : t(est.reliable ? 'stage.twists.tolerance' : 'stage.twists.toleranceDiscounted', {
+          deg: Math.round(sigma),
+          conf: pct(est.confidence),
+        }),
   );
   if (tm.twistDoneU !== null) notes.push(t('stage.twists.done', { at: pct(tm.twistDoneU) }));
   return {
@@ -803,7 +824,21 @@ export const hierarchicalClassifier: SkillClassifier = {
           needed: t('limit.unmeasured.needed'),
         },
       );
+    if (input.twist?.source === 'pose2d' && stages.tw.measured)
+      limitations.push({
+        id: 'twist-2d',
+        signal: t('limit.twist2d.signal'),
+        problem: t('limit.twist2d.problem'),
+        needed: t('limit.twist2d.needed'),
+      });
     const evidence: EvidenceItem[] = [...rules.evidence];
+    if (stages.tw.measured)
+      evidence.push({
+        key: 'twist_source',
+        label: t('ev.twistSource.label'),
+        text: t(input.twist?.source === 'pose2d' ? 'ev.twistSource.pose2d' : 'ev.twistSource.pose3d'),
+        value: null,
+      });
     for (const st of stageReports)
       evidence.push({
         key: `stage_${st.stage}`,

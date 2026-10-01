@@ -71,6 +71,10 @@ export const classifier = {
   'limit.twist.needed': '3D pose or a second camera to measure the twist.',
   'limit.unmeasured.problem': 'Not measured.',
   'limit.unmeasured.needed': '3D pose.',
+  'limit.twist2d.signal': 'Twist from 2D cues',
+  'limit.twist2d.problem':
+    'The twist was counted from the shoulder and hip lines and the face in one 2D view, not from 3D. It cannot tell the direction or when the twist happened, it assumes a typical shoulder width, and it has only been checked on a simulated athlete.',
+  'limit.twist2d.needed': 'A reliable 3D pose, a second camera, or a person counting the twists.',
 
   // Words for what was measured
   'level.low': 'low',
@@ -124,6 +128,9 @@ export const classifier = {
   'ev.poseQuality.label': 'Pose quality in flight',
   'ev.poseQuality.note': 'measured joints count 1, interpolated 0.6, corrected 0.4, missing 0',
   'ev.temporal.label': 'Trajectory match',
+  'ev.twistSource.label': 'Twist from',
+  'ev.twistSource.pose3d': '3D pose',
+  'ev.twistSource.pose2d': '2D cues (shoulder width, left/right order, face)',
   'ev.temporal.noteExample': 'closest reference: a labelled example of {name}',
   'ev.temporal.noteModel': 'closest reference: the expected movement of {name}',
   'ev.offGrid.label': 'Rotation from the nearest whole somersault',
@@ -182,6 +189,11 @@ export const classifier = {
     'tolerance ±{deg}°, twist confidence {conf} (below its reliability limit: partly discounted)',
   'stage.twists.done': '90% of the twist done by {at} of the flight',
   'stage.twists.observed': '{turns} twists ({deg}°)',
+  'stage.twists.source2d':
+    'twist counted from the 2D skeleton (shoulder width, left/right order, face): {n} half twists, consistency {conf}, tolerance ±{deg}°; no reliable 3D twist',
+  'stage.twists.secondAgrees': 'the 2D skeleton counts the same: {n} half twists (consistency {conf})',
+  'stage.twists.secondDisagrees':
+    'the 2D skeleton counts {n} half twists (consistency {conf}) and disagrees: the 3D twist is given less weight',
   'stage.position.mostClosed': 'most closed moment: {position} (rule score {score}, held {held})',
   'stage.position.share': 'share of the flight: {shares}',
   'stage.position.peakAt': 'most closed at {at} of the flight',

@@ -38,6 +38,7 @@ import { videoIdFromTrack, videoIdOf } from './dataset/videoId';
 import type { JumpRecord } from './dataset/types';
 import { analyzeTwist } from './pose3d/twist';
 import { analyzeSkills } from './skills/analyzeSkills';
+import { analyzeTwist2d } from './skills/twist2d';
 import { DEFAULT_SKILL_CONFIG, type SkillConfig } from './skills/config';
 import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from './skills/export';
 import { buildPoseSeries, parsePoseSeries, toSeriesJson, type ParsedSeries } from './analysis/timeSeries';
@@ -233,6 +234,15 @@ export default function App() {
         : null,
     [track, result, locale], // oxlint-disable-line react-hooks/exhaustive-deps
   );
+  // The twist counted from the 2D skeleton: used when the 3D one is missing or not reliable, a second opinion otherwise. It reads
+  // the raw landmarks, not the smoothed ones, which would flatten a fast twist.
+  const twist2d = useMemo(
+    () =>
+      track && result
+        ? analyzeTwist2d({ frames: track.frames, time: result.time, fps: result.meta.fps, cycles: result.jumps.cycles })
+        : null,
+    [track, result],
+  );
 
   // The jumps the person labelled with a figure are reference examples for the classifier. Keyed on what matters, so saving a
   // note or a skill label does not redo the classification.
@@ -250,8 +260,8 @@ export default function App() {
 
   // The twist feeds the classifier: 'twists' is one of its four questions.
   const skills = useMemo(
-    () => (result ? analyzeSkills(result, { config: skillConfig, twist, references, videoId }) : null),
-    [result, skillConfig, twist, references, videoId, locale], // oxlint-disable-line react-hooks/exhaustive-deps
+    () => (result ? analyzeSkills(result, { config: skillConfig, twist, twist2d, references, videoId }) : null),
+    [result, skillConfig, twist, twist2d, references, videoId, locale], // oxlint-disable-line react-hooks/exhaustive-deps
   );
   // The side by side view needs every athlete analyzed; the chosen one is already done.
   const athleteViews = useMemo<AthleteView[]>(() => {
@@ -269,6 +279,7 @@ export default function App() {
         skills: analyzeSkills(r, {
           config: skillConfig,
           twist: tw,
+          twist2d: analyzeTwist2d({ frames: tr.frames, time: r.time, fps: r.meta.fps, cycles: r.jumps.cycles }),
           references,
           videoId: athleteVideoId(fileVideoId, i),
         }),

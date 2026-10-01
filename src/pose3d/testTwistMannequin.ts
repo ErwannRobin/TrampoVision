@@ -23,6 +23,8 @@ export interface TwistJumpSpec {
   twistTurns?: number;
   /** +1: faces the right of the image when upright; -1: left. */
   facing?: 1 | -1;
+  /** When the twist starts and ends, as shares of the flight (smoothstep between them). Default [0.15, 0.85]. */
+  twistWindow?: [number, number];
   /** Camera yaw from side-on, degrees (0 = side view, 90 = seen from the front or back). */
   yawDeg?: number;
   /** Constant forward lean of the trunk, degrees (a real pose, not an error). */
@@ -78,6 +80,7 @@ export function syntheticTwistJump(spec: TwistJumpSpec = {}): SyntheticTwistJump
   const twist = spec.twistTurns ?? 0;
   const yaw = spec.yawDeg ?? 0;
   const lean = spec.leanDeg ?? 0;
+  const [twistFrom, twistTo] = spec.twistWindow ?? [0.15, 0.85];
   const total = 2 * groundS + flightS;
   const n = Math.round(total * fps) + 1;
   const takeoff = Math.round(groundS * fps);
@@ -93,7 +96,7 @@ export function syntheticTwistJump(spec: TwistJumpSpec = {}): SyntheticTwistJump
     time.push(t);
     const u = Math.min(Math.max((t - groundS) / flightS, 0), 1);
     const somDeg = 360 * som * u;
-    const twistDeg = 360 * twist * smoothstep(0.15, 0.85, u);
+    const twistDeg = 360 * twist * smoothstep(twistFrom, twistTo, u);
     const pts = body.map<WorldPoint>((local) => {
       // Lean about the body's left axis, then twist about its up axis.
       const lc = (lean * Math.PI) / 180;

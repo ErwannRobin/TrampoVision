@@ -62,6 +62,10 @@ export const classifier: Translation<typeof en> = {
   'limit.twist.needed': 'ひねりを測定するための3D姿勢、または2台目のカメラ。',
   'limit.unmeasured.problem': '未測定です。',
   'limit.unmeasured.needed': '3D姿勢。',
+  'limit.twist2d.signal': '2D手がかりによるひねり',
+  'limit.twist2d.problem':
+    'ひねりは3Dではなく、1つの2D映像の肩・腰のラインと顔から数えました。向きもひねりの時点も分からず、一般的な肩幅を仮定しており、シミュレーションの選手でしか確認していません。',
+  'limit.twist2d.needed': '信頼できる3D姿勢、2台目のカメラ、または人によるひねりの数え。',
 
   'level.low': '低',
   'level.medium': '中',
@@ -113,6 +117,9 @@ export const classifier: Translation<typeof en> = {
   'ev.poseQuality.label': '滞空中の姿勢品質',
   'ev.poseQuality.note': '測定できた関節は1、補間は0.6、補正は0.4、欠損は0として計算',
   'ev.temporal.label': '軌跡の一致度',
+  'ev.twistSource.label': 'ひねりの出典',
+  'ev.twistSource.pose3d': '3D姿勢',
+  'ev.twistSource.pose2d': '2Dの手がかり（肩幅、左右の順序、顔）',
   'ev.temporal.noteExample': '最も近い参照：{name} のラベル付きサンプル',
   'ev.temporal.noteModel': '最も近い参照：{name} の想定される動き',
   'ev.offGrid.label': '最も近い整数回宙返りとの差',
@@ -167,6 +174,10 @@ export const classifier: Translation<typeof en> = {
     '許容範囲 ±{deg}°、ひねりの確信度 {conf}（信頼限界を下回るため、一部割り引いています）',
   'stage.twists.done': 'ひねりの90%は滞空の {at} までに完了',
   'stage.twists.observed': 'ひねり {turns} 回（{deg}°）',
+  'stage.twists.source2d':
+    '2D骨格からひねりを数えました（肩幅、左右の順序、顔）：半ひねり {n} 回、整合度 {conf}、許容範囲 ±{deg}°。信頼できる3Dのひねりなし',
+  'stage.twists.secondAgrees': '2D骨格も同じ数：半ひねり {n} 回（整合度 {conf}）',
+  'stage.twists.secondDisagrees': '2D骨格は半ひねり {n} 回（整合度 {conf}）で、食い違い：3Dのひねりの重みを下げました',
   'stage.position.mostClosed': '最も閉じた瞬間：{position}（ルールスコア {score}、保持 {held}）',
   'stage.position.share': '滞空中の割合：{shares}',
   'stage.position.peakAt': '滞空の {at} の時点で最も閉じる',

@@ -4,6 +4,7 @@ import type { TwistEstimate } from '../pose3d/twist';
 import type { SkillConfig } from './config';
 import type { Movement } from './fig/elements';
 import type { Reference } from './temporal/prototypes';
+import type { Twist2dEstimate } from './twist2d';
 import type { Channel, MeasuredMovement } from './temporal/signature';
 
 /** Body positions the rule set can tell apart. "unknown" = between the definitions or not enough data. */
@@ -326,10 +327,16 @@ export interface SkillPrediction {
   comparison?: TemporalComparison;
 }
 
-/** The 3D twist of one jump: the estimate and its trajectory (degrees since takeoff, 32 samples from takeoff to landing). */
+/**
+ * The twist of one jump: the estimate and its trajectory (degrees since takeoff, 32 samples from takeoff to landing).
+ * `source` says where the estimate comes from: the 3D landmarks (default) or, when those are not reliable, the 2D cues
+ * (`twist2d.ts`; then there is no trajectory and the direction is unknown). `second` is the 2D count, kept as a second opinion.
+ */
 export interface TwistContext {
   estimate: TwistEstimate;
   trajectory: number[] | null;
+  source?: 'pose3d' | 'pose2d';
+  second?: Twist2dEstimate | null;
 }
 
 export interface ClassifierInput {

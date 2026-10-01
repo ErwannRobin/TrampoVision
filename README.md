@@ -163,6 +163,7 @@ video ─► extractPoseTrack ─► PoseTrack ─► stabilizePose ─► compu
 | `src/ui/review/mode/*`, `src/dataset/stageLabel.ts`       | The review mode (one jump at a time, stage by stage) and how its answers are stored, exported and imported as a label file.                    |
 | `src/pose3d/torso.ts`, `twist.ts`, `config.ts`, `vec3.ts` | Experimental 3D: torso frame from the 3D landmarks, twist about the longitudinal axis with reliability checks.                                 |
 | `src/pose3d/capabilities.ts`                              | Measures what this browser can run (WebGPU, WebGL 2, WASM SIMD / threads).                                                                     |
+| `src/skills/twist2d.ts`, `twistContext.ts`                | Twist counted from the 2D skeleton (shoulder and hip width, left/right order, face), and which twist (3D, 2D, both) the classifier is told about. |
 | `src/pose3d/testTwistMannequin.ts`, `evaluation.ts`       | Test-only 3D athlete with known somersault and twist, and its degradations.                                                                    |
 | `src/ui/Pose3DView.tsx`, `rail/coach/TwistTab.tsx`        | 3D skeleton view (torso, axis, twist dial), twist curves, twist numbers and limits.                                                            |
 
@@ -338,7 +339,7 @@ timeline, position strip, normalized charts, exports and _Play jump_ work, forci
 
 - **Yes, in principle, for** rotation amount and direction, and for straight vs tuck vs pike, _from a side-on camera_: hip angle, knee angle and orientation carry it, and the confidence drops when they are unreliable.
 - **Only with an extra signal:** front vs back needs the facing direction (face, knee and toe cues; manual override when they are weak). Skills with half-turns or quarter turns need a landing-position rule.
-- **Not from this signal:** twists (the experimental 3D pose gives a twist estimate, but it is only as good as the model's depth: on the one real test it produced a phantom −94° and the app flagged it as not reliable; see _3D pose and twist_), straddle / leg separation (need a front view), anything seen from the front or back of the athlete.
+- **Not from this signal:** twists (the experimental 3D pose gives a twist estimate, but it is only as good as the model's depth: on the one real test it produced a phantom −94° and the app flagged it as not reliable; a count from 2D cues is a second opinion, checked on a simulated athlete only; see _3D pose and twist_ and _Twist from 2D cues_), straddle / leg separation (need a front view), anything seen from the front or back of the athlete.
 - **Unknown until real footage is tested:** how often a real pose model flips, drops or mislocates limbs on inverted, tucked or blurred athletes. This is the biggest risk and it cannot be judged from synthetic data.
 
 ## Validation workflow: dataset, evaluation, failure cases
@@ -497,6 +498,33 @@ It is **not** evidence about real twisting athletes.
 takeoff, amber arc = the twist since. Drag to rotate; presets for the camera view, the side and from above. Curves over the whole clip: accumulated twist (3D axis and image-plane axis), twist angular velocity, trunk-axis tilt out of the image plane, 3D shoulder and hip width. The panel gives the net twist, half twists,
 direction, peak and mean twist speed, the current twist and speed at the playhead, the same twist by three other routes, the checks, and what one camera can never tell. A twist that cannot be measured says why (no 3D data, jump cut off, torso not found) and shows no number.
 
+### Twist from 2D cues (second opinion)
+
+`src/skills/twist2d.ts` counts half twists from the raw 2D skeleton, so that a twist is not simply "not measured" when the 3D estimate above is unreliable (it was on the only real test). Seen from the side, the shoulder line of an athlete who has twisted by an angle φ about the long axis, projected on the axis perpendicular to the trunk, is `W · sin(φ₀ + φ)`; the same holds for the hip line. A circle projected on a line keeps its amplitude whatever the camera yaw, so the yaw only moves the start phase φ₀. Three cues:
+
+- **width**: |shoulder line| and |hip line| have one minimum per half twist. They do not care about left/right labels.
+- **chirality**: the signed line changes sign at each half twist. It is only used when the **face** agrees with it: the visibility of nose and eyes is in phase with the signed line, and a left/right swap of the pose model flips the line but not the face. The nose offset from the ears (in quadrature) is a second check of the phase.
+- The count is a **model fit**, not an unwrapped angle: for 0 to 8 half twists and a family of twist profiles (start and end inside the flight) the curve is fitted to the measured ones, and the smallest residual wins. It reads the raw landmarks, because the smoothing of the cleaned ones would flatten a fast twist.
+
+The confidence is the product of seven checks (fit quality, margin to the next count, width vs chirality agreement, frames per half twist, coverage, plausible amplitude, face agreement): internal consistency, **not** a probability. How it is used: a reliable 3D twist is kept, with the 2D count as a **second opinion** (a disagreement lowers the weight of the 3D one, and the stage's notes say so). Without a reliable 3D twist, a reliable 2D count is used instead, marked `source: pose2d` in the evidence and in the limitations, with no trajectory (the fitted profile is not a measurement of when the twist happened, so the twist-end deduction never uses it) and no direction (one side view cannot tell it). It is a tolerance of ±80° rather than the 3D one. An unreliable 2D count is ignored.
+
+**Synthetic check** (`src/skills/twist2d.test.ts`; the rigid 3D athlete of `testTwistMannequin.ts` projected to 2D with an orthographic camera, 0 to 3 twists, 0 to 2 somersaults, both facings, lean, 80 random jumps per row; the simulated model's face visibility is high when the face looks toward the camera). _Right_ = the half-twist count is exactly right; _reliable_ = the estimator did not decline.
+
+| condition                                                  | right       | reliable   | right when reliable | reliable but wrong |
+| ---------------------------------------------------------- | ----------- | ---------- | ------------------- | ------------------ |
+| clean                                                      | 100%        | 100%       | 100%                | 0                  |
+| landmark noise 1.5 px / 3 px (1.7% / 3.3% of the trunk)    | 100% / 100% | 99% / 98%  | 100%                | 0                  |
+| landmark noise 6 px / 10 px (6.7% / 11%)                   | 100% / 98%  | 91% / 59%  | 100%                | 0                  |
+| noise 1.5 px + 10% / 30% of the frames missing             | 100% / 100% | 100% / 88% | 100%                | 0                  |
+| left/right swapped for 8 frames                            | 99%         | 99%        | 100%                | 0                  |
+| no face information in the visibility                      | 100%        | 99%        | 100%                | 0                  |
+| shoulders and hips 25% wider / 20% narrower than the prior | 100% / 100% | 94% / 100% | 100%                | 0                  |
+| twist over the whole flight / late (35% to 95%)            | 100% / 96%  | 99% / 73%  | 100%                | 0                  |
+| 20 fps / 15 fps                                            | 100% / 100% | 96% / 74%  | 100%                | 0                  |
+| oblique camera, yaw 25° to 50°                             | 73%         | 56%        | 100%                | 0                  |
+
+**How to read this.** If a pose model returned the shoulder and hip lines of a rigid body with the noise simulated here, the half twists can be counted, and the estimator declines when the signal is weak (few frames per half twist, much noise or missing data, a late twist). The oblique camera row shows a limit that is geometry, not noise: a somersault seen from an angle makes the shoulder line swing with the somersault, which looks like a twist; the amplitude is then implausible, and the estimator declines instead of counting it. The table is optimistic: the simulation has no systematic pose-model errors (a model that collapses the shoulder line when it is edge-on, a face that is mislabeled, arms swinging in front of the shoulders), the twist profile of the simulated athlete is inside the family the fit chooses from, and the shoulder width of the model is only checked within ±25% of a prior of 0.76 trunk lengths (hips 0.40). **There is no real twisting ground truth yet**: the Dong Dong clip is not labeled. What `make eval` would have to show on labeled real jumps is the table above with real numbers; until then a 2D count is a second opinion, and the classifier's limitations list says so each time it relies on one. The 2D count is not saved in the dataset records yet, so `make eval` does not replay it.
+
 ## Accuracy: what has and has not been checked
 
 Synthetic routines with analytic ground truth (`npm test`), 30 and 60 fps, up to 2 cm of landmark noise, glitches and dropouts:
@@ -527,6 +555,7 @@ cameras that are not level. Real COM estimates also move with arm and leg motion
 - **Front vs back** depends on the facing estimate; in a side view with pointed toes and a turned head the cues can be weak, in which case the app reports it and asks for a manual setting.
 - **The skill analysis is 2D.** Angles and rotation are image-plane projections. They are correct only for a fixed camera looking roughly
   perpendicular to the plane of the skill, and a somersault seen from an angle is under-counted. Twists come only from the experimental 3D estimate, which depends on a single-camera model's depth (see _3D pose and twist_).
+- **The 2D twist count is unvalidated on real twisting athletes.** It is exact on a simulated athlete with noise and gaps (see _Twist from 2D cues_), it assumes a typical shoulder width, cannot tell the direction or when the twist happened, and is misled by an oblique camera on a somersault (it declines then). It is saved neither in the dataset records nor in `make eval`.
 - **3D pose is experimental and unvalidated on real twisting athletes.** The twist estimator is exact on a simulated 3D athlete and was checked for phantom twist on one still photo; the world frame's alignment and handedness were checked on that photo only.
   A dedicated 3D model (lifting network) was not built or tested. The confidence is internal consistency, not a probability.
 - **The evaluation is only as good as the labels.** One labeler, no agreement check, and a small dataset gives wide intervals. Labeled jumps are the only way to tune the thresholds honestly: keep some you never tune on.
