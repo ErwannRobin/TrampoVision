@@ -69,7 +69,15 @@ export const reviewer: Translation<typeof en> = {
   'rv.noService':
     'Diese Version hat keinen Prüfdienst konfiguriert (VITE_REVIEW_API_URL und VITE_REVIEW_INGEST_TOKEN).',
   'rv.resetView': 'Ansicht zurücksetzen',
-  'rv.viewHint': 'Ziehen zum Verschieben · Scrollen oder Zwei-Finger-Zoom · Doppelklick zum Zurücksetzen',
+  'rv.viewHint':
+    'Ziehen zum Drehen · Umschalt+Ziehen oder zwei Finger zum Verschieben · Scrollen oder Zwei-Finger-Zoom · Doppelklick zum Zurücksetzen',
+  'rv.views': 'Ansicht',
+  'rv.viewSide': 'Seite',
+  'rv.viewTop': 'Oben',
+  'rv.viewUpright': 'Aufrecht',
+  'rv.viewUprightHint':
+    'Hält den Rumpf aufrecht, damit die Schraube lesbar ist: der Salto bleibt auf seiner Anzeige. „Oben“ blickt dann von über dem Kopf.',
+  'rv.flat': 'Für diesen Sprung wurde keine Tiefe gespeichert: flache Ansicht.',
   'rv.salto': 'Salto',
   'rv.twist': 'Schraube',
   'rv.fix': 'Anderes Element',

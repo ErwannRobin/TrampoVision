@@ -1,6 +1,7 @@
 import { lazyText, t, type Locale } from '../i18n/core';
 import type { StageLabel } from '../eval/labels';
 import type { MovementLabel } from './movementLabel';
+import type { Pose3dSequence } from '../pose3d/poseSequence';
 import type { TwistEstimate, TwistSequence } from '../pose3d/twist';
 import type { SkillConfig } from '../skills/config';
 import type { JumpFeatures, JumpSequence, SkillPrediction } from '../skills/types';
@@ -104,6 +105,8 @@ export interface JumpRecord {
   prediction: SkillPrediction;
   /** Experimental 3D twist: summary and its curve. Null when the pose data had no 3D. */
   twist: { estimate: TwistEstimate; sequence: TwistSequence | null } | null;
+  /** The joints in 3D, for turning the skeleton around in the review; absent in files saved before it existed, null without 3D landmarks. */
+  pose3d?: Pose3dSequence | null;
   truth: GroundTruth | null;
   twistTruth: TwistTruth | null;
   /** Full figure label; absent in files saved before it existed. */

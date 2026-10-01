@@ -279,6 +279,8 @@ import {
     renderTexts(row);
     $('note').value = row.review_note || '';
     setPick(row.review_element_id || row.auto_element_id || 'back-1s-0t-tuck');
+    buildPose();
+    buildGeo();
     u = 0;
     $('scrub').value = 0;
     stop();
@@ -421,22 +423,72 @@ import {
     return seq.data[Math.max(0, Math.min(seq.data.length - 1, i))];
   }
 
-  // The skeleton is stored in the body's own frame (hips at the origin, the trunk pointing up), so on its own it never turns. The somersault
-  // turns it about the hips as it did in the video, and the twist is shown on a dial: both can be read at a glance, and the figure can be
-  // moved and zoomed.
-  const view = { x: 0, y: 0, k: 1 };
-  const ORIGIN_Y = 0.54;
-  const viewMoved = () => view.x !== 0 || view.y !== 0 || view.k !== 1;
+  // The skeleton is drawn in 3D. The stored pose is in meters with the hips at the origin and the axes of the camera (x right, y down,
+  // z away); here it is turned to x right, y up, z toward the viewer, and a camera orbits around the hips: drag to turn, shift-drag or
+  // two fingers to move, wheel or pinch to zoom. "Upright" turns the trunk to point up in every frame (the smallest turn), which takes the
+  // somersault out and leaves the twist, to be read from above the head. Jumps saved before the depth was kept show a flat skeleton.
+  const NAMES = [
+    'nose',
+    'left_ear',
+    'right_ear',
+    'left_shoulder',
+    'right_shoulder',
+    'left_elbow',
+    'right_elbow',
+    'left_wrist',
+    'right_wrist',
+    'left_hip',
+    'right_hip',
+    'left_knee',
+    'right_knee',
+    'left_ankle',
+    'right_ankle',
+    'left_heel',
+    'right_heel',
+    'left_foot_index',
+    'right_foot_index',
+  ];
+  const CAMERA_M = 6; // distance of the camera from the hips
+  const cam = { yaw: 0, pitch: 0, x: 0, y: 0, k: 1 };
+  let upright = false;
+  const PRESETS = { side: [90, 0], top: [0, 90] };
+  const camMoved = () => cam.yaw !== 0 || cam.pitch !== 0 || cam.x !== 0 || cam.y !== 0 || cam.k !== 1;
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-  function syncReset() {
-    $('resetview').hidden = !viewMoved();
+  function syncViews() {
+    $('resetview').disabled = !camMoved() && !upright;
+    document.querySelectorAll('#views button[data-view]').forEach((b) => {
+      const p = PRESETS[b.dataset.view];
+      b.setAttribute('aria-pressed', String(cam.yaw === p[0] && cam.pitch === p[1]));
+    });
+    $('vup').setAttribute('aria-pressed', String(upright));
   }
-  function resetView() {
-    view.x = 0;
-    view.y = 0;
-    view.k = 1;
-    syncReset();
-    draw();
+  // Moves the camera to `to` in a short glide (at once when the system asks for less motion).
+  let glide = 0;
+  function goTo(to) {
+    cancelAnimationFrame(glide);
+    const from = { ...cam };
+    const dyaw = ((((to.yaw - from.yaw) % 360) + 540) % 360) - 180;
+    const t0 = performance.now();
+    const quick = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    (function step(now) {
+      const f = quick ? 1 : Math.min(1, (now - t0) / 220);
+      const e = f * f * (3 - 2 * f);
+      ['pitch', 'x', 'y', 'k'].forEach((n) => (cam[n] = f === 1 ? to[n] : from[n] + (to[n] - from[n]) * e));
+      cam.yaw = f === 1 ? to.yaw : from.yaw + dyaw * e;
+      syncViews();
+      drawSkeleton();
+      if (f < 1) glide = requestAnimationFrame(step);
+    })(t0);
+  }
+  const resetView = () => {
+    upright = false;
+    goTo({ yaw: 0, pitch: 0, x: 0, y: 0, k: 1 });
+  };
+  const lookFrom = (name) => goTo({ ...cam, yaw: PRESETS[name][0], pitch: PRESETS[name][1] });
+  function setUpright(on) {
+    upright = on;
+    syncViews();
+    drawSkeleton();
   }
 
   // A canvas that follows the size of its box, sharp on dense screens. Returns what to draw with, in CSS pixels.
@@ -469,6 +521,127 @@ import {
     const vb = tw.data[b][i];
     if (va == null || !isFinite(va)) return null;
     return (vb == null || !isFinite(vb) ? va : va + (vb - va) * (f - a)) / 360;
+  }
+
+  // ---- the pose of the jump, as points x right, y up, z toward the viewer ----
+  let pose = null; // { flat, frames: [[point | null per NAMES]] }
+  const finite = (v) => v != null && isFinite(v);
+  function buildPose() {
+    pose = null;
+    if (!rec) return;
+    const r = rec.record;
+    const p3 = r.pose3d;
+    if (p3 && p3.columns && p3.data && p3.data.length > 1) {
+      const at = NAMES.map((n) => p3.columns.indexOf(n + '_x'));
+      pose = {
+        flat: false,
+        frames: p3.data.map((row) =>
+          NAMES.map((_, j) => {
+            const i = at[j];
+            return i >= 0 && finite(row[i]) && finite(row[i + 1]) && finite(row[i + 2])
+              ? [row[i], -row[i + 1], -row[i + 2]]
+              : null;
+          }),
+        ),
+      };
+      return;
+    }
+    const seq = r.sequence;
+    if (!seq || !seq.data || seq.data.length < 2) return;
+    const len = (r.analysis && r.analysis.athleteHeightM) || 1.7;
+    const iT = col(seq, 'orient_turns');
+    const at = NAMES.map((n) => col(seq, n + '_x'));
+    pose = {
+      flat: true,
+      frames: seq.data.map((row) => {
+        const th = (finite(row[iT]) ? row[iT] : 0) * 2 * Math.PI;
+        const cs = Math.cos(th);
+        const sn = Math.sin(th);
+        return NAMES.map((_, j) => {
+          const x = row[at[j]];
+          const y = row[at[j] + 1];
+          return at[j] >= 0 && finite(x) && finite(y) ? [len * (x * cs + y * sn), len * (y * cs - x * sn), 0] : null;
+        });
+      }),
+    };
+  }
+  const vsub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const vadd = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+  const vmul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+  const vcross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const vunit = (a) => {
+    const n = Math.hypot(a[0], a[1], a[2]);
+    return n > 1e-6 ? vmul(a, 1 / n) : null;
+  };
+  const vmid = (a, b) => (a && b ? vmul(vadd(a, b), 0.5) : a || b || null);
+  // The joints at the position u, as a map; hips at the origin, and with `turnUp` the trunk turned to point up.
+  function jointsAt(u, turnUp) {
+    const F = pose.frames;
+    const f = clamp(u, 0, 1) * (F.length - 1);
+    const a = Math.floor(f);
+    const b = Math.min(F.length - 1, a + 1);
+    const w = f - a;
+    const J = {};
+    NAMES.forEach((n, j) => {
+      const p = F[a][j];
+      const q = F[b][j];
+      J[n] = p && q ? vadd(p, vmul(vsub(q, p), w)) : (w < 0.5 ? p || q : q || p) || null;
+    });
+    const hip = vmid(J.left_hip, J.right_hip);
+    const sh = vmid(J.left_shoulder, J.right_shoulder);
+    const axis = hip && sh ? vunit(vsub(sh, hip)) : null;
+    let turn = (x) => x;
+    if (turnUp && axis) {
+      // Rodrigues: the smallest rotation taking the trunk axis to +y.
+      const v = vcross(axis, [0, 1, 0]);
+      const c = axis[1];
+      if (c > -0.9999)
+        turn = (x) => {
+          const vx = vcross(v, x);
+          return vadd(vadd(x, vx), vmul(vcross(v, vx), 1 / (1 + c)));
+        };
+      else turn = (x) => [-x[0], -x[1], x[2]]; // upside down: half a turn about the camera axis, as the somersault itself turns
+    }
+    NAMES.forEach((n) => {
+      if (J[n]) J[n] = turn(hip ? vsub(J[n], hip) : J[n]);
+    });
+    return J;
+  }
+
+  // The heading of the shoulder line about the vertical once the trunk is upright, unwrapped over the jump: the twist as the 3D pose has it.
+  let geo = null; // { h0, cum: radians since takeoff per sample (NaN = unknown) }
+  function buildGeo() {
+    geo = null;
+    if (!pose || pose.flat) return;
+    const n = pose.frames.length;
+    let prev = null;
+    let h0 = null;
+    const cum = [];
+    for (let k = 0; k < n; k++) {
+      const J = jointsAt(k / (n - 1), true);
+      const l = J.left_shoulder && J.right_shoulder ? vsub(J.right_shoulder, J.left_shoulder) : null;
+      if (!l || Math.hypot(l[0], l[2]) < 0.05) {
+        cum.push(NaN);
+        continue;
+      }
+      let hd = Math.atan2(l[0], l[2]);
+      if (prev !== null) hd = prev + Math.atan2(Math.sin(hd - prev), Math.cos(hd - prev));
+      prev = hd;
+      if (h0 === null) h0 = hd;
+      cum.push(hd - h0);
+    }
+    if (h0 !== null) geo = { h0, cum };
+  }
+  function geoTwist(u) {
+    if (!geo) return null;
+    const f = clamp(u, 0, 1) * (geo.cum.length - 1);
+    const a = Math.floor(f);
+    const b = Math.min(geo.cum.length - 1, a + 1);
+    const va = geo.cum[a];
+    const vb = geo.cum[b];
+    if (!isFinite(va) && !isFinite(vb)) return null;
+    const d = !isFinite(vb) ? va : !isFinite(va) ? vb : va + (vb - va) * (f - a);
+    return { h0: geo.h0, d };
   }
 
   // One dial: a turn counter. `turns` is clockwise from the top; the swept part is filled.
@@ -506,107 +679,237 @@ import {
     const seq = rec.record.sequence;
     const { g, w, h } = fit($('skel'));
     if (!w || !h) return;
-    if (!seq) {
+    if (!pose) {
       g.fillStyle = css('--muted');
       g.font = '14px system-ui';
       g.fillText(t('rv.noSequence'), 12, 24);
       return;
     }
-    const row = rowAt(seq);
-    const turnsRaw = row[col(seq, 'orient_turns')];
-    const salto = turnsRaw == null || !isFinite(turnsRaw) ? 0 : turnsRaw;
+    const J = jointsAt(u, upright);
+    const row = seq ? rowAt(seq) : null;
+    const turnsRaw = row ? row[col(seq, 'orient_turns')] : null;
+    const salto = finite(turnsRaw) ? turnsRaw : 0;
     const twist = twistTurns(u);
     const th = salto * 2 * Math.PI;
-    const cs = Math.cos(th);
-    const sn = Math.sin(th);
-    const S = (Math.min(w, h) / 2.4) * view.k;
-    const ox = w / 2 + view.x;
-    const oy = h * ORIGIN_Y + view.y;
-    const pt = (name) => {
-      const x = row[col(seq, name + '_x')];
-      const y = row[col(seq, name + '_y')];
-      if (x == null || y == null || !isFinite(x) || !isFinite(y)) return null;
-      return [ox + S * (x * cs + y * sn), oy + S * (x * sn - y * cs)];
-    };
 
-    // The somersault: a ring around the hips with the turn since takeoff swept on it, and the upright reference.
-    const R = S * 1.08;
+    // The camera: yaw about the vertical, then pitch (+ = from above); a mild perspective.
+    const ya = (cam.yaw * Math.PI) / 180;
+    const pa = (cam.pitch * Math.PI) / 180;
+    const cy = Math.cos(ya);
+    const sy = Math.sin(ya);
+    const cp = Math.cos(pa);
+    const sp = Math.sin(pa);
+    const unit = (Math.min(w, h) / 2.3) * cam.k;
+    const ox = w / 2 + cam.x;
+    const oy = h / 2 + cam.y;
+    const toView = (p) => {
+      const z1 = -p[0] * sy + p[2] * cy;
+      return [p[0] * cy + p[2] * sy, p[1] * cp - z1 * sp, p[1] * sp + z1 * cp];
+    };
+    const proj = (p) => {
+      const v = toView(p);
+      const s = (unit * CAMERA_M) / Math.max(0.5, CAMERA_M - v[2]);
+      return [ox + v[0] * s, oy - v[1] * s, v[2], s];
+    };
+    const path = (pts, close) => {
+      g.beginPath();
+      pts.forEach((p, i) => {
+        const q = proj(p);
+        if (i) g.lineTo(q[0], q[1]);
+        else g.moveTo(q[0], q[1]);
+      });
+      if (close) g.closePath();
+    };
+    const circle = (n, f) => Array.from({ length: n + 1 }, (_, i) => f((i / n) * 2 * Math.PI));
+
+    // References: the horizon ring around the hips, the vertical, and the somersault ring in the plane facing the camera.
+    const R = 0.85;
     g.lineWidth = 1;
     g.strokeStyle = css('--line');
     g.setLineDash([3, 6]);
-    g.beginPath();
-    g.arc(ox, oy, R, 0, 2 * Math.PI);
+    path(circle(72, (a) => [R * Math.sin(a), 0, R * Math.cos(a)]));
     g.stroke();
-    g.setLineDash([]);
-    g.beginPath();
-    g.moveTo(ox, oy - R - 6);
-    g.lineTo(ox, oy - R + 6);
+    path([
+      [0, -1.1, 0],
+      [0, 1.1, 0],
+    ]);
     g.stroke();
-    if (Math.abs(th) > 0.01) {
-      g.strokeStyle = css('--warn');
-      g.lineWidth = 3;
-      g.beginPath();
-      g.arc(ox, oy, R, -Math.PI / 2, -Math.PI / 2 + clamp(th, -2 * Math.PI, 2 * Math.PI), th < 0);
+    if (!upright) {
+      path(circle(72, (a) => [(R + 0.2) * Math.sin(a), (R + 0.2) * Math.cos(a), 0]));
       g.stroke();
     }
-    g.fillStyle = css('--warn');
+    g.setLineDash([]);
+    const tip = proj([0, 1.1, 0]);
+    g.fillStyle = css('--muted');
     g.beginPath();
-    g.arc(ox + R * Math.sin(th), oy - R * Math.cos(th), 4, 0, 2 * Math.PI);
+    g.arc(tip[0], tip[1], 3, 0, 2 * Math.PI);
     g.fill();
-
-    g.lineWidth = Math.max(2.5, S * 0.035);
-    g.lineCap = 'round';
-    BONES.forEach((b) => {
-      const a = pt(b[0]);
-      const c = pt(b[1]);
-      if (!a || !c) return;
-      g.strokeStyle = b[0].indexOf('left') === 0 ? css('--accent') : css('--ink');
-      g.beginPath();
-      g.moveTo(a[0], a[1]);
-      g.lineTo(c[0], c[1]);
+    if (!upright && Math.abs(th) > 0.01) {
+      const rr = R + 0.2;
+      g.strokeStyle = css('--warn');
+      g.lineWidth = 3;
+      const n = Math.max(2, Math.ceil((Math.min(Math.abs(th), 2 * Math.PI) / (2 * Math.PI)) * 72));
+      const end = clamp(th, -2 * Math.PI, 2 * Math.PI);
+      path(Array.from({ length: n + 1 }, (_, i) => [rr * Math.sin((end * i) / n), rr * Math.cos((end * i) / n), 0]));
       g.stroke();
-    });
-    const nose = pt('nose');
-    if (nose) {
-      g.fillStyle = css('--ink');
+    }
+    if (!upright) {
+      const d = proj([(R + 0.2) * Math.sin(th), (R + 0.2) * Math.cos(th), 0]);
+      g.fillStyle = css('--warn');
       g.beginPath();
-      g.arc(nose[0], nose[1], Math.max(5, S * 0.06), 0, 2 * Math.PI);
+      g.arc(d[0], d[1], 4, 0, 2 * Math.PI);
       g.fill();
     }
 
-    // The counters, in the corner of the view: they stay where they are when the figure is moved.
+    // The twist ring (upright): where the shoulder line pointed at takeoff, and how far it has turned since, seen from above the head
+    // (+ = counter-clockwise). It is read from the 3D pose itself, so it can be compared with the measured twist on the dial.
+    const turned = upright ? geoTwist(u) : null;
+    if (turned) {
+      const ring = (a) => [R * Math.sin(a), 0, R * Math.cos(a)];
+      g.strokeStyle = css('--muted');
+      g.lineWidth = 2;
+      path([[0, 0, 0], ring(turned.h0)]);
+      g.stroke();
+      g.strokeStyle = css('--accent');
+      g.lineWidth = 3;
+      const n = 48;
+      const sweep = clamp(turned.d, -2 * Math.PI, 2 * Math.PI);
+      path(Array.from({ length: n + 1 }, (_, i) => ring(turned.h0 + (sweep * i) / n)));
+      g.stroke();
+      g.lineWidth = 2;
+      path([[0, 0, 0], ring(turned.h0 + turned.d)]);
+      g.stroke();
+    }
+
+    // The figure, the far bones first.
+    const P = {};
+    NAMES.forEach((n) => (P[n] = J[n] ? proj(J[n]) : null));
+    const fade = (z) => 0.55 + 0.45 * clamp((z + 1) / 2, 0, 1);
+    const width = (s) => Math.max(2, s * 0.032);
+    const quad = ['left_shoulder', 'right_shoulder', 'right_hip', 'left_hip'];
+    const hip = vmid(J.left_hip, J.right_hip);
+    const sh = vmid(J.left_shoulder, J.right_shoulder);
+    // The chest faces where up x right points; the torso is filled one way when the chest faces the viewer and another when the back does.
+    let chest = null;
+    if (hip && sh && J.left_shoulder && J.right_shoulder) {
+      const ax = vunit(vsub(sh, hip));
+      const rt = vsub(J.right_shoulder, J.left_shoulder);
+      chest = ax && !pose.flat ? vunit(vcross(ax, rt)) : null;
+    }
+    if (quad.every((n) => J[n])) {
+      const facing = chest ? toView(chest)[2] > 0 : null;
+      g.beginPath();
+      quad.forEach((n, i) => (i ? g.lineTo(P[n][0], P[n][1]) : g.moveTo(P[n][0], P[n][1])));
+      g.closePath();
+      g.globalAlpha = 0.28;
+      g.fillStyle = facing === false ? css('--muted') : css('--accent');
+      g.fill();
+      g.globalAlpha = 1;
+    }
+    g.lineCap = 'round';
+    BONES.map((b) => [b, P[b[0]], P[b[1]]])
+      .filter((x) => x[1] && x[2])
+      .sort((p, q) => p[1][2] + p[2][2] - (q[1][2] + q[2][2]))
+      .forEach(([b, a, c]) => {
+        g.globalAlpha = fade((a[2] + c[2]) / 2);
+        g.lineWidth = width((a[3] + c[3]) / 2);
+        g.strokeStyle = b[0].indexOf('left') === 0 ? css('--accent') : css('--ink');
+        g.beginPath();
+        g.moveTo(a[0], a[1]);
+        g.lineTo(c[0], c[1]);
+        g.stroke();
+      });
+    g.globalAlpha = 1;
+    NAMES.filter((n) => !/ear|nose/.test(n)).forEach((n) => {
+      if (!P[n]) return;
+      g.globalAlpha = fade(P[n][2]);
+      g.fillStyle = n.indexOf('left') === 0 ? css('--accent') : css('--ink');
+      g.beginPath();
+      g.arc(P[n][0], P[n][1], Math.max(2.5, P[n][3] * 0.018), 0, 2 * Math.PI);
+      g.fill();
+    });
+    g.globalAlpha = 1;
+    // The head, and the nose that shows where it looks.
+    const head = vmid(J.left_ear, J.right_ear) || J.nose;
+    if (head) {
+      const c = proj(head);
+      g.strokeStyle = css('--ink');
+      g.fillStyle = css('--accent-soft');
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(c[0], c[1], Math.max(5, c[3] * 0.095), 0, 2 * Math.PI);
+      g.fill();
+      g.stroke();
+      if (P.nose) {
+        g.beginPath();
+        g.moveTo(c[0], c[1]);
+        g.lineTo(P.nose[0], P.nose[1]);
+        g.stroke();
+        g.fillStyle = css('--ink');
+        g.beginPath();
+        g.arc(P.nose[0], P.nose[1], Math.max(2.5, P.nose[3] * 0.02), 0, 2 * Math.PI);
+        g.fill();
+      }
+    }
+    // The chest arrow.
+    if (chest && hip && sh) {
+      const a = proj(vmid(hip, sh));
+      const b = proj(vadd(vmid(hip, sh), vmul(chest, 0.32)));
+      g.strokeStyle = css('--warn');
+      g.fillStyle = css('--warn');
+      g.lineWidth = 2.5;
+      g.beginPath();
+      g.moveTo(a[0], a[1]);
+      g.lineTo(b[0], b[1]);
+      g.stroke();
+      const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      g.beginPath();
+      g.moveTo(b[0], b[1]);
+      g.lineTo(b[0] - 9 * Math.cos(ang - 0.45), b[1] - 9 * Math.sin(ang - 0.45));
+      g.lineTo(b[0] - 9 * Math.cos(ang + 0.45), b[1] - 9 * Math.sin(ang + 0.45));
+      g.closePath();
+      g.fill();
+    }
+
+    // The counters, in the corner of the view: they stay where they are when the camera moves.
     const m = (rec.record.prediction && rec.record.prediction.measured) || {};
     const r = h < 320 ? 17 : 22;
     [
       [t('rv.salto'), salto, m.somersaults, css('--warn')],
       [t('rv.twist'), twist, m.twists, css('--accent')],
     ].forEach(([label, turns, total, color], n) => {
-      const cy = 12 + r + n * (2 * r + 8);
-      dial(g, 12 + r, cy, r, turns, color);
+      const cy2 = 12 + r + n * (2 * r + 8);
+      dial(g, 12 + r, cy2, r, turns, color);
       g.textAlign = 'left';
       g.fillStyle = css('--muted');
       g.font = '11px system-ui';
-      g.fillText(label, 12 + 2 * r + 8, cy - 2);
+      g.fillText(label, 12 + 2 * r + 8, cy2 - 2);
       g.fillStyle = css('--ink');
       g.font = '600 14px system-ui';
       g.fillText(
         (turns == null ? '–' : formatNumber(turns, 2)) + (total == null ? '' : ' / ' + formatNumber(total, 2)),
         12 + 2 * r + 8,
-        cy + 14,
+        cy2 + 14,
       );
     });
 
     g.fillStyle = css('--muted');
     g.font = '13px system-ui';
     g.textAlign = 'left';
-    g.fillText(
-      t('rv.hipsKnees', {
-        hip: Math.round(row[col(seq, 'hip_angle_deg')]),
-        knee: Math.round(row[col(seq, 'knee_angle_deg')]),
-      }),
-      10,
-      h - 10,
-    );
+    if (row)
+      g.fillText(
+        t('rv.hipsKnees', {
+          hip: Math.round(row[col(seq, 'hip_angle_deg')]),
+          knee: Math.round(row[col(seq, 'knee_angle_deg')]),
+        }),
+        10,
+        h - 10,
+      );
+    if (pose.flat) {
+      g.font = '12px system-ui';
+      g.fillStyle = css('--warn');
+      g.fillText(t('rv.flat'), 10, h - 30);
+    }
   }
 
   function draw() {
@@ -799,26 +1102,31 @@ import {
     draw();
   };
   $('resetview').onclick = resetView;
+  document.querySelectorAll('#views button[data-view]').forEach((b) => {
+    b.onclick = () => lookFrom(b.dataset.view);
+  });
+  $('vup').onclick = () => setUpright(!upright);
   const skel = $('skel');
   const pointers = new Map();
   let pinch = null;
+  let moving = false; // the one pointer down moves the view instead of turning it
   const local = (e) => {
     const r = skel.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
   const zoomAt = (p, ratio) => {
-    const w = skel.clientWidth;
-    const h = skel.clientHeight;
-    const k = clamp(view.k * ratio, 0.4, 6);
-    const r = k / view.k;
-    const o = { x: w / 2 + view.x, y: h * ORIGIN_Y + view.y };
-    view.x = p.x - (p.x - o.x) * r - w / 2;
-    view.y = p.y - (p.y - o.y) * r - h * ORIGIN_Y;
-    view.k = k;
+    const k = clamp(cam.k * ratio, 0.4, 6);
+    const r = k / cam.k;
+    const o = { x: skel.clientWidth / 2 + cam.x, y: skel.clientHeight / 2 + cam.y };
+    cam.x = p.x - (p.x - o.x) * r - skel.clientWidth / 2;
+    cam.y = p.y - (p.y - o.y) * r - skel.clientHeight / 2;
+    cam.k = k;
   };
   skel.addEventListener('pointerdown', (e) => {
+    cancelAnimationFrame(glide);
     skel.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, local(e));
+    moving = e.shiftKey || e.button === 1 || e.button === 2;
     skel.classList.add('grabbing');
     pinch = null;
   });
@@ -828,20 +1136,25 @@ import {
     const p = local(e);
     pointers.set(e.pointerId, p);
     if (pointers.size === 1) {
-      view.x += p.x - prev.x;
-      view.y += p.y - prev.y;
+      if (moving) {
+        cam.x += p.x - prev.x;
+        cam.y += p.y - prev.y;
+      } else {
+        cam.yaw += (p.x - prev.x) * 0.4;
+        cam.pitch = clamp(cam.pitch + (p.y - prev.y) * 0.4, -90, 90);
+      }
     } else if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
       if (pinch && pinch.d > 0) {
         zoomAt(mid, d / pinch.d);
-        view.x += mid.x - pinch.mid.x;
-        view.y += mid.y - pinch.mid.y;
+        cam.x += mid.x - pinch.mid.x;
+        cam.y += mid.y - pinch.mid.y;
       }
       pinch = { d, mid };
     }
-    syncReset();
+    syncViews();
     drawSkeleton();
     $('viewhint').hidden = true;
   });
@@ -852,13 +1165,14 @@ import {
   };
   skel.addEventListener('pointerup', release);
   skel.addEventListener('pointercancel', release);
+  skel.addEventListener('contextmenu', (e) => e.preventDefault());
   skel.addEventListener(
     'wheel',
     (e) => {
       e.preventDefault();
       zoomAt(local(e), Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.002)));
       $('viewhint').hidden = true;
-      syncReset();
+      syncViews();
       drawSkeleton();
     },
     { passive: false },
@@ -899,6 +1213,9 @@ import {
     } else if (k === 'arrowright' || k === 'n') step(1);
     else if (k === 'arrowleft' || k === 'p') step(-1);
     else if (k === 'r') resetView();
+    else if (k === 's') lookFrom('side');
+    else if (k === 't') lookFrom('top');
+    else if (k === 'a') setUpright(!upright);
     else if (k === 'escape') document.body.classList.remove('listopen', 'fixopen');
     else if (k === 'u') verdict({ verdict: 'unknown' });
     else if (k === 'b') verdict({ verdict: 'bad-data' });

@@ -69,7 +69,15 @@ export const reviewer: Translation<typeof en> = {
   'rv.noService':
     'Cette version n’a pas de service de vérification configuré (VITE_REVIEW_API_URL et VITE_REVIEW_INGEST_TOKEN).',
   'rv.resetView': 'Recentrer',
-  'rv.viewHint': 'Glisser pour déplacer · molette ou pincement pour zoomer · double-clic pour recentrer',
+  'rv.viewHint':
+    'Glisser pour tourner · Maj + glisser ou deux doigts pour déplacer · molette ou pincement pour zoomer · double-clic pour recentrer',
+  'rv.views': 'Vue',
+  'rv.viewSide': 'Côté',
+  'rv.viewTop': 'Dessus',
+  'rv.viewUpright': 'Tronc droit',
+  'rv.viewUprightHint':
+    'Garde le tronc à la verticale pour lire la vrille : le salto reste sur son cadran. « Dessus » regarde alors depuis le haut de la tête.',
+  'rv.flat': 'Pas de profondeur enregistrée pour ce saut : vue à plat.',
   'rv.salto': 'Salto',
   'rv.twist': 'Vrille',
   'rv.fix': 'Autre figure',
