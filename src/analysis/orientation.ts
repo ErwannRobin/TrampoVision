@@ -44,6 +44,11 @@ export interface OrientationInput {
    * the frames around them.
    */
   ignore?: ArrayLike<number>;
+  /**
+   * Frames where the reading may be turned over (the athlete is in the air). On the bed the body is not turning freely, and a trunk that
+   * is bent double is not a head/feet flip. Default: everywhere.
+   */
+  allowFlip?: ArrayLike<number>;
   /** 0..1 how much each frame's angle can be trusted (trunk visible, not collapsed). Default 1. */
   weight?: ArrayLike<number>;
   /** Wrapped angle of a second direction that should agree with the trunk (ankles to head), and its weight 0..1. */
@@ -122,6 +127,12 @@ export function trackOrientation(input: OrientationInput, options: Partial<Orien
     const here: [Node, Node] = [null as unknown as Node, null as unknown as Node];
     for (const s of [0, 1] as const) {
       const v = m + 180 * s;
+      const barred = s === 1 && input.allowFlip !== undefined && !input.allowFlip[i];
+      if (barred) {
+        // Not a reading this frame may take: it can never be on the best path, and it passes nothing on.
+        here[s] = { cost: Infinity, out: v, steps: [], prevState: 0 };
+        continue;
+      }
       if (k === 0) {
         // Nothing before: the clip is taken as read, and starting flipped has a price.
         here[s] = { cost: (s ? o.flipPenalty : 0) + witnessCost(i, v), out: v, steps: [], prevState: -1 };
