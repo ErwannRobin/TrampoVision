@@ -16,8 +16,6 @@ export const coach: Translation<typeof en> = {
     'Lassen Sie Jev (TypeSafe) diesen Sprung anhand seiner Messwerte klassifizieren und vergleichen Sie die Antwort mit dem lokalen Klassifizierer.',
   'coach.jev.notInBuild':
     'Jev gehört nicht zu dieser Version: Sie wurde ohne VITE_JEV_API_URL gebaut, die App bleibt also lokal.',
-  'coach.jev.key': 'Jev-API-Schlüssel',
-  'coach.jev.keyHint': 'Wird nur in diesem Browser gespeichert und nie Teil der Version.',
   'coach.jev.run': 'Diesen Sprung mit Jev klassifizieren',
   'coach.jev.running': 'Jev wird gefragt…',
   'coach.jev.runAll': 'Alle {n} Sprünge klassifizieren',

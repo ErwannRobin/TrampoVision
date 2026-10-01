@@ -14,8 +14,6 @@ export const coach = {
     'Ask Jev (TypeSafe) to classify this jump from its measurements, then compare its answer with the local classifier.',
   'coach.jev.notInBuild':
     'Jev is not part of this build: it was made without VITE_JEV_API_URL, so the app stays local-only.',
-  'coach.jev.key': 'Jev API key',
-  'coach.jev.keyHint': 'Kept in this browser only. It is never part of the build.',
   'coach.jev.run': 'Classify this jump with Jev',
   'coach.jev.running': 'Asking Jev…',
   'coach.jev.runAll': 'Classify all {n} jumps',

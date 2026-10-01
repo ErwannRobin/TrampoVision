@@ -6,8 +6,8 @@
  *
  * Three exceptions, all set by the build. The review service (VITE_REVIEW_API_URL), when there is one: the analyzed jumps
  * are posted there for a person to check. The asset host (VITE_ASSET_BASE_URL): models, wasm and the sample are
- * only read from it, nothing is sent. And Jev (VITE_JEV_API_URL): measurements of one jump, never a frame, sent only when
- * a person presses the button of the Classification tab. Those three origins are the only others let through.
+ * only read from it, nothing is sent. And Jev (VITE_JEV_API_URL), which is `/api/jev` on this origin (a function that holds
+ * the key) and needs no exception; only an absolute URL there adds an origin. Those are the only others let through.
  */
 const originOf = (value: string | undefined): string | null => {
   try {

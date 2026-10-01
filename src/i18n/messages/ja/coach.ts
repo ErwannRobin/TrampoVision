@@ -15,8 +15,6 @@ export const coach: Translation<typeof en> = {
   'coach.jev.intro': 'Jev（TypeSafe）にこのジャンプを測定値から分類してもらい、ローカル分類器の答えと比べます。',
   'coach.jev.notInBuild':
     'このビルドには Jev が含まれていません。VITE_JEV_API_URL なしで作られたため、アプリはローカルのままです。',
-  'coach.jev.key': 'Jev の API キー',
-  'coach.jev.keyHint': 'このブラウザにだけ保存され、ビルドには含まれません。',
   'coach.jev.run': 'このジャンプを Jev で分類',
   'coach.jev.running': 'Jev に問い合わせ中…',
   'coach.jev.runAll': '{n} 本のジャンプをすべて分類',

@@ -2,8 +2,9 @@
  * Minimal client for TypeSafe's Jev ("System One" decision model): typed questions over a piece of state, answered with probabilities.
  * https://docs.typesafe.ai/api.md
  *
- * Only measurements are ever sent (see `state.ts`), never a video or a frame. The app's browser build does not use this: its
- * local-only guard refuses cross-origin requests, and an API key must not ship in a bundle. It runs from Node (`scripts/jev-eval.ts`).
+ * Only measurements are ever sent (see `state.ts`), never a video or a frame. Two callers: Node with the key (`scripts/jev-eval.ts`),
+ * and the browser through the Vercel function `api/jev/systemone.ts`, which holds the key (`baseUrl` = VITE_JEV_API_URL, no `apiKey`):
+ * an API key must not ship in a bundle.
  */
 
 export const JEV_BASE_URL = 'https://api.typesafe.ai/v1';
@@ -32,7 +33,8 @@ export interface JevResponse {
 }
 
 export interface JevClientOptions {
-  apiKey: string;
+  /** Absent when `baseUrl` is the app's own function, which adds the key on the server. */
+  apiKey?: string;
   baseUrl?: string;
   model?: string;
   /** Injectable for tests. */
@@ -66,7 +68,7 @@ export async function jevSystemOne(
     try {
       res = await doFetch(`${o.baseUrl ?? JEV_BASE_URL}/systemone`, {
         method: 'POST',
-        headers: { authorization: `Bearer ${o.apiKey}`, 'content-type': 'application/json' },
+        headers: { ...(o.apiKey ? { authorization: `Bearer ${o.apiKey}` } : {}), 'content-type': 'application/json' },
         body,
         signal: AbortSignal.timeout(o.timeoutMs ?? 15_000),
       });

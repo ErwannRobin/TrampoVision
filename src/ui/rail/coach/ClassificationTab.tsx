@@ -6,8 +6,7 @@ import { classifyWithJev, type JevResult } from '../../../skills/jev/classify';
 import type { JevClientOptions } from '../../../skills/jev/client';
 import type { JumpSkillResult } from '../../../skills/types';
 import { pct } from '../../format';
-import { useLocalStorage } from '../../hooks';
-import { Badge, Banner, Button, Field } from '../../kit';
+import { Badge, Banner, Button } from '../../kit';
 import { compareLines } from './jevCompare';
 import { Group } from './parts';
 import { skillName } from '../../insights';
@@ -17,9 +16,8 @@ interface Props {
   selected: number;
 }
 
-/** Where the browser may call Jev: the build says so (VITE_JEV_API_URL), or the tab only explains. */
+/** Where the browser asks Jev: the build says so (VITE_JEV_API_URL, the app's own `/api/jev`, which holds the key), or the tab only explains. */
 const JEV_URL = (import.meta.env.VITE_JEV_API_URL as string | undefined) || null;
-const KEY_STORAGE = 'trampovision.jevKey';
 
 type Run = { state: 'running' } | { state: 'done'; result: JevResult };
 
@@ -36,11 +34,9 @@ const nameOf = (id: string | null) => {
  * the person looks at a jump, and what is sent is the measurements of that jump, never a frame.
  */
 export function ClassificationTab({ skills, selected }: Props) {
-  const [apiKey, setApiKey] = useLocalStorage<string>(KEY_STORAGE, '');
   const [, redraw] = useState(0);
   const j = skills.jumps[Math.min(selected, skills.jumps.length - 1)];
-  const key = apiKey.trim();
-  const client: JevClientOptions | null = JEV_URL && key ? { apiKey: key, baseUrl: JEV_URL } : null;
+  const client: JevClientOptions | null = JEV_URL ? { baseUrl: JEV_URL } : null;
 
   const ask = async (jumps: JumpSkillResult[]) => {
     if (!client) return;
@@ -70,17 +66,6 @@ export function ClassificationTab({ skills, selected }: Props) {
       <section className="coach__lead">
         <p className="coach__para">{t('coach.jev.intro')}</p>
         {!JEV_URL && <Banner tone="warning">{t('coach.jev.notInBuild')}</Banner>}
-        <Field label={t('coach.jev.key')} hint={t('coach.jev.keyHint')}>
-          <input
-            className="input"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={apiKey}
-            disabled={!JEV_URL}
-            onChange={(e) => setApiKey(e.target.value)}
-          />
-        </Field>
         <div className="coach__actions">
           <Button
             size="sm"
