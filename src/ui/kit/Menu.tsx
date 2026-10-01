@@ -27,12 +27,14 @@ interface Props {
   iconOnly?: boolean;
   groups: MenuGroupDef[];
   align?: 'start' | 'end';
+  /** Open above the trigger, for a trigger at the bottom of a scrolling area that would clip the list. */
+  up?: boolean;
   variant?: ButtonVariant;
   size?: 'sm' | 'md' | 'lg';
 }
 
 /** A button that opens a list of actions. Escape and an outside press close it; arrows move through the items. */
-export function Menu({ label, icon, iconOnly, groups, align = 'end', variant = 'secondary', size = 'md' }: Props) {
+export function Menu({ label, icon, iconOnly, groups, align = 'end', up, variant = 'secondary', size = 'md' }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -94,7 +96,7 @@ export function Menu({ label, icon, iconOnly, groups, align = 'end', variant = '
           id={id}
           role="menu"
           aria-label={label}
-          className={`menu__panel menu__panel--${align}`}
+          className={`menu__panel menu__panel--${align}${up ? ' menu__panel--up' : ''}`}
           onKeyDown={onKeyDown}
         >
           {groups.map((g, gi) => (

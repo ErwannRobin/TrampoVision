@@ -4,7 +4,18 @@ import { POSE_ENGINES } from '../../pose/engines';
 import type { ModelVariant, Point, PoseEngineId } from '../../pose/types';
 import { t, useLocale } from '../../i18n';
 import { setupState } from './setupState';
-import { Button, Field, Icon, IconButton, NumberField, Segmented, SelectField, Switch, type IconName } from '../kit';
+import {
+  Button,
+  Field,
+  Icon,
+  IconButton,
+  Menu,
+  NumberField,
+  Segmented,
+  SelectField,
+  Switch,
+  type IconName,
+} from '../kit';
 import { syncStatusText } from '../../sync/reviewSync';
 import type { SyncState } from '../../sync/useReviewSync';
 import type { Sample } from '../../video/sample';
@@ -456,17 +467,25 @@ export function SettingsDialog(props: SettingsDialogProps) {
                         />
                       </label>
                     </Field>
-                    {props.samples.map((sample) => (
-                      <Button
-                        key={sample.id}
-                        variant="secondary"
+                    {props.samples.length > 0 && (
+                      <Menu
+                        label={t('landing.sample')}
                         icon="film"
-                        disabled={state.engineLocked}
-                        onClick={() => props.onSample(sample.path)}
-                      >
-                        {sample.label}
-                      </Button>
-                    ))}
+                        align="start"
+                        up
+                        groups={[
+                          {
+                            id: 'samples',
+                            items: props.samples.map((sample) => ({
+                              id: sample.id,
+                              label: sample.label,
+                              disabled: state.engineLocked,
+                              onSelect: () => props.onSample(sample.path),
+                            })),
+                          },
+                        ]}
+                      />
+                    )}
                   </Block>
                 )}
               </Group>
