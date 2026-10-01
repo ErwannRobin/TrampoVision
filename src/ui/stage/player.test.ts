@@ -116,6 +116,30 @@ describe('createPlayer', () => {
     expect(video.paused).toBe(false);
   });
 
+  it('a boomerang range goes back to its start after the end, and stops there', () => {
+    const video = fakeVideo();
+    const player = createPlayer(video, FPS);
+    player.playRange(2, 4, false, true);
+    video.currentTime = 4.01;
+    player.tick(0);
+    expect(player.isReversing()).toBe(true);
+    for (let i = 0; i < 20; i++) player.tick(i * 1000);
+    expect(player.isReversing()).toBe(false);
+    expect(video.currentTime).toBeCloseTo(middleOf(60), 6);
+    expect(video.paused).toBe(true);
+  });
+
+  it('a looping boomerang plays forward again once it is back', () => {
+    const video = fakeVideo();
+    const player = createPlayer(video, FPS);
+    player.playRange(2, 4, true, true);
+    video.currentTime = 4.01;
+    player.tick(0);
+    for (let i = 0; i < 20; i++) player.tick(i * 1000);
+    expect(player.isReversing()).toBe(false);
+    expect(video.paused).toBe(false);
+  });
+
   it('ends a range before the clip does', () => {
     const video = fakeVideo({ duration: 5 });
     const player = createPlayer(video, FPS);

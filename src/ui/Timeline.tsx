@@ -48,6 +48,8 @@ export interface TimelineProps {
   onPlayJump: () => void;
   loop: boolean;
   onLoop: (loop: boolean) => void;
+  boomerang: boolean;
+  onBoomerang: (boomerang: boolean) => void;
   /** Where the routine starts: the jump and its time (null: no start), the detected jump, and a way to change it. */
   routine: {
     jump: number | null;
@@ -105,6 +107,8 @@ export function Timeline({
   onStepJump,
   onPlayJump,
   loop,
+  boomerang,
+  onBoomerang,
   onLoop,
   routine,
 }: TimelineProps) {
@@ -337,6 +341,14 @@ export function Timeline({
             pressed={loop}
             disabled={selected === null}
             onClick={() => onLoop(!loop)}
+          />
+          <IconButton
+            icon="boomerang"
+            label={t('tl.boomerang')}
+            size="sm"
+            pressed={boomerang}
+            disabled={selected === null}
+            onClick={() => onBoomerang(!boomerang)}
           />
           <Menu
             label={t('tl.routine')}

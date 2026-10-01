@@ -177,6 +177,7 @@ export default function App() {
   const [clipSize, setClipSize] = useState<Size | null>(null);
   const openedSeries = useRef(false);
   const [loop, setLoop] = useState(false);
+  const [boomerang, setBoomerang] = useState(false);
   // The video whose analysis starts by itself once it is ready (the live view).
   const [autoUrl, setAutoUrl] = useState<string | null>(null);
 
@@ -329,14 +330,24 @@ export default function App() {
   const selectedRef = useRef(0);
   selectedRef.current = jumpSel;
   // The review mode loops one jump and keeps it selected: the run-up and the landing must not move the selection.
+  // "Play jump" keeps its jump selected while the playhead stays in its range, even after it stops: the run-up and
+  // the landing can touch the neighbouring jumps. Moving out of the range (scrub, normal play) frees the selection.
+  const rangeLock = useRef<{ from: number; to: number } | null>(null);
   useEffect(() => {
     if (!result || reviewOpen) return;
     const unsubscribe = playhead.subscribe(() => {
-      const idx = result.jumps.cycleIndex[sampleIndexAt(result.meta, playhead.getSnapshot())];
+      const t = playhead.getSnapshot();
+      const lock = rangeLock.current;
+      if (lock) {
+        if (t >= lock.from - 0.1 && t <= lock.to + 0.1) return;
+        rangeLock.current = null;
+      }
+      const idx = result.jumps.cycleIndex[sampleIndexAt(result.meta, t)];
       if (idx >= 0 && idx !== selectedRef.current) setSelectedJump(idx);
     });
     return () => {
       unsubscribe();
+      rangeLock.current = null;
     };
   }, [result, playhead, reviewOpen]);
 
@@ -355,7 +366,12 @@ export default function App() {
   /** Play the selected jump with a little run-up and landing. */
   const playJump = () => {
     const c = result?.jumps.cycles[jumpSel];
-    if (c) playhead.playRange((c.takeoffTimeS ?? c.apexTimeS) - 0.4, (c.landingTimeS ?? c.apexTimeS) + 0.3, loop);
+    if (!c) return;
+    // Looping starts right at takeoff and a boomerang turns right at landing; a single play keeps the run-up and landing.
+    const from = (c.takeoffTimeS ?? c.apexTimeS) - (loop ? 0 : 0.4);
+    const to = (c.landingTimeS ?? c.apexTimeS) + (boomerang ? 0 : 0.3);
+    rangeLock.current = { from, to };
+    playhead.playRange(from, to, loop, boomerang);
   };
 
   // [ and ] go to the previous and next jump.
@@ -1268,6 +1284,8 @@ export default function App() {
                     onPlayJump={playJump}
                     loop={loop}
                     onLoop={setLoop}
+                    boomerang={boomerang}
+                    onBoomerang={setBoomerang}
                     routine={{
                       jump: routineJump,
                       startS: routineStartS,
