@@ -255,6 +255,7 @@ export function computeAnalysis(
     trunkAngle: trunk,
     lineAngle: line,
     orientation,
+    orientationFlipped: tracked.flipped,
     lineOrientation,
     rotation,
     angularVelocity,

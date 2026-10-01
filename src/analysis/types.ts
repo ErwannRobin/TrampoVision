@@ -137,6 +137,8 @@ export interface AnalysisResult {
   lineAngle: Float64Array;
   /** Continuous body orientation (trunk angle unwrapped): 350 → 355 → 360 → 365, never back to 0. */
   orientation: Float64Array;
+  /** 1 where the trunk angle of a frame was read 180° away from the pose model's (a head/feet flip put back by the orientation tracker). */
+  orientationFlipped: Uint8Array;
   /** Body-line (ankles→head) angle made continuous like `orientation`. */
   lineOrientation: Float64Array;
   /** Cumulative trunk rotation, degrees, relative to the first valid sample. */
