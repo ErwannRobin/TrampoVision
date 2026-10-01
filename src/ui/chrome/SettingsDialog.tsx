@@ -464,7 +464,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
                         disabled={state.engineLocked}
                         onClick={() => props.onSample(sample.path)}
                       >
-                        {t(sample.label)}
+                        {sample.label}
                       </Button>
                     ))}
                   </Block>

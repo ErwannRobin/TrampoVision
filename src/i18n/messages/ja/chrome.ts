@@ -48,8 +48,6 @@ export const chrome: Translation<typeof en> = {
     '演技を撮影すると、TrampoVision が各技を判定し、難度を計算し、演技点を提案して、直すべき点を教えます。処理はすべてお使いの端末上で行われます。',
   'landing.film': '演技を撮影',
   'landing.choose': '動画を選択',
-  'sample.portrait': 'サンプル動画（縦）',
-  'sample.landscape': 'サンプル動画（横）',
   'landing.drop': 'または、このページのどこかに動画をドロップ',
   'landing.openSaved': '保存した解析を開く',
   'landing.review': 'ジャンプを確認',

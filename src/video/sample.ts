@@ -1,20 +1,19 @@
 import { assetBase } from '../assets';
-import { t, type StringKey } from '../i18n/core';
+import { t } from '../i18n/core';
 
 /**
  * The sample videos are not part of the build (they would be copied into every deployment). They are read from the
- * asset host (samples/, see src/assets.ts), and only one is fetched, when requested. Without an asset host there is
- * no sample and the button is hidden. The browser gets the file it decodes natively: the iPhone .mov in Safari, the
- * H.264 .mp4 elsewhere (desktop Chrome cannot decode the HEVC .mov without a slow in-browser conversion).
+ * asset host (samples/, see src/assets.ts), and only one is fetched, when requested. The list is not hard-coded:
+ * `npm run upload-assets` writes samples/index.json (the file names in the store), read once at startup. Files that
+ * share a name and differ by extension are one clip (IMG_8368.mp4 and IMG_8368.MOV), and the browser gets the one it
+ * decodes natively: the iPhone .mov in Safari, the H.264 .mp4 elsewhere (desktop Chrome cannot decode the HEVC .mov
+ * without a slow in-browser conversion). Without an asset host, or without that index, there is no sample and the
+ * button is hidden.
  */
-const SAMPLE_CLIPS: { id: string; label: StringKey; files: string[] }[] = [
-  { id: 'portrait', label: 'sample.portrait', files: ['IMG_8368.mp4', 'IMG_8368.MOV'] },
-  { id: 'landscape', label: 'sample.landscape', files: ['dong-dong-2011-landscape.mp4'] },
-];
-
 export interface Sample {
   id: string;
-  label: StringKey;
+  /** The file name without its extension, spaces for underscores and dashes: "dong-dong_2011" reads "dong dong 2011". */
+  label: string;
   path: string;
 }
 
@@ -40,13 +39,45 @@ export function pickSample(paths: string[], userAgent?: string, maxTouchPoints?:
   return sorted.find((p) => extensionOf(p) === preferred) ?? sorted.find((p) => extensionOf(p) === 'mp4') ?? null;
 }
 
-/** The sample clips, each with the file suited to this browser. Empty without an asset host. */
-export const samples: Sample[] = assetBase
-  ? SAMPLE_CLIPS.flatMap(({ id, label, files }) => {
-      const path = pickSample(files.map((file) => `${assetBase}samples/${file}`));
-      return path ? [{ id, label, path }] : [];
-    })
-  : [];
+const VIDEO_FILE = /\.(mp4|mov)$/i;
+
+/** Groups the file names by clip (same name, different extension) and picks, for each, the file suited to this browser. */
+export function samplesFromFiles(base: string, files: string[], userAgent?: string, maxTouchPoints?: number): Sample[] {
+  const clips = new Map<string, string[]>();
+  for (const file of files.filter((f) => VIDEO_FILE.test(f))) {
+    const id = file.slice(0, file.lastIndexOf('.'));
+    clips.set(id, [...(clips.get(id) ?? []), file]);
+  }
+  return [...clips]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .flatMap(([id, names]) => {
+      const path = pickSample(
+        names.map((name) => `${base}samples/${encodeURIComponent(name)}`),
+        userAgent,
+        maxTouchPoints,
+      );
+      return path ? [{ id, label: id.replace(/[_-]+/g, ' ').trim(), path }] : [];
+    });
+}
+
+/** The sample clips on the asset host. Empty without an asset host, or when its index is missing or unreadable. */
+export async function loadSamples(): Promise<Sample[]> {
+  if (!assetBase) return [];
+  try {
+    const response = await fetch(`${assetBase}samples/index.json`);
+    if (!response.ok) return [];
+    const index: unknown = await response.json();
+    const files = index && typeof index === 'object' ? (index as { files?: unknown }).files : null;
+    return Array.isArray(files)
+      ? samplesFromFiles(
+          assetBase,
+          files.filter((f): f is string => typeof f === 'string'),
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 /** Downloads the sample into a File, so it goes through the same path as a user-selected file. */
 export async function loadSample(path: string, onProgress?: (fraction: number) => void): Promise<File> {

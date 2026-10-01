@@ -45,7 +45,7 @@ import { buildPoseSeries, parsePoseSeries, toSeriesJson, type ParsedSeries } fro
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point, PoseEngineId } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
-import { loadSample, samples } from './video/sample';
+import { loadSample, loadSamples, type Sample } from './video/sample';
 import { dragHasFiles, pickDroppedVideo } from './video/drop';
 import { transcodeToH264 } from './video/transcode';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
@@ -123,6 +123,7 @@ export default function App() {
   // Text made while analyzing (skill names, tips, warnings) follows the language: it is made again when the language changes.
   const locale = useLocale();
   const [url, setUrl] = useState<string | null>(null);
+  const [samples, setSamples] = useState<Sample[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [fps, setFps] = useState(30);
   const [model, setModel] = useState<ModelVariant>('full');
@@ -316,6 +317,14 @@ export default function App() {
   const notes = useMemo(() => (result ? analysisWarnings(result) : []), [result, locale]); // oxlint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => abort.current?.abort(), []);
+
+  useEffect(() => {
+    let live = true;
+    void loadSamples().then((found) => live && setSamples(found));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // A new analysis starts at the first jump.
   const firstSkillPending = useRef(false);

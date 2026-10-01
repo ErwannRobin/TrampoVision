@@ -112,7 +112,7 @@ export function Landing({ onFile, samples, onSample, onOpenSeries, dataset, rece
                 disabled={busy}
                 onClick={() => onSample(sample.path)}
               >
-                {t(sample.label)}
+                {sample.label}
               </Button>
             ))}
           </div>

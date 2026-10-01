@@ -55,8 +55,6 @@ export const chrome = {
     'Film a set. TrampoVision names each skill, works out its difficulty, proposes an execution score and tells you what to fix. It runs on your device.',
   'landing.film': 'Film a set',
   'landing.choose': 'Choose a video',
-  'sample.portrait': 'Sample video (portrait)',
-  'sample.landscape': 'Sample video (landscape)',
   'landing.drop': 'or drop a video anywhere on this page',
   'landing.openSaved': 'Open a saved analysis',
   'landing.review': 'Review jumps',
