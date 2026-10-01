@@ -2,10 +2,18 @@ import { t } from '../i18n/core';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
 import { elementName } from '../skills/fig/elements';
 import { legacyId } from '../skills/hierarchical';
-import type { Session } from './session';
+import type { LiveJump, Session } from './session';
 
 /** The name shown for a jump a person says is none of the elements of the list. */
 export const otherLabel = (): string => t('live.other');
+
+/** The name of a jump as the live view says it: the coach's label, else the guess (with a question mark when it is a tentative one). */
+export function jumpName(j: LiveJump): string {
+  if (j.other) return otherLabel();
+  if (!j.element) return j.complete ? t('live.notNamed') : t('live.cutOff');
+  const name = elementName(j.element);
+  return j.source === 'auto' && j.certainty === 'tentative' ? `${name}?` : name;
+}
 
 /**
  * The skills as people see them on the video and on the timeline: each jump carries the name the session settled on (the coach's

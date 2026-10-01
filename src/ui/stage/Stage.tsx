@@ -22,7 +22,10 @@ import type { Playhead } from '../playhead';
 import type { StageView } from '../types';
 import { clipOrientation, DEFAULT_RATIO, fitRatio, portraitStageWidth, splitLayout, type Box, type Size } from './fit';
 import { createClockVideo } from './clockVideo';
+import { FullscreenHud } from './FullscreenHud';
+import type { HudJump } from './hud';
 import { createPlayer } from './player';
+import { useScrub } from './scrub';
 
 export interface StageProps {
   /** The video; null when only saved data is open (the stage then invites the user to add the matching clip). */
@@ -59,6 +62,17 @@ export interface StageProps {
   others?: OtherAthlete[];
   /** The 3D skeleton, shown next to the video (split) or instead of it (3d). */
   pane?: ReactNode;
+  /**
+   * The full screen (a phone held in the hand): only the picture, the skill under the playhead and a slim bar, and a swipe right or
+   * left moves the video. Undefined = no full screen button.
+   */
+  fullscreen?: {
+    jumps: HudJump[];
+    /** The jump under the playhead. */
+    selected: number;
+    onJump: (delta: -1 | 1) => void;
+    onSpeed: (speed: number) => void;
+  };
   /** Layers above the video (busy state, calibration bar): each positions itself absolutely inside the stage. */
   children?: ReactNode;
 }
@@ -84,6 +98,8 @@ const PICK_RADIUS_PX = 16;
 /** Space between the video and the pane in the split view. */
 const SPLIT_GAP_PX = 12;
 const NO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
+/** How long the hint about swiping stays up when the full screen opens. */
+const HINT_MS = 3500;
 
 const viewOptions = () =>
   [
@@ -121,6 +137,7 @@ export function Stage({
   athletes,
   others = NO_OTHERS,
   pane,
+  fullscreen,
   children,
 }: StageProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -156,9 +173,66 @@ export function Stage({
     return () => onClipSize?.(null);
   }, [onClipSize, clipWidth, clipHeight]);
 
+  // The full screen: the same stage, fixed over the page (the <video> is never remounted), and the browser's own full screen where it has one.
+  const [full, setFull] = useState(false);
+  const [swiping, setSwiping] = useState(false);
+  const [hint, setHint] = useState(false);
+  // Only with a video and its analysis: what the full screen shows is the analysis.
+  const canFull = !!fullscreen && !!url && !!result;
+  const isFull = full && canFull;
+  const enterFull = () => {
+    setFull(true);
+    // Not every browser can (a phone's Safari cannot for anything but a video): the fixed stage is the full screen then.
+    void Promise.resolve(viewportRef.current?.requestFullscreen?.()).catch(() => undefined);
+  };
+  const exitFull = useCallback(() => {
+    setFull(false);
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (!isFull) return;
+    const root = document.documentElement;
+    root.dataset.stageFullscreen = '';
+    setHint(true);
+    const timer = window.setTimeout(() => setHint(false), HINT_MS);
+    const viewport = viewportRef.current;
+    viewport?.querySelector<HTMLElement>('[data-fs-close]')?.focus();
+    // The browser's own way out (Escape, the back gesture) must bring the stage back as well.
+    const onChange = () => {
+      if (!document.fullscreenElement) setFull(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') exitFull();
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      delete root.dataset.stageFullscreen;
+      window.clearTimeout(timer);
+      document.removeEventListener('fullscreenchange', onChange);
+      window.removeEventListener('keydown', onKey);
+      setSwiping(false);
+      viewport?.querySelector<HTMLElement>('[data-fs-open]')?.focus();
+    };
+  }, [isFull, exitFull]);
+  // Gone with the video (a new clip, saved data only): leave the browser's full screen too.
+  useEffect(() => {
+    if (!canFull && document.fullscreenElement === viewportRef.current)
+      void document.exitFullscreen().catch(() => undefined);
+  }, [canFull]);
+  const onSwipe = useCallback((on: boolean) => {
+    setSwiping(on);
+    if (on) setHint(false);
+  }, []);
+  const toggleOnTap = useCallback(() => playhead.toggle(), [playhead]);
+  const scrub = useScrub({ enabled: isFull, playhead, onTap: toggleOnTap, onSwipe });
+  // The labels are drawn by the full screen itself, in the page's type, where a finger does not cover them.
+  const shownOverlay = useMemo(() => (isFull ? { ...overlay, hud: false } : overlay), [overlay, isFull]);
+
   // Where the video goes: the whole viewport, or its share of the split view; in 3D it stays mounted but hidden.
   const layout = useMemo(() => {
-    if (view === 'video' || !pane) return { video: fitRatio(ratio, size), pane: NO_BOX, hidden: false, stacked: false };
+    if (view === 'video' || !pane || isFull)
+      return { video: fitRatio(ratio, size), pane: NO_BOX, hidden: false, stacked: false };
     if (view === '3d') {
       return {
         video: fitRatio(ratio, size),
@@ -169,14 +243,32 @@ export function Stage({
     }
     const split = splitLayout(size, ratio, SPLIT_GAP_PX);
     return { video: split.video, pane: split.pane, hidden: false, stacked: split.direction === 'column' };
-  }, [view, pane, ratio, size]);
+  }, [view, pane, ratio, size, isFull]);
 
   // The latest inputs for the animation loop, which must not restart on every change.
-  const live = useRef({ result, skills, overlay, fps, calibration, box: layout.video, hidden: layout.hidden, others });
-  live.current = { result, skills, overlay, fps, calibration, box: layout.video, hidden: layout.hidden, others };
+  const live = useRef({
+    result,
+    skills,
+    overlay: shownOverlay,
+    fps,
+    calibration,
+    box: layout.video,
+    hidden: layout.hidden,
+    others,
+  });
+  live.current = {
+    result,
+    skills,
+    overlay: shownOverlay,
+    fps,
+    calibration,
+    box: layout.video,
+    hidden: layout.hidden,
+    others,
+  };
   useEffect(() => {
     dirty.current = true;
-  }, [result, skills, overlay, calibration, layout.video, layout.hidden, others]);
+  }, [result, skills, shownOverlay, calibration, layout.video, layout.hidden, others]);
 
   // The player bus: everything else in the interface drives the video through these.
   useEffect(() => {
@@ -391,11 +483,12 @@ export function Stage({
   const editing = !!calibration?.editing;
   /** A click or a tap on the picture plays or pauses, at once; while the bed is being outlined a click places a corner instead. */
   const onFrameClick = (e: MouseEvent<HTMLDivElement>) => {
-    if (editing || (e.target as HTMLElement).closest('.stage__pick')) return;
+    // The full screen has its own tap (`useScrub`), which also works on the letterbox.
+    if (isFull || editing || (e.target as HTMLElement).closest('.stage__pick')) return;
     playhead.toggle();
   };
   const frame = layout.video;
-  const showPane = !!pane && view !== 'video';
+  const showPane = !!pane && view !== 'video' && !isFull;
   // In the wide layout a portrait clip has a stage of its own width (shell.css) instead of a black one: it says how wide.
   const portraitWidth = portrait ? portraitStageWidth(ratio, size.height) : 0;
 
@@ -405,6 +498,9 @@ export function Stage({
       ref={viewportRef}
       role="region"
       aria-label={t('stage.region')}
+      data-fullscreen={isFull || undefined}
+      data-swiping={swiping || undefined}
+      {...scrub}
       style={portraitWidth > 0 ? ({ '--stage-w': `${portraitWidth}px` } as CSSProperties) : undefined}
     >
       {url ? (
@@ -501,7 +597,7 @@ export function Stage({
         </div>
       )}
 
-      {athletes && (
+      {athletes && !isFull && (
         <div className="stage__views stage__athletes">
           <Segmented<string>
             ariaLabel={t('stage.athletes')}
@@ -520,7 +616,7 @@ export function Stage({
         </div>
       )}
 
-      {onView && (
+      {onView && !isFull && (
         <div className="stage__views">
           <Segmented<StageView>
             ariaLabel={t('stage.views')}
@@ -532,6 +628,50 @@ export function Stage({
             )}
           />
         </div>
+      )}
+
+      {canFull && !isFull && !editing && (
+        <button
+          type="button"
+          className="icon-btn icon-btn--solid stage__expand"
+          data-fs-open
+          aria-label={t('fs.enter')}
+          onClick={enterFull}
+        >
+          <svg
+            className="icon"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <polyline points="4 9 4 4 9 4" />
+            <polyline points="20 9 20 4 15 4" />
+            <polyline points="4 15 4 20 9 20" />
+            <polyline points="20 15 20 20 15 20" />
+          </svg>
+        </button>
+      )}
+
+      {isFull && fullscreen && (
+        <FullscreenHud
+          playhead={playhead}
+          fps={fps}
+          speed={speed}
+          onSpeed={fullscreen.onSpeed}
+          jumps={fullscreen.jumps}
+          selected={fullscreen.selected}
+          onJump={fullscreen.onJump}
+          onClose={exitFull}
+          swiping={swiping}
+          hint={hint}
+        />
       )}
 
       <div className="stage__layer">{children}</div>

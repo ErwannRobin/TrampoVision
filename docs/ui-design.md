@@ -220,6 +220,18 @@ Files: `Stage.tsx`, `Transport.tsx`, `ProcessingOverlay.tsx`, `CalibrationBar.ts
   (pick radius 16px, pointer capture). Space toggles (Shift + Space plays backwards), arrows step one frame (Shift: ten), except
   when focus is in an input, select, textarea or button. A click or a tap on the picture toggles playback at once, except while the
   bed is being outlined (a click places a corner). Install and clean up every `playhead` handler; call `setPlaying` and `setDuration`.
+- **Full screen** (`FullscreenHud.tsx`, `scrub.ts`, `hud.ts`; `StageProps.fullscreen`): a button at the bottom right of the picture, once there is a
+  video and its analysis. The same `.stage` (the `<video>` is never remounted) is fixed over the page (`html[data-stage-fullscreen]`
+  lifts its column above the top bar and stops the page scrolling) and asks the browser for its own full screen where there is one
+  (a phone's Safari has none for anything but a video, so the fixed stage is the full screen there). Only the video is shown, with the
+  skeleton and the center of mass as chosen but not the labels, and one layer of its own: top, the way out and the skill under the
+  playhead (its place in the set, its name with a dashed underline when it is a guess, difficulty and execution deduction, the same
+  numbers as the live rail); bottom, a slim seek bar and play, previous and next skill, and the speed (it cycles through `SPEEDS`).
+  **A swipe right or left on the picture moves the video** (`useScrub`): the video pauses while the finger is down, a drag across
+  the screen is a few seconds (`SCRUB_SPAN_S`, at most `SCRUB_REFERENCE_PX` wide so a wide screen is not touchier), each seek lands on
+  a whole frame, the time is shown large in the middle meanwhile, and a video that was playing goes on from where the finger left it.
+  A tap plays or pauses, an up or down move is left alone, and the controls are excluded (`data-stage-control`). The page's busy and
+  ready panels are hidden while it is open. Escape and the browser's own way out close it.
 - `view`: `video` (default), `split` (video and `pane` side by side when the viewport is wide, stacked when tall),
   `3d` (the `pane` fills it; keep the `<video>` mounted but hidden so playback and seeking continue). When `onView` is
   given, show a small translucent segmented switcher (video, split, cube icons) at the top right of the viewport.

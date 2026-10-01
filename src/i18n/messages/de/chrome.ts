@@ -218,6 +218,13 @@ export const chrome: Translation<typeof en> = {
   'stage.view3d': '3D',
   'stage.view3dTitle': 'Nur das 3D-Skelett (experimentell)',
   'stage.noVideo': 'Eine gespeicherte Analyse enthält kein Video',
+  'fs.enter': 'Vollbild',
+  'fs.exit': 'Vollbild schließen',
+  'fs.jump': 'Sprung {n} von {total}',
+  'fs.seek': 'Position im Video',
+  'fs.prevJump': 'Vorheriger Sprung',
+  'fs.nextJump': 'Nächster Sprung',
+  'fs.hint': 'Nach links oder rechts wischen, um durch das Video zu gehen',
 
   'transport.back10': '10 Bilder zurück (Umschalt + ←)',
   'transport.prev': 'Vorheriges Bild (←)',
