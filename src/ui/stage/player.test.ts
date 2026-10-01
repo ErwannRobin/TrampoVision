@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { createPlayer, frameCount } from './player';
 
 /** A video that only remembers what it was told: 10 s long, paused at the start. */
-function fakeVideo(over: { duration?: number; currentTime?: number; paused?: boolean; ended?: boolean } = {}) {
+function fakeVideo(
+  over: { duration?: number; currentTime?: number; paused?: boolean; ended?: boolean; seeking?: boolean } = {},
+) {
   const video = {
     currentTime: 0,
     duration: 10,
@@ -143,5 +145,109 @@ describe('createPlayer', () => {
     video.currentTime = 4.02;
     player.tick();
     expect(video.pause).toHaveBeenCalled();
+  });
+});
+
+describe('reverse play', () => {
+  /** A player at 1 s into the clip that is playing backwards, and a way to say how many seconds went by. */
+  function reversing(over: Parameters<typeof fakeVideo>[0] = {}, rate = 1) {
+    const video = fakeVideo({ currentTime: middleOf(30), ...over });
+    const states: boolean[] = [];
+    const player = createPlayer(video, FPS, { rate: () => rate, onReverse: (a) => states.push(a) });
+    player.reverse();
+    let now = 1000;
+    player.tick(now); // the first tick only starts the clock
+    return {
+      video,
+      player,
+      states,
+      /** Time goes by in animation frames of 20 ms. */
+      after: (seconds: number) => {
+        for (let i = 0; i < Math.round(seconds / 0.02); i++) {
+          now += 20;
+          player.tick(now);
+        }
+      },
+    };
+  }
+
+  it('pauses the video and walks it back at the playback speed', () => {
+    const { video, player, states, after } = reversing();
+    expect(video.pause).toHaveBeenCalled();
+    expect(states).toEqual([true]);
+    expect(player.isReversing()).toBe(true);
+    after(0.5);
+    expect(video.currentTime).toBeCloseTo(middleOf(15), 6);
+    after(0.2);
+    expect(video.currentTime).toBeCloseTo(middleOf(9), 6);
+    expect(video.play).not.toHaveBeenCalled();
+  });
+
+  it('follows the speed that is chosen', () => {
+    const { video, after } = reversing({}, 0.5);
+    after(0.5);
+    expect(video.currentTime).toBeCloseTo(middleOf(23), 6);
+  });
+
+  it('keeps time while the decoder is busy instead of falling behind', () => {
+    const { video, after } = reversing({ seeking: true });
+    after(0.3);
+    expect(video.currentTime).toBeCloseTo(middleOf(30), 6);
+    video.seeking = false;
+    after(0.1);
+    expect(video.currentTime).toBeCloseTo(middleOf(18), 6);
+  });
+
+  it('does not seek again for a frame it already shows', () => {
+    const { video, after } = reversing();
+    const before = video.currentTime;
+    after(0.001);
+    expect(video.currentTime).toBe(before);
+  });
+
+  it('stops on the first frame', () => {
+    const { video, player, states, after } = reversing({ currentTime: middleOf(3) });
+    after(0.5);
+    expect(video.currentTime).toBeCloseTo(middleOf(0), 6);
+    expect(player.isReversing()).toBe(false);
+    expect(states).toEqual([true, false]);
+  });
+
+  it('starts over from the last frame when it is asked for on the first one', () => {
+    const video = fakeVideo({ currentTime: middleOf(0) });
+    const player = createPlayer(video, FPS);
+    player.reverse();
+    expect(video.currentTime).toBeCloseTo(middleOf(299), 6);
+    expect(player.isReversing()).toBe(true);
+  });
+
+  it('stops when it is asked again, on pause, on a toggle, a step and a seek', () => {
+    const asks: ((p: ReturnType<typeof createPlayer>) => void)[] = [
+      (p) => p.reverse(),
+      (p) => p.pause(),
+      (p) => p.toggle(),
+      (p) => p.step(1),
+      (p) => p.seek(2),
+      (p) => p.playRange(2, 3, false),
+    ];
+    for (const ask of asks) {
+      const { player, states } = reversing();
+      ask(player);
+      expect(player.isReversing()).toBe(false);
+      expect(states).toEqual([true, false]);
+    }
+  });
+
+  it('a toggle while going back only stops: it does not start playing forward', () => {
+    const { video, player } = reversing();
+    player.toggle();
+    expect(video.play).not.toHaveBeenCalled();
+  });
+
+  it('does nothing before the duration is known', () => {
+    const video = fakeVideo({ duration: NaN });
+    const player = createPlayer(video, FPS);
+    player.reverse();
+    expect(player.isReversing()).toBe(false);
   });
 });

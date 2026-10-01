@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent,
   type PointerEvent,
   type ReactNode,
 } from 'react';
@@ -102,6 +103,16 @@ export function Stage({
   // What the video says its frames measure. Only valid for the clip it was read from.
   const [videoSize, setVideoSize] = useState<{ url: string; width: number; height: number } | null>(null);
   const size = useElementSize(viewportRef);
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
+  /** The player says when it starts and stops playing backwards; the video itself never does. */
+  const onReverse = useCallback(
+    (active: boolean) => {
+      playhead.setReverse(active);
+      playhead.setPlaying(active);
+    },
+    [playhead],
+  );
 
   // The size of the clip: from the video, or, for a saved analysis without one, from the analysis. Unknown until then: the
   // clip is laid out as 16:9 and the page in the landscape layout.
@@ -142,13 +153,14 @@ export function Stage({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    const player = createPlayer(video, fps);
+    const player = createPlayer(video, fps, { rate: () => speedRef.current, onReverse });
     playerRef.current = player;
     playhead.seekHandler = player.seek;
     playhead.playRangeHandler = player.playRange;
     playhead.toggleHandler = player.toggle;
     playhead.pauseHandler = player.pause;
     playhead.stepHandler = player.step;
+    playhead.reverseHandler = player.reverse;
     return () => {
       playerRef.current = null;
       playhead.seekHandler = null;
@@ -156,8 +168,10 @@ export function Stage({
       playhead.toggleHandler = null;
       playhead.pauseHandler = null;
       playhead.stepHandler = null;
+      playhead.reverseHandler = null;
+      playhead.setReverse(false);
     };
-  }, [playhead, fps, url]);
+  }, [playhead, fps, url, onReverse]);
 
   // Without a clip or saved data there is nothing to play, and a stale state must not linger in the transport.
   const hasData = !!result;
@@ -170,8 +184,6 @@ export function Stage({
   // Saved data without its video: a clock plays the analysis, through the same player the video would use.
   const dataCount = dataMeta?.count ?? 0;
   const dataFps = dataMeta?.fps ?? 0;
-  const speedRef = useRef(speed);
-  speedRef.current = speed;
   useEffect(() => {
     if (!dataCount || !dataFps) return;
     const duration = dataCount / dataFps;
@@ -183,12 +195,13 @@ export function Stage({
       },
       playhead.getSnapshot(),
     );
-    const player = createPlayer(clock, fps);
+    const player = createPlayer(clock, fps, { rate: () => speedRef.current, onReverse });
     playhead.seekHandler = player.seek;
     playhead.playRangeHandler = player.playRange;
     playhead.toggleHandler = player.toggle;
     playhead.pauseHandler = player.pause;
     playhead.stepHandler = player.step;
+    playhead.reverseHandler = player.reverse;
     playhead.setDuration(duration);
     playhead.setPlaying(false);
     playhead.setTime(clock.currentTime);
@@ -232,9 +245,11 @@ export function Stage({
       playhead.toggleHandler = null;
       playhead.pauseHandler = null;
       playhead.stepHandler = null;
+      playhead.reverseHandler = null;
+      playhead.setReverse(false);
       playhead.setPlaying(false);
     };
-  }, [playhead, fps, dataCount, dataFps]);
+  }, [playhead, fps, dataCount, dataFps, onReverse]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = speed;
@@ -279,14 +294,15 @@ export function Stage({
     return () => cancelAnimationFrame(raf);
   }, [playhead]);
 
-  // Keyboard: space = play or pause, arrows = one frame (Shift: ten).
+  // Keyboard: space = play or pause (Shift: play backwards), arrows = one frame (Shift: ten).
   useEffect(() => {
     if (!url && !hasData) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
       if (e.code === 'Space') {
         e.preventDefault();
-        playhead.toggle();
+        if (e.shiftKey) playhead.reverse();
+        else playhead.toggle();
       } else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
         e.preventDefault();
         playhead.step((e.code === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 10 : 1));
@@ -341,6 +357,11 @@ export function Stage({
   }, []);
 
   const editing = !!calibration?.editing;
+  /** A click or a tap on the picture plays or pauses, at once; while the bed is being outlined a click places a corner instead. */
+  const onFrameClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (editing || (e.target as HTMLElement).closest('.stage__pick')) return;
+    playhead.toggle();
+  };
   const frame = layout.video;
   const showPane = !!pane && view !== 'video';
   // In the wide layout a portrait clip has a stage of its own width (shell.css) instead of a black one: it says how wide.
@@ -359,6 +380,7 @@ export function Stage({
           className="stage__frame"
           data-hidden={layout.hidden || undefined}
           style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height }}
+          onClick={onFrameClick}
         >
           <video
             ref={videoRef}
@@ -376,6 +398,8 @@ export function Stage({
             onDurationChange={(e) => playhead.setDuration(e.currentTarget.duration)}
             onPlay={() => playhead.setPlaying(true)}
             onPause={() => {
+              // Playing backwards keeps the video paused on purpose: the player is still "playing".
+              if (playerRef.current?.isReversing()) return;
               playhead.setPlaying(false);
               playerRef.current?.clearRange();
             }}
@@ -397,6 +421,7 @@ export function Stage({
           className="stage__frame stage__frame--data"
           data-hidden={layout.hidden || undefined}
           style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height }}
+          onClick={onFrameClick}
         >
           <canvas ref={canvasRef} className="stage__overlay" aria-hidden="true" />
           <label className="btn btn--secondary stage__pick stage__pick--corner">

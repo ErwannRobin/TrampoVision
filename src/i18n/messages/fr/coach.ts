@@ -141,6 +141,9 @@ export const coach: Translation<typeof en> = {
   'row.jointsHint': '« Corrigé » signifie qu’un artefact a été remplacé.',
   'row.maxHeight': 'Hauteur max {reference}',
   'row.rise': 'Hauteur gagnée',
+  'row.airRise': 'Hauteur gagnée, d’après le temps de vol',
+  'row.airRiseHint':
+    'Gravité × temps² ÷ 8, à partir du seul temps de vol : aucune échelle nécessaire. À comparer à la hauteur gagnée mesurée sur la vidéo.',
   'row.drift': 'Déplacement horizontal',
   'row.driftHint': 'Position à la réception moins position à l’impulsion, + est à droite dans l’image.',
   'row.bedTakeoff': 'Position sur la toile à l’impulsion',

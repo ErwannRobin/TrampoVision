@@ -244,6 +244,14 @@
   color: var(--warn);
 }
 
+/* The routine starts at this skill: a small flag after its name. */
+.live-flag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--text-2);
+}
+
 /* Bounces between the skills: folded, so the skills stand out. */
 .live-bounces {
   padding: 0 10px;
@@ -788,6 +796,15 @@
   (max-width: 1099px) and (max-height: 520px) and (orientation: landscape) {
   .app[data-mode='live'] .workspace:has(.tl) .tl__zoom {
     display: none;
+  }
+}
+@media (max-width: 440px) and (min-height: 521px) {
+  /* The bar holds the start, both ways of playing and the frame steps: its air gives way before the time does (see stage.css). */
+  .app[data-mode='live'] .workspace:has(.tl) .transport {
+    gap: 0 8px;
+  }
+  .app[data-mode='live'] .workspace:has(.tl) .transport__code {
+    font-size: 16px;
   }
 }
 @media (max-width: 340px) and (min-height: 521px) {

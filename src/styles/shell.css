@@ -95,6 +95,88 @@
   }
 }
 
+/*
+ * A wide screen has the room for the controls of the video and the controls of the selected jump on one row, side by side: the strip
+ * of the timeline takes the row under them, at the full width. The live view's transport is short (no ten-frame steps, no layers) and
+ * fits from 1280px; the whole one needs 1500px. In between, and below, they stack. The legend of the strip needs more room still.
+ */
+@media (min-width: 1280px) {
+  .workspace__dock:not(:has(.transport__far)) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    column-gap: 20px;
+  }
+  .workspace__dock:not(:has(.transport__far)) > .tl {
+    display: contents;
+  }
+  .workspace__dock:not(:has(.transport__far)) .tl__head {
+    flex-wrap: nowrap;
+    min-width: 0;
+    /* The same height as the transport, so that what is in them lines up. */
+    min-height: 54px;
+    padding: 2px 0 10px 20px;
+    border-left: 1px solid var(--line);
+  }
+  .workspace__dock:not(:has(.transport__far)) .tl__strip {
+    grid-column: 1 / -1;
+  }
+  .workspace__dock:not(:has(.transport__far)) .tl__zoom {
+    margin-left: auto;
+  }
+}
+@media (min-width: 1500px) {
+  .workspace__dock:has(.transport__far) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    column-gap: 20px;
+  }
+  .workspace__dock:has(.transport__far) > .tl {
+    display: contents;
+  }
+  .workspace__dock:has(.transport__far) .tl__head {
+    flex-wrap: nowrap;
+    min-width: 0;
+    min-height: 54px;
+    padding: 2px 0 10px 20px;
+    border-left: 1px solid var(--line);
+  }
+  .workspace__dock:has(.transport__far) .tl__strip {
+    grid-column: 1 / -1;
+  }
+  .workspace__dock:has(.transport__far) .tl__zoom {
+    margin-left: auto;
+  }
+}
+/* In one row the legend only fits on a very wide screen; the zoom takes the right edge until then. */
+@media (min-width: 1280px) {
+  .workspace__dock:not(:has(.transport__far)) .tl__legend {
+    display: none;
+  }
+}
+@media (min-width: 1500px) {
+  .workspace__dock:has(.transport__far) .tl__legend {
+    display: none;
+  }
+}
+@media (min-width: 1800px) {
+  .workspace__dock:is(:has(.transport__far), :not(:has(.transport__far))) .tl__legend {
+    display: flex;
+  }
+  .workspace__dock:is(:has(.transport__far), :not(:has(.transport__far))) .tl__zoom {
+    margin-left: 0;
+  }
+}
+/* The dock sits at the bottom of the screen: the routine menu opens upward. */
+@media (min-width: 1100px) {
+  .tl__actions .menu__panel {
+    top: auto;
+    bottom: calc(100% + 8px);
+    transform-origin: bottom left;
+  }
+}
+
 @media (max-width: 1099px) {
   .workspace {
     display: flex;

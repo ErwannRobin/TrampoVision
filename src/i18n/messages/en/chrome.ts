@@ -37,6 +37,7 @@ export const chrome = {
   // Keyboard shortcuts
   'shortcuts.title': 'Keyboard shortcuts',
   'shortcuts.playPause': 'Play or pause',
+  'shortcuts.reverse': 'Play backwards',
   'shortcuts.frame': 'Previous or next frame',
   'shortcuts.tenFrames': 'Ten frames at a time',
   'shortcuts.jump': 'Previous or next jump',
@@ -205,6 +206,9 @@ export const chrome = {
   'transport.prev': 'Previous frame (←)',
   'transport.pause': 'Pause (Space)',
   'transport.play': 'Play (Space)',
+  'transport.startRoutine': 'Back to the start of the routine',
+  'transport.startClip': 'Back to the start of the clip',
+  'transport.reverse': 'Play backwards (Shift + Space)',
   'transport.next': 'Next frame (→)',
   'transport.forward10': 'Forward 10 frames (Shift + →)',
   'transport.frame': 'Frame {n} of {total}',

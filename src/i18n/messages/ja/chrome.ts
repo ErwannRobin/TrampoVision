@@ -31,6 +31,7 @@ export const chrome: Translation<typeof en> = {
 
   'shortcuts.title': 'キーボードショートカット',
   'shortcuts.playPause': '再生／一時停止',
+  'shortcuts.reverse': '逆再生',
   'shortcuts.frame': '前／次のフレーム',
   'shortcuts.tenFrames': '10フレームずつ移動',
   'shortcuts.jump': '前／次のジャンプ',
@@ -191,6 +192,9 @@ export const chrome: Translation<typeof en> = {
   'transport.prev': '前のフレーム（←）',
   'transport.pause': '一時停止（スペース）',
   'transport.play': '再生（スペース）',
+  'transport.startRoutine': '演技の開始位置に戻る',
+  'transport.startClip': 'クリップの先頭に戻る',
+  'transport.reverse': '逆再生（Shift + スペース）',
   'transport.next': '次のフレーム（→）',
   'transport.forward10': '10フレーム進む（Shift + →）',
   'transport.frame': 'フレーム {n} / {total}',

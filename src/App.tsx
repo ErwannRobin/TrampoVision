@@ -29,6 +29,7 @@ import { useAutosave, useHistory } from './history/useHistory';
 import { useReviewedReferences, useReviewUpload, useSyncSetting, useVerdictOutbox } from './sync/useReviewSync';
 import { EXECUTION_RULESET } from './coaching/config';
 import { withCalls } from './coaching/display';
+import { detectRoutineStart, routineStartJump, routineStartTime, type RoutineMark } from './coaching/routine';
 import { buildSession, labelOf } from './coaching/session';
 import { elementById } from './skills/fig/elements';
 import { videoIdFromTrack, videoIdOf } from './dataset/videoId';
@@ -117,6 +118,8 @@ export default function App() {
   const [preferGpu, setPreferGpu] = useState(true);
   const [height, setHeight] = useState(1.75);
   const [speed, setSpeed] = useState(1);
+  // Where the routine starts: what the analysis detected (undefined), a jump chosen by hand, or no mark (null: the clip is the routine).
+  const [routineMark, setRoutineMark] = useState<RoutineMark>(undefined);
   const [overlay, setOverlay] = useState<OverlayOptions>({ skeleton: true, com: true, trail: true, hud: true });
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [backend, setBackend] = useState('');
@@ -239,6 +242,7 @@ export default function App() {
   useEffect(() => {
     firstSkillPending.current = true;
     setSelectedJump(0);
+    setRoutineMark(undefined);
     // Saved data opens on the 3D skeleton: it is what there is to show until the clip is added.
     setStageView(openedSeries.current ? '3d' : 'video');
     openedSeries.current = false;
@@ -614,6 +618,17 @@ export default function App() {
 
   // The video and the timeline say what the session says, so a correction shows at once.
   const shownSkills = useMemo(() => (skills && session ? withCalls(skills, session) : skills), [skills, session]);
+
+  // The routine starts at its first skill. The mark is detected, and can be moved to any jump or taken off.
+  const detectedStart = useMemo(() => (session ? detectRoutineStart(session.jumps) : null), [session]);
+  const routineJump = routineStartJump(routineMark, detectedStart, jumpCount);
+  const clipStartS = result?.time[0] ?? 0;
+  const routineStartS = useMemo(
+    () => (result && routineJump !== null ? routineStartTime(result.jumps.cycles[routineJump], clipStartS) : null),
+    [result, routineJump, clipStartS],
+  );
+  /** Back to the start of the routine, or of the clip when there is none. */
+  const goToStart = () => playhead.seek(routineStartS ?? clipStartS);
 
   // What the coach says (the element, that it is none of them, the deduction they give) is saved in the local dataset, where a labelled skill
   // becomes a reference example for the classifier at once, and is sent to the review service, so that every device learns from it.
@@ -1106,6 +1121,8 @@ export default function App() {
                     hasVideo
                     hasResult={!!result}
                     simple={!advanced}
+                    onStart={goToStart}
+                    startsAtRoutine={routineStartS !== null}
                   />
                 )}
                 {result && (
@@ -1119,6 +1136,12 @@ export default function App() {
                     onPlayJump={playJump}
                     loop={loop}
                     onLoop={setLoop}
+                    routine={{
+                      jump: routineJump,
+                      startS: routineStartS,
+                      detected: detectedStart,
+                      onMark: setRoutineMark,
+                    }}
                   />
                 )}
               </div>
@@ -1142,6 +1165,7 @@ export default function App() {
                     onClear={sayClear}
                     onDeduction={sayDeduction}
                     canLabel={!!videoId}
+                    routineStart={routineJump}
                     onOpenSetup={openSetup}
                     onShowAdvanced={() => {
                       setAdvancedFlag('on');

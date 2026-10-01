@@ -128,6 +128,12 @@ export const coaching = {
   'live.cannotLabel': 'Labels can be saved once the video is identified.',
   'live.partTitle': 'FIG Code of Points 2025-2028, §{rule}',
   'live.noElement': 'A straight jump is not an element: it has no difficulty.',
+  'live.routineStart': 'The routine starts here',
+  'live.air': 'Time in the air',
+  'live.airRise': 'Height gained',
+  'live.airRiseTitle': 'Height above the takeoff, worked out from the time in the air',
+  'live.airNote':
+    'Estimated from the time in the air alone (gravity × time² ÷ 8), so it does not depend on the scale of the video.',
   'live.easier':
     'The body looked like a {measured}. A judge gives the least difficult shape: {element} is worth {value}.',
   'live.easierDetail':

@@ -86,10 +86,13 @@ code above, and except where this document says so.
 
 ### Player bus (`ui/playhead.ts`)
 
-`Playhead` is an external store: current time, playing, duration. The stage installs the handlers
-(`seekHandler`, `playRangeHandler`, `toggleHandler`, `pauseHandler`, `stepHandler`) and publishes `setTime`,
-`setPlaying`, `setDuration`. Everyone else calls `seek(t)`, `playRange(from, to, loop)`, `toggle()`, `pause()`,
-`step(frames)` and reads with `usePlayheadTime`, `usePlaying`, `useDuration`. This is how the transport bar and the
+`Playhead` is an external store: current time, playing, reverse, duration. The stage installs the handlers
+(`seekHandler`, `playRangeHandler`, `toggleHandler`, `pauseHandler`, `stepHandler`, `reverseHandler`) and publishes `setTime`,
+`setPlaying`, `setReverse`, `setDuration`. Everyone else calls `seek(t)`, `playRange(from, to, loop)`, `toggle()`, `pause()`,
+`step(frames)`, `reverse()` and reads with `usePlayheadTime`, `usePlaying`, `useReverse`, `useDuration`.
+A `<video>` cannot play backwards, so `createPlayer` (`ui/stage/player.ts`) walks it back one frame at a time from `tick()`, at the
+playback speed and by the clock (frames are dropped while the decoder is busy, the speed stays true); while it does, the video is
+paused and `playing` and `reverse` are both true. Anything else that moves the video (play, pause, a step, a seek, a range) ends it. This is how the transport bar and the
 timeline drive a video they do not own, and how charts follow playback at frame rate without re-rendering the tree.
 
 ### Layout (`styles/shell.css`)
@@ -106,6 +109,9 @@ wide (>= 1100px)                      narrow, live view with results
                                       | technical data    |
 ```
 
+- From 1280px the dock puts the transport and the controls of the selected jump (`.tl__head`, the timeline's `.tl` gives up its
+  box with `display: contents`) on one row, the strip under both at the full width; under 1600px the legend of the strip goes first.
+  Below that they stack as before.
 - `.workspace__stage` is transparent and gives the stage a definite size. The stage draws its own black rounded viewport.
 - `.workspace__dock` and `.workspace__rail` are `.sheet`s (the shell adds the surface and the padding).
 - The workspace is exactly one viewport tall on wide screens (the video, the timeline and the transport are always
@@ -139,7 +145,7 @@ wide (>= 1100px)                      narrow, live view with results
 
 The interface has two levels, kept in localStorage: `trampovision.advanced` (`on` or `off`, default off) and, with the advanced
 tools on, `Audience`, `'athlete' | 'coach'` (default athlete). Off is the **live view**: the stage shows the video only (no
-view switcher), the transport keeps play, the frame steps and the speed (`simple`), the top bar has no audience switch and no
+view switcher), the transport keeps back to the start, play (and backwards), the frame steps and the speed (`simple`), the top bar has no audience switch and no
 export menu, the rail is the live rail (below), the settings show the athlete, the review upload, the switch and the appearance
 (while the analysis runs, only the athlete and the review upload), and the first screen only asks for a video (a phone opens its
 camera). A video that is loaded starts its analysis by itself, at
@@ -211,8 +217,9 @@ Files: `Stage.tsx`, `Transport.tsx`, `ProcessingOverlay.tsx`, `CalibrationBar.ts
   input changed (dirty flag), the rAF loop publishing `playhead.setTime`, range playback with optional loop
   (`playRangeHandler`), frame seeking through `frameAtTime` / `frameSeekTime`, `speed` -> `playbackRate`, the error
   message "This browser cannot play the video. Try an MP4 (H.264) file.", calibration corner picking and dragging
-  (pick radius 16px, pointer capture). Space toggles, arrows step one frame (Shift: ten), except when focus is in an
-  input, select, textarea or button. Install and clean up every `playhead` handler; call `setPlaying` and `setDuration`.
+  (pick radius 16px, pointer capture). Space toggles (Shift + Space plays backwards), arrows step one frame (Shift: ten), except
+  when focus is in an input, select, textarea or button. A click or a tap on the picture toggles playback at once, except while the
+  bed is being outlined (a click places a corner). Install and clean up every `playhead` handler; call `setPlaying` and `setDuration`.
 - `view`: `video` (default), `split` (video and `pane` side by side when the viewport is wide, stacked when tall),
   `3d` (the `pane` fills it; keep the `<video>` mounted but hidden so playback and seeking continue). When `onView` is
   given, show a small translucent segmented switcher (video, split, cube icons) at the top right of the viewport.

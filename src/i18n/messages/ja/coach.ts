@@ -137,6 +137,9 @@ export const coach: Translation<typeof en> = {
   'row.jointsHint': '「補正」は、異常値を置き換えたことを意味します。',
   'row.maxHeight': '{reference}の最高点',
   'row.rise': '上昇量',
+  'row.airRise': '上昇量（滞空時間から）',
+  'row.airRiseHint':
+    '重力 × 時間² ÷ 8。滞空時間だけから求めるのでスケールは不要です。映像で測った上昇量と比べてください。',
   'row.drift': '水平方向の変位',
   'row.driftHint': '着地位置から踏み切り位置を引いた値。+ は画像の右です。',
   'row.bedTakeoff': '踏み切り時のベッド上の位置',

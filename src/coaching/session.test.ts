@@ -60,6 +60,12 @@ describe('a set of skills', () => {
     expect(s.summary.execution!).toBeLessThanOrEqual(10);
   });
 
+  it('estimates how high each jump rose from its time in the air alone', () => {
+    for (const j of s.jumps.filter((j) => j.flightS !== null))
+      expect(j.airRiseM).toBeCloseTo((9.81 * j.flightS! ** 2) / 8, 9);
+    for (const j of s.jumps.filter((j) => j.flightS === null)) expect(j.airRiseM).toBeNull();
+  });
+
   it('adds up the time in the air of the skills only', () => {
     const flights = s.jumps.filter((j) => j.isSkill).map((j) => j.flightS!);
     expect(s.summary.flightS).toBeCloseTo(

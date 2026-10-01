@@ -7,6 +7,15 @@ export const PHASE = Object.fromEntries(JUMP_PHASES.map((p, i) => [p, i])) as Re
 
 export const GRAVITY = 9.81;
 
+/**
+ * How high the center of mass rises above its takeoff, from the time in the air alone: it climbs for half of the flight under gravity,
+ * so rise = g (T / 2)² / 2 = g T² / 8. It needs no scale (nothing is measured in pixels), only that the landing is at the height of the
+ * takeoff, which is what the trampoline bed gives. Null when the flight time is not known.
+ */
+export function riseFromFlightTime(flightTimeS: number | null | undefined, g = GRAVITY): number | null {
+  return flightTimeS != null && Number.isFinite(flightTimeS) && flightTimeS > 0 ? (g * flightTimeS ** 2) / 8 : null;
+}
+
 export interface JumpInput {
   fps: number;
   /** Sample times, seconds. */

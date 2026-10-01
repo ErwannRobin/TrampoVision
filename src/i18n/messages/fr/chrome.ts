@@ -31,6 +31,7 @@ export const chrome: Translation<typeof en> = {
 
   'shortcuts.title': 'Raccourcis clavier',
   'shortcuts.playPause': 'Lecture ou pause',
+  'shortcuts.reverse': 'Lecture arrière',
   'shortcuts.frame': 'Image précédente ou suivante',
   'shortcuts.tenFrames': 'Dix images à la fois',
   'shortcuts.jump': 'Saut précédent ou suivant',
@@ -195,6 +196,9 @@ export const chrome: Translation<typeof en> = {
   'transport.prev': 'Image précédente (←)',
   'transport.pause': 'Pause (Espace)',
   'transport.play': 'Lecture (Espace)',
+  'transport.startRoutine': 'Retour au début de l’enchaînement',
+  'transport.startClip': 'Retour au début du clip',
+  'transport.reverse': 'Lecture arrière (Maj + Espace)',
   'transport.next': 'Image suivante (→)',
   'transport.forward10': 'Avancer de 10 images (Maj + →)',
   'transport.frame': 'Image {n} sur {total}',

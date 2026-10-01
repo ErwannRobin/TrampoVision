@@ -14,6 +14,7 @@ import { confidenceTier, TIER_TEXT } from './insights';
 import { Badge, Button, ConfidenceMeter, Field, Segmented } from './kit';
 import type { Playhead } from './playhead';
 import { DatasetBar } from './review/DatasetBar';
+import { Detected } from './review/Detected';
 import { FailureCase } from './review/FailureCase';
 import { Keycap } from './review/Keycap';
 import { MovementPicker } from './review/MovementPicker';
@@ -156,7 +157,9 @@ export function EvaluatePanel({
         <h3 className="review-heading">{t('review.classifierSays')}</h3>
         <div className="review-classifier">
           <div className="review-classifier__head">
-            <span className="review-classifier__skill t-brand">{jump.prediction.label}</span>
+            <span className="review-classifier__skill t-brand">
+              <Detected movement={movementFromPrediction(jump.prediction)}>{jump.prediction.label}</Detected>
+            </span>
             <span className="review-classifier__pct num" title={t('ins.scoreNote')}>
               {pct(jump.prediction.confidence)}
             </span>

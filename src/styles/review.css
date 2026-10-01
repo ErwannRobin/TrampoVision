@@ -141,6 +141,90 @@
   font-weight: 550;
 }
 
+/* What was detected: the name of the skill opens a menu with its somersaults, twists and position, on hover, focus or press. */
+.detected {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+.detected__trigger {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: help;
+}
+.detected__name {
+  min-width: 0;
+  border-bottom: 1px dotted var(--text-3);
+}
+.detected__icon {
+  flex: none;
+  align-self: center;
+  color: var(--text-3);
+}
+.detected__trigger:hover .detected__icon,
+.detected__trigger[aria-expanded='true'] .detected__icon {
+  color: var(--text);
+}
+.detected__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: 240px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pop);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+  color: var(--text);
+  font-size: var(--fs-base);
+  font-weight: 400;
+  animation: pop-in var(--t-fast) var(--ease);
+  transform-origin: top left;
+}
+.detected__title {
+  margin-bottom: 6px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.detected__rows {
+  display: grid;
+  gap: 2px;
+}
+.detected__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+}
+.detected__row:first-child {
+  border-top: 0;
+}
+.detected__row dt {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.detected__row dd {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.detected__none {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
 /* The six labels: the chosen one is filled, like the primary button. */
 .review-labels {
   display: grid;

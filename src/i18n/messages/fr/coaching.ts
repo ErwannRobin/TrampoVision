@@ -126,6 +126,12 @@ export const coaching: Translation<typeof en> = {
   'live.cannotLabel': 'Les étiquettes peuvent être enregistrées une fois la vidéo identifiée.',
   'live.partTitle': 'Code de pointage FIG 2025-2028, §{rule}',
   'live.noElement': 'Un saut droit n’est pas un élément : il n’a pas de difficulté.',
+  'live.routineStart': 'L’enchaînement commence ici',
+  'live.air': 'Temps de vol',
+  'live.airRise': 'Hauteur gagnée',
+  'live.airRiseTitle': 'Hauteur au-dessus de l’impulsion, déduite du temps de vol',
+  'live.airNote':
+    'Estimée à partir du seul temps de vol (gravité × temps² ÷ 8) : elle ne dépend donc pas de l’échelle de la vidéo.',
   'live.easier': 'Le corps semblait {measured}. Un juge retient la forme la moins difficile : {element} vaut {value}.',
   'live.easierDetail':
     'Le corps semblait {measured} (hanches {hip}, genoux {knee}). Un juge retient la forme la moins difficile : {element} vaut {value}.',
