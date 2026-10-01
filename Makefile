@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: icons eval eval-fetch worker-schema worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets upload-assets convert clean distclean
+.PHONY: icons eval jev-eval eval-fetch worker-schema worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets upload-assets convert clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -71,6 +71,10 @@ worker-deploy: node_modules ## Deploy the review Worker (run worker-schema first
 eval: node_modules ## Score the classifier on reviewed jumps: FILE=eval/export.ndjson [BASELINE=eval/baseline.json | SAVE=eval/baseline.json]
 	@test -n "$(FILE)" || { echo "usage: make eval FILE=eval/export.ndjson [BASELINE=f.json | SAVE=f.json]  (get the file with: make eval-fetch)"; exit 1; }
 	npx vite-node scripts/eval.ts $(FILE) $(if $(BASELINE),--baseline $(BASELINE)) $(if $(SAVE),--save $(SAVE))
+
+jev-eval: node_modules ## Compare Jev with the classifier on reviewed jumps: FILE=eval/export.ndjson [DEBUG=1] (needs TYPESAFE_API_KEY; only measurements are sent)
+	@test -n "$(FILE)" || { echo "usage: TYPESAFE_API_KEY=... make jev-eval FILE=eval/export.ndjson [DEBUG=1]"; exit 1; }
+	npx vite-node scripts/jev-eval.ts $(FILE) $(if $(DEBUG),--debug)
 
 eval-fetch: ## Download the reviewed jumps to eval/export.ndjson (needs REVIEW_API_URL and REVIEW_TOKEN in the environment)
 	@test -n "$(REVIEW_API_URL)" -a -n "$(REVIEW_TOKEN)" || { echo "set REVIEW_API_URL and REVIEW_TOKEN"; exit 1; }
