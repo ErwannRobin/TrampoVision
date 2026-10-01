@@ -6,6 +6,7 @@ import { setupState } from './setupState';
 import { Button, Field, Icon, IconButton, NumberField, Segmented, SelectField, Switch, type IconName } from '../kit';
 import { syncStatusText } from '../../sync/reviewSync';
 import type { SyncState } from '../../sync/useReviewSync';
+import type { Sample } from '../../video/sample';
 import type { Appearance } from '../types';
 
 export interface SettingsDialogProps {
@@ -69,8 +70,9 @@ export interface SettingsDialogProps {
   onScaleSource: (source: ScaleSource | 'auto') => void;
 
   // Data and look
-  /** Null when no sample video is bundled. */
-  onSample: (() => void) | null;
+  /** The sample videos on offer: none when there is no asset host. */
+  samples: Sample[];
+  onSample: (path: string) => void;
   onOpenSeries: (file: File) => void;
   appearance: Appearance;
   onAppearance: (appearance: Appearance) => void;
@@ -430,11 +432,17 @@ export function SettingsDialog(props: SettingsDialogProps) {
                         />
                       </label>
                     </Field>
-                    {props.onSample && (
-                      <Button variant="secondary" icon="film" disabled={state.engineLocked} onClick={props.onSample}>
-                        {t('setup.sample')}
+                    {props.samples.map((sample) => (
+                      <Button
+                        key={sample.id}
+                        variant="secondary"
+                        icon="film"
+                        disabled={state.engineLocked}
+                        onClick={() => props.onSample(sample.path)}
+                      >
+                        {t(sample.label)}
                       </Button>
-                    )}
+                    ))}
                   </Block>
                 )}
               </Group>

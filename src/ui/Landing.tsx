@@ -7,13 +7,15 @@ import { HeroArcs } from './chrome/HeroArcs';
 import { RecentSets, type RecentSetsProps } from './chrome/RecentSets';
 import { DemoSkeleton } from './DemoSkeleton';
 import { DatasetBar, EvaluationReport } from './EvaluationView';
+import type { Sample } from '../video/sample';
 import { useMediaQuery } from './hooks';
 import { Button, Icon } from './kit';
 
 export interface LandingProps {
   onFile: (file: File) => void;
-  /** Null when no sample video is bundled. */
-  onSample: (() => void) | null;
+  /** The sample videos on offer: none when there is no asset host. */
+  samples: Sample[];
+  onSample: (path: string) => void;
   onOpenSeries: (file: File) => void;
   /** The dataset saved in this browser: shown as its own section when it holds something. */
   dataset: DatasetApi;
@@ -83,7 +85,7 @@ function VideoButton({
 }
 
 /** The first screen: what the app does and how to start. The advanced tools add the saved analyses and the dataset kept in this browser. */
-export function Landing({ onFile, onSample, onOpenSeries, dataset, recent, busy, advanced }: LandingProps) {
+export function Landing({ onFile, samples, onSample, onOpenSeries, dataset, recent, busy, advanced }: LandingProps) {
   const hasDataset = advanced && dataset.records.length > 0;
   // A phone or a tablet can film right away; a computer picks a file.
   const touch = useMediaQuery('(pointer: coarse)');
@@ -102,11 +104,17 @@ export function Landing({ onFile, onSample, onOpenSeries, dataset, recent, busy,
             ) : (
               <VideoButton label={t('landing.choose')} icon="upload" primary busy={busy} onFile={onFile} />
             )}
-            {onSample && (
-              <Button variant="secondary" size="lg" disabled={busy} onClick={onSample}>
-                {t('landing.sample')}
+            {samples.map((sample) => (
+              <Button
+                key={sample.id}
+                variant="secondary"
+                size="lg"
+                disabled={busy}
+                onClick={() => onSample(sample.path)}
+              >
+                {t(sample.label)}
               </Button>
-            )}
+            ))}
           </div>
           <p className="landing__hint">{t('landing.drop')}</p>
           {advanced && (

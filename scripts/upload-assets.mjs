@@ -2,13 +2,13 @@
 //
 //   BLOB_READ_WRITE_TOKEN=... npm run upload-assets            upload everything
 //   npm run upload-assets -- --dry-run                         list what would be uploaded
-//   npm run upload-assets -- --samples path/to/videos          folder with IMG_8368.mp4 and IMG_8368.MOV (default: video-sample/)
+//   npm run upload-assets -- --samples path/to/videos          folder with IMG_8368.mp4, IMG_8368.MOV and dong-dong-2011-landscape.mp4 (default: video-sample/)
 //
 // Layout under the store (what the app reads):
 //   models/pose_landmarker_{lite,full,heavy}.task
 //   mediapipe/<tasks-vision version>/vision_wasm_internal.wasm, vision_wasm_nosimd_internal.wasm
 //   ffmpeg/<@ffmpeg/core version>/ffmpeg-core.wasm
-//   samples/IMG_8368.mp4, samples/IMG_8368.MOV
+//   samples/IMG_8368.mp4, samples/IMG_8368.MOV, samples/dong-dong-2011-landscape.mp4
 // Run it again after upgrading @mediapipe/tasks-vision or @ffmpeg/core: the new version gets its own folder.
 // At the end it prints the value for VITE_ASSET_BASE_URL.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';

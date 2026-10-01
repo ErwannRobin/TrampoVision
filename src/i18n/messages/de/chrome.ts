@@ -45,7 +45,8 @@ export const chrome: Translation<typeof en> = {
     'Filmen Sie eine Übung. TrampoVision benennt jedes Element, berechnet dessen Schwierigkeit, schlägt eine Haltungsnote vor und zeigt, was zu verbessern ist. Alles läuft auf Ihrem Gerät.',
   'landing.film': 'Übung filmen',
   'landing.choose': 'Video auswählen',
-  'landing.sample': 'Beispielvideo verwenden',
+  'sample.portrait': 'Beispielvideo (Hochformat)',
+  'sample.landscape': 'Beispielvideo (Querformat)',
   'landing.drop': 'oder ziehen Sie ein Video irgendwo auf diese Seite',
   'landing.openSaved': 'Gespeicherte Analyse öffnen',
   'landing.review': 'Sprünge prüfen',
@@ -142,7 +143,6 @@ export const chrome: Translation<typeof en> = {
   'setup.skipHint':
     'Öffnen Sie eine gespeicherte Analyse (JSON), um ihre Ergebnisse zu sehen, ohne das Pose-Modell erneut auszuführen.',
   'setup.openSaved': 'Gespeicherte Analyse öffnen',
-  'setup.sample': 'Beispielvideo verwenden',
   'setup.analyze': 'Video analysieren',
   'setup.again': 'Erneut analysieren',
   'setup.hintLoading': 'Das Video wird geladen.',
