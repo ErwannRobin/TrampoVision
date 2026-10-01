@@ -384,6 +384,18 @@ It does not decide who is right (the label or the measurement); it shows where t
 
 **Read the numbers with care.** One labeler, no second opinion. Few jumps give wide intervals. If you tune the thresholds while looking at the same jumps, the accuracy becomes training accuracy and will look better than it is: keep some labeled jumps you never tune on.
 
+## Jev comparison (offline proof of concept)
+
+`src/skills/jev/` puts TypeSafe's **Jev** decision model on top of the existing pipeline, for comparison only. Nothing upstream changes (pose, jumps, rotation, twist, features), and the temporal (DTW + prototype) classifier stays the default and the fallback.
+
+For each jump the movement signature and the features (counts, rotation, facing cues, hip and knee angles, 9-point trajectories) are written into a text state and Jev answers four typed questions: somersaults, twists, direction, position. The element is found by table lookup and the top 5 come from the product of the four answers. **Only measurements are sent, never a video, a frame or a file name** (a test checks the request body). The browser build does not call Jev: the local-only guard refuses cross-origin requests and a key must not ship in a bundle. It runs from Node:
+
+```bash
+TYPESAFE_API_KEY=... make jev-eval FILE=eval/export.ndjson DEBUG=1
+```
+
+It prints top-1/3/5 for both classifiers, which part (somersaults, twists, direction, position) each gets right, the jumps where they disagree, confidence calibration, latency and tokens; `DEBUG=1` adds, per jump, the signature, Jev's answers, both top 5s, the reason and the final element. Without a key, Jev is skipped and the local answer is the fallback.
+
 ## Review service (optional)
 
 `worker/` is a Cloudflare Worker with a D1 database. The browser stays the **only classifier**: right after an analysis, and without

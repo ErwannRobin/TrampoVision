@@ -3,7 +3,7 @@ import { referencesFromRecords } from '../dataset/references';
 import type { JumpRecord } from '../dataset/types';
 import { mergeSkillConfig, type SkillConfig } from '../skills/config';
 import { elementById } from '../skills/fig/elements';
-import type { SkillClassifier, SkillPrediction } from '../skills/types';
+import type { ClassifierInput, SkillClassifier, SkillPrediction } from '../skills/types';
 import { temporalClassifier } from '../skills/temporal/classifier';
 import type { Reference } from '../skills/temporal/prototypes';
 import type { StageLabel } from './labels';
@@ -72,14 +72,9 @@ export function parseLabelled(text: string): LabelledJump[] {
 }
 
 /** What the classifier is given for a stored jump. It never reads the cycle, so the timestamps are all that is kept of it. */
-export function classifyRecord(
-  r: JumpRecord,
-  config: SkillConfig,
-  references: readonly Reference[],
-  classifier: SkillClassifier = temporalClassifier,
-): SkillPrediction {
+export function inputOfRecord(r: JumpRecord, config: SkillConfig, references: readonly Reference[]): ClassifierInput {
   const curve = r.twist?.sequence?.data.map((row) => row[1]) ?? null;
-  return classifier.classify({
+  return {
     cycle: {
       takeoffTimeS: r.timestamps.takeoffS,
       apexTimeS: r.timestamps.apexS,
@@ -91,7 +86,16 @@ export function classifyRecord(
     twist: r.twist ? { estimate: r.twist.estimate, trajectory: curve } : null,
     config,
     references: [...references],
-  });
+  };
+}
+
+export function classifyRecord(
+  r: JumpRecord,
+  config: SkillConfig,
+  references: readonly Reference[],
+  classifier: SkillClassifier = temporalClassifier,
+): SkillPrediction {
+  return classifier.classify(inputOfRecord(r, config, references));
 }
 
 export type Cause = 'rotation' | 'twist' | 'direction' | 'position' | 'several' | 'unclassified';
