@@ -9,7 +9,10 @@ const shortcuts = (): { keys: string[]; text: string }[] => [
   { keys: ['←', '→'], text: t('shortcuts.frame') },
   { keys: ['Shift', '← →'], text: t('shortcuts.tenFrames') },
   { keys: ['[', ']'], text: t('shortcuts.jump') },
-  { keys: ['1', '–', '6'], text: t('shortcuts.label') },
+  { keys: ['0', '–', '3'], text: t('shortcuts.label') },
+  { keys: ['Enter'], text: t('shortcuts.accept') },
+  { keys: ['U'], text: t('shortcuts.cannotTell') },
+  { keys: ['Z'], text: t('shortcuts.undo') },
   { keys: ['N'], text: t('shortcuts.nextUnlabeled') },
   { keys: ['?'], text: t('shortcuts.list') },
 ];

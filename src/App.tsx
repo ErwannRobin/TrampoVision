@@ -24,6 +24,7 @@ import {
   withTwistTruth,
   type RecordContext,
 } from './dataset/record';
+import { withNote } from './dataset/stageLabel';
 import { useDataset } from './dataset/useDataset';
 import type { SetSnapshot } from './history/autosave';
 import { useAutosave, useHistory } from './history/useHistory';
@@ -58,6 +59,8 @@ import { Timeline } from './ui/Timeline';
 import { TopBar } from './ui/TopBar';
 import { About } from './ui/About';
 import { useAbout } from './ui/chrome/aboutRoute';
+import { useReviewRoute } from './ui/chrome/reviewRoute';
+import { ReviewMode } from './ui/review/mode/ReviewMode';
 import { Icon, ActivityToast, type MenuGroupDef } from './ui/kit';
 import { useLocalStorage } from './ui/hooks';
 import { analysisWarnings } from './ui/quality';
@@ -161,6 +164,8 @@ export default function App() {
   // The settings are a popup over the app: from the first screen as well as from an open clip.
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useAbout();
+  // The review mode: one jump at a time, with the buttons that say what it was. It takes the place of the rail.
+  const [reviewOpen, setReviewOpen] = useReviewRoute();
   const openSetup = useCallback(() => setSettingsOpen(true), []);
   const closeSetup = useCallback(() => setSettingsOpen(false), []);
   const [coachTab, setCoachTab] = useState<CoachTab>('skill');
@@ -311,8 +316,9 @@ export default function App() {
   // While the video plays or is scrubbed, the jump view follows the jump under the playhead.
   const selectedRef = useRef(0);
   selectedRef.current = jumpSel;
+  // The review mode loops one jump and keeps it selected: the run-up and the landing must not move the selection.
   useEffect(() => {
-    if (!result) return;
+    if (!result || reviewOpen) return;
     const unsubscribe = playhead.subscribe(() => {
       const idx = result.jumps.cycleIndex[sampleIndexAt(result.meta, playhead.getSnapshot())];
       if (idx >= 0 && idx !== selectedRef.current) setSelectedJump(idx);
@@ -320,7 +326,7 @@ export default function App() {
     return () => {
       unsubscribe();
     };
-  }, [result, playhead]);
+  }, [result, playhead, reviewOpen]);
 
   /** Choose a jump and move the video to its takeoff. */
   const chooseJump = (k: number) => {
@@ -617,7 +623,7 @@ export default function App() {
   const noteJump = useCallback(
     (k: number, note: string) => {
       const r = fresh[k];
-      if (r?.truth) void saveRecords([withTruth(r, r.truth.label, { note })]);
+      if (r?.truth) void saveRecords([withNote(r, note)]);
     },
     [fresh, saveRecords],
   );
@@ -741,6 +747,11 @@ export default function App() {
     if (deduction === null) void saveRecords([next]);
     else say(next);
   };
+  const reviewing = reviewOpen && !!result && !!skills && !comparing;
+  // Slow motion is what labeling needs: the first time the review opens, a clip at normal speed goes to half speed.
+  useEffect(() => {
+    if (reviewing) setSpeed((s) => (s === 1 ? 0.5 : s));
+  }, [reviewing]);
   /** Jump of the current video that has this apex time (a failure card asks to see it). */
   const goToApex = (apexS: number) => {
     const k = result?.jumps.cycles.findIndex((c) => Math.abs(c.apexTimeS - apexS) <= 0.2) ?? -1;
@@ -1072,7 +1083,12 @@ export default function App() {
     ) : null;
 
   return (
-    <div className="app" data-audience={audience} data-mode={advanced ? 'advanced' : 'live'}>
+    <div
+      className="app"
+      data-audience={audience}
+      data-mode={advanced ? 'advanced' : 'live'}
+      data-review={reviewing ? 'on' : undefined}
+    >
       {dragging && (
         <div className="dropzone" role="presentation">
           <Icon name="upload" size={40} strokeWidth={1.5} />
@@ -1091,6 +1107,7 @@ export default function App() {
         onOpenSetup={openSetup}
         aboutOpen={aboutOpen}
         onAbout={() => setAboutOpen(!aboutOpen)}
+        review={result && skills && !comparing ? { open: reviewing, onToggle: () => setReviewOpen(!reviewOpen) } : null}
         onFile={hasClip && !analyzing ? (f) => void onFile(f) : null}
         onHome={aboutOpen ? () => setAboutOpen(false) : hasClip && !analyzing ? () => void goHome() : null}
       />
@@ -1251,6 +1268,22 @@ export default function App() {
                     fileName={file?.name ?? seriesName}
                     busy={analyzing ? 'analyzing' : loading ? 'loading' : 'idle'}
                     onOpenSetup={openSetup}
+                  />
+                ) : reviewing ? (
+                  <ReviewMode
+                    skills={skills}
+                    records={fresh}
+                    selected={jumpSel}
+                    onSelect={chooseJump}
+                    playhead={playhead}
+                    speed={speed}
+                    onSpeed={setSpeed}
+                    videoId={videoId}
+                    fileName={fileName}
+                    baseName={base}
+                    onSave={(records) => void saveRecords(records)}
+                    onClose={() => setReviewOpen(false)}
+                    storageWarning={dataset.warning}
                   />
                 ) : !advanced && session ? (
                   <LiveRail

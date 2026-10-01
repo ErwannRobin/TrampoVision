@@ -159,6 +159,7 @@ video ─► extractPoseTrack ─► PoseTrack ─► stabilizePose ─► compu
 | `src/dataset/store.ts`, `useDataset.ts`                   | Local storage in the browser (IndexedDB, memory fallback), merge on import.                                                                    |
 | `src/dataset/metrics.ts`, `failures.ts`, `export.ts`      | Accuracy / precision / recall / confusion matrix, label-vs-measurement checks for failures, dataset and evaluation JSON/CSV.                   |
 | `src/ui/EvaluationView.tsx`, `src/ui/review/*`            | The _Review_ tab (label the jumps), the metrics report and the failure cards.                                                                  |
+| `src/ui/review/mode/*`, `src/dataset/stageLabel.ts`       | The review mode (one jump at a time, stage by stage) and how its answers are stored, exported and imported as a label file.                    |
 | `src/pose3d/torso.ts`, `twist.ts`, `config.ts`, `vec3.ts` | Experimental 3D: torso frame from the 3D landmarks, twist about the longitudinal axis with reliability checks.                                 |
 | `src/pose3d/capabilities.ts`                              | Measures what this browser can run (WebGPU, WebGL 2, WASM SIMD / threads).                                                                     |
 | `src/pose3d/testTwistMannequin.ts`, `evaluation.ts`       | Test-only 3D athlete with known somersault and twist, and its degradations.                                                                    |
@@ -427,6 +428,16 @@ In the label file, fill what you can see and leave the rest `null`: `somersaults
 (`front` / `back`, only for a somersault), `halfTwists` (0, 1, 2, ...), `position` (`straight` / `tuck` / `pike`). Set `cannotTell` or
 `badSegmentation` (the flight is two jumps, or a cut) instead of guessing. A label finds its jump by `videoId` and `apexS` (within 0.2 s). Nothing
 is invented for you: a blank file scores nothing.
+
+**Review mode (labeling in the app).** Instead of editing the label file by hand, open an analysis and press **Review** in the top bar (or go to
+`#review`). One jump at a time loops in the video (half speed to start with) next to what the classifier made of it, what its four stages
+measured, the data problems that make a guess weak (a pose flip, a camera that is not side-on, a twist that is not measured) and the buttons: one to
+say the classifier was right, and a row for each question (somersaults in quarters, direction, half twists, position), with the figure of the table
+and its difficulty shown as the answers are given. Keys: `0`-`3`, `Q`, `B` `F`, `W` `+` `-`, `S` `T` `P`, `Enter` accepts, `U` cannot tell, `X` bad cut,
+`Z` undo, `N` next. A filter shows only the jumps to do, the ones whose label differs from the guess, or the ones the classifier is not confident
+about, and the review moves on by itself. Labels are kept in the local dataset (never sent anywhere), partly answered jumps included, and **Download
+labels** writes them as the label file above: put it in `eval/labels/` and `make eval` scores each question. **Import labels** does the reverse (jumps
+are matched by apex time, and the app asks first when the file names another video).
 
 `make eval` reads `eval/labels/` by default (`LABELS=dir` to change it, several `FILE`s are fine). A complete label (somersaults, direction when
 it somersaults, twists, position, and an element of the table) counts as the figure for the scores above and as an example for the leave-one-video-out
