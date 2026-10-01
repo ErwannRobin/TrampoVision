@@ -133,6 +133,43 @@
   }
 }
 
+/* Touch: 44px targets in the bar, the landing and the settings. The kit's small button is 40, its menu item 38 and its
+   segmented option 36; the pill keeps its look and the option's hit area grows past it instead (a ::before). */
+@media (pointer: coarse) {
+  .topbar__home {
+    min-width: 44px;
+    min-height: 44px;
+    padding-inline: 10px;
+    margin-inline: -10px;
+  }
+  .topbar .btn--sm,
+  .settings .btn--sm {
+    min-height: 44px;
+  }
+  .topbar .menu__item {
+    min-height: 44px;
+  }
+  .topbar .seg__opt,
+  .settings .seg__opt {
+    position: relative;
+    min-width: 44px;
+  }
+  .topbar .seg__opt::before,
+  .settings .seg__opt::before {
+    content: '';
+    position: absolute;
+    inset: -4px 0;
+  }
+  .settings .switch {
+    min-height: 44px;
+  }
+  .landing__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
 /* Shortcuts ---------------------------------------------------------------------------------------------------- */
 
 .shortcuts {

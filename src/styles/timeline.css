@@ -108,3 +108,19 @@
     font-size: var(--fs-base);
   }
 }
+
+/* Touch: 44px targets on a coarse pointer. The Clip / Jump pill keeps its size; its options' hit area grows past it. */
+@media (pointer: coarse) {
+  .tl .btn--sm {
+    min-height: 44px;
+  }
+  .tl .seg__opt {
+    position: relative;
+    min-width: 44px;
+  }
+  .tl .seg__opt::before {
+    content: '';
+    position: absolute;
+    inset: -4px 0;
+  }
+}
