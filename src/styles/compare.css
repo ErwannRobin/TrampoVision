@@ -1,0 +1,76 @@
+/* The athletes of a clip side by side, in the rail. */
+
+.cmp {
+  display: flex;
+  flex-direction: column;
+}
+.cmp > .cmp__section:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+.cmp__grid {
+  display: grid;
+  grid-template-columns: minmax(84px, 1.1fr) repeat(var(--cols), minmax(0, 1fr));
+  column-gap: 12px;
+  align-items: baseline;
+}
+.cmp__grid--head {
+  padding-bottom: 8px;
+}
+.cmp__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.cmp__swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.cmp__row {
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+.cmp__label {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.cmp__value {
+  font-size: 19px;
+  font-weight: 600;
+}
+.cmp__value--best {
+  color: var(--gold);
+}
+.cmp__unit {
+  margin-left: 3px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.cmp__cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.cmp__skill {
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmp__skill--none,
+.cmp__skill--low {
+  color: var(--text-3);
+  font-weight: 500;
+}
+.cmp__sub {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}

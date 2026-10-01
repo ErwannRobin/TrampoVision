@@ -16,6 +16,8 @@ export interface OverlayOptions {
   hud: boolean;
   /** How much the labels say: 'simple' for the athlete (phase and skill), 'full' for the coach (adds body position and rotation). */
   detail?: 'simple' | 'full';
+  /** Draws the skeleton in this one color instead of the left/right colors: how athletes are told apart when several are shown. */
+  tint?: string;
 }
 
 /*
@@ -457,7 +459,7 @@ function drawTrajectory(
 const SIDES: Side[] = ['center', 'left', 'right'];
 
 /** Thin rounded bones and small joints. Dashed and translucent while the pose is unclear. */
-function drawSkeleton(ctx: CanvasRenderingContext2D, pose: Keypoint[], f: Frame, unclear: boolean) {
+function drawSkeleton(ctx: CanvasRenderingContext2D, pose: Keypoint[], f: Frame, unclear: boolean, tint?: string) {
   const wf = buildWireframe(pose);
   const { sx, sy, u } = f;
   const head = wf.head;
@@ -512,7 +514,7 @@ function drawSkeleton(ctx: CanvasRenderingContext2D, pose: Keypoint[], f: Frame,
   ctx.lineWidth = width;
   if (unclear) ctx.setLineDash([5 * u, 4 * u]);
   for (const side of SIDES) {
-    ctx.strokeStyle = SIDE[side];
+    ctx.strokeStyle = tint ?? SIDE[side];
     trace(side);
     ctx.stroke();
   }
@@ -530,7 +532,7 @@ function drawSkeleton(ctx: CanvasRenderingContext2D, pose: Keypoint[], f: Frame,
       ctx.moveTo(x + radius, y);
       ctx.arc(x, y, radius, 0, TAU);
     }
-    ctx.fillStyle = SIDE[side];
+    ctx.fillStyle = tint ?? SIDE[side];
     ctx.fill();
     ctx.stroke();
   }
@@ -590,7 +592,7 @@ export function drawOverlay(
 
   if (opts.trail) drawTrajectory(ctx, result, sample, detail, f);
   const pose = result.landmarks[sample];
-  if (opts.skeleton && pose) drawSkeleton(ctx, pose, f, result.confidence[sample] < UNCLEAR_BELOW);
+  if (opts.skeleton && pose) drawSkeleton(ctx, pose, f, result.confidence[sample] < UNCLEAR_BELOW, opts.tint);
   if (opts.com && Number.isFinite(result.comX[sample]) && Number.isFinite(result.comY[sample])) {
     drawCenterOfMass(ctx, result.comX[sample] * f.sx, result.comY[sample] * f.sy, f);
   }

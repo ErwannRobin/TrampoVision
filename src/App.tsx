@@ -61,6 +61,8 @@ import { Icon, ActivityToast, type MenuGroupDef } from './ui/kit';
 import { useLocalStorage } from './ui/hooks';
 import { analysisWarnings } from './ui/quality';
 import { AthleteInsights } from './ui/rail/AthleteInsights';
+import { AthleteCompare } from './ui/rail/compare/AthleteCompare';
+import { ATHLETE_TINTS, type AthleteView } from './ui/rail/compare/compare';
 import { CoachRail } from './ui/rail/CoachRail';
 import { LiveRail } from './ui/live/LiveRail';
 import { SettingsDialog } from './ui/chrome/SettingsDialog';
@@ -68,7 +70,7 @@ import { ReadyCard } from './ui/rail/ReadyCard';
 import { CalibrationBar } from './ui/stage/CalibrationBar';
 import { ProcessingOverlay } from './ui/stage/ProcessingOverlay';
 import { clipOrientation, type Size } from './ui/stage/fit';
-import { Stage } from './ui/stage/Stage';
+import { Stage, type OtherAthlete } from './ui/stage/Stage';
 import { Transport } from './ui/stage/Transport';
 import type { Appearance, Audience, CoachTab, StageView, Status } from './ui/types';
 import { useAnnotatedExport } from './ui/useAnnotatedExport';
@@ -104,6 +106,11 @@ function saveCalibration(file: File | null, cal: SavedCalibration) {
   } catch {
     /* storage unavailable: the calibration just isn't remembered */
   }
+}
+
+/** Each athlete of a clip is a video of their own for the labels: the first keeps the id of the clip. */
+function athleteVideoId(base: string | null, index: number): string | null {
+  return base && index > 0 ? `${base}#${index + 1}` : base;
 }
 
 export default function App() {
@@ -167,7 +174,10 @@ export default function App() {
   // Evaluation: which video the labels belong to, and whether the report covers this video or every saved one.
   const [fileVideoId, setVideoId] = useState<string | null>(null);
   // Labels are kept per video: each athlete of a clip is a video of their own, so their jumps never mix.
-  const videoId = fileVideoId && athleteIdx > 0 ? `${fileVideoId}#${athleteIdx + 1}` : fileVideoId;
+  const videoId = athleteVideoId(fileVideoId, athleteIdx);
+  // All the athletes next to each other, instead of one at a time.
+  const [compare, setCompare] = useState(false);
+  const comparing = compare && athleteCount > 1;
   const [seriesName, setSeriesName] = useState<string | null>(null);
   const [evalScope, setEvalScope] = useState<'video' | 'all'>('video');
   const dataset = useDataset();
@@ -235,6 +245,48 @@ export default function App() {
   const skills = useMemo(
     () => (result ? analyzeSkills(result, { config: skillConfig, twist, references, videoId }) : null),
     [result, skillConfig, twist, references, videoId, locale], // oxlint-disable-line react-hooks/exhaustive-deps
+  );
+  // The side by side view needs every athlete analyzed; the chosen one is already done.
+  const athleteViews = useMemo<AthleteView[]>(() => {
+    if (!comparing) return [];
+    return tracks.map((tr, i) => {
+      if (i === athleteIdx && result && skills) return { result, skills };
+      const r = computeAnalysis(
+        tr,
+        { athleteHeightM: height, calibration: analysisCalibration, scaleSource },
+        stabilizePose(tr),
+      );
+      const tw = analyzeTwist({ world: tr.world, time: r.time, fps: r.meta.fps, cycles: r.jumps.cycles });
+      return {
+        result: r,
+        skills: analyzeSkills(r, {
+          config: skillConfig,
+          twist: tw,
+          references,
+          videoId: athleteVideoId(fileVideoId, i),
+        }),
+      };
+    });
+  }, [
+    comparing,
+    tracks,
+    athleteIdx,
+    result,
+    skills,
+    height,
+    analysisCalibration,
+    scaleSource,
+    skillConfig,
+    references,
+    fileVideoId,
+    locale,
+  ]); // oxlint-disable-line react-hooks/exhaustive-deps
+  const others = useMemo<OtherAthlete[]>(
+    () =>
+      athleteViews.flatMap((v, i) =>
+        i === athleteIdx ? [] : [{ result: v.result, tint: ATHLETE_TINTS[i % ATHLETE_TINTS.length] }],
+      ),
+    [athleteViews, athleteIdx],
   );
   const jumpCount = skills?.jumps.length ?? 0;
   const jumpSel = Math.min(selectedJump, Math.max(0, jumpCount - 1));
@@ -433,6 +485,7 @@ export default function App() {
         onProgress: (done, total) => setStatus({ kind: 'analyzing', done, total }),
       });
       setAthleteIdx(0);
+      setCompare(false);
       setTracks(ts);
       setStatus({ kind: 'idle' });
     } catch (err) {
@@ -754,6 +807,13 @@ export default function App() {
   const overlayOpts = useMemo<OverlayOptions>(
     () => ({ ...overlay, detail: advanced && audience === 'coach' ? 'full' : 'simple' }),
     [overlay, audience, advanced],
+  );
+
+  // Side by side, every athlete is one color on the video, the same as in the panel.
+  const stageOverlay = useMemo<OverlayOptions>(
+    () =>
+      comparing ? { ...overlayOpts, hud: false, tint: ATHLETE_TINTS[athleteIdx % ATHLETE_TINTS.length] } : overlayOpts,
+    [overlayOpts, comparing, athleteIdx],
   );
 
   const annotated = useAnnotatedExport({
@@ -1083,7 +1143,8 @@ export default function App() {
                   fps={fps}
                   result={result}
                   skills={shownSkills}
-                  overlay={overlayOpts}
+                  overlay={stageOverlay}
+                  others={others}
                   playhead={playhead}
                   speed={speed}
                   calibration={calDraw}
@@ -1095,7 +1156,18 @@ export default function App() {
                   onClipSize={setClipSize}
                   pane={pane}
                   athletes={
-                    athleteCount > 1 ? { count: athleteCount, value: athleteIdx, onChange: setAthleteIdx } : undefined
+                    athleteCount > 1
+                      ? {
+                          count: athleteCount,
+                          value: athleteIdx,
+                          onChange: (i) => {
+                            setCompare(false);
+                            setAthleteIdx(i);
+                          },
+                          compare: comparing,
+                          onCompare: () => setCompare(true),
+                        }
+                      : undefined
                   }
                 >
                   {editingCal && (
@@ -1156,7 +1228,9 @@ export default function App() {
               </div>
 
               <aside className="workspace__rail sheet" aria-label={result ? t('app.analysis') : t('setup.readyTitle')}>
-                {!result || !skills ? (
+                {comparing && athleteViews.length > 1 ? (
+                  <AthleteCompare athletes={athleteViews} playhead={playhead} />
+                ) : !result || !skills ? (
                   <ReadyCard
                     fileName={file?.name ?? seriesName}
                     busy={analyzing ? 'analyzing' : loading ? 'loading' : 'idle'}

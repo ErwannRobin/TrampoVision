@@ -86,6 +86,7 @@
   --grid: rgba(20, 22, 26, 0.09);
   --series-1: #1a6fe0;
   --series-2: #d9530a;
+  --series-3: #0f8f86;
   --band: rgba(217, 83, 10, 0.12);
   --flight-band: rgba(26, 111, 224, 0.08);
 }
@@ -128,6 +129,7 @@
     --grid: rgba(255, 255, 255, 0.09);
     --series-1: #5da9ff;
     --series-2: #ff9350;
+    --series-3: #19d3c5;
     --band: rgba(255, 147, 80, 0.16);
     --flight-band: rgba(93, 169, 255, 0.1);
   }
@@ -168,6 +170,7 @@
   --grid: rgba(255, 255, 255, 0.09);
   --series-1: #5da9ff;
   --series-2: #ff9350;
+  --series-3: #19d3c5;
   --band: rgba(255, 147, 80, 0.16);
   --flight-band: rgba(93, 169, 255, 0.1);
 }
