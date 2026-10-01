@@ -8,7 +8,7 @@ import {
 } from './analysis/calibration';
 import { computeAnalysis } from './analysis/computeAnalysis';
 import { download, toCsv, toJumpsCsv } from './analysis/export';
-import { extractPoseTrack } from './analysis/extractPoseTrack';
+import { extractPoseTracks } from './analysis/extractPoseTrack';
 import { analysisStride } from './analysis/stride';
 import { stabilizePose } from './analysis/stabilize';
 import { sampleIndexAt } from './analysis/lookup';
@@ -123,7 +123,11 @@ export default function App() {
   const [overlay, setOverlay] = useState<OverlayOptions>({ skeleton: true, com: true, trail: true, hud: true });
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [backend, setBackend] = useState('');
-  const [track, setTrack] = useState<PoseTrack | null>(null);
+  // One track per athlete followed in the clip; everything below (analysis, skills, exports) is about the one chosen.
+  const [tracks, setTracks] = useState<PoseTrack[]>([]);
+  const [athleteIdx, setAthleteIdx] = useState(0);
+  const athleteCount = tracks.length;
+  const track = tracks[Math.min(athleteIdx, Math.max(0, athleteCount - 1))] ?? null;
   const [notice, setNotice] = useState('');
 
   // Trampoline calibration (manual): four corners, bed size, and where meters come from.
@@ -161,7 +165,9 @@ export default function App() {
   const [autoUrl, setAutoUrl] = useState<string | null>(null);
 
   // Evaluation: which video the labels belong to, and whether the report covers this video or every saved one.
-  const [videoId, setVideoId] = useState<string | null>(null);
+  const [fileVideoId, setVideoId] = useState<string | null>(null);
+  // Labels are kept per video: each athlete of a clip is a video of their own, so their jumps never mix.
+  const videoId = fileVideoId && athleteIdx > 0 ? `${fileVideoId}#${athleteIdx + 1}` : fileVideoId;
   const [seriesName, setSeriesName] = useState<string | null>(null);
   const [evalScope, setEvalScope] = useState<'video' | 'all'>('video');
   const dataset = useDataset();
@@ -322,7 +328,7 @@ export default function App() {
     abort.current?.abort();
     if (url) URL.revokeObjectURL(url);
     const nextUrl = URL.createObjectURL(next);
-    setTrack(null);
+    setTracks([]);
     setBackend('');
     setNotice('');
     setFile(next);
@@ -409,14 +415,14 @@ export default function App() {
     abort.current?.abort();
     const ctl = new AbortController();
     abort.current = ctl;
-    setTrack(null);
+    setTracks([]);
     setNotice('');
     setStatus({ kind: 'analyzing', done: 0, total: 1 });
     // The live view analyzes about 30 frames a second, so a phone film at 60 or 120 fps does not make the wait longer.
     const strideNow = advanced ? stride : analysisStride(fps);
     if (strideNow !== stride) setStride(strideNow);
     try {
-      const t = await extractPoseTrack(url, {
+      const ts = await extractPoseTracks(url, {
         model,
         numPoses,
         preferGpu,
@@ -426,7 +432,8 @@ export default function App() {
         onBackend: setBackend,
         onProgress: (done, total) => setStatus({ kind: 'analyzing', done, total }),
       });
-      setTrack(t);
+      setAthleteIdx(0);
+      setTracks(ts);
       setStatus({ kind: 'idle' });
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -450,9 +457,10 @@ export default function App() {
     try {
       const parsed = parsePoseSeries(text);
       openedSeries.current = true;
-      setTrack(parsed.track);
+      setAthleteIdx(0);
+      setTracks([parsed.track]);
       setSeriesName(parsed.source.fileName);
-      setVideoId(parsed.source.videoId ?? videoId ?? videoIdFromTrack(parsed.source.fileName, parsed.track));
+      setVideoId(parsed.source.videoId ?? fileVideoId ?? videoIdFromTrack(parsed.source.fileName, parsed.track));
       setBackend(t('app.fromFile', { backend: parsed.source.backend }));
       setHeight(parsed.settings.athleteHeightM);
       setScaleSource(parsed.settings.scaleSource);
@@ -494,7 +502,7 @@ export default function App() {
     fileRef.current = null;
     setUrl(null);
     setFile(null);
-    setTrack(null);
+    setTracks([]);
     setBackend('');
     setNotice('');
     setStatus({ kind: 'idle' });
@@ -722,7 +730,8 @@ export default function App() {
   }, []);
 
   const fileName = file?.name ?? seriesName ?? 'trampovision';
-  const base = fileName.replace(/\.[^.]+$/, '') || 'trampovision';
+  const clipBase = fileName.replace(/\.[^.]+$/, '') || 'trampovision';
+  const base = athleteCount > 1 ? `${clipBase}-athlete${athleteIdx + 1}` : clipBase;
 
   useEffect(() => {
     document.title = url || result ? `${base} – TrampoVision` : 'TrampoVision';
@@ -915,7 +924,7 @@ export default function App() {
       onFps={(next) => {
         if (next === fps) return;
         setFps(next);
-        setTrack(null);
+        setTracks([]);
       }}
       backend={backend}
       webgpu={webgpu}
@@ -1085,6 +1094,9 @@ export default function App() {
                   onView={advanced && result && twist ? switchStageView : undefined}
                   onClipSize={setClipSize}
                   pane={pane}
+                  athletes={
+                    athleteCount > 1 ? { count: athleteCount, value: athleteIdx, onChange: setAthleteIdx } : undefined
+                  }
                 >
                   {editingCal && (
                     <CalibrationBar

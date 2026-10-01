@@ -435,7 +435,7 @@ hairlines, each with a quiet heading:
   corners", while editing "Undo last corner" and "Done", "Clear" when there are corners; bed size long and short in m;
   "Side 1 to 2 is the" long/short; "Meters from" (auto (bed if set), the bed, athlete height).
 - **Analysis**: model (Lite (fast), Full, Heavy (most accurate)), frame rate (hint: changing it clears the analysis),
-  "Analyze every" (frame, 2nd, 3rd, 4th), people to look for (1 to 3), "Use the GPU if possible"; the runtime line
+  "Analyze every" (frame, 2nd, 3rd, 4th), athletes to follow (1 to 3, each one gets a track and a switcher on the stage), "Use the GPU if possible"; the runtime line
   ("Runtime: {backend or not started}") and the WebGPU line (the two original sentences). The primary action is a sticky
   footer: "Analyze video" (block, large) when there is a video and no result, "Analyze again" (secondary) with a result;
   while analyzing there is no action here (Cancel is on the stage's overlay) and the engine fields are disabled. Loading

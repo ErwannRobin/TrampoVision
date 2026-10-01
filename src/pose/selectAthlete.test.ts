@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LM } from './landmarks';
-import { AthleteTracker } from './selectAthlete';
+import { AthleteTracker, MultiAthleteTracker } from './selectAthlete';
 import type { Keypoint } from './types';
 
 /** A 33-point person whose shoulders and hips (all the tracker reads) sit `torso` pixels apart, hips at (x, y). */
@@ -53,5 +53,79 @@ describe('AthleteTracker', () => {
     }
     const apex = person(500, y - 20);
     expect(t.select([person(300, y, 100), apex])).toBe(apex);
+  });
+});
+
+describe('MultiAthleteTracker', () => {
+  it('gives the tracks to the two biggest people, the leftmost first, and ignores the others', () => {
+    const t = new MultiAthleteTracker(2);
+    const left = person(300, 600, 100);
+    const right = person(800, 600, 100);
+    const [a, b] = t.select([person(500, 600, 40), right, left]);
+    expect(a).toBe(left);
+    expect(b).toBe(right);
+  });
+
+  it('keeps each athlete on their own track frame after frame', () => {
+    const t = new MultiAthleteTracker(2);
+    t.select([person(300, 600), person(800, 600)]);
+    const left = person(305, 560);
+    const right = person(795, 540);
+    // The detector lists them in the opposite order: the tracks follow the people, not the order.
+    const [a, b] = t.select([right, left]);
+    expect(a).toBe(left);
+    expect(b).toBe(right);
+  });
+
+  it('does not swap two athletes who pass close to each other', () => {
+    const t = new MultiAthleteTracker(2);
+    t.select([person(300, 600), person(500, 600)]);
+    let x1 = 300;
+    let x2 = 500;
+    for (let i = 0; i < 8; i++) {
+      x1 += 30;
+      x2 -= 30;
+      const first = person(x1, 600);
+      const second = person(x2, 600);
+      const [a, b] = t.select([first, second]);
+      if (i < 5) {
+        expect(a).toBe(first);
+        expect(b).toBe(second);
+      }
+    }
+  });
+
+  it('leaves one athlete empty while the other is still followed', () => {
+    const t = new MultiAthleteTracker(2);
+    t.select([person(300, 600), person(800, 600)]);
+    const right = person(805, 590);
+    const [a, b] = t.select([right]);
+    expect(a).toBeNull();
+    expect(b).toBe(right);
+  });
+
+  it('never gives one detection to two athletes', () => {
+    const t = new MultiAthleteTracker(2);
+    t.select([person(300, 600), person(340, 600)]);
+    const only = person(320, 600);
+    const out = t.select([only]);
+    expect(out.filter((p) => p === only)).toHaveLength(1);
+  });
+
+  it('picks up the second athlete when they enter later', () => {
+    const t = new MultiAthleteTracker(2);
+    const first = person(300, 600);
+    expect(t.select([first])).toEqual([first, null]);
+    const second = person(800, 600);
+    const out = t.select([person(302, 600), second]);
+    expect(out[1]).toBe(second);
+  });
+
+  it('behaves like the single tracker with one athlete', () => {
+    const t = new MultiAthleteTracker(1);
+    t.select([person(500, 600, 100)]);
+    const athlete = person(510, 500, 100);
+    expect(t.select([person(700, 900, 260), athlete])).toEqual([athlete]);
+    expect(t.select([person(900, 700, 300)])).toEqual([null]);
   });
 });

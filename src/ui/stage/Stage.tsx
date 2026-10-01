@@ -47,6 +47,8 @@ export interface StageProps {
    * The shell lays the page out for a portrait clip from it.
    */
   onClipSize?: (size: Size | null) => void;
+  /** Several athletes were followed: which one the analysis shows. Undefined = a single athlete, no switcher. */
+  athletes?: { count: number; value: number; onChange: (index: number) => void };
   /** The 3D skeleton, shown next to the video (split) or instead of it (3d). */
   pane?: ReactNode;
   /** Layers above the video (busy state, calibration bar): each positions itself absolutely inside the stage. */
@@ -91,6 +93,7 @@ export function Stage({
   view,
   onView,
   onClipSize,
+  athletes,
   pane,
   children,
 }: StageProps) {
@@ -466,6 +469,22 @@ export function Stage({
           data-stacked={layout.stacked || undefined}
         >
           {pane}
+        </div>
+      )}
+
+      {athletes && (
+        <div className="stage__views stage__athletes">
+          <Segmented<string>
+            ariaLabel={t('stage.athletes')}
+            size="sm"
+            value={String(athletes.value)}
+            onChange={(v) => athletes.onChange(Number(v))}
+            options={Array.from({ length: athletes.count }, (_, i) => ({
+              value: String(i),
+              label: t('stage.athlete', { n: i + 1 }),
+              title: t('stage.athleteTitle', { n: i + 1 }),
+            }))}
+          />
         </div>
       )}
 
