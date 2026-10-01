@@ -1,5 +1,5 @@
 import { assetBase } from '../assets';
-import { t } from '../i18n/core';
+import { t, type StringKey } from '../i18n/core';
 
 /**
  * The sample videos are not part of the build (they would be copied into every deployment). They are read from the
@@ -7,7 +7,16 @@ import { t } from '../i18n/core';
  * no sample and the button is hidden. The browser gets the file it decodes natively: the iPhone .mov in Safari, the
  * H.264 .mp4 elsewhere (desktop Chrome cannot decode the HEVC .mov without a slow in-browser conversion).
  */
-const SAMPLE_FILES = ['IMG_8368.mp4', 'IMG_8368.MOV'];
+const SAMPLE_CLIPS: { id: string; label: StringKey; files: string[] }[] = [
+  { id: 'portrait', label: 'sample.portrait', files: ['IMG_8368.mp4', 'IMG_8368.MOV'] },
+  { id: 'landscape', label: 'sample.landscape', files: ['dong-dong-2011-landscape.mp4'] },
+];
+
+export interface Sample {
+  id: string;
+  label: StringKey;
+  path: string;
+}
 
 /**
  * Desktop Safari decodes the HEVC .mov natively. Chromium browsers and Firefox do not reliably, and on iPhone/iPad
@@ -31,7 +40,13 @@ export function pickSample(paths: string[], userAgent?: string, maxTouchPoints?:
   return sorted.find((p) => extensionOf(p) === preferred) ?? sorted.find((p) => extensionOf(p) === 'mp4') ?? null;
 }
 
-export const samplePath = assetBase ? pickSample(SAMPLE_FILES.map((file) => `${assetBase}samples/${file}`)) : null;
+/** The sample clips, each with the file suited to this browser. Empty without an asset host. */
+export const samples: Sample[] = assetBase
+  ? SAMPLE_CLIPS.flatMap(({ id, label, files }) => {
+      const path = pickSample(files.map((file) => `${assetBase}samples/${file}`));
+      return path ? [{ id, label, path }] : [];
+    })
+  : [];
 
 /** Downloads the sample into a File, so it goes through the same path as a user-selected file. */
 export async function loadSample(path: string, onProgress?: (fraction: number) => void): Promise<File> {

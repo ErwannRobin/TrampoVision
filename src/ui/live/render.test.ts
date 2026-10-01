@@ -214,6 +214,10 @@ describe('the first screen', () => {
     renderToStaticMarkup(
       createElement(Landing, {
         onFile: () => {},
+        samples: [
+          { id: 'portrait', label: 'sample.portrait', path: 'portrait.mp4' },
+          { id: 'landscape', label: 'sample.landscape', path: 'landscape.mp4' },
+        ],
         onSample: () => {},
         onOpenSeries: () => {},
         dataset,
@@ -226,7 +230,8 @@ describe('the first screen', () => {
     const html = landing(false);
     expect(html).toContain('Score every skill.');
     expect(html).toContain('Choose a video');
-    expect(html).toContain('Use the sample video');
+    expect(html).toContain('Sample video (portrait)');
+    expect(html).toContain('Sample video (landscape)');
     expect(html).not.toContain('Open a saved analysis');
   });
 
@@ -278,6 +283,7 @@ describe('the settings', () => {
     onBedShort: () => {},
     onFirstSide: () => {},
     onScaleSource: () => {},
+    samples: [],
     onSample: () => {},
     onOpenSeries: () => {},
     appearance: 'system',

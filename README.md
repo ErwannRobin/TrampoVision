@@ -524,7 +524,7 @@ The same list is on the About page. The links are in `src/ui/About.tsx`; the tex
 Every deployment stores a copy of the build output, and the big files were most of it (about 144 MB of 146). With `VITE_ASSET_BASE_URL` set, the build leaves them out (2 MB) and the app reads them from a public folder at runtime: the pose models (`models/`), the MediaPipe and ffmpeg wasm (`mediapipe/<version>/`, `ffmpeg/<version>/`) and the sample videos (`samples/`). The small loader scripts stay in the build, so the host only ever serves data. Without the variable, everything is served from this origin as before (`npm run fetch-assets`; no sample button), which is what `npm run dev` uses.
 
 1. Create a public Vercel Blob store. The browser needs CORS headers on the wasm and model downloads; Blob should send `Access-Control-Allow-Origin: *` (**not checked on a real Blob store yet**).
-2. `BLOB_READ_WRITE_TOKEN=... make upload-assets SAMPLES=<folder>`, with the folder holding `IMG_8368.mp4` and `IMG_8368.MOV` (add `DRY_RUN=1` to only list the files; `npm run upload-assets` does the same). It prints the value for `VITE_ASSET_BASE_URL`.
+2. `BLOB_READ_WRITE_TOKEN=... make upload-assets SAMPLES=<folder>`, with the folder holding `IMG_8368.mp4`, `IMG_8368.MOV` and `dong-dong-2011-landscape.mp4` (add `DRY_RUN=1` to only list the files; `npm run upload-assets` does the same). It prints the value for `VITE_ASSET_BASE_URL`.
 3. Set `VITE_ASSET_BASE_URL` in the Vercel project (Production and Preview) and redeploy.
 4. After upgrading `@mediapipe/tasks-vision` or `@ffmpeg/core`, run the upload again: each version gets its own folder, and a missing folder fails to load instead of mixing versions.
 

@@ -42,7 +42,7 @@ import { buildPoseSeries, parsePoseSeries, toSeriesJson, type ParsedSeries } fro
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
-import { loadSample, samplePath } from './video/sample';
+import { loadSample, samples } from './video/sample';
 import { dragHasFiles, pickDroppedVideo } from './video/drop';
 import { transcodeToH264 } from './video/transcode';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
@@ -307,12 +307,11 @@ export default function App() {
     [corners, editingCal, calibrationModel],
   );
 
-  async function onSample() {
-    if (!samplePath) return;
+  async function onSample(path: string) {
     setStatus({ kind: 'loading', stage: 'downloading', progress: 0 });
     try {
       await onFile(
-        await loadSample(samplePath, (progress) => setStatus({ kind: 'loading', stage: 'downloading', progress })),
+        await loadSample(path, (progress) => setStatus({ kind: 'loading', stage: 'downloading', progress })),
       );
     } catch (err) {
       setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
@@ -951,14 +950,11 @@ export default function App() {
       onBedShort={(m) => setBedShort(m || DEFAULT_BED_M.short)}
       onFirstSide={setFirstSide}
       onScaleSource={setScaleSource}
-      onSample={
-        samplePath
-          ? () => {
-              closeSetup();
-              void onSample();
-            }
-          : null
-      }
+      samples={samples}
+      onSample={(path) => {
+        closeSetup();
+        void onSample(path);
+      }}
       onOpenSeries={(f) => {
         closeSetup();
         void openSeries(f);
@@ -1055,7 +1051,8 @@ export default function App() {
             )}
             <Landing
               onFile={(f) => void onFile(f)}
-              onSample={samplePath ? () => void onSample() : null}
+              samples={samples}
+              onSample={(path) => void onSample(path)}
               onOpenSeries={(f) => void openSeries(f)}
               dataset={dataset}
               recent={{
