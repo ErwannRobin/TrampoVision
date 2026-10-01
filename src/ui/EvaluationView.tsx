@@ -6,6 +6,7 @@ import { buildEvaluationReport, toEvaluationCsv, toEvaluationJson } from '../dat
 import { findFailures } from '../dataset/failures';
 import { agrees, computeMetrics, predictionOf } from '../dataset/metrics';
 import { movementFromPrediction, movementOfRecord, type MovementLabel } from '../dataset/movementLabel';
+import { reviewStatusOf } from '../dataset/stageLabel';
 import { TRUTH_TEXT, type JumpRecord } from '../dataset/types';
 import { elementById, elementName } from '../skills/fig/elements';
 import type { DatasetApi } from '../dataset/useDataset';
@@ -79,7 +80,7 @@ export function EvaluatePanel({
   const predicted = rec ? predictionOf(rec) : null;
   const canLabel = !!videoId && !!rec;
   const movement = rec ? movementOfRecord(rec) : null;
-  const cannotTell = truth === 'unknown' && !rec?.truth?.movement && !rec?.figure;
+  const cannotTell = !!rec && reviewStatusOf(rec) === 'cannot-tell';
   const figureId = rec?.figure?.elementId ?? null;
   const labeled = useMemo(() => skills.jumps.map((_, j) => !!fresh[j]?.truth), [skills.jumps, fresh]);
   const labeledCount = labeled.filter(Boolean).length;

@@ -763,3 +763,421 @@
   min-width: 48px;
   padding: 0 14px;
 }
+
+/* Review mode (ui/review/mode/*): one jump at a time in the place of the rail --------------------------------------- */
+
+.rm {
+  container: rm / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+/* The strip of jumps takes the timeline's place under the video: the room goes to the buttons. */
+.app[data-review='on'] .workspace__dock > .tl {
+  display: none;
+}
+.rm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.rm-title {
+  font-size: var(--fs-lg);
+}
+.rm-alldone {
+  color: var(--ok);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+.rm-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-3);
+}
+.rm-bar__count {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+/* Every jump of the clip, in time order: filled when done, dashed while only partly answered, struck through when it cannot be told. */
+.rm-strip {
+  display: flex;
+  gap: 6px;
+  padding: 2px 2px 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.rm-jumpchip {
+  flex: none;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  transition:
+    background var(--t-fast),
+    border-color var(--t-fast),
+    opacity var(--t-fast);
+}
+.rm-jumpchip:hover {
+  background: var(--panel-3);
+}
+.rm-jumpchip[data-status='done'] {
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.rm-jumpchip[data-status='partial'] {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--warn) 65%, transparent);
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.rm-jumpchip[data-status='cannot-tell'],
+.rm-jumpchip[data-status='bad-segmentation'] {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+.rm-jumpchip[data-dim='true'] {
+  opacity: 0.38;
+}
+.rm-jumpchip[aria-current='true'] {
+  border-color: var(--text);
+  box-shadow: 0 0 0 1px var(--text);
+  opacity: 1;
+}
+
+.rm-jump {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.rm-jump__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.rm-jump__title {
+  font-size: var(--fs-md);
+  text-align: center;
+}
+.rm-jump__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+.rm-speed {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--panel-3);
+}
+.rm-speed__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.rm-speed__btn:hover {
+  color: var(--text);
+}
+.rm-speed__btn[aria-pressed='true'] {
+  background: var(--seg-thumb);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(20, 22, 26, 0.12);
+}
+
+/* The four questions. A chip is a answer; the chosen one is filled. */
+.rm-answer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-input);
+  background: var(--panel-2);
+}
+.rm-answer .btn--primary {
+  --keycap-line: color-mix(in srgb, var(--inverse) 45%, transparent);
+  --keycap-bg: transparent;
+  --keycap-ink: var(--inverse);
+  justify-content: center;
+  gap: var(--sp-2);
+}
+.rm-facet {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.rm-facet__name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+.rm-facet__keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+.rm-facet__note {
+  align-self: center;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+.rm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* With the room for it the name of a question stands beside its buttons, so the four questions fit under one another. */
+@container rm (min-width: 380px) {
+  .rm-facet {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--sp-3);
+  }
+  .rm-facet__name {
+    flex: none;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 4px;
+    width: 84px;
+    padding-top: 6px;
+  }
+  .rm-facet .rm-chips {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+.rm-chip {
+  min-width: 40px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-input);
+  background: var(--panel);
+  color: var(--text);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  transition:
+    background var(--t-fast),
+    border-color var(--t-fast),
+    color var(--t-fast),
+    transform var(--t-fast) var(--ease);
+}
+.rm-chip:hover:not(:disabled) {
+  background: var(--panel-3);
+}
+.rm-chip:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.rm-chip:disabled {
+  opacity: 0.4;
+}
+.rm-chip[aria-pressed='true'],
+.rm-chip[aria-pressed='true']:hover:not(:disabled) {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--inverse);
+}
+@media (pointer: coarse) {
+  .rm-chip {
+    min-width: 44px;
+    height: 44px;
+  }
+}
+.rm-figure {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.rm-figure[data-tone='ok'] {
+  color: var(--ok);
+  font-size: var(--fs-base);
+  font-weight: 600;
+}
+.rm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.rm-actions .btn {
+  gap: 6px;
+}
+
+.rm-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rm-note__label {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+
+.rm-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.rm-section--foot {
+  align-items: flex-start;
+}
+
+/* Candidates: where each one agrees with the measurement, one mark for each question. */
+.rm-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rm-candidate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+}
+.rm-candidate--head {
+  border-top: 0;
+  padding: 0;
+}
+.rm-candidate__name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--fs-base);
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.rm-candidate__meta {
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+}
+.rm-checks {
+  display: inline-grid;
+  grid-template-columns: repeat(4, 30px);
+  gap: 3px;
+}
+.rm-check {
+  display: grid;
+  place-items: center;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--panel-3);
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.rm-check[data-status='match'] {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.rm-check[data-status='weak'] {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.rm-check[data-status='mismatch'] {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.rm-check[data-status='none'] {
+  background: transparent;
+}
+.rm-check--head {
+  height: auto;
+  background: transparent;
+  font-size: var(--fs-xs);
+  font-weight: 550;
+}
+
+.rm-measured {
+  display: grid;
+  gap: 2px;
+}
+.rm-measured__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+}
+.rm-measured__row:first-child {
+  border-top: 0;
+}
+.rm-measured__row dt {
+  flex: none;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.rm-measured__row dd {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: var(--fs-base);
+  font-weight: 550;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.rm-measured__p {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+}
+
+.rm-flags {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rm-flag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--sp-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}

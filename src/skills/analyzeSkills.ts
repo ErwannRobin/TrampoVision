@@ -5,6 +5,8 @@ import { excludeSelf, validExamples, type Reference } from './temporal/prototype
 import { mergeSkillConfig, type DeepPartial, type SkillConfig } from './config';
 import { computeFrameShape, type FrameShape } from './frameShape';
 import { extractJump } from './jumpFeatures';
+import { twistContextOf } from './twistContext';
+import type { Twist2dAnalysis } from './twist2d';
 import { twistTrajectory } from './twistTrajectory';
 import type { JumpSkillResult, SkillClassifier } from './types';
 
@@ -32,6 +34,8 @@ export function analyzeSkills(
     config?: DeepPartial<SkillConfig>;
     classifier?: SkillClassifier;
     twist?: TwistAnalysis | null;
+    /** The twist read from the 2D skeleton (`analyzeTwist2d`): used when the 3D one is missing or not reliable, and as a second opinion otherwise. */
+    twist2d?: Twist2dAnalysis | null;
     /** Labelled examples to compare with (see `dataset/references.ts`). */
     references?: Reference[];
     /** The video being analysed: its own labelled jumps are not compared with themselves. */
@@ -44,12 +48,10 @@ export function analyzeSkills(
   const jumps = result.jumps.cycles.map<JumpSkillResult>((cycle, i) => {
     const { features, sequence } = extractJump(result, frames, cycle, config);
     const estimate = options.twist?.jumps[i];
-    const twist = estimate
-      ? {
-          estimate,
-          trajectory: twistTrajectory(options.twist?.frames ?? null, result.time, cycle, config.sequenceSamples),
-        }
+    const trajectory = estimate
+      ? twistTrajectory(options.twist?.frames ?? null, result.time, cycle, config.sequenceSamples)
       : null;
+    const twist = twistContextOf(estimate, trajectory, options.twist2d?.jumps[i]);
     const examples = validExamples(options.references ?? []);
     const references = options.videoId
       ? excludeSelf(examples, { videoId: options.videoId, apexS: cycle.apexTimeS })

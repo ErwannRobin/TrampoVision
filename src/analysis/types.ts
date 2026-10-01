@@ -49,6 +49,11 @@ export interface AnalysisOptions {
    * athlete height. 'auto' picks the trampoline when a calibration exists.
    */
   scaleSource?: ScaleSource | 'auto';
+  /**
+   * Put back the trunk angle where the pose model turned the athlete upside down for a few frames (head where the feet are), so the
+   * rotation count is not thrown off (see orientation.ts). Default true; false unwraps the trunk angle exactly as it was measured.
+   */
+  repairOrientation?: boolean;
 }
 
 export const DEFAULT_ANALYSIS_OPTIONS: AnalysisOptions = {
@@ -56,6 +61,7 @@ export const DEFAULT_ANALYSIS_OPTIONS: AnalysisOptions = {
   minVisibility: 0.4,
   calibration: null,
   scaleSource: 'auto',
+  repairOrientation: true,
 };
 
 export interface AnalysisSummary {
@@ -101,6 +107,9 @@ export interface AnalysisResult {
     bodyLengthPx: number;
     /** Largest change of body orientation between two consecutive samples, degrees. Above ~120 the count can be ambiguous. */
     maxRotationStepDeg: number;
+    /** Frames whose trunk angle was read 180° away from the pose model's (a head/feet flip repaired by the orientation tracker), and how many separate stretches. */
+    orientationFlippedFrames: number;
+    orientationFlipRuns: number;
   };
   time: Float64Array;
   /** Smoothed, gap-filled landmarks in pixels (null where no athlete could be located). Visibility = per-joint score. */
@@ -128,6 +137,10 @@ export interface AnalysisResult {
   lineAngle: Float64Array;
   /** Continuous body orientation (trunk angle unwrapped): 350 → 355 → 360 → 365, never back to 0. */
   orientation: Float64Array;
+  /** 1 where the trunk angle of a frame was read 180° away from the pose model's (a head/feet flip put back by the orientation tracker). */
+  orientationFlipped: Uint8Array;
+  /** Body-line (ankles→head) angle made continuous like `orientation`. */
+  lineOrientation: Float64Array;
   /** Cumulative trunk rotation, degrees, relative to the first valid sample. */
   rotation: Float64Array;
   /** Trunk angular velocity, deg/s. */

@@ -1,6 +1,6 @@
 import { t } from '../i18n';
 import { useMediaQuery } from './hooks';
-import { Icon, IconButton, Logo, Menu, Segmented, type MenuGroupDef } from './kit';
+import { Button, Icon, IconButton, Logo, Menu, Segmented, type MenuGroupDef } from './kit';
 import { LanguageMenu } from './LanguageMenu';
 import { ShortcutsPopover } from './chrome/ShortcutsPopover';
 import type { Audience } from './types';
@@ -20,6 +20,8 @@ export interface TopBarProps {
   /** The About page is open; `onAbout` opens it. */
   aboutOpen: boolean;
   onAbout: () => void;
+  /** The review mode (label the jumps one at a time); null hides the button, e.g. when there is no analysis to review. */
+  review: { open: boolean; onToggle: () => void } | null;
   /** Choose another video (null hides the button, e.g. while analyzing). */
   onFile: ((file: File) => void) | null;
   /** Go back to the first screen (the logo); null when already there. */
@@ -43,6 +45,7 @@ export function TopBar({
   onOpenSetup,
   aboutOpen,
   onAbout,
+  review,
   onFile,
   onHome,
 }: TopBarProps) {
@@ -85,6 +88,21 @@ export function TopBar({
         {exportGroups && (
           <Menu label={t('topbar.export')} icon="download" groups={exportGroups} size="sm" iconOnly={narrow} />
         )}
+        {review &&
+          (labeled ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon="tag"
+              aria-pressed={review.open}
+              title={t('rm.openHint')}
+              onClick={review.onToggle}
+            >
+              {t('rm.open')}
+            </Button>
+          ) : (
+            <IconButton icon="tag" label={t('rm.open')} pressed={review.open} onClick={review.onToggle} />
+          ))}
         <IconButton
           icon="gear"
           label={t('topbar.settings')}

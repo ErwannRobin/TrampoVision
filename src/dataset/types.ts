@@ -1,4 +1,5 @@
 import { lazyText, t, type Locale } from '../i18n/core';
+import type { StageLabel } from '../eval/labels';
 import type { MovementLabel } from './movementLabel';
 import type { TwistEstimate, TwistSequence } from '../pose3d/twist';
 import type { SkillConfig } from '../skills/config';
@@ -27,6 +28,12 @@ export type ClassLabel = (typeof CLASS_LABELS)[number];
 export const RECORD_SCHEMA = 'trampovision.jump-record';
 export const RECORD_VERSION = 1;
 
+/** What a person counted at each of the four questions of the classifier, one by one (the review mode). The same shape as a line of a label file (`eval/labels.ts`). */
+export type StageAnswers = StageLabel;
+
+/** Why a jump has no figure: the person cannot tell what it was, or it was cut at the wrong place. */
+export type ReviewFlag = 'cannot-tell' | 'bad-segmentation';
+
 export interface GroundTruth {
   label: TruthLabel;
   /** ISO time of the last change. */
@@ -34,6 +41,10 @@ export interface GroundTruth {
   note?: string;
   /** The choices `label` was derived from (position, direction, somersaults, half twists); absent in files saved before them. */
   movement?: MovementLabel;
+  /** The answers as they were given: quarters of somersaults allowed, questions left blank stay blank. Set by the review mode. */
+  stages?: StageAnswers;
+  /** Set by the review mode when the jump has no label because it cannot be told (`cannot-tell`) or was cut at the wrong place. */
+  flag?: ReviewFlag;
 }
 
 /** What the annotator counted, in half twists (0, 1, 2, ...). Separate from the skill label: it only serves to check the experimental twist estimate. */

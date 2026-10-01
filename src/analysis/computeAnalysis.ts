@@ -2,9 +2,10 @@ import { LM } from '../pose/landmarks';
 import { buildCalibration } from './calibration';
 import { estimateCom } from './com';
 import { angleFromVertical, jointAngle, mid, skeletonLength } from './geometry';
-import { detectJumps } from './jumpCycles';
+import { detectJumps, PHASE } from './jumpCycles';
+import { plainOrientation, trackOrientation } from './orientation';
 import { localPolyFit, median, oddWindow, unwrapDegrees } from './signal';
-import { stabilizePose, type StabilizedPose } from './stabilize';
+import { JOINT_STATE, stabilizePose, type StabilizedPose } from './stabilize';
 import {
   DEFAULT_ANALYSIS_OPTIONS,
   JOINT_NAMES,
@@ -61,6 +62,12 @@ export function computeAnalysis(
   const comCoverage = new Float64Array(n);
   const trunk = nanSeries(n);
   const line = nanSeries(n);
+  // What the orientation tracker needs to tell a real rotation from a head/feet flip of the pose model (see orientation.ts).
+  const headDir = nanSeries(n);
+  const trunkLen = nanSeries(n);
+  const trunkTrust = nanSeries(n);
+  const lineWeight = nanSeries(n);
+  const headWeight = nanSeries(n);
   const skeletonLen = nanSeries(n);
   const joints = Object.fromEntries(JOINT_NAMES.map((j) => [j, nanSeries(n)])) as Record<JointName, Float64Array>;
 
@@ -85,6 +92,15 @@ export function computeAnalysis(
 
     trunk[i] = angleFromVertical(hips, shoulders);
     line[i] = angleFromVertical(ankles, head);
+    trunkLen[i] = Math.hypot(shoulders.x - hips.x, shoulders.y - hips.y);
+    trunkTrust[i] =
+      (pts[LM.L_SHOULDER].visibility +
+        pts[LM.R_SHOULDER].visibility +
+        pts[LM.L_HIP].visibility +
+        pts[LM.R_HIP].visibility) /
+      4;
+    if (Number.isFinite(comX[i]) && Number.isFinite(comY[i]) && Number.isFinite(head.x))
+      headDir[i] = angleFromVertical({ x: comX[i], y: comY[i] }, head);
     skeletonLen[i] = skeletonLength(pts);
     for (const name of JOINT_NAMES) {
       const [a, b, c] = JOINTS[name];
@@ -127,8 +143,68 @@ export function computeAnalysis(
   }
   const vy = localPolyFit(height, velWindow).slope.map((s) => s * fps);
 
-  // 5. Orientation: the trunk angle made continuous, then differentiated.
-  const orientation = unwrapDegrees(trunk);
+  // 5. Orientation: the trunk angle made continuous, then differentiated. A trunk that the pose model turned upside down for a few
+  // frames is put back by the orientation tracker (it costs nothing on a clean track); `repairOrientation: false` unwraps as it comes.
+  const medTrunk = median(trunkLen);
+  const bodyLen = median(skeletonLen);
+  for (let i = 0; i < n; i++) {
+    // A trunk that looks much shorter than usual is foreshortened or collapsed: its angle is not worth much.
+    const lengthTrust = Number.isFinite(medTrunk) && medTrunk > 0 ? Math.min(1, trunkLen[i] / (0.7 * medTrunk)) : 1;
+    trunkTrust[i] = Math.min(1, trunkTrust[i] * 1.25) * lengthTrust;
+    // The ankles-to-head line says little when the legs are folded up to the head, the center-of-mass-to-head direction when the head is tucked in.
+    const pts = landmarks[i];
+    if (pts && Number.isFinite(bodyLen)) {
+      const ankles = mid(pts[LM.L_ANKLE], pts[LM.R_ANKLE]);
+      const head =
+        Number.isFinite(pts[LM.L_EAR].x) && Number.isFinite(pts[LM.R_EAR].x)
+          ? mid(pts[LM.L_EAR], pts[LM.R_EAR])
+          : pts[LM.NOSE];
+      lineWeight[i] = Math.min(1, Math.hypot(head.x - ankles.x, head.y - ankles.y) / (0.7 * bodyLen));
+      headWeight[i] = Number.isFinite(comX[i])
+        ? Math.min(1, Math.hypot(head.x - comX[i], head.y - comY[i]) / (0.3 * bodyLen))
+        : 0;
+    }
+  }
+  // A joint that was put in place of a rejected glitch is not a measurement: the angle of such a frame is left to the frames around it.
+  // (Joints interpolated across a gap are still used: leaving those out as well changed the rotation of real double somersaults by half
+  // a turn and more, in a direction nobody has checked yet; see README, Head/feet flips.)
+  const bridged = (i: number, ks: number[]) => ks.some((k) => stab.state[k][i] === JOINT_STATE.corrected);
+  const trunkMadeUp = new Uint8Array(n);
+  const lineMadeUp = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    trunkMadeUp[i] = bridged(i, [LM.L_SHOULDER, LM.R_SHOULDER, LM.L_HIP, LM.R_HIP]) ? 1 : 0;
+    lineMadeUp[i] = trunkMadeUp[i] || bridged(i, [LM.L_ANKLE, LM.R_ANKLE]) || bridged(i, [LM.NOSE]) ? 1 : 0;
+  }
+  // The flights, found a first time on the orientation as measured: only there can the trunk have been turned over by the pose model.
+  const tracked = (() => {
+    if (opts.repairOrientation === false) return null;
+    const first = detectJumps({
+      fps,
+      time: Float64Array.from(track.times),
+      height,
+      vy,
+      x,
+      orientation: unwrapDegrees(trunk),
+    });
+    const inFlight = Uint8Array.from(first.phase, (p) => (p === PHASE.ground || p === PHASE.unknown ? 0 : 1));
+    return {
+      trunk: trackOrientation({
+        angle: trunk,
+        ignore: trunkMadeUp,
+        allowFlip: inFlight,
+        weight: trunkTrust,
+        line,
+        lineWeight,
+        head: headDir,
+        headWeight,
+      }),
+      line: trackOrientation({ angle: line, ignore: lineMadeUp, allowFlip: inFlight, weight: lineWeight }),
+    };
+  })();
+  const trunkTrack = tracked?.trunk ?? plainOrientation(trunk);
+  const orientation = trunkTrack.orientation;
+  // The body line is made continuous the same way, on its own: it is the independent check of the trunk's rotation (see skills/rotation.ts).
+  const lineOrientation = (tracked?.line ?? plainOrientation(line)).orientation;
   const firstOrientation = orientation.find(Number.isFinite) ?? 0;
   const rotation = orientation.map((r) => r - firstOrientation);
   const angularVelocity = localPolyFit(rotation, velWindow).slope.map((s) => s * fps);
@@ -179,6 +255,8 @@ export function computeAnalysis(
       viewAngleDeg: model ? model.viewAngleDeg : NaN,
       bodyLengthPx: stab.bodyLengthPx,
       maxRotationStepDeg,
+      orientationFlippedFrames: trunkTrack.flippedFrames,
+      orientationFlipRuns: trunkTrack.flipRuns,
     },
     time,
     landmarks,
@@ -195,6 +273,8 @@ export function computeAnalysis(
     trunkAngle: trunk,
     lineAngle: line,
     orientation,
+    orientationFlipped: trunkTrack.flipped,
+    lineOrientation,
     rotation,
     angularVelocity,
     joints,

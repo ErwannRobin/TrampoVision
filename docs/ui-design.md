@@ -391,6 +391,39 @@ Keeps every export and prop: `DatasetBar`, `EvaluatePanel`, `EvaluationReport`. 
   failure cases as disclosure rows with the check table, what the classifier saw, sparks and all features. Use `--lift`
   for lines, tokens for everything else.
 
+### Review mode (`ui/review/mode/*`, `ui/chrome/reviewRoute.ts`, `dataset/stageLabel.ts`, `styles/review.css`)
+
+A focused way to label jumps: one jump at a time, in the place of the rail. The top bar's **Review** button (or the address `#review`,
+which survives a reload and closes with the back button) opens it for the open analysis; it works on a loaded video and on a saved
+analysis. The app root gets `data-review="on"`: the timeline leaves the dock (the strip of jumps takes its job, and the room goes to the
+buttons), and the video loops the selected jump from a little before takeoff to a little after landing, at half speed the first time.
+
+- Rail, top to bottom: title and close; progress (jumps done or flagged) with its bar; the filter (`All`, `To do`, `Differ`, `Not sure`);
+  the strip of every jump (a chip each: filled green = labelled, dashed amber = partly answered, struck through = cannot tell or bad cut,
+  faint = left out by the filter, ringed = the one on screen); previous / next; the state, the flight time and the speed (`0.25×`, `0.5×`,
+  `1×`, replay); the **answer panel**; the note; what the classifier says with its best candidates; what was measured by the four stages;
+  the data problems; the curves; the switch for moving on by itself, the label download and import, and the keys.
+- Answer panel: a primary button that says the classifier was right (the guess and its difficulty on it); one row of chips for each of the
+  four questions (somersaults in quarters 0 to 3, direction, half twists 0 to 8, position), the name of the question beside its chips
+  with the keys under it on a wide rail, above them on a narrow one; the figure the answers name with its difficulty, or why there is none
+  yet (partly answered, a quarter rotation, not in the table); `Can’t tell`, `Bad cut`, `Clear`, `Undo`. A chip pressed twice takes the
+  answer back; a jump marked `Can’t tell` or `Bad cut` shows no answer pressed.
+- Candidates: the four best, each with a mark for each question (✓ agrees, ~ weak, ✗ differs, · not measured; the words are the title
+  and the accessible name, the glyph never carries it alone) and a button that says it was that one.
+- Data problems are plain sentences with a badge: cut off, pose flip (a step of the orientation above the limit), back and forth (a
+  reversal), body line (the cross-check), poor pose, camera angle, facing, twist not measured. They explain why a guess is weak.
+- Keys: `0`–`3` somersaults, `Q` a further quarter, `B` `F` direction, `W` no twist, `+` `−` half twists, `S` `T` `P` position, `Enter` or
+  `A` accepts the classifier, `U` cannot tell, `X` bad cut, `C` clear, `Z` or Ctrl/⌘+Z undo, `N` next jump of the filter, `R` replay.
+  Space and the arrows stay with the player and `[` `]` with the jumps. `Enter` on a button reached with the keyboard presses it; after a
+  click it still accepts. The button that opened the review is blurred, so the keys land on the page.
+- It moves on by itself (switch, on by default) 450 ms after a jump becomes done, flagged, or accepted, to the next jump of the filter
+  that still needs a label; changing an answer of a done jump does not move. `Undo` takes back the last 50 changes, one by one.
+- Labels are saved in the local dataset as they are given (never sent to the review service from here), as the five-way label and the figure
+  the rest of the app already reads, plus the answers as given (`truth.stages`: blanks stay blank, quarters allowed) and the flag
+  (`truth.flag`). Only whole answers make a figure, and so a reference example; partly answered jumps and quarter rotations are kept for
+  the stage scores. **Download labels** writes the clip's labels as a `trampovision.jump-labels` file, the one `make eval` scores against;
+  **Import labels** puts such a file on the jumps by apex time (it asks first when the file names another video).
+
 ### Chrome (`ui/Landing.tsx`, `ui/TopBar.tsx`, `ui/StatusBanners.tsx`, `ui/rail/SetupPanel.tsx`, `styles/chrome.css`)
 
 **TopBar** (56px, `<header class="topbar">`). Left: the logo (a button when `onHome`), then the clip name (truncated,

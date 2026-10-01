@@ -299,12 +299,16 @@ describe('arms', () => {
 });
 
 describe('end of the twist', () => {
-  const twisting = (finishU: number, reliable: boolean) => {
+  const twisting = (finishU: number, reliable: boolean, source?: 'pose2d') => {
     const trajectory = Array.from(
       { length: SAMPLES },
       (_, k) => 720 * smooth((k / (SAMPLES - 1) - 0.1) / (finishU - 0.1)),
     );
-    const twist = { estimate: { available: true, reliable, totalDeg: 720 }, trajectory } as unknown as TwistContext;
+    const twist = {
+      estimate: { available: true, reliable, totalDeg: 720 },
+      trajectory,
+      source,
+    } as unknown as TwistContext;
     return executionOf({
       sequence: sequenceOf({ hip: () => 174, turns: one(1) }),
       features: features(),
@@ -320,6 +324,12 @@ describe('end of the twist', () => {
 
   it('does not judge it from a twist that is not reliable', () => {
     const e = twisting(1, false);
+    expect(e.items.some((d) => d.id === 'twist-end')).toBe(false);
+    expect(e.unchecked.map((u) => u.id)).toContain('twist-end');
+  });
+
+  it('does not judge it from a twist counted in 2D, which has no timing of its own', () => {
+    const e = twisting(1, true, 'pose2d');
     expect(e.items.some((d) => d.id === 'twist-end')).toBe(false);
     expect(e.unchecked.map((u) => u.id)).toContain('twist-end');
   });

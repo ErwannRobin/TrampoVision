@@ -70,6 +70,10 @@ export const classifier: Translation<typeof en> = {
   'limit.twist.needed': 'Une pose 3D ou une seconde caméra pour mesurer la vrille.',
   'limit.unmeasured.problem': 'Non mesurée.',
   'limit.unmeasured.needed': 'Pose 3D.',
+  'limit.twist2d.signal': 'Vrille par indices 2D',
+  'limit.twist2d.problem':
+    'La vrille a été comptée à partir des lignes des épaules et du bassin et du visage dans une seule vue 2D, pas en 3D. Elle ne donne ni le sens ni le moment de la vrille, suppose une largeur d’épaules typique et n’a été vérifiée que sur un athlète simulé.',
+  'limit.twist2d.needed': 'Une pose 3D fiable, une deuxième caméra, ou quelqu’un qui compte les vrilles.',
 
   'level.low': 'faible',
   'level.medium': 'moyen',
@@ -121,6 +125,9 @@ export const classifier: Translation<typeof en> = {
   'ev.poseQuality.label': 'Qualité de la pose en vol',
   'ev.poseQuality.note': 'articulations mesurées : 1, interpolées : 0,6, corrigées : 0,4, manquantes : 0',
   'ev.temporal.label': 'Correspondance de trajectoire',
+  'ev.twistSource.label': 'Vrille issue de',
+  'ev.twistSource.pose3d': 'pose 3D',
+  'ev.twistSource.pose2d': 'indices 2D (largeur des épaules, ordre gauche/droite, visage)',
   'ev.temporal.noteExample': 'référence la plus proche : un exemple étiqueté de {name}',
   'ev.temporal.noteModel': 'référence la plus proche : le mouvement attendu de {name}',
   'ev.offGrid.label': 'Rotation par rapport au salto entier le plus proche',
@@ -176,6 +183,11 @@ export const classifier: Translation<typeof en> = {
     'tolérance ±{deg}°, confiance de la vrille {conf} (sous sa limite de fiabilité : partiellement écartée)',
   'stage.twists.done': '90 % de la vrille réalisée à {at} du vol',
   'stage.twists.observed': '{turns} vrilles ({deg}°)',
+  'stage.twists.source2d':
+    'vrille comptée sur le squelette 2D (largeur des épaules, ordre gauche/droite, visage) : {n} demi-vrilles, cohérence {conf}, tolérance ±{deg}° ; pas de vrille 3D fiable',
+  'stage.twists.secondAgrees': 'le squelette 2D compte pareil : {n} demi-vrilles (cohérence {conf})',
+  'stage.twists.secondDisagrees':
+    'le squelette 2D compte {n} demi-vrilles (cohérence {conf}) et n’est pas d’accord : la vrille 3D pèse moins',
   'stage.position.mostClosed': 'moment le plus fermé : {position} (score de règle {score}, tenu {held})',
   'stage.position.share': 'part du vol : {shares}',
   'stage.position.peakAt': 'le plus fermé à {at} du vol',

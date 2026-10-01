@@ -317,7 +317,8 @@ export function executionOf(input: ExecutionInput): Execution {
   if (N >= 1 && halfTwists > 2) {
     const est = input.twist?.estimate;
     const traj = input.twist?.trajectory;
-    if (est?.available && est.reliable && traj && traj.length === n && g) {
+    // A twist read from 2D cues has no trajectory of its own, so it never says when the twist finished.
+    if (input.twist?.source !== 'pose2d' && est?.available && est.reliable && traj && traj.length === n && g) {
       const total = Math.abs(traj[n - 1]);
       const done = traj.findIndex((v) => Number.isFinite(v) && Math.abs(v) >= total - 90);
       if (total >= 270 && done >= 0 && Number.isFinite(g[done]) && g[done] >= CLOCK.three - cfg.clockTolerance) {

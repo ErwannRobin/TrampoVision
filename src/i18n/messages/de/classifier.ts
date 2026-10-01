@@ -70,6 +70,10 @@ export const classifier: Translation<typeof en> = {
   'limit.twist.needed': '3D-Pose oder eine zweite Kamera, um die Schraube zu messen.',
   'limit.unmeasured.problem': 'Nicht gemessen.',
   'limit.unmeasured.needed': '3D-Pose.',
+  'limit.twist2d.signal': 'Schraube aus 2D-Hinweisen',
+  'limit.twist2d.problem':
+    'Die Schraube wurde aus Schulter- und Hüftlinie und dem Gesicht in einer einzigen 2D-Ansicht gezählt, nicht in 3D. Sie sagt weder die Richtung noch den Zeitpunkt der Schraube, nimmt eine typische Schulterbreite an und wurde nur an einem simulierten Athleten geprüft.',
+  'limit.twist2d.needed': 'Eine verlässliche 3D-Pose, eine zweite Kamera oder jemand, der die Schrauben zählt.',
 
   'level.low': 'niedrig',
   'level.medium': 'mittel',
@@ -121,6 +125,9 @@ export const classifier: Translation<typeof en> = {
   'ev.poseQuality.label': 'Posenqualität im Flug',
   'ev.poseQuality.note': 'gemessene Gelenke zählen 1, interpolierte 0,6, korrigierte 0,4, fehlende 0',
   'ev.temporal.label': 'Bahnübereinstimmung',
+  'ev.twistSource.label': 'Schraube aus',
+  'ev.twistSource.pose3d': '3D-Pose',
+  'ev.twistSource.pose2d': '2D-Hinweisen (Schulterbreite, Links/Rechts-Reihenfolge, Gesicht)',
   'ev.temporal.noteExample': 'nächstliegende Referenz: ein beschriftetes Beispiel von {name}',
   'ev.temporal.noteModel': 'nächstliegende Referenz: die erwartete Bewegung von {name}',
   'ev.offGrid.label': 'Rotation zum nächsten ganzen Salto',
@@ -177,6 +184,11 @@ export const classifier: Translation<typeof en> = {
     'Toleranz ±{deg}°, Vertrauen der Schraube {conf} (unter ihrer Zuverlässigkeitsgrenze: teilweise abgewertet)',
   'stage.twists.done': '90 % der Schraube sind bei {at} des Fluges geschafft',
   'stage.twists.observed': '{turns} Schrauben ({deg}°)',
+  'stage.twists.source2d':
+    'Schraube am 2D-Skelett gezählt (Schulterbreite, Links/Rechts-Reihenfolge, Gesicht): {n} halbe Schrauben, Stimmigkeit {conf}, Toleranz ±{deg}°; keine verlässliche 3D-Schraube',
+  'stage.twists.secondAgrees': 'das 2D-Skelett zählt gleich: {n} halbe Schrauben (Stimmigkeit {conf})',
+  'stage.twists.secondDisagrees':
+    'das 2D-Skelett zählt {n} halbe Schrauben (Stimmigkeit {conf}) und widerspricht: die 3D-Schraube zählt weniger',
   'stage.position.mostClosed': 'am stärksten geschlossener Moment: {position} (Regelwert {score}, gehalten {held})',
   'stage.position.share': 'Anteil am Flug: {shares}',
   'stage.position.peakAt': 'am stärksten geschlossen bei {at} des Fluges',
