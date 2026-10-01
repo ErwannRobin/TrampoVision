@@ -1,5 +1,6 @@
 import { useMemo, type CSSProperties } from 'react';
-import { t, useLocale } from '../../../i18n';
+import { synchroScore, SYNCHRO_FULL_MARK } from '../../../analysis/synchro';
+import { formatPercent, t, useLocale } from '../../../i18n';
 import { Chart } from '../../Chart';
 import { fmt } from '../../format';
 import { cx } from '../../kit';
@@ -21,6 +22,10 @@ export function AthleteCompare({ athletes, playhead }: Props) {
   const locale = useLocale();
   const stats = useMemo(() => compareStats(athletes), [athletes, locale]); // oxlint-disable-line react-hooks/exhaustive-deps
   const jumps = useMemo(() => compareJumpRows(athletes), [athletes, locale]); // oxlint-disable-line react-hooks/exhaustive-deps
+  const synchro = useMemo(
+    () => synchroScore(athletes.map((a) => a.skills.jumps.map((j) => ({ cycle: j.cycle, skill: j.prediction.skill })))),
+    [athletes],
+  );
   const series = useMemo(
     () =>
       athletes.map((a, i) => ({
@@ -56,6 +61,41 @@ export function AthleteCompare({ athletes, playhead }: Props) {
             ))}
           </div>
         ))}
+      </section>
+
+      <section className="ins-section cmp__section">
+        <h3 className="ins-h">{t('compare.synchro')}</h3>
+        {synchro.score === null ? (
+          <p className="ins-quiet">{t('compare.synchroNone')}</p>
+        ) : (
+          <>
+            <div className="cmp__score">
+              <span className="cmp__score-num num">{fmt(synchro.score, 1)}</span>
+              <span className="cmp__score-of">{t('compare.synchroOf', { max: SYNCHRO_FULL_MARK })}</span>
+            </div>
+            <div className="cmp__grid cmp__grid--synchro cmp__grid--head">
+              <span />
+              <span className="cmp__col">{t('compare.synchroTiming')}</span>
+              <span className="cmp__col">{t('compare.synchroHeight')}</span>
+              <span className="cmp__col">{t('compare.synchroScore')}</span>
+            </div>
+            {synchro.jumps.map((j) => (
+              <div key={j.number} className="cmp__grid cmp__grid--synchro cmp__row">
+                <span className="cmp__label num">{j.number}</span>
+                <span className="num">{fmt((j.takeoffSpreadS + j.landingSpreadS) / 2, 2)} s</span>
+                <span className="num">{formatPercent(j.heightSpread)}</span>
+                <span className="cmp__score-cell num">
+                  {fmt(j.score, 1)}
+                  {j.sameSkill === false && <span className="cmp__flag">{t('compare.synchroSkill')}</span>}
+                </span>
+              </div>
+            ))}
+          </>
+        )}
+        {synchro.unmatched > 0 && (
+          <p className="ins-quiet cmp__note">{t('compare.synchroUnmatched', { n: synchro.unmatched })}</p>
+        )}
+        <p className="ins-quiet cmp__note">{t('compare.synchroNote')}</p>
       </section>
 
       <section className="ins-section cmp__section">
