@@ -475,7 +475,8 @@
   }
 }
 @media (max-width: 520px) {
-  .landing__actions .btn {
+  .landing__actions .btn,
+  .landing__actions .menu {
     width: 100%;
   }
   .landing__dataset {

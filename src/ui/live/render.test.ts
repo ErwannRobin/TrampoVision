@@ -230,8 +230,9 @@ describe('the first screen', () => {
     const html = landing(false);
     expect(html).toContain('Score every skill.');
     expect(html).toContain('Choose a video');
-    expect(html).toContain('>portrait<');
-    expect(html).toContain('>landscape<');
+    // The samples sit behind one menu: the home page shows two actions, the clips only once it is open.
+    expect(html).toContain('Try a sample');
+    expect(html).not.toContain('>portrait<');
     expect(html).not.toContain('Open a saved analysis');
   });
 

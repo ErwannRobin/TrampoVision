@@ -9,7 +9,7 @@ import { DemoSkeleton } from './DemoSkeleton';
 import { DatasetBar, EvaluationReport } from './EvaluationView';
 import type { Sample } from '../video/sample';
 import { useMediaQuery } from './hooks';
-import { Button, Icon } from './kit';
+import { Icon, Menu } from './kit';
 
 export interface LandingProps {
   onFile: (file: File) => void;
@@ -104,17 +104,25 @@ export function Landing({ onFile, samples, onSample, onOpenSeries, dataset, rece
             ) : (
               <VideoButton label={t('landing.choose')} icon="upload" primary busy={busy} onFile={onFile} />
             )}
-            {samples.map((sample) => (
-              <Button
-                key={sample.id}
-                variant="secondary"
+            {samples.length > 0 && (
+              <Menu
+                label={t('landing.sample')}
+                icon="film"
                 size="lg"
-                disabled={busy}
-                onClick={() => onSample(sample.path)}
-              >
-                {sample.label}
-              </Button>
-            ))}
+                align="start"
+                groups={[
+                  {
+                    id: 'samples',
+                    items: samples.map((sample) => ({
+                      id: sample.id,
+                      label: sample.label,
+                      disabled: busy,
+                      onSelect: () => onSample(sample.path),
+                    })),
+                  },
+                ]}
+              />
+            )}
           </div>
           <p className="landing__hint">{t('landing.drop')}</p>
           {advanced && (

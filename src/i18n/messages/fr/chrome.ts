@@ -48,6 +48,7 @@ export const chrome: Translation<typeof en> = {
     'Filmez un enchaînement. TrampoVision nomme chaque figure, calcule sa difficulté, propose une note d’exécution et indique ce qu’il faut corriger. Tout se passe sur votre appareil.',
   'landing.film': 'Filmer un enchaînement',
   'landing.choose': 'Choisir une vidéo',
+  'landing.sample': 'Essayer un exemple',
   'landing.drop': 'ou déposez une vidéo n’importe où sur cette page',
   'landing.openSaved': 'Ouvrir une analyse enregistrée',
   'landing.review': 'Vérifier les sauts',
