@@ -1,0 +1,36 @@
+name: Deploy review Worker
+on:
+  push:
+    branches: [main]
+    # worker/ plus what its bundle imports from the app (src/skills, src/i18n) and the wrangler version.
+    paths:
+      - worker/**
+      - src/skills/**
+      - src/i18n/**
+      - package.json
+      - package-lock.json
+      - .github/workflows/deploy-worker.yml
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: make worker-check
+      - run: npx vitest run worker
+      # schema.sql is idempotent (CREATE ... IF NOT EXISTS), so it can run on every deploy.
+      - run: make worker-schema
+      - run: make worker-deploy
