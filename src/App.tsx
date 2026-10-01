@@ -329,24 +329,24 @@ export default function App() {
   const selectedRef = useRef(0);
   selectedRef.current = jumpSel;
   // The review mode loops one jump and keeps it selected: the run-up and the landing must not move the selection.
-  // "Play jump" keeps its jump selected until it stops: its run-up and landing can touch the neighbouring jumps.
-  const rangeLock = useRef<'off' | 'armed' | 'playing'>('off');
+  // "Play jump" keeps its jump selected while the playhead stays in its range, even after it stops: the run-up and
+  // the landing can touch the neighbouring jumps. Moving out of the range (scrub, normal play) frees the selection.
+  const rangeLock = useRef<{ from: number; to: number } | null>(null);
   useEffect(() => {
     if (!result || reviewOpen) return;
     const unsubscribe = playhead.subscribe(() => {
-      if (rangeLock.current !== 'off') return;
-      const idx = result.jumps.cycleIndex[sampleIndexAt(result.meta, playhead.getSnapshot())];
+      const t = playhead.getSnapshot();
+      const lock = rangeLock.current;
+      if (lock) {
+        if (t >= lock.from - 0.1 && t <= lock.to + 0.1) return;
+        rangeLock.current = null;
+      }
+      const idx = result.jumps.cycleIndex[sampleIndexAt(result.meta, t)];
       if (idx >= 0 && idx !== selectedRef.current) setSelectedJump(idx);
-    });
-    const unsubscribeState = playhead.subscribeState(() => {
-      if (playhead.getPlaying()) {
-        if (rangeLock.current === 'armed') rangeLock.current = 'playing';
-      } else if (rangeLock.current === 'playing') rangeLock.current = 'off';
     });
     return () => {
       unsubscribe();
-      unsubscribeState();
-      rangeLock.current = 'off';
+      rangeLock.current = null;
     };
   }, [result, playhead, reviewOpen]);
 
@@ -366,8 +366,10 @@ export default function App() {
   const playJump = () => {
     const c = result?.jumps.cycles[jumpSel];
     if (!c) return;
-    rangeLock.current = playhead.getPlaying() ? 'playing' : 'armed';
-    playhead.playRange((c.takeoffTimeS ?? c.apexTimeS) - 0.4, (c.landingTimeS ?? c.apexTimeS) + 0.3, loop);
+    const from = (c.takeoffTimeS ?? c.apexTimeS) - 0.4;
+    const to = (c.landingTimeS ?? c.apexTimeS) + 0.3;
+    rangeLock.current = { from, to };
+    playhead.playRange(from, to, loop);
   };
 
   // [ and ] go to the previous and next jump.
