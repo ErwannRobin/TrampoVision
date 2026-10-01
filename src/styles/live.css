@@ -565,6 +565,8 @@
     top: var(--pin-top);
     z-index: 6;
     height: var(--pin-stage);
+    /* What scrolls past must not show in the rounded corners of the stage. */
+    background: var(--bg);
   }
   /* Under a notch or the status bar of a home screen app the page must not show through. */
   .app[data-mode='live'] .workspace:has(.tl) .workspace__stage::before {
