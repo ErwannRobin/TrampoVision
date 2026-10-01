@@ -80,9 +80,9 @@ consistency: node_modules ## Label-free rotation quality of saved jumps or a pos
 	@test -n "$(FILE)" || { echo "usage: make consistency FILE=<dataset.json | export.ndjson | pose-series.json> [BASELINE=f.json | SAVE=f.json]"; exit 1; }
 	npx vite-node scripts/consistency.ts $(FILE) $(if $(BASELINE),--baseline $(BASELINE)) $(if $(SAVE),--save $(SAVE))
 
-jev-eval: node_modules ## Compare Jev with the classifier on reviewed jumps: FILE=eval/export.ndjson [DEBUG=1] (needs TYPESAFE_API_KEY; only measurements are sent)
-	@test -n "$(FILE)" || { echo "usage: TYPESAFE_API_KEY=... make jev-eval FILE=eval/export.ndjson [DEBUG=1]"; exit 1; }
-	npx vite-node scripts/jev-eval.ts $(FILE) $(if $(DEBUG),--debug)
+jev-eval: node_modules ## Compare Jev with the classifier on reviewed jumps: FILE=eval/export.ndjson [DEBUG=1] [ALL=1] (needs TYPESAFE_API_KEY; only measurements are sent)
+	@test -n "$(FILE)" || { echo "usage: TYPESAFE_API_KEY=... make jev-eval FILE=eval/export.ndjson [DEBUG=1] [ALL=1]"; exit 1; }
+	npx vite-node scripts/jev-eval.ts $(FILE) $(if $(DEBUG),--debug) $(if $(ALL),--all)
 
 eval-fetch: ## Download the reviewed jumps to eval/export.ndjson (needs REVIEW_API_URL and REVIEW_TOKEN in the environment)
 	@test -n "$(REVIEW_API_URL)" -a -n "$(REVIEW_TOKEN)" || { echo "set REVIEW_API_URL and REVIEW_TOKEN"; exit 1; }

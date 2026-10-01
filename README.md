@@ -396,6 +396,8 @@ TYPESAFE_API_KEY=... make jev-eval FILE=eval/export.ndjson DEBUG=1
 
 It prints top-1/3/5 for both classifiers, which part (somersaults, twists, direction, position) each gets right, the jumps where they disagree, confidence calibration, latency and tokens; `DEBUG=1` adds, per jump, the signature, Jev's answers, both top 5s, the reason and the final element. Without a key, Jev is skipped and the local answer is the fallback.
 
+Jev answers as confidently on a broken signal as on a clean one, so three guards sit around it. When the curves look wrong (the center of mass far below takeoff, a rotation that runs back, as a panning or cutting camera produces), the local answer is kept and the reason says why. A count just under a whole number is flagged to Jev as possibly cut off. When Jev's own answers together are no FIG element (a pike jump with a half twist, say), the closest element is reported with the low confidence of the product, not a share of what is left. `ALL=1` runs jumps nobody labelled and lists where the two classifiers differ instead of scoring them.
+
 ## Review service (optional)
 
 `worker/` is a Cloudflare Worker with a D1 database. The browser stays the **only classifier**: right after an analysis, and without
