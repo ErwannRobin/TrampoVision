@@ -130,9 +130,13 @@ export function parseDataset(text: string): JumpRecord[] {
     const seq = rest.sequence
       ? { ...rest.sequence, data: rest.sequence.data.map((row) => row.map((v) => (v === null ? NaN : v))) }
       : null;
+    const pose3d = rest.pose3d
+      ? { ...rest.pose3d, data: rest.pose3d.data.map((row) => row.map((v) => (v === null ? NaN : v))) }
+      : null;
     return {
       ...(rest as JumpRecord),
       sequence: seq,
+      pose3d,
       twistTruth: rest.twistTruth ?? null,
       truth: rest.truth ?? null,
       figure: rest.figure ?? null,

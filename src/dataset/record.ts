@@ -1,4 +1,6 @@
 import type { AnalysisResult } from '../analysis/types';
+import type { WorldPoint } from '../pose/types';
+import { pose3dSequence } from '../pose3d/poseSequence';
 import { twistSequence, type TwistAnalysis } from '../pose3d/twist';
 import type { SkillAnalysis } from '../skills/analyzeSkills';
 import type { SkillPrediction } from '../skills/types';
@@ -15,6 +17,8 @@ export interface RecordContext {
   skills: SkillAnalysis;
   /** Null when 3D was not analyzed. */
   twist: TwistAnalysis | null;
+  /** The 3D landmarks of the clip (one entry per analysis sample); saved with each jump so it can be turned around in the review. */
+  world?: (WorldPoint[] | null)[];
   now?: Date;
 }
 
@@ -30,6 +34,7 @@ export function buildJumpRecord(ctx: RecordContext, k: number, jumpId: number, p
     twist?.frames && estimate?.available
       ? twistSequence(twist.frames, result.time, cycle, j.sequence?.samples ?? skills.config.sequenceSamples)
       : null;
+  const pose3d = pose3dSequence(ctx.world, result.time, cycle, j.sequence?.samples ?? skills.config.sequenceSamples);
   return {
     schema: RECORD_SCHEMA,
     version: RECORD_VERSION,
@@ -50,6 +55,7 @@ export function buildJumpRecord(ctx: RecordContext, k: number, jumpId: number, p
     features: j.features,
     prediction: j.prediction,
     twist: estimate ? { estimate, sequence: seq } : null,
+    pose3d,
     truth: prior?.truth ?? null,
     twistTruth: prior?.twistTruth ?? null,
     figure: prior?.figure ?? null,

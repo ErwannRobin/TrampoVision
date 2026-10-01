@@ -604,8 +604,11 @@ export default function App() {
   // Local dataset: the jumps of this video as they would be saved now, next to what is already saved.
   const fileNameForRecords = file?.name ?? seriesName ?? 'trampovision';
   const recordCtx = useMemo<RecordContext | null>(
-    () => (result && skills && videoId ? { videoId, fileName: fileNameForRecords, result, skills, twist } : null),
-    [result, skills, videoId, fileNameForRecords, twist],
+    () =>
+      result && skills && videoId
+        ? { videoId, fileName: fileNameForRecords, result, skills, twist, world: track?.world }
+        : null,
+    [result, skills, videoId, fileNameForRecords, twist, track],
   );
   const videoRecords = useMemo(() => dataset.records.filter((r) => r.videoId === videoId), [dataset.records, videoId]);
   const fresh = useMemo(() => (recordCtx ? syncRecords(videoRecords, recordCtx) : []), [recordCtx, videoRecords]);

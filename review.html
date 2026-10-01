@@ -440,12 +440,25 @@
       #skel.grabbing {
         cursor: grabbing;
       }
-      #resetview {
+      #views {
         position: absolute;
         top: 8px;
         right: 8px;
-        padding: 5px 10px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 4px;
+        max-width: calc(100% - 170px);
+      }
+      #views button {
+        padding: 4px 9px;
         font-size: 13px;
+      }
+      #views button[aria-pressed='true'] {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 600;
       }
       #viewhint {
         position: absolute;
@@ -742,10 +755,26 @@
           <div class="viewport" id="viewport">
             <canvas
               id="skel"
-              aria-label="Skeleton replay"
+              aria-label="3D skeleton replay"
               data-i18n-attr="aria-label:rv.skeleton;title:rv.viewHint"
             ></canvas>
-            <button class="act" id="resetview" type="button" data-i18n="rv.resetView" hidden>Reset view</button>
+            <div id="views" role="group" aria-label="View" data-i18n-attr="aria-label:rv.views">
+              <button class="act" id="resetview" type="button" data-i18n="rv.resetView" disabled>Reset view</button>
+              <button class="act" type="button" data-view="side" aria-pressed="false" data-i18n="rv.viewSide">
+                Side
+              </button>
+              <button class="act" type="button" data-view="top" aria-pressed="false" data-i18n="rv.viewTop">Top</button>
+              <button
+                class="act"
+                id="vup"
+                type="button"
+                aria-pressed="false"
+                data-i18n="rv.viewUpright"
+                data-i18n-attr="title:rv.viewUprightHint"
+              >
+                Upright
+              </button>
+            </div>
             <span id="viewhint" data-i18n="rv.viewHint"></span>
           </div>
           <div class="controls">
