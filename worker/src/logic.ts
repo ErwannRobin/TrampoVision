@@ -138,3 +138,18 @@ export function tokenMatches(header: string | null, secret: string | undefined):
     diff |= (a.charCodeAt(i) || 0) ^ (secret.charCodeAt(i) || 0);
   return diff === 0;
 }
+
+/**
+ * The origins the browser may call from: the app, localhost for development and, when `previewPattern` is set, the preview
+ * deployments of the app. The pattern is a regular expression matched against the whole origin (an invalid one allows nothing).
+ */
+export function originAllowed(origin: string | null, allowed: string, previewPattern?: string): boolean {
+  if (!origin) return false;
+  if (origin === allowed || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return true;
+  if (!previewPattern) return false;
+  try {
+    return new RegExp(`^(?:${previewPattern})$`).test(origin);
+  } catch {
+    return false;
+  }
+}

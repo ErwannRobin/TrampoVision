@@ -1,9 +1,11 @@
 import { FIG_ELEMENTS } from '../../src/skills/fig/elements';
-import { parseIngest, parseReview, tokenMatches, STATUSES, type JumpRow } from './logic';
+import { originAllowed, parseIngest, parseReview, tokenMatches, STATUSES, type JumpRow } from './logic';
 
 export interface Env {
   DB: D1Database;
   ALLOWED_ORIGIN: string;
+  /** Regular expression of the preview deployments of the app that may call too (optional). */
+  PREVIEW_ORIGIN_PATTERN?: string;
   INGEST_TOKEN?: string;
   REVIEW_TOKEN?: string;
 }
@@ -19,13 +21,12 @@ const json = (body: unknown, status = 200, headers: HeadersInit = {}) =>
 
 const cors = (env: Env, req: Request): Record<string, string> => {
   const origin = req.headers.get('origin');
-  // The app's origin, and localhost for development.
-  const ok = origin && (origin === env.ALLOWED_ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin));
-  return ok
+  // The app's origin, its preview deployments and localhost for development.
+  return origin && originAllowed(origin, env.ALLOWED_ORIGIN, env.PREVIEW_ORIGIN_PATTERN)
     ? {
         'access-control-allow-origin': origin,
         'access-control-allow-headers': 'authorization, content-type',
-        'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+        'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
         vary: 'origin',
       }
     : {};
@@ -118,6 +119,15 @@ export default {
         return reply({ jumps: results });
       }
 
+      // Removes every jump of one status (the tab on screen). The status is required: there is no way to empty the table by accident.
+      if (path === '/jumps' && req.method === 'DELETE') {
+        const status = url.searchParams.get('status');
+        if (!status || !(STATUSES as readonly string[]).includes(status))
+          return reply({ error: 'status required' }, 400);
+        const res = await env.DB.prepare(`DELETE FROM jumps WHERE status = ?1`).bind(status).run();
+        return reply({ deleted: res.meta.changes ?? 0 });
+      }
+
       if (path === '/stats' && req.method === 'GET') {
         const { results } = await env.DB.prepare(`SELECT status, COUNT(*) AS n FROM jumps GROUP BY status`).all();
         return reply({ stats: results });
@@ -139,6 +149,11 @@ export default {
           .bind(decodeURIComponent(one[1]))
           .first<Record<string, unknown> & { record: string }>();
         return row ? reply({ ...row, record: JSON.parse(row.record) }) : reply({ error: 'not found' }, 404);
+      }
+
+      if (one && req.method === 'DELETE') {
+        const res = await env.DB.prepare(`DELETE FROM jumps WHERE id = ?1`).bind(decodeURIComponent(one[1])).run();
+        return res.meta.changes ? reply({ deleted: res.meta.changes }) : reply({ error: 'not found' }, 404);
       }
 
       if (review && req.method === 'PUT') {
