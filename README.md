@@ -384,6 +384,20 @@ It does not decide who is right (the label or the measurement); it shows where t
 
 **Read the numbers with care.** One labeler, no second opinion. Few jumps give wide intervals. If you tune the thresholds while looking at the same jumps, the accuracy becomes training accuracy and will look better than it is: keep some labeled jumps you never tune on.
 
+## Jev comparison (proof of concept, by hand only)
+
+`src/skills/jev/` puts TypeSafe's **Jev** decision model on top of the existing pipeline, for comparison only. Nothing upstream changes (pose, jumps, rotation, twist, features), and the temporal (DTW + prototype) classifier stays the default and the fallback.
+
+For each jump the movement signature and the features (counts, rotation, facing cues, hip and knee angles, 9-point trajectories) are written into a text state and Jev answers four typed questions: somersaults, twists, direction, position. The element is found by table lookup and the top 5 come from the product of the four answers. **Only measurements are sent, never a video, a frame or a file name** (a test checks the request body). Jev is never called on its own. Two ways to ask it, both by hand. In the app, the advanced tools have a **Classification** tab in the coach rail: a button asks Jev about the selected jump (or all of them) and a comparison panel shows both classifiers side by side (element, confidence, the four parts, the five best, agreement). The tab calls the app's own Vercel function `api/jev/systemone.ts`, which holds the key: set the project's secret `TYPESAFE_API_KEY` and the build variable `VITE_JEV_API_URL=/api/jev` (empty: the tab says Jev is not in this build). The key never reaches the browser, and the call is same-origin, so the CSP and the local-only guard are unchanged. The function is a public URL, so it is no general proxy: POST only, fixed model, small body, and only the four questions. From Node:
+
+```bash
+TYPESAFE_API_KEY=... make jev-eval FILE=eval/export.ndjson DEBUG=1
+```
+
+It prints top-1/3/5 for both classifiers, which part (somersaults, twists, direction, position) each gets right, the jumps where they disagree, confidence calibration, latency and tokens; `DEBUG=1` adds, per jump, the signature, Jev's answers, both top 5s, the reason and the final element. Without a key, Jev is skipped and the local answer is the fallback.
+
+Jev answers as confidently on a broken signal as on a clean one, so three guards sit around it. When the curves look wrong (the center of mass far below takeoff, a rotation that runs back, as a panning or cutting camera produces), the local answer is kept and the reason says why. A count just under a whole number is flagged to Jev as possibly cut off. When Jev's own answers together are no FIG element (a pike jump with a half twist, say), the closest element is reported with the low confidence of the product, not a share of what is left. `ALL=1` runs jumps nobody labelled and lists where the two classifiers differ instead of scoring them.
+
 ## Review service (optional)
 
 `worker/` is a Cloudflare Worker with a D1 database. The browser stays the **only classifier**: right after an analysis, and without
@@ -574,7 +588,7 @@ cameras that are not level. Real COM estimates also move with arm and leg motion
 - **Video codecs depend on the browser.** MP4 (H.264) is safest. HEVC `.mov` from iPhones plays in Safari and recent Chrome/Edge, not everywhere.
 - **Privacy note.** The MediaPipe runtime contains a usage-logging call to `odml.pa.googleapis.com`. The app blocks all cross-origin
   requests at runtime (`localOnlyGuard.ts`) and the production build enforces `connect-src 'self' blob: data:` via CSP. Video frames are never uploaded.
-  The exceptions are the review service, when the build is configured with `VITE_REVIEW_API_URL` (see _Review service_), and the asset host, when it has `VITE_ASSET_BASE_URL` (see _Asset host_; read only: models, wasm and the sample are downloaded, nothing is sent). Only those origins are then let through. Without those variables the app is local-only as described here.
+  The exceptions are the review service, when the build is configured with `VITE_REVIEW_API_URL` (see _Review service_), and the asset host, when it has `VITE_ASSET_BASE_URL` (see _Asset host_; read only: models, wasm and the sample are downloaded, nothing is sent). Jev needs no exception: the Classification tab calls the app's own `/api/jev` function (see _Jev comparison_), only when a person presses its button. Only those origins are let through. Without those variables the app is local-only as described here.
   What is stored in the browser: the calibration corners per file name and size (`localStorage`), and the jump dataset you save (IndexedDB `trampovision`: measurements, predictions and labels, never the video). _Delete all_ in the Review tab (_Dataset on this computer_) removes the dataset.
 - Multi-person scenes: the athlete is followed by continuity; a coach walking next to the athlete can still steal the track.
 

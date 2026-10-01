@@ -7,8 +7,9 @@ import react from '@vitejs/plugin-react';
 
 /**
  * Production build: the browser itself enforces "no network except this origin" through a CSP.
- * The only other origins are the review service (VITE_REVIEW_API_URL) and the asset host
- * (VITE_ASSET_BASE_URL: models, wasm and sample, read only), when the build has them.
+ * The only other origins are the review service (VITE_REVIEW_API_URL), the asset host
+ * (VITE_ASSET_BASE_URL: models, wasm and sample, read only) and Jev (VITE_JEV_API_URL, only when absolute: measurements of one jump,
+ * sent by hand from the Classification tab), when the build has them.
  * (Not applied in `vite dev`, which needs inline scripts and a websocket for hot reload; the
  * runtime guard in src/localOnlyGuard.ts covers that case.)
  */
@@ -39,7 +40,7 @@ export default defineConfig(({ mode }) => ({
       transformIndexHtml: () => {
         const env = loadEnv(mode, '.', '');
         const origins: string[] = [];
-        for (const value of [env.VITE_REVIEW_API_URL, env.VITE_ASSET_BASE_URL]) {
+        for (const value of [env.VITE_REVIEW_API_URL, env.VITE_ASSET_BASE_URL, env.VITE_JEV_API_URL]) {
           try {
             if (value) origins.push(new URL(value).origin);
           } catch {

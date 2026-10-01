@@ -363,4 +363,6 @@ export interface JumpSkillResult {
   features: JumpFeatures;
   sequence: JumpSequence | null;
   prediction: SkillPrediction;
+  /** What the classifier was given, kept so another classifier (Jev, run by hand) can read the same jump. */
+  input?: ClassifierInput;
 }

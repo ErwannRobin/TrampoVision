@@ -7,6 +7,7 @@ import type { SkillConfig } from '../../skills/config';
 import { Button, IconButton, panelId, tabId, Tabs, type TabDef } from '../kit';
 import type { Playhead } from '../playhead';
 import type { CoachTab } from '../types';
+import { ClassificationTab } from './coach/ClassificationTab';
 import { DataTab } from './coach/DataTab';
 import { MetricsTab } from './coach/MetricsTab';
 import { SkillTab } from './coach/SkillTab';
@@ -42,12 +43,13 @@ const tabs = (): TabDef<CoachTab>[] => [
   { value: 'metrics', label: t('coach.tab.metrics') },
   { value: 'twist', label: t('coach.tab.twist') },
   { value: 'review', label: t('coach.tab.review') },
+  { value: 'classification', label: t('coach.tab.classification') },
   { value: 'data', label: t('coach.tab.data') },
 ];
 
 const ID = 'coach';
 
-/** The coach's depth: the skill and its evidence, every measurement, the twist, the review of the labels, the data quality. */
+/** The coach's depth: the skill and its evidence, every measurement, the twist, the review of the labels, the classification by Jev, the data quality. */
 export function CoachRail({
   tab,
   onTab,
@@ -125,6 +127,7 @@ export function CoachRail({
           />
         )}
         {tab === 'review' && review}
+        {tab === 'classification' && <ClassificationTab skills={skills} selected={k} />}
         {tab === 'data' && <DataTab result={result} notes={notes} playhead={playhead} />}
       </div>
     </div>

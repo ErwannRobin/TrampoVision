@@ -7,7 +7,7 @@ export type Audience = 'athlete' | 'coach';
 export type StageView = 'video' | 'split' | '3d';
 
 /** Sections of the coach's rail. */
-export type CoachTab = 'skill' | 'metrics' | 'twist' | 'review' | 'data';
+export type CoachTab = 'skill' | 'metrics' | 'twist' | 'review' | 'classification' | 'data';
 
 export type Appearance = 'system' | 'light' | 'dark';
 
