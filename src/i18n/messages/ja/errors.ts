@@ -15,6 +15,8 @@ export const errors: Translation<typeof en> = {
   'err.exportSurface': 'エクスポート用の描画面を作成できませんでした。',
   'err.exportH264': 'このブラウザーでは H.264 動画をエンコードできません。',
   'err.dimensions': '動画のサイズまたは長さを読み取れませんでした。',
+  'err.modelFile':
+    'モデルファイル {file} が見つかりません。「npm run fetch-assets」を実行してください（またはアセットホストにアップロードしてください）。',
   'err.notJson': 'このファイルは有効な JSON ではありません。',
   'err.notSeries': 'これは TrampoVision の姿勢時系列ファイルではありません。',
   'err.seriesVersion':

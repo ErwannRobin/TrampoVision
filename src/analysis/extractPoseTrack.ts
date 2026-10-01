@@ -1,5 +1,5 @@
 import { t } from '../i18n/core';
-import { createMediaPipeEstimator } from '../pose/MediaPipePoseEstimator';
+import { estimatorFactory } from '../pose/engines';
 import { bodySignature, createPixelReader } from '../pose/appearance';
 import { MultiAthleteTracker } from '../pose/selectAthlete';
 import type { EstimatorOptions, Keypoint, PoseEstimatorFactory, WorldPoint } from '../pose/types';
@@ -50,7 +50,7 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
   const athletes = opts.numPoses > 0 ? Math.floor(opts.numPoses) : AUTO_ATHLETES;
   // Always look for more people than the athletes: with a single pose the model picks who to follow by itself and can swap
   // to somebody in the foreground. Seeing everyone lets the tracker keep the people it locked on.
-  const estimator = await (opts.createEstimator ?? createMediaPipeEstimator)({
+  const estimator = await (opts.createEstimator ?? estimatorFactory(opts.engine))({
     ...opts,
     numPoses: Math.max(athletes + EXTRA_POSES, MIN_POSES),
   });
@@ -75,7 +75,7 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
       await seekTo(video, Math.min(frameSeekTime(frame, opts.sourceFps), duration - 1e-3));
 
       lastTs = Math.max(lastTs + 1, Math.round((frame / opts.sourceFps) * 1000));
-      const detections = estimator.detect(video, lastTs);
+      const detections = await estimator.detect(video, lastTs);
       const candidates = detections.map((d) =>
         d.landmarks.map((p) => ({ x: p.x * width, y: p.y * height, visibility: p.visibility })),
       );

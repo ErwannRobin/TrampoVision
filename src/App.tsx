@@ -43,7 +43,7 @@ import { DEFAULT_SKILL_CONFIG, type SkillConfig } from './skills/config';
 import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from './skills/export';
 import { buildPoseSeries, parsePoseSeries, toSeriesJson, type ParsedSeries } from './analysis/timeSeries';
 import type { PoseTrack, ScaleSource } from './analysis/types';
-import type { ModelVariant, Point } from './pose/types';
+import type { ModelVariant, Point, PoseEngineId } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
 import { loadSample, samples } from './video/sample';
 import { dragHasFiles, pickDroppedVideo } from './video/drop';
@@ -126,6 +126,8 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [fps, setFps] = useState(30);
   const [model, setModel] = useState<ModelVariant>('full');
+  // Experimental: another pose model than MediaPipe. Only used with the advanced tools on, which are where it is picked.
+  const [engine, setEngine] = useState<PoseEngineId>('mediapipe');
   // Athletes to follow; 0 = the app decides: everybody who jumps.
   const [numPoses, setNumPoses] = useState(0);
   const [stride, setStride] = useState(1);
@@ -495,6 +497,7 @@ export default function App() {
     if (strideNow !== stride) setStride(strideNow);
     try {
       const ts = await extractPoseTracks(url, {
+        engine: advanced ? engine : 'mediapipe',
         model,
         numPoses,
         preferGpu,
@@ -1018,6 +1021,8 @@ export default function App() {
       fileName={file?.name ?? seriesName}
       model={model}
       onModel={setModel}
+      engine={engine}
+      onEngine={setEngine}
       numPoses={numPoses}
       onNumPoses={setNumPoses}
       stride={stride}

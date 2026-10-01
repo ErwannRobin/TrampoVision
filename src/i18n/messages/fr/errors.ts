@@ -15,6 +15,8 @@ export const errors: Translation<typeof en> = {
   'err.exportSurface': 'Impossible de créer une surface de dessin pour l’export.',
   'err.exportH264': 'Ce navigateur ne peut pas encoder de vidéo H.264.',
   'err.dimensions': 'Impossible de lire les dimensions ou la durée de la vidéo.',
+  'err.modelFile':
+    'Le fichier de modèle {file} est introuvable. Lancez « npm run fetch-assets » (ou envoyez-le sur l’hôte des ressources).',
   'err.notJson': 'Ce fichier n’est pas un JSON valide.',
   'err.notSeries': 'Ce n’est pas un fichier de série de poses TrampoVision.',
   'err.seriesVersion': 'Version de fichier non prise en charge ({found}) ; cette appli lit la version {expected}.',

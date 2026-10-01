@@ -8,8 +8,10 @@
 //   models/pose_landmarker_{lite,full,heavy}.task
 //   mediapipe/<tasks-vision version>/vision_wasm_internal.wasm, vision_wasm_nosimd_internal.wasm
 //   ffmpeg/<@ffmpeg/core version>/ffmpeg-core.wasm
+//   ort/<onnxruntime-web version>/ort-wasm-simd-threaded.jsep.wasm
+//   models/yolox_s.onnx, rtmpose_m_halpe26.onnx, vitpose_base_simple.onnx   (experimental pose engines; only the ones in public/models)
 //   samples/IMG_8368.mp4, samples/IMG_8368.MOV, samples/dong-dong-2011-landscape.mp4
-// Run it again after upgrading @mediapipe/tasks-vision or @ffmpeg/core: the new version gets its own folder.
+// Run it again after upgrading @mediapipe/tasks-vision, onnxruntime-web or @ffmpeg/core: the new version gets its own folder.
 // At the end it prints the value for VITE_ASSET_BASE_URL.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -42,6 +44,16 @@ files.push([
   `ffmpeg/${version('@ffmpeg/core')}/ffmpeg-core.wasm`,
   () => readFileSync(join(root, 'node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm')),
 ]);
+
+files.push([
+  `ort/${version('onnxruntime-web')}/ort-wasm-simd-threaded.jsep.wasm`,
+  () => readFileSync(join(root, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm')),
+]);
+for (const name of ['yolox_s.onnx', 'rtmpose_m_halpe26.onnx', 'vitpose_base_simple.onnx']) {
+  const local = join(root, 'public/models', name);
+  if (existsSync(local)) files.push([`models/${name}`, () => readFileSync(local)]);
+  else console.warn(`[upload] ${name} is not in public/models (run npm run fetch-assets): skipped`);
+}
 
 const MODEL_BASE = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker';
 for (const variant of ['lite', 'full', 'heavy']) {

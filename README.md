@@ -131,6 +131,7 @@ video ─► extractPoseTrack ─► PoseTrack ─► stabilizePose ─► compu
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/pose/types.ts`                                       | `PoseEstimator` interface. Any backend that returns the 33-point BlazePose topology can be plugged in.                                            |
 | `src/pose/MediaPipePoseEstimator.ts`                      | MediaPipe Pose Landmarker, GPU delegate first, CPU (WASM) fallback.                                                                               |
+| `src/pose/engines.ts`, `src/pose/onnx/`                   | Experimental pose engines (RTMPose, ViTPose) on ONNX Runtime Web, behind the same interface. See "Experimental pose engines".                     |
 | `src/analysis/stabilize.ts`                               | Low-confidence gating, glitch rejection, gap filling, confidence-weighted smoothing, per-joint state.                                             |
 | `src/analysis/signal.ts`                                  | Median, spike mask, gap filling (linear / quadratic), weighted Savitzky–Golay-style fits, peak finder, angle unwrapping.                          |
 | `src/analysis/com.ts`                                     | Segment-based COM (14 segments, de Leva-style mass fractions).                                                                                    |
@@ -590,9 +591,29 @@ cameras that are not level. Real COM estimates also move with arm and leg motion
 
 The same list is on the About page. The links are in `src/ui/About.tsx`; the texts around them are in `src/i18n/messages/*/about.ts`.
 
+## Experimental pose engines
+
+Advanced tools on, Settings → Analysis → **Experimental → Pose model** picks the engine that finds the body points. **MediaPipe** (default) is the one the whole app was built and checked with. **RTMPose-m** and **ViTPose-B** are there to test whether another model follows the athlete where MediaPipe loses them (upside down, tucked, blurred). Off by default; with the advanced tools off, MediaPipe is always used.
+
+How it works (`src/pose/onnx/`): a person detector (YOLOX-s) finds the people, a top-down pose model reads a 192 × 256 crop of each, and the points are converted to the 33-point BlazePose layout the rest of the app reads. They run with ONNX Runtime Web (WebGPU when "Use the GPU" is on and the browser has it, else WebAssembly), and are loaded only when picked. The engine used is saved in the analysis (`backend`).
+
+| Engine  | Points                    | Feet and hands                                                                            |
+| ------- | ------------------------- | ----------------------------------------------------------------------------------------- |
+| RTMPose | Halpe 26 (COCO 17 + feet) | Heels and toe tips yes; fingers no                                                        |
+| ViTPose | COCO 17                   | No heels, toes or fingers (the center of mass leaves those segments out and renormalizes) |
+
+Files: `npm run fetch-assets` downloads `yolox_s.onnx`, `rtmpose_m_halpe26.onnx` and `vitpose_base_simple.onnx` into `public/models/` (a failed download only prints a warning; the app then says which file is missing). With an asset host, `npm run upload-assets` uploads them and the ONNX Runtime wasm too.
+
+**What has and has not been checked.**
+
+- Checked in headless Chromium (WebAssembly): ONNX Runtime loads from the build, the real YOLOX-s finds a person in a photo (same box as the reference Python code), and the whole pipeline (detector, crop, decode, conversion to 33 landmarks) gives the exact coordinates expected from small synthetic pose models with known outputs. The decoders, the crop geometry and the point conversions have unit tests (`src/pose/onnx/onnx.test.ts`).
+- **Not checked: the real RTMPose and ViTPose files.** They could not be downloaded where this was written, so nothing says yet that they find better points than MediaPipe, or even that the real files match the assumptions: RGB input with the usual mean and standard deviation, a 1.25 padded box, SimCC output with a ratio of 2 (RTMPose); heatmap output `[1, 17, 64, 48]` (ViTPose). The ViTPose download URL is from memory. The WebGPU path was not run (no GPU here). Try both on a clip where MediaPipe fails and compare the skeletons before trusting either.
+- The scores are not on MediaPipe's scale. The analysis ignores points under 0.4, which may be too strict or too lax for these models.
+- 2D only: no 3D landmarks, so no twist estimate (see "3D pose and twist"). The person detector runs on every analyzed frame, so these engines are slower than MediaPipe, and ViTPose-B is a large file (hundreds of MB unless a quantized export is used).
+
 ## Asset host
 
-Every deployment stores a copy of the build output, and the big files were most of it (about 144 MB of 146). With `VITE_ASSET_BASE_URL` set, the build leaves them out (2 MB) and the app reads them from a public folder at runtime: the pose models (`models/`), the MediaPipe and ffmpeg wasm (`mediapipe/<version>/`, `ffmpeg/<version>/`) and the sample videos (`samples/`). The small loader scripts stay in the build, so the host only ever serves data. Without the variable, everything is served from this origin as before (`npm run fetch-assets`; no sample button), which is what `npm run dev` uses.
+Every deployment stores a copy of the build output, and the big files were most of it (about 144 MB of 146). With `VITE_ASSET_BASE_URL` set, the build leaves them out (2 MB) and the app reads them from a public folder at runtime: the pose models (`models/`), the MediaPipe, ONNX Runtime and ffmpeg wasm (`mediapipe/<version>/`, `ort/<version>/`, `ffmpeg/<version>/`) and the sample videos (`samples/`). The small loader scripts stay in the build, so the host only ever serves data. Without the variable, everything is served from this origin as before (`npm run fetch-assets`; no sample button), which is what `npm run dev` uses.
 
 1. Create a public Vercel Blob store. The browser needs CORS headers on the wasm and model downloads; Blob should send `Access-Control-Allow-Origin: *` (**not checked on a real Blob store yet**).
 2. `BLOB_READ_WRITE_TOKEN=... make upload-assets SAMPLES=<folder>`, with the folder holding `IMG_8368.mp4`, `IMG_8368.MOV` and `dong-dong-2011-landscape.mp4` (add `DRY_RUN=1` to only list the files; `npm run upload-assets` does the same). It prints the value for `VITE_ASSET_BASE_URL`.

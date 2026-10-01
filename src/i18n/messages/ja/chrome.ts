@@ -120,6 +120,13 @@ export const chrome: Translation<typeof en> = {
   'setup.modelLite': 'Lite（高速）',
   'setup.modelFull': 'Full',
   'setup.modelHeavy': 'Heavy（最高精度）',
+  'setup.experimental': '実験的',
+  'setup.engine': '姿勢モデル',
+  'setup.engine.mediapipe': 'MediaPipe（標準）',
+  'setup.engine.rtmpose': 'RTMPose-m（足あり）',
+  'setup.engine.vitpose': 'ViTPose-B',
+  'setup.engineHint':
+    'MediaPipe は検証済みのモデルです。ほかのモデルは、MediaPipe が選手を見失う場面で追跡できるか試すものです。2Dの点のみで3Dはなく、ひねりの推定は使えません。モデルファイルが必要で、処理も遅くなります。',
   'setup.fps': '動画のフレームレート',
   'setup.fpsHint': '動画から測定した値です。変更すると解析結果が消去されます。',
   'setup.stride': '解析対象',

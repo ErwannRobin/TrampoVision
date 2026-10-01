@@ -130,6 +130,13 @@ export const chrome = {
   'setup.modelLite': 'Lite (fast)',
   'setup.modelFull': 'Full',
   'setup.modelHeavy': 'Heavy (most accurate)',
+  'setup.experimental': 'Experimental',
+  'setup.engine': 'Pose model',
+  'setup.engine.mediapipe': 'MediaPipe (default)',
+  'setup.engine.rtmpose': 'RTMPose-m (with feet)',
+  'setup.engine.vitpose': 'ViTPose-B',
+  'setup.engineHint':
+    'MediaPipe is the tested one. The others try to follow the athlete where MediaPipe loses them. They give 2D points only: no 3D, so no twist estimate. They need their model files and are slower.',
   'setup.fps': 'Video frame rate',
   'setup.fpsHint': 'Measured from the video. Changing it clears the analysis.',
   'setup.stride': 'Analyze',

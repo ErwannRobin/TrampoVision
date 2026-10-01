@@ -13,6 +13,7 @@ export const errors = {
   'err.exportSurface': 'Could not create a drawing surface for the export.',
   'err.exportH264': 'This browser cannot encode H.264 video.',
   'err.dimensions': 'Could not read the video dimensions/duration.',
+  'err.modelFile': 'The model file {file} was not found. Run "npm run fetch-assets" (or upload it to the asset host).',
   'err.notJson': 'This file is not valid JSON.',
   'err.notSeries': 'This is not a TrampoVision pose-series file.',
   'err.seriesVersion': 'Unsupported file version ({found}); this app reads version {expected}.',

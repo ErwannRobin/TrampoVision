@@ -123,6 +123,13 @@ export const chrome: Translation<typeof en> = {
   'setup.modelLite': 'Lite (schnell)',
   'setup.modelFull': 'Voll',
   'setup.modelHeavy': 'Heavy (am genauesten)',
+  'setup.experimental': 'Experimentell',
+  'setup.engine': 'Posenmodell',
+  'setup.engine.mediapipe': 'MediaPipe (Standard)',
+  'setup.engine.rtmpose': 'RTMPose-m (mit Füßen)',
+  'setup.engine.vitpose': 'ViTPose-B',
+  'setup.engineHint':
+    'MediaPipe ist das getestete Modell. Die anderen versuchen, den Athleten dort zu verfolgen, wo MediaPipe ihn verliert. Sie liefern nur 2D-Punkte: kein 3D, also keine Schätzung der Schraube. Sie brauchen ihre Modelldateien und sind langsamer.',
   'setup.fps': 'Bildrate des Videos',
   'setup.fpsHint': 'Aus dem Video gemessen. Eine Änderung löscht die Analyse.',
   'setup.stride': 'Analysieren',

@@ -123,6 +123,13 @@ export const chrome: Translation<typeof en> = {
   'setup.modelLite': 'Léger (rapide)',
   'setup.modelFull': 'Complet',
   'setup.modelHeavy': 'Lourd (le plus précis)',
+  'setup.experimental': 'Expérimental',
+  'setup.engine': 'Modèle de pose',
+  'setup.engine.mediapipe': 'MediaPipe (par défaut)',
+  'setup.engine.rtmpose': 'RTMPose-m (avec les pieds)',
+  'setup.engine.vitpose': 'ViTPose-B',
+  'setup.engineHint':
+    'MediaPipe est le modèle testé. Les autres essaient de suivre l’athlète là où MediaPipe le perd. Ils donnent des points 2D seulement : pas de 3D, donc pas d’estimation de la vrille. Ils ont besoin de leurs fichiers de modèle et sont plus lents.',
   'setup.fps': 'Cadence de la vidéo',
   'setup.fpsHint': 'Mesurée à partir de la vidéo. La modifier efface l’analyse.',
   'setup.stride': 'Analyser',
