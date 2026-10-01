@@ -56,8 +56,9 @@ export function analyzeSkills(
     const references = options.videoId
       ? excludeSelf(examples, { videoId: options.videoId, apexS: cycle.apexTimeS })
       : examples;
-    const prediction = classifier.classify({ cycle, features, sequence, twist, config, references });
-    return { cycle, features, sequence, prediction };
+    const input = { cycle, features, sequence, twist, config, references };
+    const prediction = classifier.classify(input);
+    return { cycle, features, sequence, prediction, input };
   });
   return { config, classifier: { id: classifier.id, version: classifier.version }, frames, jumps };
 }

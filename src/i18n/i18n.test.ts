@@ -144,6 +144,9 @@ describe('the messages', () => {
 /** Messages that read the same in French or in German because the word is the same there (a cognate). */
 const SAME_IN: Partial<Record<Locale, string[]>> = {
   fr: [
+    'coach.tab.classification',
+    'coach.jev.local',
+    'coach.jev.part.position',
     'about.inspirationTitle',
     'setup.trampoline',
     'ev.rotation.label',
@@ -178,6 +181,7 @@ const SAME_IN: Partial<Record<Locale, string[]>> = {
     'rv.somTriple',
   ],
   de: [
+    'coach.jev.element',
     'about.inspirationTitle',
     'setup.appearanceSystem',
     'stage.region',

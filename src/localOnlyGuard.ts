@@ -4,9 +4,10 @@
  * fetch / XHR / sendBeacon refuse any cross-origin request. The production build additionally
  * sets a Content-Security-Policy (see vite.config.ts) that the browser enforces itself.
  *
- * Two exceptions, both set by the build. The review service (VITE_REVIEW_API_URL), when there is one: the analyzed jumps
- * are posted there for a person to check. And the asset host (VITE_ASSET_BASE_URL): models, wasm and the sample are
- * only read from it, nothing is sent. Those two origins are the only others let through.
+ * Three exceptions, all set by the build. The review service (VITE_REVIEW_API_URL), when there is one: the analyzed jumps
+ * are posted there for a person to check. The asset host (VITE_ASSET_BASE_URL): models, wasm and the sample are
+ * only read from it, nothing is sent. And Jev (VITE_JEV_API_URL): measurements of one jump, never a frame, sent only when
+ * a person presses the button of the Classification tab. Those three origins are the only others let through.
  */
 const originOf = (value: string | undefined): string | null => {
   try {
@@ -17,6 +18,7 @@ const originOf = (value: string | undefined): string | null => {
 };
 const reviewOrigin = originOf(import.meta.env.VITE_REVIEW_API_URL as string | undefined);
 const assetOrigin = originOf(import.meta.env.VITE_ASSET_BASE_URL as string | undefined);
+const jevOrigin = originOf(import.meta.env.VITE_JEV_API_URL as string | undefined);
 
 const isLocal = (url: string | URL | Request): boolean => {
   try {
@@ -26,6 +28,7 @@ const isLocal = (url: string | URL | Request): boolean => {
       u.origin === location.origin ||
       (reviewOrigin !== null && u.origin === reviewOrigin) ||
       (assetOrigin !== null && u.origin === assetOrigin) ||
+      (jevOrigin !== null && u.origin === jevOrigin) ||
       u.protocol === 'blob:' ||
       u.protocol === 'data:'
     );
