@@ -329,14 +329,24 @@ export default function App() {
   const selectedRef = useRef(0);
   selectedRef.current = jumpSel;
   // The review mode loops one jump and keeps it selected: the run-up and the landing must not move the selection.
+  // "Play jump" keeps its jump selected until it stops: its run-up and landing can touch the neighbouring jumps.
+  const rangeLock = useRef<'off' | 'armed' | 'playing'>('off');
   useEffect(() => {
     if (!result || reviewOpen) return;
     const unsubscribe = playhead.subscribe(() => {
+      if (rangeLock.current !== 'off') return;
       const idx = result.jumps.cycleIndex[sampleIndexAt(result.meta, playhead.getSnapshot())];
       if (idx >= 0 && idx !== selectedRef.current) setSelectedJump(idx);
     });
+    const unsubscribeState = playhead.subscribeState(() => {
+      if (playhead.getPlaying()) {
+        if (rangeLock.current === 'armed') rangeLock.current = 'playing';
+      } else if (rangeLock.current === 'playing') rangeLock.current = 'off';
+    });
     return () => {
       unsubscribe();
+      unsubscribeState();
+      rangeLock.current = 'off';
     };
   }, [result, playhead, reviewOpen]);
 
@@ -355,7 +365,9 @@ export default function App() {
   /** Play the selected jump with a little run-up and landing. */
   const playJump = () => {
     const c = result?.jumps.cycles[jumpSel];
-    if (c) playhead.playRange((c.takeoffTimeS ?? c.apexTimeS) - 0.4, (c.landingTimeS ?? c.apexTimeS) + 0.3, loop);
+    if (!c) return;
+    rangeLock.current = playhead.getPlaying() ? 'playing' : 'armed';
+    playhead.playRange((c.takeoffTimeS ?? c.apexTimeS) - 0.4, (c.landingTimeS ?? c.apexTimeS) + 0.3, loop);
   };
 
   // [ and ] go to the previous and next jump.
