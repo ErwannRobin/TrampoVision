@@ -491,7 +491,8 @@ export default function App() {
     abort.current = ctl;
     setTracks([]);
     setNotice('');
-    setStatus({ kind: 'analyzing', done: 0, total: 1 });
+    // The pose model loads first, which can take long (a download for the experimental ones).
+    setStatus({ kind: 'loading', stage: 'model' });
     // The live view analyzes about 30 frames a second, so a phone film at 60 or 120 fps does not make the wait longer.
     const strideNow = advanced ? stride : analysisStride(fps);
     if (strideNow !== stride) setStride(strideNow);
@@ -505,6 +506,7 @@ export default function App() {
         stride: strideNow,
         signal: ctl.signal,
         onBackend: setBackend,
+        onLoad: (progress) => setStatus({ kind: 'loading', stage: 'model', progress }),
         onProgress: (done, total) => setStatus({ kind: 'analyzing', done, total }),
       });
       // Left to the app, the people who do not jump (a coach, a judge) are not athletes.
@@ -784,7 +786,8 @@ export default function App() {
     else if (coachTab === 'twist') setCoachTab('skill');
   };
 
-  const analyzing = status.kind === 'analyzing';
+  // Loading the pose model is part of the analysis: the controls stay locked, nothing else can start.
+  const analyzing = status.kind === 'analyzing' || (status.kind === 'loading' && status.stage === 'model');
   const loading = status.kind === 'loading';
 
   // Drop a video anywhere on the page. The handlers read the latest onFile/analyzing through a ref.

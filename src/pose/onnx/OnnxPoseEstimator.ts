@@ -1,10 +1,10 @@
 import type * as Ort from 'onnxruntime-web';
 import type { BackendInfo, EstimatorOptions, PoseDetection, PoseEstimator, PoseEstimatorFactory } from '../types';
 import { decodeHeatmaps, decodeSimcc, type Decoded } from './decode';
-import { createPersonDetector } from './detector';
+import { createPersonDetector, DETECTOR_FILE } from './detector';
 import { cropAround, cropToImage, type Crop } from './geometry';
 import { COCO17, HALPE26, toLandmarks, type KeypointMap, type ScoredPoint } from './keypointMaps';
-import { createSession, loadOrt } from './runtime';
+import { createSession, fetchModel, loadOrt } from './runtime';
 
 /**
  * Experimental pose engines: a person detector (YOLOX), then a top-down pose model on each person's crop, run with ONNX Runtime
@@ -82,10 +82,39 @@ function drawCrop(ctx: CanvasRenderingContext2D, video: HTMLVideoElement, crop: 
   }
 }
 
+/**
+ * Downloads the detector and the pose model side by side and tells the share of the bytes received. Once everything is in, the
+ * progress goes back to unknown: what is left (building the sessions) has no measure.
+ */
+async function downloadModels(files: string[], onLoad: EstimatorOptions['onLoad']): Promise<void> {
+  const parts = new Map<string, { loaded: number; total: number }>();
+  const report = () => {
+    if (!onLoad) return;
+    let loaded = 0;
+    let total = 0;
+    for (const part of parts.values()) {
+      loaded += part.loaded;
+      total += part.total;
+    }
+    // A size the server did not tell makes the share unknown rather than wrong.
+    const known = parts.size === files.length && [...parts.values()].every((p) => p.total > 0);
+    onLoad(known && loaded < total ? loaded / total : undefined);
+  };
+  await Promise.all(
+    files.map((file) =>
+      fetchModel(file, (loaded, total) => {
+        parts.set(file, { loaded, total });
+        report();
+      }),
+    ),
+  );
+  onLoad?.(undefined);
+}
+
 export function createOnnxEstimator(engine: OnnxEngine): PoseEstimatorFactory {
   const spec: Spec = SPECS[engine];
   return async (options: EstimatorOptions) => {
-    const ort = await loadOrt();
+    const [ort] = await Promise.all([loadOrt(), downloadModels([DETECTOR_FILE, spec.file], options.onLoad)]);
     const webgpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
 
     const canvas = document.createElement('canvas');

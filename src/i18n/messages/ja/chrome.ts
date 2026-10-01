@@ -159,6 +159,7 @@ export const chrome: Translation<typeof en> = {
   'busy.downloading': 'サンプル動画を読み込んでいます…',
   'busy.reading': '動画を開いています…',
   'busy.measuring': '動画を確認しています…',
+  'busy.model': 'ポーズモデルを読み込んでいます…',
   'busy.converting': '動画を変換しています…',
   'busy.convertingText': 'お使いのブラウザーではこの形式をそのまま再生できないため、端末上で動画を変換しています。',
   'busy.progress': '解析の進行状況',

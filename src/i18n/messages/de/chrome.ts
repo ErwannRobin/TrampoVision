@@ -163,6 +163,7 @@ export const chrome: Translation<typeof en> = {
   'busy.downloading': 'Beispielvideo wird geladen…',
   'busy.reading': 'Ihr Video wird geöffnet…',
   'busy.measuring': 'Ihr Video wird geprüft…',
+  'busy.model': 'Pose-Modell wird geladen…',
   'busy.converting': 'Ihr Video wird umgewandelt…',
   'busy.convertingText':
     'Ihr Browser kann dieses Format nicht direkt abspielen, deshalb wird das Video auf Ihrem Gerät umgewandelt.',

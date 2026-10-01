@@ -162,6 +162,7 @@ export const chrome: Translation<typeof en> = {
   'busy.downloading': 'Chargement de la vidéo d’exemple…',
   'busy.reading': 'Ouverture de votre vidéo…',
   'busy.measuring': 'Vérification de votre vidéo…',
+  'busy.model': 'Chargement du modèle de pose…',
   'busy.converting': 'Conversion de votre vidéo…',
   'busy.convertingText':
     'Votre navigateur ne peut pas lire ce format tel quel : la vidéo est donc convertie sur votre appareil.',

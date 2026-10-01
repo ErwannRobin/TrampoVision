@@ -170,6 +170,7 @@ export const chrome = {
   'busy.downloading': 'Loading the sample video…',
   'busy.reading': 'Opening your video…',
   'busy.measuring': 'Checking your video…',
+  'busy.model': 'Loading the pose model…',
   'busy.converting': 'Converting your video…',
   'busy.convertingText': 'Your browser cannot play this format directly, so the video is converted on your device.',
   'busy.progress': 'Analysis progress',

@@ -64,7 +64,10 @@ const EXPERIMENTAL = [
     'end2end.onnx',
   ],
   // ViTPose-B, COCO 17 points (ONNX export from onnx-community, 344 MB).
-  ['vitpose_base_simple.onnx', 'https://huggingface.co/onnx-community/vitpose-base-simple/resolve/main/onnx/model.onnx'],
+  [
+    'vitpose_base_simple.onnx',
+    'https://huggingface.co/onnx-community/vitpose-base-simple/resolve/main/onnx/model.onnx',
+  ],
 ];
 for (const [name, url, inZip] of EXPERIMENTAL) {
   const file = join(modelDir, name);

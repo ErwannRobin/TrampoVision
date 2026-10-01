@@ -32,19 +32,46 @@ export function modelUrl(file: string): string {
 
 const fetched = new Map<string, Promise<Uint8Array>>();
 
-/** The bytes of a model file. A missing file is told clearly (a dev server answers an unknown path with the page itself). */
-export function fetchModel(file: string): Promise<Uint8Array> {
+/** Bytes received so far and the size of the file (0 when the server does not tell it). */
+export type ByteProgress = (loaded: number, total: number) => void;
+
+/**
+ * The bytes of a model file. A missing file is told clearly (a dev server answers an unknown path with the page itself).
+ * `onBytes` follows the download; a file already fetched reports itself done at once.
+ */
+export function fetchModel(file: string, onBytes?: ByteProgress): Promise<Uint8Array> {
   let bytes = fetched.get(file);
-  if (!bytes) {
-    bytes = (async () => {
-      const res = await fetch(modelUrl(file));
-      const html = res.headers.get('content-type')?.includes('text/html');
-      if (!res.ok || html) throw new Error(t('err.modelFile', { file }));
-      return new Uint8Array(await res.arrayBuffer());
-    })();
-    bytes.catch(() => fetched.delete(file));
-    fetched.set(file, bytes);
+  if (bytes) {
+    void bytes.then((done) => onBytes?.(done.length, done.length)).catch(() => {});
+    return bytes;
   }
+  bytes = (async () => {
+    const res = await fetch(modelUrl(file));
+    const html = res.headers.get('content-type')?.includes('text/html');
+    if (!res.ok || html) throw new Error(t('err.modelFile', { file }));
+    const total = Number(res.headers.get('content-length')) || 0;
+    if (!res.body || !onBytes) return new Uint8Array(await res.arrayBuffer());
+    onBytes(0, total);
+    const chunks: Uint8Array[] = [];
+    let loaded = 0;
+    const reader = res.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      loaded += value.length;
+      onBytes(loaded, total);
+    }
+    const all = new Uint8Array(loaded);
+    let at = 0;
+    for (const chunk of chunks) {
+      all.set(chunk, at);
+      at += chunk.length;
+    }
+    return all;
+  })();
+  bytes.catch(() => fetched.delete(file));
+  fetched.set(file, bytes);
   return bytes;
 }
 

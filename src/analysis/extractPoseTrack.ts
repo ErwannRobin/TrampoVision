@@ -61,6 +61,8 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
 
   try {
     const total = Math.max(1, Math.floor((duration * opts.sourceFps) / opts.stride));
+    // The model is ready: the busy screen moves on from loading it to counting frames.
+    opts.onProgress?.(0, total);
     const times: number[] = [];
     const frames: (Keypoint[] | null)[][] = Array.from({ length: athletes }, () => []);
     const world: (WorldPoint[] | null)[][] = Array.from({ length: athletes }, () => []);

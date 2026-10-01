@@ -31,6 +31,8 @@ export interface EstimatorOptions {
   numPoses: number;
   /** Try the GPU delegate first and fall back to CPU (WASM) if it fails. */
   preferGpu: boolean;
+  /** Told while the model loads: the share of the files downloaded (0..1), or undefined when it is not known (or the files are in and the model starts). */
+  onLoad?: (fraction: number | undefined) => void;
 }
 
 export interface BackendInfo {
