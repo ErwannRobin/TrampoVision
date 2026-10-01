@@ -75,6 +75,7 @@ import { ReadyCard } from './ui/rail/ReadyCard';
 import { CalibrationBar } from './ui/stage/CalibrationBar';
 import { ProcessingOverlay } from './ui/stage/ProcessingOverlay';
 import { clipOrientation, type Size } from './ui/stage/fit';
+import { hudJumps } from './ui/stage/hud';
 import { Stage, type OtherAthlete } from './ui/stage/Stage';
 import { Transport } from './ui/stage/Transport';
 import type { Appearance, Audience, CoachTab, StageView, Status } from './ui/types';
@@ -648,6 +649,8 @@ export default function App() {
     () => (result && skills ? buildSession({ skills, result, twist, labels }) : null),
     [result, skills, twist, labels, locale], // oxlint-disable-line react-hooks/exhaustive-deps
   );
+  // What the full screen says about each jump.
+  const fullscreenJumps = useMemo(() => hudJumps(session), [session]);
   // The set on screen, as the recent sets keep it: stored when the analysis completes, and again whenever what the live view says about
   // it changes (a skill the coach confirms, changes or deletes). Only when the saved records are read, so a set that is reopened has its labels.
   const setSnapshot = useMemo<SetSnapshot | null>(() => {
@@ -1199,6 +1202,7 @@ export default function App() {
                   onView={advanced && result && twist ? switchStageView : undefined}
                   onClipSize={setClipSize}
                   pane={pane}
+                  fullscreen={{ jumps: fullscreenJumps, selected: jumpSel, onJump: stepJump, onSpeed: setSpeed }}
                   athletes={
                     athleteCount > 1
                       ? {

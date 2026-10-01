@@ -152,6 +152,274 @@
   cursor: pointer;
 }
 
+/* Full screen: the stage fixed over the page, with only what a coach needs in the hand. -------------------------------------- */
+
+.stage__expand {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(12, 13, 15, 0.6);
+  color: rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.stage__expand:hover:not(:disabled) {
+  background: rgba(12, 13, 15, 0.8);
+  color: #fff;
+}
+
+/* The page behind does not scroll, and the stage's own column (sticky, stacked below the top bar) must not hold it down. */
+html[data-stage-fullscreen] {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html[data-stage-fullscreen] .app .workspace__stage {
+  z-index: 200 !important;
+}
+/* The shell sizes the stage by its place in the grid (some of it by a portrait clip's width): here it is the screen. */
+html[data-stage-fullscreen] .stage[data-fullscreen] {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  flex: none;
+  width: auto !important;
+  max-width: none !important;
+  height: auto !important;
+  border-radius: 0;
+  /* The finger moves the video: the browser must not scroll or zoom with it. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Busy and ready panels belong to the page, not to the picture in the hand. */
+.stage[data-fullscreen] .stage__layer {
+  display: none;
+}
+
+.fs {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+  pointer-events: none;
+}
+.fs__top,
+.fs__bottom {
+  display: flex;
+  gap: 10px;
+  transition: opacity var(--t-med) var(--ease);
+}
+.stage[data-swiping] .fs__top,
+.stage[data-swiping] .fs__bottom {
+  opacity: 0.35;
+}
+.fs__top {
+  align-items: flex-start;
+  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 28px
+    max(12px, env(safe-area-inset-left));
+  background: linear-gradient(rgba(0, 0, 0, 0.55), transparent);
+}
+.fs__bottom {
+  flex-direction: column;
+  padding: 28px max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
+}
+.fs .icon-btn {
+  color: rgba(255, 255, 255, 0.9);
+  pointer-events: auto;
+}
+.fs .icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.fs .icon-btn--solid {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(12, 13, 15, 0.6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.fs .icon-btn--primary {
+  background: #fff;
+  color: #0b0c0e;
+}
+.fs .icon-btn--primary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.88);
+  color: #0b0c0e;
+}
+
+/* The skill under the playhead. It ignores the pointer: a finger on it still moves the video. */
+.fs__skill {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 2px;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+.fs__jump {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: var(--fs-sm);
+}
+.fs__name {
+  font-size: var(--fs-lg);
+  font-stretch: var(--wd-brand);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.fs__name[data-unsure] {
+  text-decoration: underline dashed rgba(255, 255, 255, 0.6);
+  text-underline-offset: 4px;
+}
+.fs__figs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: var(--fs-sm);
+}
+.fs__fig b {
+  color: #fff;
+  font-weight: 600;
+}
+
+.fs__swipe,
+.fs__hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+.fs__swipe {
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1;
+}
+.fs__hint {
+  width: max-content;
+  max-width: calc(100% - 48px);
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--r-pill);
+  background: rgba(12, 13, 15, 0.6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  font-size: var(--fs-sm);
+  text-shadow: none;
+  animation: fade-in var(--t-med) var(--ease);
+}
+
+.fs__seek {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+}
+.fs__time {
+  min-width: 4.5em;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+.fs__range {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: none;
+}
+.fs__range:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.fs__range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, #fff var(--fs-progress, 0%), rgba(255, 255, 255, 0.3) var(--fs-progress, 0%));
+}
+.fs__range::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+.fs__range::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: #fff;
+}
+.fs__range::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.fs__range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.fs__buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.fs__play {
+  margin: 0 6px;
+}
+.fs__speed {
+  min-width: 52px;
+  height: 36px;
+  margin-left: 12px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--r-pill);
+  background: rgba(12, 13, 15, 0.4);
+  color: #fff;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.fs__speed:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.fs__speed:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .fs__speed {
+    min-height: 44px;
+  }
+}
+
 /* Busy: reading, converting, analyzing. ------------------------------------------------------------------------ */
 
 .busy {

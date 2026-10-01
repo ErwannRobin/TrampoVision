@@ -213,6 +213,13 @@ export const chrome: Translation<typeof en> = {
   'stage.view3d': '3D',
   'stage.view3dTitle': '3Dスケルトンのみ（試験的）',
   'stage.noVideo': '保存済みの解析には動画がありません',
+  'fs.enter': '全画面',
+  'fs.exit': '全画面を閉じる',
+  'fs.jump': 'ジャンプ {n} / {total}',
+  'fs.seek': '動画の位置',
+  'fs.prevJump': '前のジャンプ',
+  'fs.nextJump': '次のジャンプ',
+  'fs.hint': '左右にスワイプして動画を動かします',
 
   'transport.back10': '10フレーム戻る（Shift + ←）',
   'transport.prev': '前のフレーム（←）',

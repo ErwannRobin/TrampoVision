@@ -218,6 +218,13 @@ export const chrome: Translation<typeof en> = {
   'stage.view3d': '3D',
   'stage.view3dTitle': 'Le squelette 3D seul (expérimental)',
   'stage.noVideo': 'Une analyse enregistrée n’a pas de vidéo',
+  'fs.enter': 'Plein écran',
+  'fs.exit': 'Quitter le plein écran',
+  'fs.jump': 'Saut {n} sur {total}',
+  'fs.seek': 'Position dans la vidéo',
+  'fs.prevJump': 'Saut précédent',
+  'fs.nextJump': 'Saut suivant',
+  'fs.hint': 'Glissez à gauche ou à droite pour parcourir la vidéo',
 
   'transport.back10': 'Reculer de 10 images (Maj + ←)',
   'transport.prev': 'Image précédente (←)',

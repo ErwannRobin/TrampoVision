@@ -3,7 +3,7 @@ import { formatNumber, lower, t, tx } from '../../i18n';
 import { difficultyRange } from '../../skills/fig/difficulty';
 import { elementName } from '../../skills/fig/elements';
 import type { LiveJump } from '../../coaching/session';
-import { otherLabel } from '../../coaching/display';
+import { jumpName as nameOf } from '../../coaching/display';
 import { deductionText, difficultyText } from '../../coaching/summary';
 import { Button, Disclosure, Icon, cx } from '../kit';
 import { ElementPicker } from './ElementPicker';
@@ -26,13 +26,6 @@ export interface SkillActions {
   /** Labels can be saved (the video is identified). */
   canLabel: boolean;
 }
-
-const nameOf = (j: LiveJump): string => {
-  if (j.other) return otherLabel();
-  if (!j.element) return j.complete ? t('live.notNamed') : t('live.cutOff');
-  const name = elementName(j.element);
-  return j.source === 'auto' && j.certainty === 'tentative' ? `${name}?` : name;
-};
 
 /** What the row says under the name: how sure it is, in words. */
 export function subline(j: LiveJump): string {
