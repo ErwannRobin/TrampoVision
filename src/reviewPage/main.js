@@ -169,6 +169,9 @@ import {
     ul.textContent = '';
     $('empty').hidden = list.length > 0;
     $('empty').textContent = t(mode === 'auto' ? 'rv.nothingReview' : 'rv.nothingHere');
+    const all = $('deleteall');
+    all.hidden = list.length === 0;
+    all.textContent = t('rv.deleteAll', { n: counts[mode] == null ? list.length : counts[mode], tab: tabLabel(mode) });
     list.forEach((j) => {
       const li = document.createElement('li');
       const b = document.createElement('button');
@@ -1088,6 +1091,62 @@ import {
     }
   }
 
+  // ---- delete ----
+  // Both ask first: a deleted jump is gone from the service (the app puts it back only if it analyses the video again).
+  const emptyDetail = () => {
+    current = null;
+    rec = null;
+    stop();
+    $('detail').hidden = true;
+  };
+  let deleting = false;
+  function remove(path, confirmText, done) {
+    if (deleting || !window.confirm(confirmText)) return;
+    deleting = true;
+    $('err').textContent = '';
+    api(path, { method: 'DELETE' })
+      .then((b) => {
+        deleting = false;
+        done(b);
+      })
+      .catch((e) => {
+        deleting = false;
+        showErr(e);
+      });
+  }
+  function deleteCurrent() {
+    if (!current || !rec) return;
+    const id = current;
+    remove(
+      '/jumps/' + encodeURIComponent(id),
+      t('rv.deleteConfirm', { n: rec.jump_id, video: shortVideo(rec.video_id) }),
+      () => {
+        toast(t('rv.toastDeleted'));
+        const i = list.findIndex((j) => j.id === id);
+        if (i >= 0) list.splice(i, 1);
+        const target = list[i] || list[Math.max(0, i - 1)];
+        loadStats();
+        if (target) select(target.id);
+        else {
+          emptyDetail();
+          renderList();
+        }
+      },
+    );
+  }
+  function deleteAll() {
+    const tab = mode;
+    const n = counts[tab] == null ? list.length : counts[tab];
+    remove('/jumps?status=' + encodeURIComponent(tab), t('rv.deleteAllConfirm', { n, tab: tabLabel(tab) }), (b) => {
+      toast(t('rv.toastDeletedAll', { n: b.deleted }));
+      if (mode !== tab) return;
+      list = [];
+      emptyDetail();
+      loadStats();
+      renderList();
+    });
+  }
+
   function step(delta) {
     const i = list.findIndex((j) => j.id === current);
     const n = list[i + delta];
@@ -1201,6 +1260,8 @@ import {
   $('unknown').onclick = () => verdict({ verdict: 'unknown' });
   $('baddata').onclick = () => verdict({ verdict: 'bad-data' });
   $('skip').onclick = () => step(1);
+  $('delete').onclick = deleteCurrent;
+  $('deleteall').onclick = deleteAll;
   $('prev').onclick = () => step(-1);
   document.addEventListener('keydown', (e) => {
     const tag = e.target && e.target.tagName;

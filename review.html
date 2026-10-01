@@ -387,6 +387,12 @@
         background: var(--bad-soft);
         color: var(--bad);
       }
+      .a-end {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+      }
       #ident {
         text-align: right;
         font-size: 12px;
@@ -512,6 +518,19 @@
       }
       button.act:hover:not(:disabled) {
         border-color: var(--accent);
+      }
+      button.danger {
+        padding: 4px 10px;
+        font-size: 13px;
+        color: var(--bad);
+      }
+      button.danger:hover:not(:disabled) {
+        border-color: var(--bad);
+        background: var(--bad-soft);
+      }
+      #deleteall {
+        margin-top: 8px;
+        align-self: stretch;
       }
       button.primary {
         background: var(--ok);
@@ -734,6 +753,7 @@
         <h2 id="listtitle">To review</h2>
         <ul class="queue" id="queue"></ul>
         <p id="empty" class="muted" hidden>Nothing here. All done!</p>
+        <button class="act danger" id="deleteall" type="button" hidden></button>
       </aside>
 
       <div id="detail" hidden>
@@ -748,7 +768,18 @@
             </div>
           </div>
           <div class="facts" id="measured"></div>
-          <div class="muted" id="ident"></div>
+          <div class="a-end">
+            <div class="muted" id="ident"></div>
+            <button
+              class="act danger"
+              id="delete"
+              type="button"
+              data-i18n="rv.delete"
+              data-i18n-attr="title:rv.deleteTitle"
+            >
+              Delete
+            </button>
+          </div>
         </section>
 
         <section class="card" id="stage" aria-label="The jump" data-i18n-attr="aria-label:rv.theJump">
