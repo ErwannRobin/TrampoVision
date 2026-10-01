@@ -68,4 +68,10 @@ export const reviewer: Translation<typeof en> = {
   'rv.badToken': 'Le service de vérification n’accepte pas le jeton de cette version.',
   'rv.noService':
     'Cette version n’a pas de service de vérification configuré (VITE_REVIEW_API_URL et VITE_REVIEW_INGEST_TOKEN).',
+  'rv.resetView': 'Recentrer',
+  'rv.viewHint': 'Glisser pour déplacer · molette ou pincement pour zoomer · double-clic pour recentrer',
+  'rv.salto': 'Salto',
+  'rv.twist': 'Vrille',
+  'rv.fix': 'Autre figure',
+  'rv.close': 'Fermer',
 };

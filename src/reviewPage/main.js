@@ -196,6 +196,7 @@ import {
 
   function select(id) {
     current = id;
+    document.body.classList.remove('listopen', 'fixopen');
     renderList();
     $('err').textContent = '';
     api('/jumps/' + encodeURIComponent(id))
@@ -227,7 +228,7 @@ import {
     $('autoconf').textContent = pct(p.confidence);
     $('autoclf').textContent = row.classifier;
     $('ident').textContent = t('rv.jumpVideo', { n: row.jump_id, video: shortVideo(row.video_id) });
-    $('summary').textContent = p.summary || '';
+    $('autoname').title = p.summary || '';
 
     const vn = $('verdictnow');
     if (row.status !== 'auto') {
@@ -420,27 +421,140 @@ import {
     return seq.data[Math.max(0, Math.min(seq.data.length - 1, i))];
   }
 
-  function draw() {
+  // The skeleton is stored in the body's own frame (hips at the origin, the trunk pointing up), so on its own it never turns. The somersault
+  // turns it about the hips as it did in the video, and the twist is shown on a dial: both can be read at a glance, and the figure can be
+  // moved and zoomed.
+  const view = { x: 0, y: 0, k: 1 };
+  const ORIGIN_Y = 0.54;
+  const viewMoved = () => view.x !== 0 || view.y !== 0 || view.k !== 1;
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  function syncReset() {
+    $('resetview').hidden = !viewMoved();
+  }
+  function resetView() {
+    view.x = 0;
+    view.y = 0;
+    view.k = 1;
+    syncReset();
+    draw();
+  }
+
+  // A canvas that follows the size of its box, sharp on dense screens. Returns what to draw with, in CSS pixels.
+  function fit(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth;
+    const h = cv.clientHeight;
+    const pw = Math.max(1, Math.round(w * dpr));
+    const ph = Math.max(1, Math.round(h * dpr));
+    if (cv.width !== pw || cv.height !== ph) {
+      cv.width = pw;
+      cv.height = ph;
+    }
+    const g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    return { g, w, h };
+  }
+
+  // Twist since takeoff, in turns, at the position u of the jump; null when the jump has no twist curve.
+  function twistTurns(u) {
+    const tw = rec && rec.record.twist && rec.record.twist.sequence;
+    if (!tw || !tw.data || !tw.data.length) return null;
+    const i = col(tw, 'twist_deg');
+    if (i < 0) return null;
+    const f = clamp(u, 0, 1) * (tw.data.length - 1);
+    const a = Math.floor(f);
+    const b = Math.min(tw.data.length - 1, a + 1);
+    const va = tw.data[a][i];
+    const vb = tw.data[b][i];
+    if (va == null || !isFinite(va)) return null;
+    return (vb == null || !isFinite(vb) ? va : va + (vb - va) * (f - a)) / 360;
+  }
+
+  // One dial: a turn counter. `turns` is clockwise from the top; the swept part is filled.
+  function dial(g, cx, cy, r, turns, color) {
+    g.lineWidth = 1.5;
+    g.strokeStyle = css('--line');
+    g.beginPath();
+    g.arc(cx, cy, r, 0, 2 * Math.PI);
+    g.stroke();
+    const a = (turns == null ? 0 : turns) * 2 * Math.PI;
+    if (turns != null) {
+      g.fillStyle = css('--accent-soft');
+      g.beginPath();
+      g.moveTo(cx, cy);
+      g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + clamp(a, -2 * Math.PI, 2 * Math.PI), a < 0);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = color;
+      g.lineWidth = 2.5;
+      g.beginPath();
+      g.moveTo(cx, cy);
+      g.lineTo(cx + Math.sin(a) * r, cy - Math.cos(a) * r);
+      g.stroke();
+    }
+    g.strokeStyle = css('--muted');
+    g.lineWidth = 1.5;
+    g.beginPath();
+    g.moveTo(cx, cy - r);
+    g.lineTo(cx, cy - r - 4);
+    g.stroke();
+  }
+
+  function drawSkeleton() {
     if (!rec) return;
     const seq = rec.record.sequence;
-    const cv = $('skel');
-    const g = cv.getContext('2d');
-    g.clearRect(0, 0, cv.width, cv.height);
+    const { g, w, h } = fit($('skel'));
+    if (!w || !h) return;
     if (!seq) {
       g.fillStyle = css('--muted');
+      g.font = '14px system-ui';
       g.fillText(t('rv.noSequence'), 12, 24);
       return;
     }
     const row = rowAt(seq);
-    const S = 90;
-    const ox = 140;
-    const oy = 120;
+    const turnsRaw = row[col(seq, 'orient_turns')];
+    const salto = turnsRaw == null || !isFinite(turnsRaw) ? 0 : turnsRaw;
+    const twist = twistTurns(u);
+    const th = salto * 2 * Math.PI;
+    const cs = Math.cos(th);
+    const sn = Math.sin(th);
+    const S = (Math.min(w, h) / 2.4) * view.k;
+    const ox = w / 2 + view.x;
+    const oy = h * ORIGIN_Y + view.y;
     const pt = (name) => {
       const x = row[col(seq, name + '_x')];
       const y = row[col(seq, name + '_y')];
-      return x == null || y == null ? null : [ox + x * S, oy - y * S];
+      if (x == null || y == null || !isFinite(x) || !isFinite(y)) return null;
+      return [ox + S * (x * cs + y * sn), oy + S * (x * sn - y * cs)];
     };
-    g.lineWidth = 3;
+
+    // The somersault: a ring around the hips with the turn since takeoff swept on it, and the upright reference.
+    const R = S * 1.08;
+    g.lineWidth = 1;
+    g.strokeStyle = css('--line');
+    g.setLineDash([3, 6]);
+    g.beginPath();
+    g.arc(ox, oy, R, 0, 2 * Math.PI);
+    g.stroke();
+    g.setLineDash([]);
+    g.beginPath();
+    g.moveTo(ox, oy - R - 6);
+    g.lineTo(ox, oy - R + 6);
+    g.stroke();
+    if (Math.abs(th) > 0.01) {
+      g.strokeStyle = css('--warn');
+      g.lineWidth = 3;
+      g.beginPath();
+      g.arc(ox, oy, R, -Math.PI / 2, -Math.PI / 2 + clamp(th, -2 * Math.PI, 2 * Math.PI), th < 0);
+      g.stroke();
+    }
+    g.fillStyle = css('--warn');
+    g.beginPath();
+    g.arc(ox + R * Math.sin(th), oy - R * Math.cos(th), 4, 0, 2 * Math.PI);
+    g.fill();
+
+    g.lineWidth = Math.max(2.5, S * 0.035);
     g.lineCap = 'round';
     BONES.forEach((b) => {
       const a = pt(b[0]);
@@ -456,34 +570,85 @@ import {
     if (nose) {
       g.fillStyle = css('--ink');
       g.beginPath();
-      g.arc(nose[0], nose[1], 7, 0, 6.3);
+      g.arc(nose[0], nose[1], Math.max(5, S * 0.06), 0, 2 * Math.PI);
       g.fill();
     }
+
+    // The counters, in the corner of the view: they stay where they are when the figure is moved.
+    const m = (rec.record.prediction && rec.record.prediction.measured) || {};
+    const r = h < 320 ? 17 : 22;
+    [
+      [t('rv.salto'), salto, m.somersaults, css('--warn')],
+      [t('rv.twist'), twist, m.twists, css('--accent')],
+    ].forEach(([label, turns, total, color], n) => {
+      const cy = 12 + r + n * (2 * r + 8);
+      dial(g, 12 + r, cy, r, turns, color);
+      g.textAlign = 'left';
+      g.fillStyle = css('--muted');
+      g.font = '11px system-ui';
+      g.fillText(label, 12 + 2 * r + 8, cy - 2);
+      g.fillStyle = css('--ink');
+      g.font = '600 14px system-ui';
+      g.fillText(
+        (turns == null ? '–' : formatNumber(turns, 2)) + (total == null ? '' : ' / ' + formatNumber(total, 2)),
+        12 + 2 * r + 8,
+        cy + 14,
+      );
+    });
+
     g.fillStyle = css('--muted');
-    g.font = '15px system-ui';
+    g.font = '13px system-ui';
+    g.textAlign = 'left';
     g.fillText(
       t('rv.hipsKnees', {
         hip: Math.round(row[col(seq, 'hip_angle_deg')]),
         knee: Math.round(row[col(seq, 'knee_angle_deg')]),
       }),
-      8,
-      312,
+      10,
+      h - 10,
     );
-    drawCurves(seq);
   }
 
-  function drawCurves(seq) {
-    const cv = $('curves');
-    const g = cv.getContext('2d');
-    g.clearRect(0, 0, cv.width, cv.height);
-    const defs = [
+  function draw() {
+    drawSkeleton();
+    drawCurves();
+  }
+
+  // The measured curves, side by side and small; the line is the position in the jump.
+  const CURVE_PAD = 6;
+  function curveDefs() {
+    return [
       ['orient_turns', t('rv.curve.turns')],
       ['hip_angle_deg', t('rv.curve.hip')],
       ['knee_angle_deg', t('rv.curve.knee')],
       ['com_h_m', t('rv.curve.height')],
     ];
-    const h = cv.height / defs.length;
+  }
+  const curveCols = (w) => (w >= 520 ? 4 : 2);
+  function drawCurves() {
+    const cv = $('curves');
+    if (!rec || !rec.record.sequence) return;
+    const seq = rec.record.sequence;
+    const { g, w, h } = fit(cv);
+    if (!w || !h) return;
+    const defs = curveDefs();
+    const cols = curveCols(w);
+    const rows = Math.ceil(defs.length / cols);
+    const cw = w / cols;
+    const ch = h / rows;
+    g.font = '11px system-ui';
+    g.textAlign = 'left';
     defs.forEach((d, k) => {
+      const x0 = (k % cols) * cw;
+      const y0 = Math.floor(k / cols) * ch;
+      if (k % cols) {
+        g.strokeStyle = css('--line');
+        g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(x0, y0 + 2);
+        g.lineTo(x0, y0 + ch - 2);
+        g.stroke();
+      }
       const i = col(seq, d[0]);
       if (i < 0) return;
       const vals = seq.data.map((r) => r[i]).filter((v) => v != null && isFinite(v));
@@ -491,13 +656,15 @@ import {
       const lo = Math.min.apply(null, vals);
       let hi = Math.max.apply(null, vals);
       if (hi - lo < 1e-6) hi = lo + 1;
-      const top = k * h + 16;
-      const bot = (k + 1) * h - 6;
+      const left = x0 + CURVE_PAD + 2;
+      const width = cw - 2 * CURVE_PAD - 4;
+      const top = y0 + 17;
+      const bot = y0 + ch - 4;
       g.fillStyle = css('--muted');
-      g.font = '15px system-ui';
-      g.fillText(d[1] + '  ' + formatNumber(lo, 1) + ' … ' + formatNumber(hi, 1), 6, k * h + 12);
+      const range = d[1] + '  ' + formatNumber(lo, 1) + ' … ' + formatNumber(hi, 1);
+      g.fillText(g.measureText(range).width <= width ? range : d[1], left, y0 + 12, width);
       g.strokeStyle = css('--accent');
-      g.lineWidth = 2;
+      g.lineWidth = 1.75;
       g.beginPath();
       let started = false;
       seq.data.forEach((r, n) => {
@@ -506,7 +673,7 @@ import {
           started = false;
           return;
         }
-        const x = 6 + (n / (seq.data.length - 1)) * (cv.width - 12);
+        const x = left + (n / (seq.data.length - 1)) * width;
         const y = bot - ((v - lo) / (hi - lo)) * (bot - top);
         if (!started) {
           g.moveTo(x, y);
@@ -514,14 +681,25 @@ import {
         } else g.lineTo(x, y);
       });
       g.stroke();
+      const cx = left + u * width;
+      g.strokeStyle = css('--ink');
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(cx, y0 + 14);
+      g.lineTo(cx, y0 + ch - 2);
+      g.stroke();
     });
-    const cx = 6 + u * (cv.width - 12);
-    g.strokeStyle = css('--ink');
-    g.lineWidth = 1;
-    g.beginPath();
-    g.moveTo(cx, 0);
-    g.lineTo(cx, cv.height);
-    g.stroke();
+  }
+  // Pointing at a curve moves the jump to that moment.
+  function scrubFromCurves(e) {
+    const cv = $('curves');
+    const rect = cv.getBoundingClientRect();
+    const cw = rect.width / curveCols(rect.width);
+    const x = (e.clientX - rect.left) % cw;
+    stop();
+    u = clamp((x - CURVE_PAD - 2) / (cw - 2 * CURVE_PAD - 4), 0, 1);
+    $('scrub').value = u;
+    draw();
   }
 
   function stop() {
@@ -538,7 +716,7 @@ import {
     const seq = rec && rec.record.sequence;
     const dur = seq && seq.durationS ? seq.durationS : 1;
     (function tick(now) {
-      u += (now - last) / 1000 / (dur * 2); // half speed
+      u = Math.max(0, u + Math.max(0, now - last) / 1000 / (dur * 2)); // half speed; the first frame can be stamped before `last`
       last = now;
       if (u >= 1) u = 0;
       $('scrub').value = u;
@@ -620,6 +798,91 @@ import {
     u = Number(e.target.value);
     draw();
   };
+  $('resetview').onclick = resetView;
+  const skel = $('skel');
+  const pointers = new Map();
+  let pinch = null;
+  const local = (e) => {
+    const r = skel.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  const zoomAt = (p, ratio) => {
+    const w = skel.clientWidth;
+    const h = skel.clientHeight;
+    const k = clamp(view.k * ratio, 0.4, 6);
+    const r = k / view.k;
+    const o = { x: w / 2 + view.x, y: h * ORIGIN_Y + view.y };
+    view.x = p.x - (p.x - o.x) * r - w / 2;
+    view.y = p.y - (p.y - o.y) * r - h * ORIGIN_Y;
+    view.k = k;
+  };
+  skel.addEventListener('pointerdown', (e) => {
+    skel.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, local(e));
+    skel.classList.add('grabbing');
+    pinch = null;
+  });
+  skel.addEventListener('pointermove', (e) => {
+    const prev = pointers.get(e.pointerId);
+    if (!prev) return;
+    const p = local(e);
+    pointers.set(e.pointerId, p);
+    if (pointers.size === 1) {
+      view.x += p.x - prev.x;
+      view.y += p.y - prev.y;
+    } else if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      if (pinch && pinch.d > 0) {
+        zoomAt(mid, d / pinch.d);
+        view.x += mid.x - pinch.mid.x;
+        view.y += mid.y - pinch.mid.y;
+      }
+      pinch = { d, mid };
+    }
+    syncReset();
+    drawSkeleton();
+    $('viewhint').hidden = true;
+  });
+  const release = (e) => {
+    pointers.delete(e.pointerId);
+    pinch = null;
+    if (!pointers.size) skel.classList.remove('grabbing');
+  };
+  skel.addEventListener('pointerup', release);
+  skel.addEventListener('pointercancel', release);
+  skel.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      zoomAt(local(e), Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.002)));
+      $('viewhint').hidden = true;
+      syncReset();
+      drawSkeleton();
+    },
+    { passive: false },
+  );
+  skel.addEventListener('dblclick', resetView);
+  const curves = $('curves');
+  curves.addEventListener('pointerdown', (e) => {
+    curves.setPointerCapture(e.pointerId);
+    scrubFromCurves(e);
+  });
+  curves.addEventListener('pointermove', (e) => {
+    if (curves.hasPointerCapture(e.pointerId)) scrubFromCurves(e);
+  });
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => {
+      if (rec) draw();
+    });
+    ro.observe($('viewport'));
+    ro.observe(curves);
+  }
+  $('listopen').onclick = () => document.body.classList.add('listopen');
+  $('listclose').onclick = () => document.body.classList.remove('listopen');
+  $('fixopen').onclick = () => document.body.classList.add('fixopen');
+  $('fixclose').onclick = () => document.body.classList.remove('fixopen');
   $('confirm').onclick = () => verdict({ verdict: 'confirm' });
   $('unknown').onclick = () => verdict({ verdict: 'unknown' });
   $('baddata').onclick = () => verdict({ verdict: 'bad-data' });
@@ -635,6 +898,8 @@ import {
       if (!$('confirm').disabled) verdict({ verdict: 'confirm' });
     } else if (k === 'arrowright' || k === 'n') step(1);
     else if (k === 'arrowleft' || k === 'p') step(-1);
+    else if (k === 'r') resetView();
+    else if (k === 'escape') document.body.classList.remove('listopen', 'fixopen');
     else if (k === 'u') verdict({ verdict: 'unknown' });
     else if (k === 'b') verdict({ verdict: 'bad-data' });
     else if (k >= '1' && k <= '5' && cands[Number(k) - 1])

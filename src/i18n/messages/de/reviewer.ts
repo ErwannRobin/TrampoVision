@@ -68,4 +68,10 @@ export const reviewer: Translation<typeof en> = {
   'rv.badToken': 'Der Prüfdienst akzeptiert den Token dieser Version nicht.',
   'rv.noService':
     'Diese Version hat keinen Prüfdienst konfiguriert (VITE_REVIEW_API_URL und VITE_REVIEW_INGEST_TOKEN).',
+  'rv.resetView': 'Ansicht zurücksetzen',
+  'rv.viewHint': 'Ziehen zum Verschieben · Scrollen oder Zwei-Finger-Zoom · Doppelklick zum Zurücksetzen',
+  'rv.salto': 'Salto',
+  'rv.twist': 'Schraube',
+  'rv.fix': 'Anderes Element',
+  'rv.close': 'Schließen',
 };
