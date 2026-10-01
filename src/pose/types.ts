@@ -19,12 +19,20 @@ export interface WorldPoint {
 
 export type ModelVariant = 'lite' | 'full' | 'heavy';
 
+/** The pose model that finds the body points: MediaPipe, or one of the experimental ones (see engines.ts). */
+export type PoseEngineId = 'mediapipe' | 'rtmpose' | 'vitpose';
+
 export interface EstimatorOptions {
+  /** Default 'mediapipe'. */
+  engine?: PoseEngineId;
+  /** The MediaPipe model size; the other engines have one size. */
   model: ModelVariant;
   /** Max people the model looks for. The athlete is picked by `selectAthlete`. */
   numPoses: number;
   /** Try the GPU delegate first and fall back to CPU (WASM) if it fails. */
   preferGpu: boolean;
+  /** Told while the model loads: the share of the files downloaded (0..1), or undefined when it is not known (or the files are in and the model starts). */
+  onLoad?: (fraction: number | undefined) => void;
 }
 
 export interface BackendInfo {
@@ -44,14 +52,13 @@ export interface PoseDetection {
 }
 
 /**
- * Backend-agnostic pose estimator. The MVP ships a MediaPipe implementation; a WebGPU
- * (e.g. onnxruntime-web) or higher-accuracy model can be dropped in behind this interface
- * as long as it outputs the 33-point MediaPipe/BlazePose topology (see landmarks.ts).
+ * Backend-agnostic pose estimator. MediaPipe is the default; the experimental engines (onnxruntime-web, see pose/onnx/) sit
+ * behind the same interface and output the 33-point MediaPipe/BlazePose topology (see landmarks.ts), the points they lack unseen.
  */
 export interface PoseEstimator {
   readonly backend: BackendInfo;
   /** `timestampMs` must be strictly increasing between calls. */
-  detect(source: HTMLVideoElement, timestampMs: number): PoseDetection[];
+  detect(source: HTMLVideoElement, timestampMs: number): PoseDetection[] | Promise<PoseDetection[]>;
   dispose(): void;
 }
 

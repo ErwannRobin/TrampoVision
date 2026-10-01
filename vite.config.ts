@@ -30,6 +30,7 @@ const installedVersion = (pkg: string): string =>
 export default defineConfig(({ mode }) => ({
   define: {
     __MEDIAPIPE_VERSION__: JSON.stringify(installedVersion('@mediapipe/tasks-vision')),
+    __ORT_VERSION__: JSON.stringify(installedVersion('onnxruntime-web')),
     __FFMPEG_CORE_VERSION__: JSON.stringify(installedVersion('@ffmpeg/core')),
   },
   plugins: [

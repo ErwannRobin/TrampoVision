@@ -11,4 +11,5 @@ export const assetBase: string | null = raw ? `${raw.replace(/\/+$/, '')}/` : nu
 
 /** Versions of the packages whose wasm is hosted: a new version gets a new folder, never a stale file. */
 export const MEDIAPIPE_VERSION = __MEDIAPIPE_VERSION__;
+export const ORT_VERSION = __ORT_VERSION__;
 export const FFMPEG_CORE_VERSION = __FFMPEG_CORE_VERSION__;

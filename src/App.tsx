@@ -43,7 +43,7 @@ import { DEFAULT_SKILL_CONFIG, type SkillConfig } from './skills/config';
 import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from './skills/export';
 import { buildPoseSeries, parsePoseSeries, toSeriesJson, type ParsedSeries } from './analysis/timeSeries';
 import type { PoseTrack, ScaleSource } from './analysis/types';
-import type { ModelVariant, Point } from './pose/types';
+import type { ModelVariant, Point, PoseEngineId } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
 import { loadSample, samples } from './video/sample';
 import { dragHasFiles, pickDroppedVideo } from './video/drop';
@@ -126,6 +126,8 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [fps, setFps] = useState(30);
   const [model, setModel] = useState<ModelVariant>('full');
+  // Experimental: another pose model than MediaPipe. Only used with the advanced tools on, which are where it is picked.
+  const [engine, setEngine] = useState<PoseEngineId>('mediapipe');
   // Athletes to follow; 0 = the app decides: everybody who jumps.
   const [numPoses, setNumPoses] = useState(0);
   const [stride, setStride] = useState(1);
@@ -505,12 +507,14 @@ export default function App() {
     abort.current = ctl;
     setTracks([]);
     setNotice('');
-    setStatus({ kind: 'analyzing', done: 0, total: 1 });
+    // The pose model loads first, which can take long (a download for the experimental ones).
+    setStatus({ kind: 'loading', stage: 'model' });
     // The live view analyzes about 30 frames a second, so a phone film at 60 or 120 fps does not make the wait longer.
     const strideNow = advanced ? stride : analysisStride(fps);
     if (strideNow !== stride) setStride(strideNow);
     try {
       const ts = await extractPoseTracks(url, {
+        engine: advanced ? engine : 'mediapipe',
         model,
         numPoses,
         preferGpu,
@@ -518,6 +522,7 @@ export default function App() {
         stride: strideNow,
         signal: ctl.signal,
         onBackend: setBackend,
+        onLoad: (progress) => setStatus({ kind: 'loading', stage: 'model', progress }),
         onProgress: (done, total) => setStatus({ kind: 'analyzing', done, total }),
       });
       // Left to the app, the people who do not jump (a coach, a judge) are not athletes.
@@ -797,7 +802,8 @@ export default function App() {
     else if (coachTab === 'twist') setCoachTab('skill');
   };
 
-  const analyzing = status.kind === 'analyzing';
+  // Loading the pose model is part of the analysis: the controls stay locked, nothing else can start.
+  const analyzing = status.kind === 'analyzing' || (status.kind === 'loading' && status.stage === 'model');
   const loading = status.kind === 'loading';
 
   // Drop a video anywhere on the page. The handlers read the latest onFile/analyzing through a ref.
@@ -1034,6 +1040,8 @@ export default function App() {
       fileName={file?.name ?? seriesName}
       model={model}
       onModel={setModel}
+      engine={engine}
+      onEngine={setEngine}
       numPoses={numPoses}
       onNumPoses={setNumPoses}
       stride={stride}

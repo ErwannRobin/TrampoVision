@@ -15,6 +15,8 @@ export const errors: Translation<typeof en> = {
   'err.exportSurface': 'Für den Export konnte keine Zeichenfläche erstellt werden.',
   'err.exportH264': 'Dieser Browser kann kein H.264-Video kodieren.',
   'err.dimensions': 'Abmessungen oder Dauer des Videos konnten nicht gelesen werden.',
+  'err.modelFile':
+    'Die Modelldatei {file} wurde nicht gefunden. Führen Sie „npm run fetch-assets“ aus (oder laden Sie sie auf den Asset-Host hoch).',
   'err.notJson': 'Diese Datei ist kein gültiges JSON.',
   'err.notSeries': 'Dies ist keine TrampoVision-Posenreihe.',
   'err.seriesVersion': 'Nicht unterstützte Dateiversion ({found}); diese App liest Version {expected}.',

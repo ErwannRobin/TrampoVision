@@ -253,6 +253,8 @@ describe('the settings', () => {
     fileName: clip ? 'clip.mp4' : null,
     model: 'full',
     onModel: () => {},
+    engine: 'mediapipe',
+    onEngine: () => {},
     numPoses: 1,
     onNumPoses: () => {},
     stride: 1,

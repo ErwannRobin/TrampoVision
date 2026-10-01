@@ -207,6 +207,7 @@ const ALLOWED_SAME = [
   'WebGL',
   'WebAssembly',
   'MediaPipe',
+  'ViTPose',
   'IndexedDB',
   'TrampoVision',
   'Debug',

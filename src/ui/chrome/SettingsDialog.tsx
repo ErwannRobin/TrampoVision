@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import type { ScaleSource } from '../../analysis/types';
-import type { ModelVariant, Point } from '../../pose/types';
+import { POSE_ENGINES } from '../../pose/engines';
+import type { ModelVariant, Point, PoseEngineId } from '../../pose/types';
 import { t, useLocale } from '../../i18n';
 import { setupState } from './setupState';
 import { Button, Field, Icon, IconButton, NumberField, Segmented, SelectField, Switch, type IconName } from '../kit';
@@ -28,6 +29,9 @@ export interface SettingsDialogProps {
   // Analysis engine
   model: ModelVariant;
   onModel: (model: ModelVariant) => void;
+  /** Experimental: the pose model. MediaPipe unless another one was picked. */
+  engine: PoseEngineId;
+  onEngine: (engine: PoseEngineId) => void;
   numPoses: number;
   onNumPoses: (n: number) => void;
   /** Analyze every n-th frame. */
@@ -83,6 +87,8 @@ const models = (): { value: ModelVariant; label: string }[] => [
   { value: 'full', label: t('setup.modelFull') },
   { value: 'heavy', label: t('setup.modelHeavy') },
 ];
+const engines = (): { value: PoseEngineId; label: string }[] =>
+  POSE_ENGINES.map((value) => ({ value, label: t(`setup.engine.${value}`) }));
 const strides = () => [
   { value: 1, label: t('setup.stride1') },
   { value: 2, label: t('setup.stride2') },
@@ -364,13 +370,15 @@ export function SettingsDialog(props: SettingsDialogProps) {
                     disabled={state.calibrationLocked}
                     onChange={props.onScaleSource}
                   />
-                  <SelectField
-                    label={t('setup.model')}
-                    value={props.model}
-                    options={models()}
-                    disabled={state.engineLocked}
-                    onChange={props.onModel}
-                  />
+                  {props.engine === 'mediapipe' && (
+                    <SelectField
+                      label={t('setup.model')}
+                      value={props.model}
+                      options={models()}
+                      disabled={state.engineLocked}
+                      onChange={props.onModel}
+                    />
+                  )}
                   <div className="settings__grid">
                     <SelectField
                       label={t('setup.stride')}
@@ -392,6 +400,19 @@ export function SettingsDialog(props: SettingsDialogProps) {
                     onChange={props.onPreferGpu}
                     disabled={state.engineLocked}
                     label={t('setup.gpu')}
+                  />
+                </Block>
+              )}
+
+              {props.advanced && (
+                <Block title={t('setup.experimental')}>
+                  <SelectField
+                    label={t('setup.engine')}
+                    value={props.engine}
+                    options={engines()}
+                    disabled={state.engineLocked}
+                    onChange={props.onEngine}
+                    hint={t('setup.engineHint')}
                   />
                 </Block>
               )}

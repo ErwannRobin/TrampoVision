@@ -13,7 +13,7 @@ export type Appearance = 'system' | 'light' | 'dark';
 
 export type Status =
   | { kind: 'idle' }
-  | { kind: 'loading'; stage: 'downloading' | 'reading' | 'measuring' | 'converting'; progress?: number }
+  | { kind: 'loading'; stage: 'downloading' | 'reading' | 'measuring' | 'converting' | 'model'; progress?: number }
   | { kind: 'analyzing'; done: number; total: number }
   /** `severity: 'warning'` = the app carried on with a fallback and the user may want to check it. */
   | { kind: 'error'; message: string; severity?: 'warning' };

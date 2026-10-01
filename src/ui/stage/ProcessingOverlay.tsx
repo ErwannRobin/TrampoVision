@@ -25,6 +25,7 @@ const loadingText = () => ({
   reading: t('busy.reading'),
   measuring: t('busy.measuring'),
   converting: t('busy.converting'),
+  model: t('busy.model'),
 });
 
 /** Milliseconds since the analysis began, kept across renders so the estimate has something to work from. */
@@ -44,7 +45,8 @@ export function announcement(status: Status): string {
   if (status.kind === 'loading') {
     const converting = status.stage === 'converting';
     const start = converting ? `${t('busy.converting')} ${t('busy.convertingText')}` : loadingText()[status.stage];
-    const progress = converting || status.stage === 'downloading' ? (status.progress ?? 0) : 0;
+    const progress =
+      converting || status.stage === 'downloading' || status.stage === 'model' ? (status.progress ?? 0) : 0;
     return milestoneText(progress, start);
   }
   if (status.kind === 'analyzing') {
@@ -90,7 +92,13 @@ export function ProcessingOverlay({
 
   if (status.kind === 'loading') {
     const converting = status.stage === 'converting';
-    const progress = converting || status.stage === 'downloading' ? (status.progress ?? 0) : undefined;
+    // The pose model's progress is unknown (a ring that turns) until its files start to arrive and again once they are in.
+    const progress =
+      converting || status.stage === 'downloading'
+        ? (status.progress ?? 0)
+        : status.stage === 'model'
+          ? status.progress
+          : undefined;
     const title = loadingText()[status.stage];
     return (
       <div className="busy">
