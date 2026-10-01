@@ -6,6 +6,7 @@ import { elementById } from '../skills/fig/elements';
 import type { SkillClassifier, SkillPrediction } from '../skills/types';
 import { temporalClassifier } from '../skills/temporal/classifier';
 import type { Reference } from '../skills/temporal/prototypes';
+import type { StageLabel } from './labels';
 
 /**
  * Offline evaluation on real jumps. A record holds everything the classifier reads (features, sequence, twist curve), so the current
@@ -22,6 +23,8 @@ export interface LabelledJump {
   /** The element id the jump really was, or null when nobody said (or nobody could). */
   truth: string | null;
   source: TruthSource;
+  /** The movement as counted by a person, stage by stage, when a label file said so (see `labels.ts`). */
+  stages?: StageLabel;
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);

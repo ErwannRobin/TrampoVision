@@ -415,6 +415,25 @@ twist, direction, position), why jumps stayed unclassified, and whether the conf
 `SAVE=eval/baseline.json` keeps the numbers; `BASELINE=eval/baseline.json` fails when top-1 falls or confident-wrong rises, so a change is
 scored on all real jumps at once. Jumps marked _cannot tell_ or _bad data_ and jumps nobody reviewed are counted, not scored.
 
+### Labeling real jumps by hand (stage labels)
+
+Real footage has no ground truth until someone watches it. `make label-sheet FILE=eval/clip.dataset.json VIDEO=video-sample/clip.mp4` reads a
+dataset JSON (or the review export) and writes, per video: `eval/sheets/<videoId>.md` and `.csv` (one line per jump: takeoff, apex, landing,
+flight time, the app's guess, measured rotation, facing and twist confidence), `eval/sheets/<videoId>-strips.sh` (one ffmpeg command per
+jump that tiles its flight into `eval/sheets/<videoId>-strips/vNN-jNN.png`; `STRIPS=1` runs them) and `eval/labels/<videoId>.json`, a label
+file with one blank entry per jump. Running it again only adds blank entries for new jumps; labels you wrote are never touched.
+
+In the label file, fill what you can see and leave the rest `null`: `somersaults` (quarters allowed: 0, 0.75, 1, 2, ...), `direction`
+(`front` / `back`, only for a somersault), `halfTwists` (0, 1, 2, ...), `position` (`straight` / `tuck` / `pike`). Set `cannotTell` or
+`badSegmentation` (the flight is two jumps, or a cut) instead of guessing. A label finds its jump by `videoId` and `apexS` (within 0.2 s). Nothing
+is invented for you: a blank file scores nothing.
+
+`make eval` reads `eval/labels/` by default (`LABELS=dir` to change it, several `FILE`s are fine). A complete label (somersaults, direction when
+it somersaults, twists, position, and an element of the table) counts as the figure for the scores above and as an example for the leave-one-video-out
+run. Next to them it prints **one score per question**: rotation (whole somersaults), direction, twists and position, each over the jumps where that
+stage is labelled, with how often the classifier gave no answer, how many directions were assumed, and the measured rotation against the label in turns
+(bias < 0 = read short). Quarter and half rotations are not in the table, so they only feed that measurement error. `eval/` is git-ignored, so are labels.
+
 ## 3D pose and twist (experimental)
 
 The stage view (_Split_ or _3D_ in the coach's interface) adds a 3D view and a twist estimate. It does **not** replace the 2D pipeline, and the classifier still uses the 2D pose only.
