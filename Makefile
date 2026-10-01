@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: icons eval eval-fetch label-sheet worker-schema worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets upload-assets convert clean distclean
+.PHONY: icons consistency eval eval-fetch label-sheet worker-schema worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets upload-assets convert clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -75,6 +75,10 @@ eval: node_modules ## Score the classifier on reviewed jumps: FILE=eval/export.n
 label-sheet: node_modules ## Make a labeling sheet, blank label file and filmstrip commands from a dataset: FILE=eval/x.dataset.json [VIDEO=clip.mp4] [STRIPS=1 runs ffmpeg]
 	@test -n "$(FILE)" || { echo "usage: make label-sheet FILE=eval/x.dataset.json [VIDEO=clip.mp4] [STRIPS=1]"; exit 1; }
 	npx vite-node scripts/label-sheet.ts $(FILE) $(if $(VIDEO),--video $(VIDEO)) $(if $(STRIPS),--strips)
+
+consistency: node_modules ## Label-free rotation quality of saved jumps or a pose series: FILE=eval/dong-dong.dataset.json [BASELINE=f.json | SAVE=f.json]
+	@test -n "$(FILE)" || { echo "usage: make consistency FILE=<dataset.json | export.ndjson | pose-series.json> [BASELINE=f.json | SAVE=f.json]"; exit 1; }
+	npx vite-node scripts/consistency.ts $(FILE) $(if $(BASELINE),--baseline $(BASELINE)) $(if $(SAVE),--save $(SAVE))
 
 eval-fetch: ## Download the reviewed jumps to eval/export.ndjson (needs REVIEW_API_URL and REVIEW_TOKEN in the environment)
 	@test -n "$(REVIEW_API_URL)" -a -n "$(REVIEW_TOKEN)" || { echo "set REVIEW_API_URL and REVIEW_TOKEN"; exit 1; }

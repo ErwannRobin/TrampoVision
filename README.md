@@ -445,6 +445,12 @@ run. Next to them it prints **one score per question**: rotation (whole somersau
 stage is labelled, with how often the classifier gave no answer, how many directions were assumed, and the measured rotation against the label in turns
 (bias < 0 = read short). Quarter and half rotations are not in the table, so they only feed that measurement error. `eval/` is git-ignored, so are labels.
 
+### Rotation quality without labels
+
+`make consistency FILE=eval/dong-dong.dataset.json` (`src/eval/consistency.ts`) needs no labels. For the rotating flights (net rotation above half a turn, or a flight of at least 1 s whose orientation path adds up to more than 0.75 turns: a rotation lost to flips) it reports the share that pass each check: orientation turns one way (`monotonic`), no step above the limit between two samples (`noFlip`), the ankle-to-head line turns like the trunk (`crossCheck`), the net rotation is near a half-turn multiple (`onGrid`), the facing is known and the 3D twist is reliable. `clean` is the share that pass the first four. It lists the flights worst first with the checks each fails. `FILE` is a dataset JSON, the review service's export, or a saved pose series, which is analyzed again with the current code, so two versions of the pipeline can be compared on the same video. `SAVE=` / `BASELINE=` work as for the scoring above. It says nothing about whether the name is right: it is the number to push up while there is nothing to score a name against.
+
+First numbers, on the 27 jumps of the Dong Dong clip (25 fps, broadcast camera): 9 rotating flights, clean rotation 22% (2/9), monotonic 44%, noFlip 89%, crossCheck 78%, onGrid 67%, facing known 33%, twist reliable 0%, mean rotation confidence 0.10.
+
 ## 3D pose and twist (experimental)
 
 The stage view (_Split_ or _3D_ in the coach's interface) adds a 3D view and a twist estimate. It does **not** replace the 2D pipeline, and the classifier still uses the 2D pose only.
