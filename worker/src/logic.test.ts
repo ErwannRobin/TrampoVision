@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { fingerprint, parseIngest, parseReview, rowOf, tokenMatches, MAX_RECORDS_PER_POST } from './logic';
+import {
+  fingerprint,
+  originAllowed,
+  parseIngest,
+  parseReview,
+  rowOf,
+  tokenMatches,
+  MAX_RECORDS_PER_POST,
+} from './logic';
 
 const record = (over: Record<string, unknown> = {}) => ({
   schema: 'trampovision.jump-record',
@@ -102,5 +110,38 @@ describe('tokens', () => {
     expect(tokenMatches(null, 'abc')).toBe(false);
     expect(tokenMatches('Bearer ', '')).toBe(false);
     expect(tokenMatches('Bearer abc', undefined)).toBe(false);
+  });
+});
+
+describe('allowed origins', () => {
+  const app = 'https://trampo-vision.vercel.app';
+  const preview = 'https://trampo-vision-[a-z0-9-]+-erwann-robins-projects\\.vercel\\.app';
+
+  it('allows the app and localhost', () => {
+    expect(originAllowed(app, app)).toBe(true);
+    expect(originAllowed('http://localhost:5174', app)).toBe(true);
+    expect(originAllowed('https://evil.example', app)).toBe(false);
+    expect(originAllowed(null, app, preview)).toBe(false);
+  });
+
+  it('allows the preview deployments of the app, and only those', () => {
+    const ok = [
+      'https://trampo-vision-git-claude-review-delete-erwann-robins-projects.vercel.app',
+      'https://trampo-vision-gla9kwrd4n-erwann-robins-projects.vercel.app',
+    ];
+    for (const o of ok) expect(originAllowed(o, app, preview)).toBe(true);
+    expect(originAllowed(ok[0], app)).toBe(false); // no pattern: no previews
+    for (const o of [
+      'https://trampo-vision-x-erwann-robins-projects.vercel.app.evil.example',
+      'https://evil.example/https://trampo-vision-x-erwann-robins-projects.vercel.app',
+      'http://trampo-vision-x-erwann-robins-projects.vercel.app',
+      'https://other-x-erwann-robins-projects.vercel.app',
+      'https://trampo-vision-x-someone-else.vercel.app',
+    ])
+      expect(originAllowed(o, app, preview)).toBe(false);
+  });
+
+  it('allows nothing extra when the pattern is not a valid expression', () => {
+    expect(originAllowed('https://trampo-vision-x-erwann-robins-projects.vercel.app', app, '(')).toBe(false);
   });
 });

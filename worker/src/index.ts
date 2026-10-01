@@ -1,9 +1,11 @@
 import { FIG_ELEMENTS } from '../../src/skills/fig/elements';
-import { parseIngest, parseReview, tokenMatches, STATUSES, type JumpRow } from './logic';
+import { originAllowed, parseIngest, parseReview, tokenMatches, STATUSES, type JumpRow } from './logic';
 
 export interface Env {
   DB: D1Database;
   ALLOWED_ORIGIN: string;
+  /** Regular expression of the preview deployments of the app that may call too (optional). */
+  PREVIEW_ORIGIN_PATTERN?: string;
   INGEST_TOKEN?: string;
   REVIEW_TOKEN?: string;
 }
@@ -19,9 +21,8 @@ const json = (body: unknown, status = 200, headers: HeadersInit = {}) =>
 
 const cors = (env: Env, req: Request): Record<string, string> => {
   const origin = req.headers.get('origin');
-  // The app's origin, and localhost for development.
-  const ok = origin && (origin === env.ALLOWED_ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin));
-  return ok
+  // The app's origin, its preview deployments and localhost for development.
+  return origin && originAllowed(origin, env.ALLOWED_ORIGIN, env.PREVIEW_ORIGIN_PATTERN)
     ? {
         'access-control-allow-origin': origin,
         'access-control-allow-headers': 'authorization, content-type',

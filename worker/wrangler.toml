@@ -13,6 +13,9 @@ enabled = true
 [vars]
 # The origin of the app: the only one the browser may call from.
 ALLOWED_ORIGIN = "https://trampo-vision.vercel.app"
+# The preview deployments of the app (one origin per branch and per commit), as a regular expression for the whole origin.
+# They reach the same data as the app: remove this line to keep previews out.
+PREVIEW_ORIGIN_PATTERN = 'https://trampo-vision-[a-z0-9-]+-erwann-robins-projects\.vercel\.app'
 
 # Secrets (wrangler secret put):
 #   INGEST_TOKEN  bearer token the app sends. It ships in the app bundle, so it only keeps strangers from writing by accident.
