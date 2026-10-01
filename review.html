@@ -48,6 +48,15 @@
           sans-serif;
         background: var(--bg);
         color: var(--ink);
+        /* The review is one screen: the header on top, the work below. Nothing on the page itself scrolls. */
+        height: 100vh;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      body.out {
+        overflow: auto;
       }
       [hidden] {
         display: none !important;
@@ -62,8 +71,7 @@
 
       /* ---- top bar ---- */
       header {
-        position: sticky;
-        top: 0;
+        flex: none;
         z-index: 5;
         display: flex;
         gap: 8px 16px;
@@ -133,43 +141,29 @@
 
       /* ---- layout ---- */
       main {
+        flex: 1;
+        min-height: 0;
         display: grid;
-        grid-template-columns: minmax(230px, 300px) 1fr;
-        gap: 16px;
-        padding: 16px;
-        align-items: start;
-      }
-      @media (max-width: 860px) {
-        main {
-          grid-template-columns: 1fr;
-        }
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 12px;
       }
       .card {
         background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 12px;
-        padding: 14px;
+        padding: 12px;
       }
       #detail {
-        display: grid;
-        gap: 12px;
+        min-height: 0;
         min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
       }
-      /* Wide screens: the figure picker sits beside the jump, so nothing needs scrolling. */
-      @media (min-width: 1150px) {
-        #detail {
-          grid-template-columns: minmax(0, 1fr) 360px;
-        }
-        #detail > * {
-          grid-column: 1;
-        }
-        #fix {
-          grid-column: 2;
-          grid-row: 1 / span 3;
-        }
-        #detail > .bar {
-          grid-column: 1 / -1;
-        }
+      #stage {
+        flex: 1;
+        min-height: 0;
       }
       h2 {
         font-size: 12px;
@@ -188,26 +182,95 @@
         flex-wrap: wrap;
         align-items: center;
       }
-
-      /* ---- list ---- */
-      #list {
-        position: sticky;
-        top: 58px;
-        padding: 8px;
+      /* The two side panels (the jumps, the figure picker) sit beside the jump on wide screens and cover it, on demand, on narrow ones. */
+      .sheetclose,
+      .sheetopen {
+        display: none;
       }
-      @media (max-width: 860px) {
+      @media (max-width: 1099px) {
+        #list,
+        #side {
+          display: none;
+          position: fixed;
+          inset: 0;
+          z-index: 20;
+          overflow: auto;
+          border-radius: 0;
+          border: 0;
+          padding: 12px 14px 20px;
+          background: var(--bg);
+        }
         #list {
-          position: static;
+          background: var(--panel);
+        }
+        body.listopen #list {
+          display: block;
+        }
+        body.fixopen #side {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .sheetclose {
+          display: block;
+          position: sticky;
+          top: 0;
+          margin: 0 0 8px auto;
+          align-self: flex-end;
+          z-index: 1;
+        }
+        .sheetopen {
+          display: inline-block;
         }
         ul.queue {
-          max-height: 220px !important;
+          max-height: none !important;
         }
       }
+      @media (min-width: 1100px) {
+        main {
+          grid-template-columns: 250px minmax(0, 1fr);
+        }
+        #list {
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+          padding: 8px;
+        }
+        ul.queue {
+          flex: 1;
+          min-height: 0;
+        }
+        #detail {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 340px;
+          grid-template-rows: auto minmax(0, 1fr) auto;
+          gap: 10px 12px;
+        }
+        #detail > #answer {
+          grid-column: 1;
+        }
+        #detail > #stage {
+          grid-column: 1;
+        }
+        #detail > .bar {
+          grid-column: 1;
+        }
+        #detail > #side {
+          grid-column: 2;
+          grid-row: 1 / span 3;
+          min-height: 0;
+          overflow: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+      }
+
+      /* ---- list ---- */
       ul.queue {
         list-style: none;
         margin: 0;
         padding: 0;
-        max-height: calc(100vh - 150px);
         overflow: auto;
       }
       ul.queue li button {
@@ -259,15 +322,30 @@
         margin-top: -2px;
       }
 
-      /* ---- answer ---- */
+      /* ---- answer: one slim strip ---- */
       .answer {
         display: flex;
-        justify-content: space-between;
-        gap: 12px;
+        align-items: center;
+        gap: 6px 16px;
+        flex-wrap: wrap;
+        padding: 8px 12px;
+      }
+      .answer h2 {
+        margin: 0 0 2px;
+        font-size: 11px;
+      }
+      .a-main {
+        flex: 1 1 260px;
+        min-width: 0;
+      }
+      .a-title {
+        display: flex;
+        align-items: center;
+        gap: 4px 10px;
         flex-wrap: wrap;
       }
       #autoname {
-        font-size: 24px;
+        font-size: 20px;
         font-weight: 650;
         line-height: 1.2;
       }
@@ -290,9 +368,9 @@
         color: var(--bad);
       }
       #verdictnow {
-        margin-top: 10px;
-        padding: 6px 12px;
+        padding: 1px 10px;
         border-radius: 8px;
+        font-size: 13px;
         font-weight: 550;
         background: var(--bg);
       }
@@ -311,40 +389,99 @@
       }
       #ident {
         text-align: right;
+        font-size: 12px;
       }
-
-      /* ---- replay ---- */
-      .visual {
-        display: grid;
-        grid-template-columns: minmax(180px, 260px) 1fr;
-        gap: 16px;
-      }
-      @media (max-width: 700px) {
-        .visual {
-          grid-template-columns: 1fr;
-        }
-      }
-      canvas {
-        width: 100%;
-        height: auto;
-        display: block;
-        background: var(--bg);
-        border-radius: 8px;
-      }
+      /* What the classifier measured, small. */
       .facts {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-        gap: 8px;
-        margin-top: 8px;
+        display: flex;
+        gap: 6px;
       }
       .fact {
         background: var(--bg);
         border-radius: 8px;
-        padding: 6px 10px;
+        padding: 2px 10px;
+        line-height: 1.25;
+      }
+      .fact span {
+        display: block;
+        font-size: 11px;
       }
       .fact b {
         display: block;
-        font-size: 16px;
+        font-size: 14px;
+      }
+
+      /* ---- the jump: a big skeleton you can move around, and slim curves under it ---- */
+      #stage {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+      }
+      .viewport {
+        position: relative;
+        flex: 1;
+        min-height: 140px;
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--bg);
+      }
+      canvas {
+        display: block;
+      }
+      #skel {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        cursor: grab;
+        touch-action: none;
+      }
+      #skel.grabbing {
+        cursor: grabbing;
+      }
+      #resetview {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        padding: 5px 10px;
+        font-size: 13px;
+      }
+      #viewhint {
+        position: absolute;
+        right: 10px;
+        bottom: 6px;
+        font-size: 11px;
+        color: var(--muted);
+        pointer-events: none;
+        text-align: right;
+        max-width: 60%;
+      }
+      @media (hover: none) {
+        #viewhint {
+          display: none;
+        }
+      }
+      .controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .controls button {
+        padding: 5px 14px;
+        min-width: 76px;
+      }
+      #curves {
+        width: 100%;
+        height: 78px;
+        flex: none;
+        cursor: ew-resize;
+        touch-action: none;
+      }
+      @media (max-height: 640px) {
+        #curves {
+          display: none;
+        }
       }
 
       /* ---- fix: pick another figure ---- */
@@ -431,43 +568,97 @@
         width: 100%;
       }
 
-      /* ---- sticky action bar ---- */
+      /* ---- action bar ---- */
       .bar {
-        position: sticky;
-        bottom: 0;
         z-index: 4;
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
         align-items: center;
-        padding: 10px 14px;
+        padding: 8px 12px;
         background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 12px;
-        box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.08);
       }
       .bar #confirm {
-        padding: 12px 22px;
-        font-size: 16px;
+        padding: 10px 20px;
+        font-size: 15px;
+      }
+      .bar #skip {
+        margin-left: auto;
+      }
+      .bar #confirm {
+        flex: 1 1 100%;
+        order: -1;
+      }
+      #err:empty {
+        display: none;
       }
       #note {
         width: 100%;
       }
-      @media (max-width: 700px) {
-        .bar #confirm {
+      #side > .card {
+        flex: none;
+      }
+      @media (max-width: 1099px) {
+        .bar #skip {
+          margin-left: 0;
+        }
+        .bar .act {
+          flex: 1 1 auto;
+          padding: 8px 10px;
+        }
+      }
+      @media (max-width: 900px) {
+        header h1 {
+          display: none;
+        }
+        header {
+          padding: 6px 12px;
+        }
+        #tabs {
+          order: 5;
           flex: 1 1 100%;
-          order: -1;
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          margin-right: 0;
+        }
+        #tabs button {
+          white-space: nowrap;
+        }
+        #who {
+          flex: 1;
+          min-width: 0;
+        }
+      }
+      @media (max-width: 700px) {
+        #ident,
+        #autoclf {
+          display: none;
+        }
+        .answer {
+          padding: 6px 10px;
+        }
+        #autoname {
+          font-size: 17px;
+        }
+        main {
+          padding: 8px;
+          gap: 8px;
         }
         .bar {
           padding: 8px;
         }
         .bar .act {
-          padding: 8px 10px;
+          font-size: 13px;
         }
       }
       @media (hover: none) {
         kbd {
           display: none;
+        }
+        #cands button {
+          grid-template-columns: 1fr auto;
         }
       }
       #err {
@@ -526,91 +717,56 @@
 
     <main id="app" hidden>
       <aside id="list" class="card" aria-label="Jumps" data-i18n-attr="aria-label:rv.jumps">
+        <button class="act sheetclose" id="listclose" type="button" data-i18n="rv.close">Close</button>
         <h2 id="listtitle">To review</h2>
         <ul class="queue" id="queue"></ul>
         <p id="empty" class="muted" hidden>Nothing here. All done!</p>
       </aside>
 
       <div id="detail" hidden>
-        <section class="card answer" aria-label="Automatic answer" data-i18n-attr="aria-label:rv.auto">
-          <div>
+        <section class="card answer" id="answer" aria-label="Automatic answer" data-i18n-attr="aria-label:rv.auto">
+          <div class="a-main">
             <h2 id="progress">Automatic answer</h2>
-            <div id="autoname"></div>
-            <div class="row">
+            <div class="a-title">
+              <span id="autoname"></span>
               <span id="autotag" class="tag"></span><span id="autoconf" class="muted"></span
               ><span id="autoclf" class="muted"></span>
+              <span id="verdictnow" hidden></span>
             </div>
-            <div id="verdictnow" hidden></div>
           </div>
+          <div class="facts" id="measured"></div>
           <div class="muted" id="ident"></div>
         </section>
 
-        <section class="card visual" aria-label="The jump" data-i18n-attr="aria-label:rv.theJump">
-          <div>
+        <section class="card" id="stage" aria-label="The jump" data-i18n-attr="aria-label:rv.theJump">
+          <div class="viewport" id="viewport">
             <canvas
               id="skel"
-              width="280"
-              height="320"
               aria-label="Skeleton replay"
-              data-i18n-attr="aria-label:rv.skeleton"
+              data-i18n-attr="aria-label:rv.skeleton;title:rv.viewHint"
             ></canvas>
-            <div class="row" style="margin-top: 8px">
-              <button class="act" id="play" type="button">Play</button>
-              <input
-                id="scrub"
-                type="range"
-                min="0"
-                max="1"
-                step="0.001"
-                value="0"
-                style="flex: 1"
-                aria-label="Position in the jump"
-                data-i18n-attr="aria-label:rv.position"
-              />
-            </div>
+            <button class="act" id="resetview" type="button" data-i18n="rv.resetView" hidden>Reset view</button>
+            <span id="viewhint" data-i18n="rv.viewHint"></span>
           </div>
-          <div>
-            <canvas
-              id="curves"
-              width="560"
-              height="320"
-              aria-label="Measured curves"
-              data-i18n-attr="aria-label:rv.curves"
-            ></canvas>
-            <div class="facts" id="measured"></div>
-            <p class="muted" id="summary" style="margin: 8px 0 0"></p>
+          <div class="controls">
+            <button class="act" id="play" type="button">Play</button>
+            <input
+              id="scrub"
+              type="range"
+              min="0"
+              max="1"
+              step="0.001"
+              value="0"
+              style="flex: 1"
+              aria-label="Position in the jump"
+              data-i18n-attr="aria-label:rv.position"
+            />
           </div>
+          <canvas id="curves" aria-label="Measured curves" data-i18n-attr="aria-label:rv.curves"></canvas>
         </section>
 
-        <section class="card" id="fix" aria-label="Pick the figure" data-i18n-attr="aria-label:rv.pick">
-          <h2 data-i18n="rv.notRight">Not right? Pick the figure</h2>
-          <div id="cands"></div>
-          <div class="builder" id="builder">
-            <span class="lab" data-i18n="picker.somersaults">Somersaults</span>
-            <div class="chips" data-field="s"></div>
-            <span class="lab" id="dirlab" data-i18n="picker.direction">Direction</span>
-            <div class="chips" data-field="d"></div>
-            <span class="lab" data-i18n="picker.twists">Twists</span>
-            <div class="chips" data-field="t"></div>
-            <span class="lab" data-i18n="picker.position">Position</span>
-            <div class="chips" data-field="p"></div>
-          </div>
-          <button class="act" id="savepick" type="button"></button>
-        </section>
-
-        <details class="card" id="debugbox">
-          <summary class="muted" data-i18n="rv.debug">Debug</summary>
-          <pre id="debug"></pre>
-        </details>
-
-        <input
-          id="note"
-          type="text"
-          placeholder="Note about this jump (optional)"
-          aria-label="Note"
-          data-i18n-attr="placeholder:rv.note;aria-label:rv.noteAria"
-        />
         <div class="bar" role="group" aria-label="Verdict" data-i18n-attr="aria-label:rv.verdictGroup">
+          <button class="act sheetopen" id="listopen" type="button" data-i18n="rv.jumps">Jumps</button>
           <button
             class="act"
             id="prev"
@@ -634,10 +790,41 @@
           <button class="act" id="baddata" type="button" title="Bad data (B)" data-i18n-attr="title:rv.badDataTitle">
             <span data-i18n="rv.badData">Bad data</span> <kbd>B</kbd>
           </button>
+          <button class="act sheetopen" id="fixopen" type="button" data-i18n="rv.fix">Other figure</button>
           <button class="act" id="skip" type="button" title="Next (→)" data-i18n-attr="title:rv.skipTitle">
             <span data-i18n="rv.skip">Skip</span> <kbd>→</kbd>
           </button>
-          <p id="err" role="alert" style="flex-basis: 100%"></p>
+          <p id="err" role="alert" style="flex-basis: 100%; margin: 0"></p>
+        </div>
+
+        <div id="side">
+          <button class="act sheetclose" id="fixclose" type="button" data-i18n="rv.close">Close</button>
+          <section class="card" id="fix" aria-label="Pick the figure" data-i18n-attr="aria-label:rv.pick">
+            <h2 data-i18n="rv.notRight">Not right? Pick the figure</h2>
+            <div id="cands"></div>
+            <div class="builder" id="builder">
+              <span class="lab" data-i18n="picker.somersaults">Somersaults</span>
+              <div class="chips" data-field="s"></div>
+              <span class="lab" id="dirlab" data-i18n="picker.direction">Direction</span>
+              <div class="chips" data-field="d"></div>
+              <span class="lab" data-i18n="picker.twists">Twists</span>
+              <div class="chips" data-field="t"></div>
+              <span class="lab" data-i18n="picker.position">Position</span>
+              <div class="chips" data-field="p"></div>
+            </div>
+            <button class="act" id="savepick" type="button"></button>
+          </section>
+          <input
+            id="note"
+            type="text"
+            placeholder="Note about this jump (optional)"
+            aria-label="Note"
+            data-i18n-attr="placeholder:rv.note;aria-label:rv.noteAria"
+          />
+          <details class="card" id="debugbox">
+            <summary class="muted" data-i18n="rv.debug">Debug</summary>
+            <pre id="debug"></pre>
+          </details>
         </div>
       </div>
     </main>

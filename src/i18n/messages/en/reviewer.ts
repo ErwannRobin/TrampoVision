@@ -65,4 +65,10 @@ export const reviewer = {
   'rv.toastSaved': 'Saved: {name}',
   'rv.badToken': "The review service does not accept this build's token.",
   'rv.noService': 'This build has no review service configured (VITE_REVIEW_API_URL and VITE_REVIEW_INGEST_TOKEN).',
+  'rv.resetView': 'Reset view',
+  'rv.viewHint': 'Drag to move · scroll or pinch to zoom · double-click to reset',
+  'rv.salto': 'Somersault',
+  'rv.twist': 'Twist',
+  'rv.fix': 'Other figure',
+  'rv.close': 'Close',
 } as const;

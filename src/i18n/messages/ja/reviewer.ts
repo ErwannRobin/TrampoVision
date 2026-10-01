@@ -67,4 +67,10 @@ export const reviewer: Translation<typeof en> = {
   'rv.toastSaved': '保存しました：{name}',
   'rv.badToken': '確認サービスがこのビルドのトークンを受け付けません。',
   'rv.noService': 'このビルドには確認サービスが設定されていません（VITE_REVIEW_API_URL と VITE_REVIEW_INGEST_TOKEN）。',
+  'rv.resetView': 'ビューをリセット',
+  'rv.viewHint': 'ドラッグで移動・スクロールまたはピンチで拡大・ダブルクリックでリセット',
+  'rv.salto': '宙返り',
+  'rv.twist': 'ひねり',
+  'rv.fix': '別の技',
+  'rv.close': '閉じる',
 };
