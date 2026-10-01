@@ -236,15 +236,15 @@ describe('the first screen', () => {
 });
 
 describe('the settings', () => {
-  const props = (advanced: boolean, clip = true): SettingsDialogProps => ({
+  const props = (advanced: boolean, clip = true, busy: SettingsDialogProps['busy'] = 'idle'): SettingsDialogProps => ({
     open: true,
     onClose: () => {},
-    clipDetail: '12 jumps, 14.0 s',
+    clipDetail: busy === 'idle' ? '12 jumps, 14.0 s' : '',
     advanced,
     onAdvanced: () => {},
     hasVideo: clip,
-    hasResult: clip,
-    busy: 'idle',
+    hasResult: clip && busy === 'idle',
+    busy,
     fileName: clip ? 'clip.mp4' : null,
     model: 'full',
     onModel: () => {},
@@ -259,7 +259,6 @@ describe('the settings', () => {
     backend: '',
     webgpu: false,
     onAnalyze: () => {},
-    onCancel: () => {},
     height: 1.75,
     onHeight: () => {},
     calibration: {
@@ -312,7 +311,56 @@ describe('the settings', () => {
     const html = renderToStaticMarkup(createElement(SettingsDialog, props(true, false)));
     expect(html).not.toContain('This video');
     expect(html).not.toContain('Analyze video');
-    for (const shown of ['Video analysis', 'App', 'Appearance', 'Language']) expect(html).toContain(shown);
+    for (const shown of ['Video analysis', 'App', 'Appearance']) expect(html).toContain(shown);
+  });
+
+  it('leaves the language to the top bar', () => {
+    for (const advanced of [false, true]) {
+      const html = renderToStaticMarkup(createElement(SettingsDialog, props(advanced)));
+      expect(html).not.toContain('Language');
+      expect(html).not.toContain('Français');
+    }
+  });
+
+  it('keeps only the height while the live view analyzes, with no second Cancel and no disabled row', () => {
+    const html = renderToStaticMarkup(createElement(SettingsDialog, props(false, true, 'analyzing')));
+    expect(html).toContain('>Video analysis</h3>');
+    expect(html).toContain('Height');
+    expect(html).toContain('Only what can still change this analysis is shown.');
+    for (const gone of [
+      'This video',
+      'Show the advanced tools',
+      'Appearance',
+      '>App</h3>',
+      'Language',
+      'Cancel',
+      'Analyze video',
+      'Analyze again',
+    ])
+      expect(html).not.toContain(gone);
+    expect(html).not.toContain('disabled');
+  });
+
+  it('keeps the review upload, after the height, while the live view analyzes: it still applies to the jumps that arrive', () => {
+    const review = { enabled: true, onEnabled: () => {}, state: 'idle' as const, posted: 0 };
+    const html = renderToStaticMarkup(createElement(SettingsDialog, { ...props(false, true, 'analyzing'), review }));
+    expect(html).toContain('Send analyzed jumps for review');
+    expect(html.indexOf('Height')).toBeLessThan(html.indexOf('Send analyzed jumps for review'));
+    expect(html).not.toContain('>App</h3>');
+  });
+
+  it('offers no Cancel while the advanced tools analyze either, and keeps the rest of the settings', () => {
+    const html = renderToStaticMarkup(createElement(SettingsDialog, props(true, true, 'analyzing')));
+    expect(html).not.toContain('Cancel');
+    expect(html).not.toContain('Analyze video');
+    for (const shown of ['This video', 'Trampoline', 'Model', 'Appearance', 'Show the advanced tools'])
+      expect(html).toContain(shown);
+  });
+
+  it('still offers to analyze, and keeps the whole popup, when nothing is running', () => {
+    const html = renderToStaticMarkup(createElement(SettingsDialog, props(false)));
+    expect(html).toContain('Analyze again');
+    expect(html).not.toContain('Only what can still change this analysis is shown.');
   });
 
   it('renders nothing inside while it is closed', () => {

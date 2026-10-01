@@ -90,7 +90,7 @@ export const chrome = {
   'setup.reviewSwitch': 'Send analyzed jumps for review',
   'setup.reviewText':
     'Measurements, the answer of the classifier and what you say about each skill, so a person can check it and the classifier can learn. No video and no file name leave this browser.',
-  'setup.language': 'Language',
+  'setup.analyzingNote': 'Only what can still change this analysis is shown. The rest comes back when it is done.',
   'setup.advanced': 'Advanced',
   'setup.advancedSwitch': 'Show the advanced tools',
   'setup.advancedText':

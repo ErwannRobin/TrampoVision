@@ -128,8 +128,9 @@ wide (>= 1100px)                      narrow, live view with results
 The interface has two levels, kept in localStorage: `trampovision.advanced` (`on` or `off`, default off) and, with the advanced
 tools on, `Audience`, `'athlete' | 'coach'` (default athlete). Off is the **live view**: the stage shows the video only (no
 view switcher), the transport keeps play, the frame steps and the speed (`simple`), the top bar has no audience switch and no
-export menu, the rail is the live rail (below), the settings show the athlete, the review upload, the switch and the appearance,
-and the first screen only asks for a video (a phone opens its camera). A video that is loaded starts its analysis by itself, at
+export menu, the rail is the live rail (below), the settings show the athlete, the review upload, the switch and the appearance
+(while the analysis runs, only the athlete and the review upload), and the first screen only asks for a video (a phone opens its
+camera). A video that is loaded starts its analysis by itself, at
 about 30 analyzed frames a second.
 
 With the advanced tools on:
@@ -173,7 +174,10 @@ The rail shows the insights of the selected jump (the live rail, or the athlete'
 Before an analysis exists it always shows the settings (in the live view that is only the athlete height, the switch and the
 appearance, while the video is read and analyzed). The settings icon in the top bar toggles them. Height and calibration change
 the result live; the model, frame rate, stride and people need a new analysis. Without the advanced switch the settings hide the
-trampoline, the analysis engine and the saved data.
+trampoline, the analysis engine and the saved data. While an analysis runs in the live view the settings shrink to what can still
+reach it: the athlete height (it scales the finished track) first, then the review upload (it sends the jumps once they exist),
+with one line saying that the rest comes back afterwards. What cannot apply is left out, not disabled. The settings never hold
+the language: it is the menu in the top bar, at every width and in every state, the home screen included.
 
 ## Parts
 
@@ -234,7 +238,7 @@ that show their key (Space, arrows). `usePlayheadTime`, `usePlaying`, `useDurati
 Converting: determinate ring, "Converting the video for this browser" and "Runs on your device and can take a while."
 Analyzing: a large ring with the percentage in the middle, "Analyzing frame 412 of 1260", "Running on {backend}" when
 known, a time estimate ("About 40 s left", derived from elapsed time and progress, shown only after 8% and 4 s, because the first frames are slow,
-rounded to 5 s), and Cancel. Ready (a video, no result): a compact panel at the bottom center with the file name and a
+rounded to 5 s), and Cancel: the one Cancel of the app, the settings do not repeat it. Ready (a video, no result): a compact panel at the bottom center with the file name and a
 primary "Analyze video" button. A soft scrim keeps the video visible. It fades in; it renders nothing when idle with a result.
 
 **CalibrationBar.** A pill at the bottom center of the stage: the instruction for the next corner
@@ -371,7 +375,9 @@ Keeps every export and prop: `DatasetBar`, `EvaluatePanel`, `EvaluationReport`. 
 ### Chrome (`ui/Landing.tsx`, `ui/TopBar.tsx`, `ui/StatusBanners.tsx`, `ui/rail/SetupPanel.tsx`, `styles/chrome.css`)
 
 **TopBar** (56px, `<header class="topbar">`). Left: the logo (a button when `onHome`), then the clip name (truncated,
-`title` shows it whole) and its detail line in muted text (spacing, not dots). Right: the athlete/coach `Segmented` when
+`title` shows it whole) and its detail line in muted text (spacing, not dots). Right: the language `Menu` (`LanguageMenu`: an icon below 720px; its list lines up with the button's
+left edge, not its right, when the athlete/coach switch is shown, and up to 420px it hangs from the bar's gutters, so that it
+stays on screen wherever the button is), the athlete/coach `Segmented` when
 `showAudience`, the export `Menu` when `exportGroups`, a settings `IconButton` (pressed when `setupOpen`), an "Open
 video" icon button wrapping a hidden file input (accept mp4/mov; hidden when `onFile` is null), and a keyboard-shortcuts
 popover (icon button; also opened by `?`) listing: Space play or pause; left and right arrows previous and next frame;
@@ -403,7 +409,8 @@ hairlines, each with a quiet heading:
   "Analyze every" (frame, 2nd, 3rd, 4th), people to look for (1 to 3), "Use the GPU if possible"; the runtime line
   ("Runtime: {backend or not started}") and the WebGPU line (the two original sentences). The primary action is a sticky
   footer: "Analyze video" (block, large) when there is a video and no result, "Analyze again" (secondary) with a result;
-  while busy, "Cancel" replaces it during analysis and all fields are disabled. Loading disables Analyze.
+  while analyzing there is no action here (Cancel is on the stage's overlay) and the engine fields are disabled. Loading
+  disables Analyze.
 - **Appearance**: `Segmented` System, Light, Dark.
 - **Saved data**: "Open saved analysis (JSON)" (file input) and "Use the sample video" when `onSample`.
 

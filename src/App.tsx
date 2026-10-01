@@ -837,7 +837,6 @@ export default function App() {
         closeSetup();
         void analyze();
       }}
-      onCancel={() => abort.current?.abort()}
       height={height}
       onHeight={(m) => setHeight(m || 1.75)}
       calibration={{

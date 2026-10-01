@@ -68,7 +68,7 @@ export function TopBar({
       </div>
 
       <div className="topbar__right">
-        <LanguageMenu compact={narrow} />
+        <LanguageMenu compact={narrow} align={showAudience ? 'start' : 'end'} />
         {showAudience && (
           <Segmented<Audience>
             ariaLabel={t('topbar.audience')}
