@@ -177,6 +177,7 @@ export default function App() {
   const [clipSize, setClipSize] = useState<Size | null>(null);
   const openedSeries = useRef(false);
   const [loop, setLoop] = useState(false);
+  const [boomerang, setBoomerang] = useState(false);
   // The video whose analysis starts by itself once it is ready (the live view).
   const [autoUrl, setAutoUrl] = useState<string | null>(null);
 
@@ -369,7 +370,7 @@ export default function App() {
     const from = (c.takeoffTimeS ?? c.apexTimeS) - 0.4;
     const to = (c.landingTimeS ?? c.apexTimeS) + 0.3;
     rangeLock.current = { from, to };
-    playhead.playRange(from, to, loop);
+    playhead.playRange(from, to, loop, boomerang);
   };
 
   // [ and ] go to the previous and next jump.
@@ -1282,6 +1283,8 @@ export default function App() {
                     onPlayJump={playJump}
                     loop={loop}
                     onLoop={setLoop}
+                    boomerang={boomerang}
+                    onBoomerang={setBoomerang}
                     routine={{
                       jump: routineJump,
                       startS: routineStartS,

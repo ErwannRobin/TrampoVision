@@ -51,6 +51,13 @@ const ICONS = {
       <path d="M21 13v1a4 4 0 0 1-4 4H3" />
     </>
   ),
+  boomerang: (
+    <>
+      <path d="m7 7-4 4 4 4" />
+      <path d="m17 7 4 4-4 4" />
+      <path d="M3 11h18" />
+    </>
+  ),
   download: (
     <>
       <path d="M12 4v11" />

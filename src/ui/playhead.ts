@@ -17,7 +17,7 @@ export class Playhead {
   /** Installed by the stage: performs an actual seek on the <video>. */
   seekHandler: ((time: number) => void) | null = null;
   /** Installed by the stage: plays from `from` to `to` seconds, then stops (or loops). */
-  playRangeHandler: ((from: number, to: number, loop: boolean) => void) | null = null;
+  playRangeHandler: ((from: number, to: number, loop: boolean, bounce?: boolean) => void) | null = null;
   /** Installed by the stage: play or pause. */
   toggleHandler: (() => void) | null = null;
   /** Installed by the stage: pause. */
@@ -73,8 +73,8 @@ export class Playhead {
     if (this.seekHandler) this.seekHandler(t);
     else this.setTime(t); // no video loaded (e.g. data opened from a file): just move the cursor
   }
-  playRange(from: number, to: number, loop = false) {
-    this.playRangeHandler?.(from, to, loop);
+  playRange(from: number, to: number, loop = false, bounce = false) {
+    this.playRangeHandler?.(from, to, loop, bounce);
   }
   toggle() {
     this.toggleHandler?.();

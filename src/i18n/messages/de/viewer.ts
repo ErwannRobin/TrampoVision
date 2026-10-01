@@ -4,6 +4,7 @@ import type { viewer as en } from '../en/viewer';
 export const viewer: Translation<typeof en> = {
   'tl.previous': 'Vorheriger Sprung ( [ )',
   'tl.next': 'Nächster Sprung ( ] )',
+  'tl.boomerang': 'Bumerang: vorwärts, dann rückwärts abspielen',
   'tl.loop': 'Sprung wiederholen',
   'tl.zoom': 'Zeitleisten-Zoom',
   'tl.zoomClip': 'Clip',

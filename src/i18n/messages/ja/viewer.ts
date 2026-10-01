@@ -4,6 +4,7 @@ import type { viewer as en } from '../en/viewer';
 export const viewer: Translation<typeof en> = {
   'tl.previous': '前のジャンプ（[）',
   'tl.next': '次のジャンプ（]）',
+  'tl.boomerang': 'ブーメラン：順再生のあと逆再生',
   'tl.loop': 'ジャンプをループ再生',
   'tl.zoom': 'タイムラインのズーム',
   'tl.zoomClip': 'クリップ',

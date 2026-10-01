@@ -3,6 +3,7 @@ export const viewer = {
   // The timeline
   'tl.previous': 'Previous jump ( [ )',
   'tl.next': 'Next jump ( ] )',
+  'tl.boomerang': 'Boomerang: play forward, then backwards',
   'tl.loop': 'Loop the jump',
   'tl.zoom': 'Timeline zoom',
   'tl.zoomClip': 'Clip',

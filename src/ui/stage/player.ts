@@ -22,6 +22,8 @@ interface Range {
   from: number;
   to: number;
   loop: boolean;
+  /** Play forward to the end, then backwards to the start (and, with `loop`, again). */
+  bounce: boolean;
 }
 
 export interface PlayerOptions {
@@ -47,7 +49,14 @@ export function createPlayer(video: PlayerVideo, fps: number, options: PlayerOpt
   let range: Range | null = null;
   // Reverse play: a video element cannot play backwards, so the player walks it back one frame at a time. `pos` is where the clip
   // should be now (it keeps running while the decoder is busy, so frames are dropped and the speed stays true), `shown` the frame asked for.
-  let reversing: { pos: number; last: number | null; shown: number } | null = null;
+  let reversing: {
+    pos: number;
+    last: number | null;
+    shown: number;
+    /** A boomerang's way back: it stops here, and `resume` is the range to go on with if it loops. */
+    floor?: number;
+    resume?: Range;
+  } | null = null;
 
   const setReversing = (next: typeof reversing) => {
     const was = reversing !== null;
@@ -74,7 +83,15 @@ export function createPlayer(video: PlayerVideo, fps: number, options: PlayerOpt
     r.last = now;
     r.pos -= dt * (options.rate?.() ?? 1);
     const frame = frameAtTime(r.pos, fps);
-    if (frame <= 0) {
+    if (r.floor !== undefined && r.resume && r.pos <= r.floor) {
+      const resume = r.resume;
+      seekFrame(frameAtTime(resume.from, fps));
+      setReversing(null);
+      if (resume.loop) {
+        range = resume;
+        play();
+      }
+    } else if (frame <= 0) {
       seekFrame(0);
       setReversing(null);
     } else if (frame !== r.shown && !video.seeking) {
@@ -133,10 +150,10 @@ export function createPlayer(video: PlayerVideo, fps: number, options: PlayerOpt
       video.pause();
     },
 
-    playRange: (from: number, to: number, loop: boolean) => {
+    playRange: (from: number, to: number, loop: boolean, bounce = false) => {
       setReversing(null);
       seekFrame(frameAtTime(from, fps));
-      range = { from, to, loop };
+      range = { from, to, loop, bounce };
       play();
     },
 
@@ -155,7 +172,18 @@ export function createPlayer(video: PlayerVideo, fps: number, options: PlayerOpt
       const end = Math.min(range.to, video.duration - RANGE_END_MARGIN_S);
       if (video.currentTime < end) return;
       const restart = frameSeekTime(frameAtTime(range.from, fps), fps);
-      if (range.loop && restart < end) seekFrame(frameAtTime(range.from, fps));
+      if (range.bounce && restart < end) {
+        const resume = range;
+        range = null;
+        video.pause();
+        setReversing({
+          pos: video.currentTime,
+          last: null,
+          shown: frameAtTime(video.currentTime, fps),
+          floor: restart,
+          resume,
+        });
+      } else if (range.loop && restart < end) seekFrame(frameAtTime(range.from, fps));
       else {
         range = null;
         video.pause();
