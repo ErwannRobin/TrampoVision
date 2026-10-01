@@ -1,5 +1,6 @@
 import { t } from '../i18n/core';
 import { createMediaPipeEstimator } from '../pose/MediaPipePoseEstimator';
+import { bodySignature, createPixelReader } from '../pose/appearance';
 import { MultiAthleteTracker } from '../pose/selectAthlete';
 import type { EstimatorOptions, Keypoint, PoseEstimatorFactory, WorldPoint } from '../pose/types';
 import { disposeVideo, frameSeekTime, loadVideo, seekTo } from '../video/frames';
@@ -9,9 +10,11 @@ import type { PoseTrack } from './types';
 const MIN_POSES = 4;
 /** People the model looks for on top of the athletes: the ones to ignore. */
 const EXTRA_POSES = 2;
+/** Athletes followed when the number is left to the app (`numPoses` 0): the ones that do not jump are dropped afterwards. */
+export const AUTO_ATHLETES = 3;
 
 export interface ExtractOptions extends EstimatorOptions {
-  // `numPoses` is the number of athletes to follow: each one gets a track of their own.
+  // `numPoses` is the number of athletes to follow, each with a track of their own; 0 = up to `AUTO_ATHLETES`, to be sorted out later.
   sourceFps: number;
   /** Analyze every Nth frame (1 = every frame). */
   stride: number;
@@ -44,7 +47,7 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
   const { videoWidth: width, videoHeight: height, duration } = video;
   if (!width || !height || !Number.isFinite(duration)) throw new Error(t('err.dimensions'));
 
-  const athletes = Math.max(1, Math.floor(opts.numPoses));
+  const athletes = opts.numPoses > 0 ? Math.floor(opts.numPoses) : AUTO_ATHLETES;
   // Always look for more people than the athletes: with a single pose the model picks who to follow by itself and can swap
   // to somebody in the foreground. Seeing everyone lets the tracker keep the people it locked on.
   const estimator = await (opts.createEstimator ?? createMediaPipeEstimator)({
@@ -62,6 +65,8 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
     const frames: (Keypoint[] | null)[][] = Array.from({ length: athletes }, () => []);
     const world: (WorldPoint[] | null)[][] = Array.from({ length: athletes }, () => []);
     const tracker = new MultiAthleteTracker(athletes);
+    // With several athletes the colors of their clothes help to keep them apart; one athlete needs no such help.
+    const readPixels = athletes > 1 ? createPixelReader(video, width) : null;
     let lastTs = 0;
 
     for (let i = 0; i < total; i++) {
@@ -74,7 +79,9 @@ async function extractFromVideo(video: HTMLVideoElement, opts: ExtractOptions): 
       const candidates = detections.map((d) =>
         d.landmarks.map((p) => ({ x: p.x * width, y: p.y * height, visibility: p.visibility })),
       );
-      const found = tracker.select(candidates);
+      const pixels = readPixels?.() ?? null;
+      const looks = candidates.map((c) => (pixels ? bodySignature(pixels, c) : null));
+      const found = tracker.select(candidates, looks);
       found.forEach((athlete, a) => {
         // The 3D landmarks of the same person: the tracker returns one of the candidates, so its index is the detection's index.
         const chosen = athlete ? candidates.indexOf(athlete) : -1;

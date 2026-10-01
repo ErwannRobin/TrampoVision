@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Signature } from './appearance';
 import { LM } from './landmarks';
 import { AthleteTracker, MultiAthleteTracker } from './selectAthlete';
 import type { Keypoint } from './types';
@@ -79,14 +80,15 @@ describe('MultiAthleteTracker', () => {
 
   it('does not swap two athletes who pass close to each other', () => {
     const t = new MultiAthleteTracker(2);
-    t.select([person(300, 600), person(500, 600)]);
+    t.select([person(300, 600), person(500, 450)]);
     let x1 = 300;
     let x2 = 500;
     for (let i = 0; i < 8; i++) {
       x1 += 30;
       x2 -= 30;
       const first = person(x1, 600);
-      const second = person(x2, 600);
+      // One athlete is higher in the picture, so their bodies cross without sitting on the same spot.
+      const second = person(x2, 450);
       const [a, b] = t.select([first, second]);
       if (i < 5) {
         expect(a).toBe(first);
@@ -127,5 +129,32 @@ describe('MultiAthleteTracker', () => {
     const athlete = person(510, 500, 100);
     expect(t.select([person(700, 900, 260), athlete])).toEqual([athlete]);
     expect(t.select([person(900, 700, 300)])).toEqual([null]);
+  });
+
+  it('does not turn the second detection of the same person into another athlete', () => {
+    const t = new MultiAthleteTracker(2);
+    t.select([person(300, 600, 100), person(800, 600, 100)]);
+    // The right athlete is lost for a while: the gate of their track opens wide.
+    for (let i = 0; i < 4; i++) t.select([person(300, 600, 100)]);
+    const left = person(305, 590, 100);
+    const ghost = person(310, 585, 50); // a smaller pose inside the left athlete's box
+    const [a, b] = t.select([left, ghost]);
+    expect(a).toBe(left);
+    expect(b).toBeNull();
+  });
+
+  it('keeps the athletes apart by the colors they wear when they come back from a long loss', () => {
+    const look = (r: number, g: number, bl: number): Signature => ({ torso: [r, g, bl], legs: null });
+    const red = look(0.9, 0.1, 0.1);
+    const blue = look(0.1, 0.1, 0.9);
+    const t = new MultiAthleteTracker(2);
+    t.select([person(300, 600), person(500, 600)], [red, blue]);
+    for (let i = 0; i < 12; i++) t.select([]);
+    // They crossed while out of sight: the red athlete is now on the right.
+    const right = person(480, 600);
+    const left = person(320, 600);
+    const [a, b] = t.select([left, right], [blue, red]);
+    expect(a).toBe(right);
+    expect(b).toBe(left);
   });
 });

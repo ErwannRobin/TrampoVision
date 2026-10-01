@@ -128,6 +128,7 @@ export const chrome: Translation<typeof en> = {
   'setup.stride3': 'Une image sur 3',
   'setup.stride4': 'Une image sur 4',
   'setup.people': 'Athlètes à suivre',
+  'setup.peopleAuto': 'Automatique',
   'setup.gpu': 'Utiliser le GPU si possible',
   'setup.runtime': 'Exécution',
   'setup.notStarted': 'pas démarrée',

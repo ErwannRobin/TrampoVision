@@ -89,7 +89,10 @@ const strides = () => [
   { value: 3, label: t('setup.stride3') },
   { value: 4, label: t('setup.stride4') },
 ];
-const PEOPLE = [1, 2, 3].map((n) => ({ value: n, label: String(n) }));
+const people = () => [
+  { value: 0, label: t('setup.peopleAuto') },
+  ...[1, 2, 3].map((n) => ({ value: n, label: String(n) })),
+];
 const sides = () => [
   { value: 'long' as const, label: t('setup.sideLong') },
   { value: 'short' as const, label: t('setup.sideShort') },
@@ -379,7 +382,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
                     <SelectField
                       label={t('setup.people')}
                       value={props.numPoses}
-                      options={PEOPLE}
+                      options={people()}
                       disabled={state.engineLocked}
                       onChange={props.onNumPoses}
                     />

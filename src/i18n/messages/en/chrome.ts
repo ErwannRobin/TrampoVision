@@ -135,6 +135,7 @@ export const chrome = {
   'setup.stride3': 'Every 3rd frame',
   'setup.stride4': 'Every 4th frame',
   'setup.people': 'Athletes to follow',
+  'setup.peopleAuto': 'Automatic',
   'setup.gpu': 'Use the GPU if possible',
   'setup.runtime': 'Runtime',
   'setup.notStarted': 'not started',

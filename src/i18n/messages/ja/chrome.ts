@@ -125,6 +125,7 @@ export const chrome: Translation<typeof en> = {
   'setup.stride3': '3フレームごと',
   'setup.stride4': '4フレームごと',
   'setup.people': '追跡する選手の数',
+  'setup.peopleAuto': '自動',
   'setup.gpu': '可能ならGPUを使う',
   'setup.runtime': 'ランタイム',
   'setup.notStarted': '未開始',

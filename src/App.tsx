@@ -8,6 +8,7 @@ import {
 } from './analysis/calibration';
 import { computeAnalysis } from './analysis/computeAnalysis';
 import { download, toCsv, toJumpsCsv } from './analysis/export';
+import { keepAthletes } from './analysis/athletes';
 import { extractPoseTracks } from './analysis/extractPoseTrack';
 import { analysisStride } from './analysis/stride';
 import { stabilizePose } from './analysis/stabilize';
@@ -120,7 +121,8 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [fps, setFps] = useState(30);
   const [model, setModel] = useState<ModelVariant>('full');
-  const [numPoses, setNumPoses] = useState(1);
+  // Athletes to follow; 0 = the app decides: everybody who jumps.
+  const [numPoses, setNumPoses] = useState(0);
   const [stride, setStride] = useState(1);
   const [preferGpu, setPreferGpu] = useState(true);
   const [height, setHeight] = useState(1.75);
@@ -484,9 +486,23 @@ export default function App() {
         onBackend: setBackend,
         onProgress: (done, total) => setStatus({ kind: 'analyzing', done, total }),
       });
+      // Left to the app, the people who do not jump (a coach, a judge) are not athletes.
+      const athletes =
+        numPoses > 0
+          ? ts
+          : keepAthletes(
+              ts,
+              (tr) =>
+                computeAnalysis(
+                  tr,
+                  { athleteHeightM: height, calibration: null, scaleSource: 'athlete' },
+                  stabilizePose(tr),
+                ).summary.jumpCount,
+            );
       setAthleteIdx(0);
-      setCompare(false);
-      setTracks(ts);
+      // Several athletes are shown together first: that is what they were filmed for.
+      setCompare(athletes.length > 1);
+      setTracks(athletes);
       setStatus({ kind: 'idle' });
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
