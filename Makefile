@@ -42,8 +42,7 @@ check: typecheck worker-check lint format-check test ## Typecheck, lint, format 
 assets: node_modules ## Re-download MediaPipe runtime + pose models into public/
 	npm run fetch-assets
 
-upload-assets: node_modules ## Upload models, wasm and samples to the Blob asset host: [SAMPLES=dir] [DRY_RUN=1] (needs BLOB_READ_WRITE_TOKEN unless DRY_RUN)
-	@test -n "$(DRY_RUN)" -o -n "$$BLOB_READ_WRITE_TOKEN" || { echo "set BLOB_READ_WRITE_TOKEN (or use DRY_RUN=1 to only list the files)"; exit 1; }
+upload-assets: node_modules ## Upload models, wasm and samples to the Blob asset host: [SAMPLES=dir] [DRY_RUN=1] (token from BLOB_READ_WRITE_TOKEN, .env.local or .env)
 	npm run upload-assets -- $(if $(SAMPLES),--samples $(SAMPLES)) $(if $(DRY_RUN),--dry-run)
 
 icons: node_modules ## Re-render the home-screen icons in public/ from the logo

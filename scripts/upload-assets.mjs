@@ -1,6 +1,6 @@
 // Uploads the big files to a public Vercel Blob store, so the deployment does not carry them (see src/assets.ts).
 //
-//   BLOB_READ_WRITE_TOKEN=... npm run upload-assets            upload everything
+//   npm run upload-assets                                      upload everything (token from BLOB_READ_WRITE_TOKEN, else .env.local, else .env)
 //   npm run upload-assets -- --dry-run                         list what would be uploaded
 //   npm run upload-assets -- --samples path/to/videos          folder with IMG_8368.mp4, IMG_8368.MOV and dong-dong-2011-landscape.mp4 (default: video-sample/)
 //
@@ -19,6 +19,8 @@ import { fileURLToPath } from 'node:url';
 import { put } from '@vercel/blob';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+// loadEnvFile never overrides a variable that is already set, so an exported token wins over .env.local, which wins over .env.
+for (const f of ['.env.local', '.env']) if (existsSync(join(root, f))) process.loadEnvFile(join(root, f));
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const samplesFlag = args.indexOf('--samples');
