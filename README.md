@@ -136,6 +136,7 @@ video ─► extractPoseTrack ─► PoseTrack ─► stabilizePose ─► compu
 | `src/analysis/calibration.ts`                             | Four bed corners → scale, bed center, position normalized to the trampoline.                                                                   |
 | `src/analysis/jumpCycles.ts`                              | Apex / takeoff / landing detection, per-frame phase, jump metrics, rotation counting.                                                          |
 | `src/analysis/computeAnalysis.ts`                         | Orchestrates the above and derives height, velocity, joint angles, body orientation.                                                           |
+| `src/analysis/orientation.ts`                             | Continuous body orientation that puts back head/feet flips of the pose model (two readings per frame, smoothest path wins).                    |
 | `src/analysis/timeSeries.ts`                              | The frame-by-frame store (`PoseSeries` JSON, import/export) and a numeric feature matrix.                                                      |
 | `src/video/overlay.ts`                                    | Canvas overlay drawn on the video and in the exported video: skeleton, center of mass, trajectory comet, label chips, bed outline.             |
 | `src/ui/*`, `src/styles/*`                                | The interface (see `docs/ui-design.md`): design tokens and kit, stage and transport, timeline, athlete and coach rails, charts, settings.      |
@@ -238,6 +239,8 @@ wrapped to (−180°, 180°] and **unwrapped** so it keeps counting (350 → 355
 360° branch closest to where the rotation was heading (last value + recent rate), so a dropout of more than half a turn is still
 counted correctly when the rate is steady.
 
+**Head/feet flips** (`orientation.ts`). A pose model sometimes puts the head where the feet are for a few frames when the athlete is inverted: the trunk angle is then 180° off, which the 360° rule above cannot tell from a real rotation (a double somersault turns about 15° per frame; half a turn in one frame is not physical). Every frame therefore has two readings, as measured and 180° away, and the path with the smoothest angular velocity wins, with a price for each switch (a small dynamic-programming search; per-frame trust from the visibility and length of the trunk). The ankles-to-head line and the center-of-mass-to-head direction lean on the choice only a little, because when the model flips the whole body they flip with it. Frames whose trunk joints were bridged across a gap or a rejected glitch are not trusted: their orientation is interpolated from the frames around them. On a clean track nothing changes. `AnalysisResult.meta.orientationFlippedFrames` and `orientationFlipRuns` say how much was put back; `repairOrientation: false` in the analysis options unwraps as before. Limits: a flip shorter than about the smoothing window (5 frames) is partly eaten by the stabilizer first, the repair does not touch the center of mass or the joint angles of a flipped frame (they stay wrong), and a flip that starts in the first frame and never ends cannot be told from the truth.
+
 Per jump, `rotation = orientation(landing) − orientation(takeoff)` (interpolated between frames), reported as turns, rounded to the
 nearest **quarter turn**, and `completed rotations = quarter turns / 4` toward zero (a 350° flip counts as 1, 310° as 0). A live
 counter (turns since takeoff, reset at each takeoff, frozen at landing) is shown in the panel. The sign is the direction on screen; it
@@ -316,7 +319,7 @@ asserts (with fewer routines). Correct = the right skill; _declined_ = unclassif
 | landmark jitter 2% of height / 4%                                            | 100% / 100% | 0 / 0                       | 0 / 0           |
 | jitter 2% + 10% of landmarks dropped                                         | 100%        | 0                           | 0               |
 | loose tucks, bent-knee pikes, piked layouts (jitter 1%)                      | 99%         | 3                           | 0               |
-| pose model flips the athlete when inverted (simulated: mirror / rotate 180°) | 60% / 60%   | 120 / 120 (all somersaults) | 0 / 0           |
+| pose model flips the athlete when inverted (simulated: mirror / rotate 180°) | 60% / 64%   | 109 / 117 (all somersaults) | 0 / 0           |
 | camera yaw 50° / 70° away from side-on                                       | 100% / 59%  | 0 / 121                     | 0 / 1           |
 | jitter 1% at 15 fps instead of 30                                            | 90%         | 31                          | 0               |
 
@@ -324,6 +327,7 @@ asserts (with fewer routines). Correct = the right skill; _declined_ = unclassif
 modes I could simulate end in "declined" and a named limitation, not in a confident wrong answer. It does **not** show that a real model is that accurate: the classes were
 generated from the same ideas as the rules (the textbook rows do not overlap), and the flip and yaw failures are my assumptions about how a pose model fails, not something I observed.
 Rotation error grows with rotation speed (about 5% for a full turn) because the takeoff and landing times are known to a few hundredths of a second.
+The flip row counts the declined answers (forced guesses off, 60 routines of 5 jumps): the head/feet repair (see _Head/feet flips_) takes the rotate-180° case from 60% to 64%, the mirror case is not a 180° flip and stays at 60%. With the app's forced guesses, rotate 180° goes from 60% to 100%, every somersault as a flagged tentative guess, because the orientation is now right but the flipped frames still bend the center of mass and the joint angles.
 
 Browser end to end (headless Chromium): (a) a stick-figure video of straight, tuck, pike, back, front, straight (pose loaded from a saved series): all six named correctly at 85–100%,
 timeline, position strip, normalized charts, exports and _Play jump_ work, forcing the facing to the other side turns Back into Front; (b) real MediaPipe on the earlier photo video (calibrated, CPU): 4 jumps found; the

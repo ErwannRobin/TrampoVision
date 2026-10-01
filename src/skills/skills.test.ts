@@ -265,7 +265,8 @@ describe('failure handling: report the limit instead of a wrong skill', () => {
   it('does not answer when the pose model flips the inverted athlete', () => {
     for (const mode of ['mirror', 'rotate180'] as const) {
       const { track } = mannequinRoutine({ jumps: somersault });
-      const result = computeAnalysis(flipInverted(track, mode));
+      // The orientation tracker would put a head/feet flip back (see the next test): here the flip is taken as it comes.
+      const result = computeAnalysis(flipInverted(track, mode), { repairOrientation: false });
       const declined = analyzeSkills(result, { config: { forceGuess: false } }).jumps[0].prediction;
       expect(['front', 'back']).not.toContain(declined.skill);
       // Asked to guess, it may name something, but never firmly.
@@ -273,6 +274,23 @@ describe('failure handling: report the limit instead of a wrong skill', () => {
       expect(p.skill === 'unclassified' || p.certainty === 'tentative' || p.confidence < 0.5).toBe(true);
       expect(p.limitations.map((l) => l.signal)).toContain('Orientation tracking');
     }
+  });
+
+  it('puts the orientation back when the model turns the inverted athlete over (rotate 180°), and still does not answer firmly', () => {
+    const { track, truth } = mannequinRoutine({ jumps: somersault });
+    const flipped = flipInverted(track, 'rotate180');
+    const repaired = computeAnalysis(flipped);
+    const plain = computeAnalysis(flipped, { repairOrientation: false });
+    const t0 = Math.round(truth.takeoff[0] * 30);
+    const t1 = Math.round(truth.landing[0] * 30);
+    expect(repaired.meta.orientationFlippedFrames).toBeGreaterThan(0);
+    expect(Math.abs(repaired.orientation[t1] - repaired.orientation[t0] - 360)).toBeLessThan(40);
+    expect(Math.abs(plain.orientation[t1] - plain.orientation[t0] - 360)).toBeGreaterThan(100);
+    // The flip also bent the center of mass and the shapes, which the repair does not touch: the guess stays a flagged one.
+    const declined = analyzeSkills(repaired, { config: { forceGuess: false } }).jumps[0].prediction;
+    expect(['front', 'back']).not.toContain(declined.skill);
+    const p = analyzeSkills(repaired).jumps[0].prediction;
+    expect(p.skill === 'unclassified' || p.certainty === 'tentative' || p.confidence < 0.5).toBe(true);
   });
 
   it('does not answer a somersault seen from nearly the front', () => {

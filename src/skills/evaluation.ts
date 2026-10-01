@@ -1,6 +1,6 @@
 import { computeAnalysis } from '../analysis/computeAnalysis';
 import { makeRng } from '../analysis/testTracks';
-import type { PoseTrack } from '../analysis/types';
+import type { AnalysisOptions, PoseTrack } from '../analysis/types';
 import { LM } from '../pose/landmarks';
 import type { Keypoint } from '../pose/types';
 import { analyzeSkills } from './analyzeSkills';
@@ -149,6 +149,8 @@ export function evaluate(
     fps?: number;
     execution?: Execution;
     classifier?: SkillClassifier;
+    /** Options of the analysis stage (for example `{ repairOrientation: false }` to see what the repair of head/feet flips is worth). */
+    analysis?: Partial<AnalysisOptions>;
   } = {},
 ): EvalSummary {
   const rnd = makeRng(options.seed ?? 11);
@@ -167,7 +169,7 @@ export function evaluate(
       dropout: condition.dropout,
       seed: 1000 + r,
     });
-    const result = computeAnalysis(degraded, { athleteHeightM: heightM });
+    const result = computeAnalysis(degraded, { athleteHeightM: heightM, ...options.analysis });
     const skills = analyzeSkills(result, { config: options.config, classifier: options.classifier });
     if (skills.jumps.length !== order.length) missed += Math.abs(order.length - skills.jumps.length);
     order.forEach((truth, k) => {

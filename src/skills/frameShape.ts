@@ -1,6 +1,5 @@
 import { dist, jointAngle, mid } from '../analysis/geometry';
 import type { AnalysisResult } from '../analysis/types';
-import { unwrapDegrees } from '../analysis/signal';
 import { CORE_LANDMARKS, FACE_LANDMARKS, LM } from '../pose/landmarks';
 import type { Point } from '../pose/types';
 import { classifyPosition } from './bodyPosition';
@@ -117,7 +116,7 @@ export function computeFrameShape(result: AnalysisResult, cfg: SkillConfig): Fra
     faceVote: nan(n),
     kneeVote: nan(n),
     footVote: nan(n),
-    lineOrientation: unwrapDegrees(result.lineAngle),
+    lineOrientation: result.lineOrientation,
     bodyX: SEQUENCE_JOINTS.map(() => nan(n)),
     bodyY: SEQUENCE_JOINTS.map(() => nan(n)),
   };

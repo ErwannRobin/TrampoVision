@@ -59,6 +59,19 @@ describe('synthetic evaluation', () => {
     },
   );
 
+  it('names the somersaults of an athlete the model turned over, as flagged guesses, thanks to the orientation repair', () => {
+    const turned: Condition = { ...base, name: 'pose flip (rotate180), jitter 1%', noise: 0.01, flip: 'rotate180' };
+    const repaired = evaluate(turned, { routines: ROUTINES });
+    const plain = evaluate(turned, { routines: ROUTINES, analysis: { repairOrientation: false } });
+    log(repaired);
+    expect(repaired.confidentWrong).toBe(0);
+    expect(repaired.accuracy).toBeGreaterThanOrEqual(0.9);
+    expect(plain.accuracy).toBeLessThan(0.7);
+    // Named, but never firmly: the flipped frames still bend the center of mass and the joint angles.
+    const somersaults = repaired.rows.filter((r) => r.truth === 'back' || r.truth === 'front');
+    expect(somersaults.filter((r) => r.certainty === 'tentative').length).toBeGreaterThanOrEqual(ROUTINES * 2 * 0.9);
+  });
+
   it('does not name a somersault seen from far off side-on (yaw 70°)', () => {
     const s = evaluate(
       { ...base, name: 'camera yaw 70°, jitter 1%', noise: 0.01, yawDeg: 70 },
