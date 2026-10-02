@@ -66,8 +66,7 @@ export const about: Translation<typeof en> = {
   'about.external': '別のサイトを開きます',
 
   'about.guidesTitle': 'ガイド',
-  'about.guidesText':
-    'プロジェクトのやさしい紹介と、動画から判定までの仕組みを示すインタラクティブなマップです。',
+  'about.guidesText': 'プロジェクトのやさしい紹介と、動画から判定までの仕組みを示すインタラクティブなマップです。',
   'about.guidesIntro': 'TrampoVision の紹介',
   'about.guidesMap': 'アーキテクチャマップ',
 
