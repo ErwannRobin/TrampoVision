@@ -96,6 +96,11 @@ export interface PoseSeries {
   raw: ([number, number, number][] | null)[];
   /** Raw 3D (world) landmarks per frame, [x, y, z, visibility] in meters. Absent in files saved before 3D support. */
   rawWorld?: ([number, number, number, number][] | null)[];
+  /**
+   * The other athletes of the clip, when there are several: each one is a series of its own. This file's own fields are the
+   * first athlete, so a reader that does not know `athletes` still gets one.
+   */
+  athletes?: PoseSeries[];
 }
 
 const r = (v: number, d = 3): number | null => (Number.isFinite(v) ? Number(v.toFixed(d)) : null);
@@ -194,12 +199,28 @@ export function buildPoseSeries(result: AnalysisResult, track: PoseTrack, info: 
   };
 }
 
+/** One athlete of a clip: the analysis, the track it came from, and the id of the video their labels belong to. */
+export interface AthleteSeriesInput {
+  result: AnalysisResult;
+  track: PoseTrack;
+  videoId?: string;
+}
+
+/** The series of a clip with one or more athletes: the first is the file itself, the others come under `athletes`. */
+export function buildPoseSeriesSet(athletes: AthleteSeriesInput[], info: SeriesInfo): PoseSeries {
+  const [first, ...others] = athletes.map((a) => buildPoseSeries(a.result, a.track, { ...info, videoId: a.videoId }));
+  return others.length ? { ...first, athletes: others } : first;
+}
+
 export function toSeriesJson(series: PoseSeries): string {
   return JSON.stringify(series);
 }
 
 export interface ParsedSeries {
+  /** The first athlete. */
   track: PoseTrack;
+  /** Every athlete of the clip, the first one included. */
+  tracks: PoseTrack[];
   calibration: TrampolineCalibration | null;
   settings: PoseSeries['settings'];
   source: PoseSeries['source'];
@@ -207,12 +228,18 @@ export interface ParsedSeries {
 
 /** Reads a series JSON back into the raw track and the settings needed to re-run the analysis. Throws a readable Error. */
 export function parsePoseSeries(text: string): ParsedSeries {
-  let data: Partial<PoseSeries>;
+  let root: Partial<PoseSeries>;
   try {
-    data = JSON.parse(text);
+    root = JSON.parse(text);
   } catch {
     throw new Error(t('err.notJson'));
   }
+  const first = parseOne(root);
+  const tracks = [first.track, ...(Array.isArray(root.athletes) ? root.athletes.map((a) => parseOne(a).track) : [])];
+  return { ...first, tracks };
+}
+
+function parseOne(data: Partial<PoseSeries>): Omit<ParsedSeries, 'tracks'> {
   if (!data || data.schema !== SERIES_SCHEMA) throw new Error(t('err.notSeries'));
   if (typeof data.version !== 'number' || data.version > SERIES_VERSION) {
     throw new Error(t('err.seriesVersion', { found: String(data.version), expected: SERIES_VERSION }));

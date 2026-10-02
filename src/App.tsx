@@ -41,12 +41,13 @@ import { analyzeSkills } from './skills/analyzeSkills';
 import { analyzeTwist2d } from './skills/twist2d';
 import { DEFAULT_SKILL_CONFIG, type SkillConfig } from './skills/config';
 import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from './skills/export';
-import { buildPoseSeries, parsePoseSeries, toSeriesJson, type ParsedSeries } from './analysis/timeSeries';
+import { buildPoseSeriesSet, parsePoseSeries, toSeriesJson, type ParsedSeries } from './analysis/timeSeries';
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point, PoseEngineId } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
 import { loadSample, loadSampleSeries, loadSamples, type Sample } from './video/sample';
-import { dragHasFiles, pickDroppedVideo } from './video/drop';
+import { dragHasFiles, pickDroppedSeries, pickDroppedVideo } from './video/drop';
+import { matchClip, type ClipIdentity } from './analysis/seriesMatch';
 import { transcodeToH264 } from './video/transcode';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
 import { EvaluatePanel, EvaluationReport } from './ui/EvaluationView';
@@ -112,6 +113,29 @@ function saveCalibration(file: File | null, cal: SavedCalibration) {
   } catch {
     /* storage unavailable: the calibration just isn't remembered */
   }
+}
+
+/** The id of the clip, whichever athlete's id it is given. */
+const clipVideoId = (id: string) => id.replace(/#\d+$/, '');
+
+/** What a video file is, to tell whether a saved analysis is of it. Its size and length stay unknown when the browser cannot decode it. */
+async function clipOfVideo(file: File): Promise<ClipIdentity> {
+  const videoId = await videoIdOf(file);
+  const url = URL.createObjectURL(file);
+  try {
+    const probe = await loadVideo(url);
+    const clip = { videoId, width: probe.videoWidth, height: probe.videoHeight, durationS: probe.duration };
+    disposeVideo(probe);
+    return clip;
+  } catch {
+    return { videoId, width: 0, height: 0, durationS: null };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function clipOfSeries({ source, track }: ParsedSeries): ClipIdentity {
+  return { videoId: source.videoId, width: track.width, height: track.height, durationS: track.times.at(-1) ?? null };
 }
 
 /** Each athlete of a clip is a video of their own for the labels: the first keeps the id of the clip. */
@@ -580,7 +604,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
       // A series opened over its own video (a sample) stays on the video, and keeps the id of that file.
       openedSeries.current = !opts?.withVideo;
       setAthleteIdx(0);
-      setTracks([parsed.track]);
+      setTracks(parsed.tracks);
+      setCompare(parsed.tracks.length > 1);
       setSeriesName(parsed.source.fileName);
       if (!opts?.withVideo) {
         setVideoId(parsed.source.videoId ?? fileVideoId ?? videoIdFromTrack(parsed.source.fileName, parsed.track));
@@ -695,13 +720,29 @@ function AppView({ playhead }: { playhead: Playhead }) {
   );
   // What the full screen says about each jump.
   const fullscreenJumps = useMemo(() => hudJumps(session), [session]);
+  /** The saved analysis of the clip: every athlete followed in it, the one on screen first. */
+  function serializeSeries(name: string, id: string | null, cal: typeof calibration): string {
+    const athletes = tracks.map((tr, i) => ({
+      result:
+        i === athleteIdx && result
+          ? result
+          : computeAnalysis(
+              tr,
+              { athleteHeightM: height, calibration: analysisCalibration, scaleSource },
+              stabilizePose(tr),
+            ),
+      track: tr,
+      videoId: athleteVideoId(id, i) ?? undefined,
+    }));
+    return toSeriesJson(buildPoseSeriesSet(athletes, { fileName: name, stride, minVisibility: 0.4, calibration: cal }));
+  }
   // The set on screen, as the recent sets keep it: stored when the analysis completes, and again whenever what the live view says about
   // it changes (a skill the coach confirms, changes or deletes). Only when the saved records are read, so a set that is reopened has its labels.
   const setSnapshot = useMemo<SetSnapshot | null>(() => {
     if (!track || !result || !session || !videoId || !dataset.ready) return null;
     const name = file?.name ?? seriesName ?? '';
     return {
-      id: videoId,
+      id: clipVideoId(videoId),
       fileName: name,
       track,
       settingsKey: JSON.stringify([height, scaleSource, stride, analysisCalibration]),
@@ -709,16 +750,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
       pending: session.summary.pending,
       difficulty: session.summary.difficulty,
       jumps: session.jumps.length,
-      serialize: () =>
-        toSeriesJson(
-          buildPoseSeries(result, track, {
-            fileName: name,
-            videoId,
-            stride,
-            minVisibility: 0.4,
-            calibration: analysisCalibration,
-          }),
-        ),
+      serialize: () => serializeSeries(name, clipVideoId(videoId), analysisCalibration),
     };
   }, [
     track,
@@ -826,9 +858,54 @@ function AppView({ playhead }: { playhead: Playhead }) {
   const analyzing = status.kind === 'analyzing' || (status.kind === 'loading' && status.stage === 'model');
   const loading = status.kind === 'loading';
 
-  // Drop a video anywhere on the page. The handlers read the latest onFile/analyzing through a ref.
-  const dropRef = useRef({ onFile, analyzing });
-  dropRef.current = { onFile, analyzing };
+  /**
+   * What is dropped on the page: a video, a saved analysis, or both. An analysis meets the video that is open (or the one dropped
+   * with it) only when it is of that clip, and a video dropped on an analysis that has none is added to it when it is its clip.
+   */
+  async function onDropped(files: ArrayLike<File> | null | undefined) {
+    const video = pickDroppedVideo(files);
+    const saved = pickDroppedSeries(files);
+    if (!saved) {
+      if (!video) return;
+      if (!url && result && track) {
+        // An analysis without its video: that video is added in place, with no new analysis.
+        const text = serializeSeries(fileName, videoId && clipVideoId(videoId), calibration);
+        if (matchClip(clipOfSeries(parsePoseSeries(text)), await clipOfVideo(video)) !== 'different') {
+          await onFile(video, text);
+          return;
+        }
+      }
+      await onFile(video);
+      return;
+    }
+    let text: string;
+    let parsed: ParsedSeries;
+    try {
+      text = await saved.text();
+      parsed = parsePoseSeries(text);
+    } catch (err) {
+      setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      return;
+    }
+    const target = video ?? (url ? file : null);
+    if (!target) {
+      openSeriesText(text, saved.name);
+      return;
+    }
+    const match = matchClip(clipOfSeries(parsed), await clipOfVideo(target));
+    if (match === 'different') {
+      setNotice(t('app.seriesOtherVideo', { name: saved.name }));
+      return;
+    }
+    if (video) await onFile(video, text);
+    else if (openSeriesText(text, saved.name, { withVideo: true }) && match === 'unknown') {
+      setNotice(t('app.openedWithVideo', { name: saved.name, frames: parsed.track.frames.length }));
+    }
+  }
+
+  // Drop a video or a saved analysis anywhere on the page. The handlers read the latest onFile/analyzing through a ref.
+  const dropRef = useRef({ onDropped, analyzing });
+  dropRef.current = { onDropped, analyzing };
   const [dragging, setDragging] = useState(false);
   useEffect(() => {
     let depth = 0;
@@ -853,8 +930,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
       e.preventDefault(); // otherwise the browser navigates to the file
       depth = 0;
       setDragging(false);
-      const video = pickDroppedVideo(e.dataTransfer?.files);
-      if (video && !dropRef.current.analyzing) void dropRef.current.onFile(video);
+      if (!dropRef.current.analyzing) void dropRef.current.onDropped(e.dataTransfer?.files);
     };
     window.addEventListener('dragenter', enter);
     window.addEventListener('dragover', over);
@@ -957,16 +1033,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
             onSelect: () =>
               track &&
               download(
-                `${base}-pose-series.json`,
-                toSeriesJson(
-                  buildPoseSeries(result, track, {
-                    fileName,
-                    videoId: videoId ?? undefined,
-                    stride,
-                    minVisibility: 0.4,
-                    calibration,
-                  }),
-                ),
+                `${clipBase}-pose-series.json`,
+                serializeSeries(fileName, videoId && clipVideoId(videoId), calibration),
                 'application/json',
               ),
           },
