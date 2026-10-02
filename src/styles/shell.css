@@ -177,7 +177,22 @@
   }
 }
 
+/*
+ * Stacked, the stage is as wide as the page and as tall as the video it shows, so that a wide clip has no black bars above and below
+ * it and the page under it comes up the screen. Stage.tsx puts the clip's ratio on the root (--clip-ratio); no clip yet, or the 3D
+ * pane in the stage, and the stage keeps the generous height it had. The heights below only cap that, and the smallest the stage
+ * gets is what its panels (the ready card, the progress) need.
+ */
+:root {
+  --stage-fit: calc(var(--stage-avail-w, 100vw) / var(--clip-ratio, 0.001));
+}
+:root:has(.stage__pane) {
+  --stage-fit: 100000px;
+}
 @media (max-width: 1099px) {
+  :root {
+    --stage-avail-w: calc(100vw - 2 * var(--gutter));
+  }
   .workspace {
     display: flex;
     flex-direction: column;
@@ -187,7 +202,7 @@
   }
   .workspace__stage {
     flex: none;
-    height: clamp(300px, 58dvh, 720px);
+    height: clamp(min(300px, max(200px, var(--stage-fit))), min(58dvh, var(--stage-fit)), 720px);
   }
   .workspace__rail {
     overflow: visible;
@@ -196,12 +211,15 @@
 }
 
 @media (max-width: 640px) {
+  :root {
+    --stage-avail-w: 100vw;
+  }
   .workspace {
     gap: 8px;
     padding: 0 8px 24px;
   }
   .workspace__stage {
-    height: clamp(260px, 60dvh, 640px);
+    height: clamp(min(260px, max(200px, var(--stage-fit))), min(60dvh, var(--stage-fit)), 640px);
     margin: 0 -8px;
   }
   .workspace__dock {

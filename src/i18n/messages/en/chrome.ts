@@ -233,13 +233,15 @@ export const chrome = {
   'stage.view3d': '3D',
   'stage.view3dTitle': 'The 3D skeleton alone (experimental)',
   'stage.noVideo': 'A saved analysis has no video',
+  'stage.zoomReset': 'Reset zoom',
   'fs.enter': 'Full screen',
   'fs.exit': 'Close full screen',
   'fs.jump': 'Jump {n} of {total}',
   'fs.seek': 'Position in the video',
   'fs.prevJump': 'Previous jump',
   'fs.nextJump': 'Next jump',
-  'fs.hint': 'Swipe to move through the video. Tap to show or hide the controls. Hold to pause. Drag down to exit.',
+  'fs.hint':
+    'Swipe to move through the video. Tap to show or hide the controls. Hold to pause. Double tap a side to jump. Pinch to zoom. Drag down to exit.',
 
   // Transport
   'transport.back10': 'Back 10 frames (Shift + ←)',

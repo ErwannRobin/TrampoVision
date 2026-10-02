@@ -220,13 +220,15 @@ export const chrome: Translation<typeof en> = {
   'stage.view3d': '3D',
   'stage.view3dTitle': '3Dスケルトンのみ（試験的）',
   'stage.noVideo': '保存済みの解析には動画がありません',
+  'stage.zoomReset': 'ズームを戻す',
   'fs.enter': '全画面',
   'fs.exit': '全画面を閉じる',
   'fs.jump': 'ジャンプ {n} / {total}',
   'fs.seek': '動画の位置',
   'fs.prevJump': '前のジャンプ',
   'fs.nextJump': '次のジャンプ',
-  'fs.hint': 'スワイプで動画を動かします。タップで操作部の表示を切り替え、長押しで一時停止、下にドラッグで閉じます。',
+  'fs.hint':
+    'スワイプで動画を動かします。タップで操作部の表示を切り替え、長押しで一時停止、左右をダブルタップでジャンプ、ピンチでズーム、下にドラッグで閉じます。',
 
   'transport.back10': '10フレーム戻る（Shift + ←）',
   'transport.prev': '前のフレーム（←）',
