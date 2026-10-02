@@ -97,5 +97,11 @@ export default defineConfig(({ mode }) => ({
   // The app and the reviewer page (/review.html) share the build, the CSP and the review service settings.
   build: { rollupOptions: { input: { main: 'index.html', review: 'review.html' } } },
   optimizeDeps: { exclude: ['@ffmpeg/ffmpeg'] },
-  test: { environment: 'node', include: ['src/**/*.test.ts', 'worker/src/**/*.test.ts'] },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts', 'worker/src/**/*.test.ts'],
+    // The synthetic evaluation tests simulate hundreds of jumps each: far slower than the 5 s default on a busy CI
+    // runner. One generous limit for every test, instead of a timeout per test that the next heavy test forgets.
+    testTimeout: 60_000,
+  },
 }));
