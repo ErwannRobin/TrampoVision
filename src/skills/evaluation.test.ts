@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { evaluate, formatSummary, type Condition } from './evaluation';
 
 /**
@@ -7,8 +7,6 @@ import { evaluate, formatSummary, type Condition } from './evaluation';
  * that the failure modes we could simulate end in "unclassified" instead of a confident wrong skill.
  * It does not measure how a real pose model behaves on real trampoline footage.
  */
-// Each test simulates 100+ jumps, and several run two conditions: slower than the 5 s default on a busy CI runner.
-vi.setConfig({ testTimeout: 60_000 });
 
 const ROUTINES = 20; // 5 jumps each: 100 jumps per condition
 const log = (s: ReturnType<typeof evaluate>) => console.log('\n' + formatSummary(s));

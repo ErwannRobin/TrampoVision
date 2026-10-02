@@ -133,5 +133,5 @@ describe('2D twist estimator (simulated athlete, orthographic camera)', () => {
     for (const [label, r] of rows) {
       expect(r.reliableButWrong, label).toBeLessThanOrEqual(Math.ceil(0.05 * r.n));
     }
-  }, 60_000); // 16 rows of 80 simulated jumps: slower than the 5 s default, most of all on a busy CI runner.
+  });
 });
