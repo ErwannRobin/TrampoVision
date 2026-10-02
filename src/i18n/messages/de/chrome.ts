@@ -231,7 +231,8 @@ export const chrome: Translation<typeof en> = {
   'fs.seek': 'Position im Video',
   'fs.prevJump': 'Vorheriger Sprung',
   'fs.nextJump': 'Nächster Sprung',
-  'fs.hint': 'Nach links oder rechts wischen, um durch das Video zu gehen',
+  'fs.hint':
+    'Wischen, um durch das Video zu gehen. Tippen blendet die Bedienelemente ein oder aus. Gedrückt halten pausiert.',
 
   'transport.back10': '10 Bilder zurück (Umschalt + ←)',
   'transport.prev': 'Vorheriges Bild (←)',

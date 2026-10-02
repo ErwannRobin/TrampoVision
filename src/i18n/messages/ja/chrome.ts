@@ -226,7 +226,7 @@ export const chrome: Translation<typeof en> = {
   'fs.seek': '動画の位置',
   'fs.prevJump': '前のジャンプ',
   'fs.nextJump': '次のジャンプ',
-  'fs.hint': '左右にスワイプして動画を動かします',
+  'fs.hint': 'スワイプで動画を動かします。タップで操作部の表示を切り替え、長押しで一時停止、下にドラッグで閉じます。',
 
   'transport.back10': '10フレーム戻る（Shift + ←）',
   'transport.prev': '前のフレーム（←）',

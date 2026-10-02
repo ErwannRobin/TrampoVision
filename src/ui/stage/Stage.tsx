@@ -17,7 +17,7 @@ import type { Point } from '../../pose/types';
 import type { SkillAnalysis } from '../../skills/analyzeSkills';
 import { drawCalibration, drawOverlay, type CalibrationDraw, type OverlayOptions } from '../../video/overlay';
 import { useElementSize } from '../hooks';
-import { Icon, Segmented } from '../kit';
+import { Icon, IconButton, Segmented } from '../kit';
 import type { Playhead } from '../playhead';
 import type { StageView } from '../types';
 import { clipOrientation, DEFAULT_RATIO, fitRatio, portraitStageWidth, splitLayout, type Box, type Size } from './fit';
@@ -99,7 +99,7 @@ const PICK_RADIUS_PX = 16;
 const SPLIT_GAP_PX = 12;
 const NO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
 /** How long the hint about swiping stays up when the full screen opens. */
-const HINT_MS = 3500;
+const HINT_MS = 5000;
 
 const viewOptions = () =>
   [
@@ -177,6 +177,8 @@ export function Stage({
   const [full, setFull] = useState(false);
   const [swiping, setSwiping] = useState(false);
   const [hint, setHint] = useState(false);
+  // A tap on the picture puts the controls away and brings them back; they are there when the full screen opens.
+  const [controls, setControls] = useState(true);
   // Only with a video and its analysis: what the full screen shows is the analysis.
   const canFull = !!fullscreen && !!url && !!result;
   const isFull = full && canFull;
@@ -194,6 +196,7 @@ export function Stage({
     const root = document.documentElement;
     root.dataset.stageFullscreen = '';
     setHint(true);
+    setControls(true);
     const timer = window.setTimeout(() => setHint(false), HINT_MS);
     const viewport = viewportRef.current;
     viewport?.querySelector<HTMLElement>('[data-fs-close]')?.focus();
@@ -224,8 +227,8 @@ export function Stage({
     setSwiping(on);
     if (on) setHint(false);
   }, []);
-  const toggleOnTap = useCallback(() => playhead.toggle(), [playhead]);
-  const scrub = useScrub({ enabled: isFull, playhead, onTap: toggleOnTap, onSwipe });
+  const toggleControls = useCallback(() => setControls((on) => !on), []);
+  const scrub = useScrub({ enabled: isFull, playhead, onTap: toggleControls, onSwipe, onExit: exitFull });
   // The labels are drawn by the full screen itself, in the page's type, where a finger does not cover them.
   const shownOverlay = useMemo(() => (isFull ? { ...overlay, hud: false } : overlay), [overlay, isFull]);
 
@@ -483,7 +486,7 @@ export function Stage({
   const editing = !!calibration?.editing;
   /** A click or a tap on the picture plays or pauses, at once; while the bed is being outlined a click places a corner instead. */
   const onFrameClick = (e: MouseEvent<HTMLDivElement>) => {
-    // The full screen has its own tap (`useScrub`), which also works on the letterbox.
+    // The full screen has its own touches (`useScrub`), which also work on the letterbox.
     if (isFull || editing || (e.target as HTMLElement).closest('.stage__pick')) return;
     playhead.toggle();
   };
@@ -631,32 +634,15 @@ export function Stage({
       )}
 
       {canFull && !isFull && !editing && (
-        <button
-          type="button"
-          className="icon-btn icon-btn--solid stage__expand"
+        <IconButton
+          className="stage__expand"
           data-fs-open
-          aria-label={t('fs.enter')}
+          icon="expand"
+          label={t('fs.enter')}
+          variant="solid"
+          tip={false}
           onClick={enterFull}
-        >
-          <svg
-            className="icon"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <polyline points="4 9 4 4 9 4" />
-            <polyline points="20 9 20 4 15 4" />
-            <polyline points="4 15 4 20 9 20" />
-            <polyline points="20 15 20 20 15 20" />
-          </svg>
-        </button>
+        />
       )}
 
       {isFull && fullscreen && (
@@ -669,7 +655,7 @@ export function Stage({
           selected={fullscreen.selected}
           onJump={fullscreen.onJump}
           onClose={exitFull}
-          swiping={swiping}
+          hidden={!controls}
           hint={hint}
         />
       )}

@@ -211,14 +211,27 @@ html[data-stage-fullscreen] .stage[data-fullscreen] {
   pointer-events: none;
 }
 .fs__top,
+.fs__bottom,
+.fs__exit {
+  transition:
+    opacity var(--t-med) var(--ease),
+    visibility var(--t-med) var(--ease);
+}
+.fs__top,
 .fs__bottom {
   display: flex;
   gap: 10px;
-  transition: opacity var(--t-med) var(--ease);
 }
 .stage[data-swiping] .fs__top,
 .stage[data-swiping] .fs__bottom {
   opacity: 0.35;
+}
+/* Put away by a tap on the picture: out of sight, out of reach of the finger and of the keyboard. */
+.fs[data-hidden] .fs__top,
+.fs[data-hidden] .fs__bottom,
+.fs[data-hidden] .fs__exit {
+  opacity: 0;
+  visibility: hidden;
 }
 .fs__top {
   align-items: flex-start;
@@ -245,6 +258,12 @@ html[data-stage-fullscreen] .stage[data-fullscreen] {
   background: rgba(12, 13, 15, 0.6);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
+}
+/* The way out sits where the button to come in was (.stage__expand). */
+.fs__exit {
+  position: absolute;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
 }
 .fs .icon-btn--primary {
   background: #fff;
@@ -292,7 +311,6 @@ html[data-stage-fullscreen] .stage[data-fullscreen] {
   font-weight: 600;
 }
 
-.fs__swipe,
 .fs__hint {
   position: absolute;
   top: 50%;
@@ -302,17 +320,12 @@ html[data-stage-fullscreen] .stage[data-fullscreen] {
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
   pointer-events: none;
 }
-.fs__swipe {
-  font-size: 44px;
-  font-weight: 600;
-  line-height: 1;
-}
 .fs__hint {
   width: max-content;
   max-width: calc(100% - 48px);
   padding: 8px 16px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: var(--r-pill);
+  border-radius: 18px;
   background: rgba(12, 13, 15, 0.6);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
