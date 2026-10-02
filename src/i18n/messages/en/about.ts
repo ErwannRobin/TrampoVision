@@ -64,6 +64,12 @@ export const about = {
   'about.related.devpost': 'BounceBoard, a project on Devpost',
   'about.external': 'Opens another site',
 
+  'about.guidesTitle': 'Guides',
+  'about.guidesText':
+    'A friendly introduction to the project, and an interactive map of how it works from video to verdict.',
+  'about.guidesIntro': 'Introduction to TrampoVision',
+  'about.guidesMap': 'Architecture map',
+
   'about.codeTitle': 'Source code',
   'about.codeText': 'TrampoVision is open on GitHub, with the tests and the notes on how each number is made.',
   'about.codeLink': 'TrampoVision on GitHub',

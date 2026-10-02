@@ -6,6 +6,8 @@ Under the hood it turns the video into a **clean, normalized time series** (skel
 
 The same explanation, written for users, is in the app: the **About** page (the info button in the top bar, or the address `#about`). It is available in English, French, German and Japanese.
 
+Two guides are also online, in the same four languages: a [friendly introduction](https://erwannrobin.github.io/TrampoVision/) and an interactive [architecture map](https://erwannrobin.github.io/TrampoVision/architecture.html) (the source of both is in [`docs/`](docs/)).
+
 ## Contents
 
 - [How it works in short](#how-it-works-in-short)
