@@ -67,6 +67,12 @@ export const about: Translation<typeof en> = {
   'about.related.devpost': 'BounceBoard, un projet sur Devpost',
   'about.external': 'Ouvre un autre site',
 
+  'about.guidesTitle': 'Pour aller plus loin',
+  'about.guidesText':
+    'Une introduction simple au projet, et une carte interactive de son fonctionnement, de la vidéo au verdict.',
+  'about.guidesIntro': 'Introduction à TrampoVision',
+  'about.guidesMap': 'Carte d’architecture',
+
   'about.codeTitle': 'Code source',
   'about.codeText':
     'TrampoVision est ouvert sur GitHub, avec les tests et les notes sur la façon dont chaque nombre est obtenu.',

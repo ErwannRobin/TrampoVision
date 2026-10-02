@@ -5,6 +5,7 @@ import { Button } from './kit';
 /** Where each link goes. The club, the FIG and the research are the ones this project points to. */
 const CLUB_URL = 'https://paristrampo12.com/';
 const FIG_URL = 'https://www.gymnastics.sport/site/rules/';
+const DOCS_URL = 'https://erwannrobin.github.io/TrampoVision/';
 const CODE_URL = 'https://github.com/ErwannRobin/TrampoVision';
 const RELATED: { url: string; label: StringKey }[] = [
   {
@@ -97,6 +98,19 @@ export function About({ onClose }: { onClose: () => void }) {
               <External href={r.url}>{t(r.label)}</External>
             </li>
           ))}
+        </ul>
+      </section>
+
+      <section className="about__section" aria-labelledby="about-guides">
+        <h2 id="about-guides">{t('about.guidesTitle')}</h2>
+        <p>{t('about.guidesText')}</p>
+        <ul>
+          <li>
+            <External href={DOCS_URL}>{t('about.guidesIntro')}</External>
+          </li>
+          <li>
+            <External href={`${DOCS_URL}architecture.html`}>{t('about.guidesMap')}</External>
+          </li>
         </ul>
       </section>
 
