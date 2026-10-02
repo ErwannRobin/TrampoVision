@@ -120,7 +120,7 @@ To add a language: add it to `LOCALES` and `LANGUAGE_NAMES` in `src/i18n/locale.
 
 ## Pipeline and code map
 
-For a visual overview, open [`docs/architecture.html`](docs/architecture.html) in a browser: an interactive map of the whole pipeline (ingestion, pose extraction, classification, scoring) with a simplified view (main flow) and a full view (options and experimental features). It needs no build; click a block for details and the files behind it.
+For a short, friendly introduction, open [`docs/index.html`](docs/index.html). For a visual overview, open [`docs/architecture.html`](docs/architecture.html) in a browser: an interactive map of the whole pipeline (ingestion, pose extraction, classification, scoring) with a simplified view (main flow) and a full view (options and experimental features). It needs no build; click a block for details and the files behind it.
 
 ```
 video ─► extractPoseTrack ─► PoseTrack ─► stabilizePose ─► computeAnalysis ─► AnalysisResult ─► analyzeSkills ─► per-jump sequence,
