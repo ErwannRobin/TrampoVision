@@ -621,7 +621,7 @@ Files: `npm run fetch-assets` downloads `yolox_s.onnx`, `rtmpose_m_halpe26.onnx`
 **What has and has not been checked.**
 
 - Checked in headless Chromium (WebAssembly): ONNX Runtime loads from the build, the real YOLOX-s finds a person in a photo (same box as the reference Python code), and the whole pipeline (detector, crop, decode, conversion to 33 landmarks) gives the exact coordinates expected from small synthetic pose models with known outputs. The decoders, the crop geometry and the point conversions have unit tests (`src/pose/onnx/onnx.test.ts`).
-- **Not checked: the real RTMPose and ViTPose files.** They could not be downloaded where this was written, so nothing says yet that they find better points than MediaPipe, or even that the real files match the assumptions: RGB input with the usual mean and standard deviation, a 1.25 padded box, SimCC output with a ratio of 2 (RTMPose); heatmap output `[1, 17, 64, 48]` (ViTPose). The ViTPose download URL is from memory. The WebGPU path was not run (no GPU here). Try both on a clip where MediaPipe fails and compare the skeletons before trusting either.
+- **Result: inconclusive.** The real RTMPose and ViTPose files were tried and did not give a clear gain over MediaPipe, so MediaPipe stays the default. They are kept as an experiment for future research, not as a recommended option. Treat the assumptions below as unverified: RGB input with the usual mean and standard deviation, a 1.25 padded box, SimCC output with a ratio of 2 (RTMPose); heatmap output `[1, 17, 64, 48]` (ViTPose). The WebGPU path was not run.
 - The scores are not on MediaPipe's scale. The analysis ignores points under 0.4, which may be too strict or too lax for these models.
 - 2D only: no 3D landmarks, so no twist estimate (see "3D pose and twist"). The person detector runs on every analyzed frame, so these engines are slower than MediaPipe, and ViTPose-B is a large file (hundreds of MB unless a quantized export is used).
 
@@ -635,3 +635,7 @@ Every deployment stores a copy of the build output, and the big files were most 
 4. After upgrading `@mediapipe/tasks-vision` or `@ffmpeg/core`, run the upload again: each version gets its own folder, and a missing folder fails to load instead of mixing versions.
 
 The trade-off: the app now needs the network for its first analysis (the browser caches the files after that). The cross-origin loading was tested with a local second-origin host in Chromium (wasm, model, sample and ffmpeg wasm all loaded); the upload script is untested against a real store.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Models, libraries, the FIG rules and the optional Jev API keep their own terms: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
