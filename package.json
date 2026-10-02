@@ -2,6 +2,15 @@
   "name": "trampovision",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
+  "author": "Erwann Robin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ErwannRobin/TrampoVision.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ErwannRobin/TrampoVision/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

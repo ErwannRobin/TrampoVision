@@ -10,3 +10,4 @@ public/models
 .vercel
 .env*
 /video-sample/
+.claude/
