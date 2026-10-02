@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SCRUB_REFERENCE_PX, SCRUB_SPAN_S, scrubTime } from './scrub';
+import { DOUBLE_TAP_JUMP_S, SCRUB_REFERENCE_PX, SCRUB_SPAN_S, jumpTime, scrubTime, tapSide } from './scrub';
 
 describe('scrubTime', () => {
   it('moves forward when the finger goes right and back when it goes left', () => {
@@ -26,5 +26,48 @@ describe('scrubTime', () => {
     expect(scrubTime(3, 100, 390, 0)).toBe(3);
     expect(scrubTime(3, 100, 390, NaN)).toBe(3);
     expect(Number.isFinite(scrubTime(3, 100, 0, 20))).toBe(true);
+  });
+});
+
+describe('tapSide', () => {
+  it('goes back on the left third and forward on the right third', () => {
+    expect(tapSide(10, 0, 390)).toBe('back');
+    expect(tapSide(129, 0, 390)).toBe('back');
+    expect(tapSide(381, 0, 390)).toBe('forward');
+    expect(tapSide(261, 0, 390)).toBe('forward');
+  });
+
+  it('leaves the middle third to the single tap', () => {
+    expect(tapSide(195, 0, 390)).toBeNull();
+    expect(tapSide(131, 0, 390)).toBeNull();
+    expect(tapSide(259, 0, 390)).toBeNull();
+  });
+
+  it('counts from the left edge of the picture, not of the screen', () => {
+    expect(tapSide(110, 100, 390)).toBe('back');
+    expect(tapSide(295, 100, 390)).toBeNull();
+    expect(tapSide(480, 100, 390)).toBe('forward');
+  });
+
+  it('copes with a picture of no width', () => {
+    expect(tapSide(5, 0, 0)).toBeNull();
+    expect(tapSide(5, 0, NaN)).toBeNull();
+  });
+});
+
+describe('jumpTime', () => {
+  it('jumps a few seconds each way', () => {
+    expect(jumpTime(10, 'forward', 30)).toBe(10 + DOUBLE_TAP_JUMP_S);
+    expect(jumpTime(10, 'back', 30)).toBe(10 - DOUBLE_TAP_JUMP_S);
+  });
+
+  it('stops at the ends of the clip', () => {
+    expect(jumpTime(1, 'back', 30)).toBe(0);
+    expect(jumpTime(29, 'forward', 30)).toBe(30);
+  });
+
+  it('copes with a clip of no known length', () => {
+    expect(jumpTime(4, 'forward', 0)).toBe(4);
+    expect(jumpTime(4, 'back', NaN)).toBe(4);
   });
 });

@@ -24,7 +24,8 @@ import { createClockVideo } from './clockVideo';
 import { FullscreenHud } from './FullscreenHud';
 import type { HudJump } from './hud';
 import { createPlayer } from './player';
-import { useScrub } from './scrub';
+import { DOUBLE_TAP_JUMP_S, jumpTime, useScrub, type TapSide } from './scrub';
+import { isZoomed, overlayScale, useZoom } from './zoom';
 
 export interface StageProps {
   /** The video; null when only saved data is open (the stage then invites the user to add the matching clip). */
@@ -99,6 +100,8 @@ const SPLIT_GAP_PX = 12;
 const NO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
 /** How long the hint about swiping stays up when the full screen opens. */
 const HINT_MS = 5000;
+/** How long the jump of a double tap stays shown. */
+const JUMP_FX_MS = 700;
 
 const viewOptions = () =>
   [
@@ -112,6 +115,18 @@ function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el) return false;
   return /^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(el.tagName) || el.isContentEditable;
+}
+
+/** What a double tap did, on the side it was on: the seconds of the run of taps so far. */
+function JumpFeedback({ side, seconds }: { side: TapSide; seconds: number }) {
+  return (
+    <div className="stage__jump" data-side={side} aria-hidden="true">
+      <span className="num">
+        {side === 'forward' ? '+' : '−'}
+        {seconds} s
+      </span>
+    </div>
+  );
 }
 
 /**
@@ -144,6 +159,7 @@ export function Stage({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const playerRef = useRef<ReturnType<typeof createPlayer> | null>(null);
   const dragging = useRef<number | null>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const dirty = useRef(true);
   // What the video says its frames measure. Only valid for the clip it was read from.
   const [videoSize, setVideoSize] = useState<{ url: string; width: number; height: number } | null>(null);
@@ -170,6 +186,16 @@ export function Stage({
     onClipSize?.(clipWidth > 0 && clipHeight > 0 ? { width: clipWidth, height: clipHeight } : null);
     return () => onClipSize?.(null);
   }, [onClipSize, clipWidth, clipHeight]);
+  // The page sizes a stage that is above its results (a phone upright) to the shape of the clip, and its pinned bar and its scroll
+  // margins with it: they all need the ratio, so it is on the root (see live.css).
+  useLayoutEffect(() => {
+    if (!(clipWidth > 0 && clipHeight > 0)) return;
+    const root = document.documentElement;
+    root.style.setProperty('--clip-ratio', String(clipWidth / clipHeight));
+    return () => {
+      root.style.removeProperty('--clip-ratio');
+    };
+  }, [clipWidth, clipHeight]);
 
   // The full screen: the same stage, fixed over the page (the <video> is never remounted), and the browser's own full screen where it has one.
   const [full, setFull] = useState(false);
@@ -230,13 +256,54 @@ export function Stage({
   // The same touches work on the picture in the page and in the full screen: a swipe moves the video, a hold pauses it. A tap plays
   // or pauses in the page (the full screen puts its controls away instead), and only the full screen has a way out to drag to.
   const calibrating = !!calibration?.editing;
+  const touchable = isFull || (!calibrating && (!!url || !!result));
+  // A double tap on the left or right of the picture jumps a few seconds; the total of a run of taps is shown there for a moment.
+  const [jumpFx, setJumpFx] = useState<{ side: TapSide; total: number; id: number } | null>(null);
+  const jumpTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(jumpTimer.current), []);
+  const onDoubleTap = useCallback(
+    (side: TapSide) => {
+      playhead.seek(jumpTime(playhead.getSnapshot(), side, playhead.getDuration()));
+      setJumpFx((prev) => ({
+        side,
+        total: prev?.side === side ? prev.total + DOUBLE_TAP_JUMP_S : DOUBLE_TAP_JUMP_S,
+        id: (prev?.id ?? 0) + 1,
+      }));
+      window.clearTimeout(jumpTimer.current);
+      jumpTimer.current = window.setTimeout(() => setJumpFx(null), JUMP_FX_MS);
+    },
+    [playhead],
+  );
   const scrub = useScrub({
-    enabled: isFull || (!calibrating && (!!url || !!result)),
+    enabled: touchable,
     playhead,
     onTap: isFull ? toggleControls : togglePlay,
     onSwipe,
+    onDoubleTap,
     onExit: isFull ? exitFull : undefined,
   });
+  // Two fingers enlarge the picture and move it: the full screen and the page each start from the whole picture.
+  const zoom = useZoom({ enabled: touchable, frameRef, resetKey: `${url ?? ''}|${isFull}|${result ? 1 : 0}` });
+  const zoomed = isZoomed(zoom.view);
+  const touches = {
+    onPointerDown: (e: PointerEvent<HTMLElement>) => {
+      scrub.onPointerDown(e);
+      zoom.handlers.onPointerDown(e);
+    },
+    onPointerMove: (e: PointerEvent<HTMLElement>) => {
+      scrub.onPointerMove(e);
+      zoom.handlers.onPointerMove(e);
+    },
+    onPointerUp: (e: PointerEvent<HTMLElement>) => {
+      scrub.onPointerUp(e);
+      zoom.handlers.onPointerUp(e);
+    },
+    onPointerCancel: (e: PointerEvent<HTMLElement>) => {
+      scrub.onPointerCancel(e);
+      zoom.handlers.onPointerCancel(e);
+    },
+    onContextMenu: scrub.onContextMenu,
+  };
   // The labels are drawn by the full screen itself, in the page's type, where a finger does not cover them.
   const shownOverlay = useMemo(() => (isFull ? { ...overlay, hud: false } : overlay), [overlay, isFull]);
 
@@ -266,6 +333,7 @@ export function Stage({
     box: layout.video,
     hidden: layout.hidden,
     others,
+    zoom: zoom.view.zoom,
   });
   live.current = {
     result,
@@ -276,10 +344,11 @@ export function Stage({
     box: layout.video,
     hidden: layout.hidden,
     others,
+    zoom: zoom.view.zoom,
   };
   useEffect(() => {
     dirty.current = true;
-  }, [result, skills, shownOverlay, calibration, layout.video, layout.hidden, others]);
+  }, [result, skills, shownOverlay, calibration, layout.video, layout.hidden, others, zoom.view.zoom]);
 
   // The player bus: everything else in the interface drives the video through these.
   useEffect(() => {
@@ -346,9 +415,18 @@ export function Stage({
       playhead.setTime(clock.currentTime);
       player.tick();
       const canvas = canvasRef.current;
-      const { result: res, skills: sk, overlay: opts, calibration: cal, box, hidden, others: more } = live.current;
+      const {
+        result: res,
+        skills: sk,
+        overlay: opts,
+        calibration: cal,
+        box,
+        hidden,
+        others: more,
+        zoom: z,
+      } = live.current;
       if (canvas && res) {
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = overlayScale(window.devicePixelRatio || 1, z);
         const w = Math.round(box.width * dpr);
         const h = Math.round(box.height * dpr);
         if (canvas.width !== w || canvas.height !== h) {
@@ -398,8 +476,17 @@ export function Stage({
       if (video && canvas) {
         playhead.setTime(video.currentTime);
         playerRef.current?.tick();
-        const { result: res, skills: sk, overlay: opts, calibration: cal, box, hidden, others: more } = live.current;
-        const dpr = window.devicePixelRatio || 1;
+        const {
+          result: res,
+          skills: sk,
+          overlay: opts,
+          calibration: cal,
+          box,
+          hidden,
+          others: more,
+          zoom: z,
+        } = live.current;
+        const dpr = overlayScale(window.devicePixelRatio || 1, z);
         const w = Math.round(box.width * dpr);
         const h = Math.round(box.height * dpr);
         if (canvas.width !== w || canvas.height !== h) {
@@ -497,6 +584,9 @@ export function Stage({
   // In the wide layout a portrait clip has a stage of its own width (shell.css) instead of a black one: it says how wide.
   // The stage says how wide the video is at its height (any clip): the page uses it where the stage has a column of its own.
   const videoWidth = portraitStageWidth(ratio, size.height);
+  const zoomStyle: CSSProperties | undefined = zoomed
+    ? { transform: `translate(${zoom.view.x}px, ${zoom.view.y}px) scale(${zoom.view.zoom})` }
+    : undefined;
 
   return (
     <div
@@ -506,58 +596,68 @@ export function Stage({
       aria-label={t('stage.region')}
       data-fullscreen={isFull || undefined}
       data-swiping={swiping || undefined}
-      {...(isFull ? scrub : null)}
+      {...(isFull ? touches : null)}
       style={videoWidth > 0 ? ({ '--stage-w': `${videoWidth}px` } as CSSProperties) : undefined}
     >
       {url ? (
         <div
           className="stage__frame"
+          ref={frameRef}
           data-hidden={layout.hidden || undefined}
+          data-zoomed={zoomed || undefined}
           style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height }}
-          {...(isFull ? null : scrub)}
+          {...(isFull ? null : touches)}
         >
-          <video
-            ref={videoRef}
-            className="stage__video"
-            src={url}
-            muted
-            playsInline
-            preload="auto"
-            onLoadedMetadata={(e) => {
-              const { videoWidth: w, videoHeight: h, duration } = e.currentTarget;
-              if (w && h) setVideoSize({ url, width: w, height: h });
-              e.currentTarget.playbackRate = speed;
-              playhead.setDuration(duration);
-            }}
-            onDurationChange={(e) => playhead.setDuration(e.currentTarget.duration)}
-            onPlay={() => playhead.setPlaying(true)}
-            onPause={() => {
-              // Playing backwards keeps the video paused on purpose: the player is still "playing".
-              if (playerRef.current?.isReversing()) return;
-              playhead.setPlaying(false);
-              playerRef.current?.clearRange();
-            }}
-            onEnded={() => playhead.setPlaying(false)}
-            onError={() => onError(t('stage.cannotPlay'))}
-          />
-          <canvas
-            ref={canvasRef}
-            className={editing ? 'stage__overlay stage__overlay--editing' : 'stage__overlay'}
-            aria-hidden="true"
-            onPointerDown={onCanvasDown}
-            onPointerMove={onCanvasMove}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
-          />
+          <div className="stage__zoom" style={zoomStyle}>
+            <video
+              ref={videoRef}
+              className="stage__video"
+              src={url}
+              muted
+              playsInline
+              preload="auto"
+              onLoadedMetadata={(e) => {
+                const { videoWidth: w, videoHeight: h, duration } = e.currentTarget;
+                if (w && h) setVideoSize({ url, width: w, height: h });
+                e.currentTarget.playbackRate = speed;
+                playhead.setDuration(duration);
+              }}
+              onDurationChange={(e) => playhead.setDuration(e.currentTarget.duration)}
+              onPlay={() => playhead.setPlaying(true)}
+              onPause={() => {
+                // Playing backwards keeps the video paused on purpose: the player is still "playing".
+                if (playerRef.current?.isReversing()) return;
+                playhead.setPlaying(false);
+                playerRef.current?.clearRange();
+              }}
+              onEnded={() => playhead.setPlaying(false)}
+              onError={() => onError(t('stage.cannotPlay'))}
+            />
+            <canvas
+              ref={canvasRef}
+              className={editing ? 'stage__overlay stage__overlay--editing' : 'stage__overlay'}
+              aria-hidden="true"
+              onPointerDown={onCanvasDown}
+              onPointerMove={onCanvasMove}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+            />
+          </div>
+          {jumpFx && <JumpFeedback key={jumpFx.id} side={jumpFx.side} seconds={jumpFx.total} />}
         </div>
       ) : result ? (
         <div
           className="stage__frame stage__frame--data"
+          ref={frameRef}
           data-hidden={layout.hidden || undefined}
+          data-zoomed={zoomed || undefined}
           style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height }}
-          {...(isFull ? null : scrub)}
+          {...(isFull ? null : touches)}
         >
-          <canvas ref={canvasRef} className="stage__overlay" aria-hidden="true" />
+          <div className="stage__zoom" style={zoomStyle}>
+            <canvas ref={canvasRef} className="stage__overlay" aria-hidden="true" />
+          </div>
+          {jumpFx && <JumpFeedback key={jumpFx.id} side={jumpFx.side} seconds={jumpFx.total} />}
           <label className="btn btn--secondary stage__pick stage__pick--corner" data-stage-control>
             <Icon name="upload" size={17} />
             {t('stage.choose')}
@@ -634,6 +734,20 @@ export function Stage({
             )}
           />
         </div>
+      )}
+
+      {zoomed && (
+        <button
+          type="button"
+          className="stage__zoom-reset"
+          data-stage-control
+          aria-label={t('stage.zoomReset')}
+          title={t('stage.zoomReset')}
+          onClick={zoom.reset}
+        >
+          <Icon name="search" size={15} />
+          <span className="num">{zoom.view.zoom.toFixed(1)}×</span>
+        </button>
       )}
 
       {canFull && !isFull && !editing && (

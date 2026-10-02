@@ -225,6 +225,7 @@ export const chrome: Translation<typeof en> = {
   'stage.view3d': '3D',
   'stage.view3dTitle': 'Le squelette 3D seul (expérimental)',
   'stage.noVideo': 'Une analyse enregistrée n’a pas de vidéo',
+  'stage.zoomReset': 'Revenir à l’image entière',
   'fs.enter': 'Plein écran',
   'fs.exit': 'Quitter le plein écran',
   'fs.jump': 'Saut {n} sur {total}',
@@ -232,7 +233,7 @@ export const chrome: Translation<typeof en> = {
   'fs.prevJump': 'Saut précédent',
   'fs.nextJump': 'Saut suivant',
   'fs.hint':
-    'Glissez pour parcourir la vidéo. Touchez pour afficher ou masquer les commandes. Maintenez pour mettre en pause.',
+    'Glissez pour parcourir la vidéo. Touchez pour afficher ou masquer les commandes. Maintenez pour mettre en pause. Touchez deux fois un côté pour sauter. Pincez pour zoomer. Glissez vers le bas pour quitter.',
 
   'transport.back10': 'Reculer de 10 images (Maj + ←)',
   'transport.prev': 'Image précédente (←)',

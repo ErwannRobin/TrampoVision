@@ -119,9 +119,14 @@ wide (>= 1100px)                      narrow, live view with results
 - `.workspace__stage` is transparent and gives the stage a definite size. The stage draws its own black rounded viewport.
 - `.workspace__dock` and `.workspace__rail` are `.sheet`s (the shell adds the surface and the padding).
 - The workspace is exactly one viewport tall on wide screens (the video, the timeline and the transport are always
-  visible; the rail scrolls). Below 1100px the page scrolls; the stage is 58dvh tall, full-bleed on phones.
+  visible; the rail scrolls). Below 1100px the page scrolls; the stage is at most 58dvh tall (60dvh on phones), full-bleed on
+  phones, and **as tall as the clip is at that width when that is less** (`--stage-fit`, from the clip's ratio, which `Stage` puts on
+  the root as `--clip-ratio`): a wide clip on an upright phone has no black bars above and below, and the page under it comes up the
+  screen. The floor is what the ready card and the progress need (200px at the least). No clip yet, or the 3D pane in the stage
+  (`:has(.stage__pane)`), and the stage keeps its full height; a portrait clip is as tall as before (the cap wins). The pinned
+  mini-player below uses the same fit.
 - Narrow, live view, once there is a result: the video stays in view while the results scroll past it. Upright (at least 521px
-  tall) it is a mini-player: the stage (28dvh on a phone, 34dvh wider; `--pin-stage`) and the transport (one slim row: play, frame
+  tall) it is a mini-player: the stage (at most 28dvh on a phone, 34dvh wider, and no taller than the clip; `--pin-stage`) and the transport (one slim row: play, frame
   steps, time, speed; `--pin-bar`) are `position: sticky` at the top. On its side (landscape, at most 520px tall) the stage is the
   left column, as tall as the screen, and the transport, the timeline and the skills scroll in the right one. Nothing moves in the
   DOM (the `<video>` is never remounted): the dock gives up its box (`display: contents`) so that the timeline scrolls on its own,
@@ -244,6 +249,18 @@ Files: `Stage.tsx`, `Transport.tsx`, `ProcessingOverlay.tsx`, `CalibrationBar.ts
   moves the video, a long press pauses it until the finger lifts, and a tap plays or pauses (the controls are in the page, so there
   are none to put away). A mouse swipes and clicks but a held button is a slow click, not a long press. Only the full screen has the
   drag down; in the page a vertical drag is the page scrolling (`touch-action: pan-y`).
+  **A double tap on the left third goes back, on the right third forward, `DOUBLE_TAP_JUMP_S` (3 s)**, in the page and in the full
+  screen (`onDoubleTap`; `tapSide`, `jumpTime`): a further tap on the same side within `DOUBLE_TAP_MS` goes on (the seconds of the run
+  are shown on that side for a moment, `.stage__jump`). The middle third has no double tap, so a tap there never waits; a tap on a side
+  waits `DOUBLE_TAP_MS` to see if a second follows (a swipe that starts in that time drops it). A mouse has none: a click is at once.
+  **Two fingers enlarge the picture and move it** (`useZoom`, `ui/stage/zoom.ts`): up to `MAX_ZOOM` (5x), around where the fingers are
+  (`pinchView`), the picture never leaves its frame, and a pinch that ends below 1.05x snaps back. One finger still moves the video,
+  so a coach can step through a jump while it is enlarged; a second finger drops the swipe or the hold that had begun. The video and
+  the overlay are in one layer (`.stage__zoom`) that takes the transform, and the overlay is drawn at the zoom's resolution
+  (`overlayScale`, at most 4 times a pixel) so the skeleton stays sharp. Enlarged, the frame is `touch-action: none` (so the browser
+  does not scroll with two fingers), a chip with the zoom (`.stage__zoom-reset`) brings the whole picture back, and the zoom starts
+  again with a new clip, the full screen and back. A laptop's trackpad pinch (a wheel with Control) does the same. Off while the bed
+  is outlined.
 - `view`: `video` (default), `split` (video and `pane` side by side when the viewport is wide, stacked when tall),
   `3d` (the `pane` fills it; keep the `<video>` mounted but hidden so playback and seeking continue). When `onView` is
   given, show a small translucent segmented switcher (video, split, cube icons) at the top right of the viewport.

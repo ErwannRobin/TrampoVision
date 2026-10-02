@@ -98,6 +98,12 @@ const ICONS = {
       <line x1="18" y1="6" x2="6" y2="18" />
     </>
   ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <line x1="16" y1="16" x2="20" y2="20" />
+    </>
+  ),
   expand: (
     <>
       <polyline points="4 9 4 4 9 4" />

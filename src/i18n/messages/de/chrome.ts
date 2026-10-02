@@ -225,6 +225,7 @@ export const chrome: Translation<typeof en> = {
   'stage.view3d': '3D',
   'stage.view3dTitle': 'Nur das 3D-Skelett (experimentell)',
   'stage.noVideo': 'Eine gespeicherte Analyse enthält kein Video',
+  'stage.zoomReset': 'Zoom zurücksetzen',
   'fs.enter': 'Vollbild',
   'fs.exit': 'Vollbild schließen',
   'fs.jump': 'Sprung {n} von {total}',
@@ -232,7 +233,7 @@ export const chrome: Translation<typeof en> = {
   'fs.prevJump': 'Vorheriger Sprung',
   'fs.nextJump': 'Nächster Sprung',
   'fs.hint':
-    'Wischen, um durch das Video zu gehen. Tippen blendet die Bedienelemente ein oder aus. Gedrückt halten pausiert.',
+    'Wischen, um durch das Video zu gehen. Tippen blendet die Bedienelemente ein oder aus. Gedrückt halten pausiert. Doppeltippen auf eine Seite springt. Zwei Finger zoomen. Nach unten ziehen beendet.',
 
   'transport.back10': '10 Bilder zurück (Umschalt + ←)',
   'transport.prev': 'Vorheriges Bild (←)',

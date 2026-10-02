@@ -17,6 +17,18 @@
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  /* The picture enlarged by a pinch stays inside its frame. */
+  overflow: hidden;
+}
+/* Enlarged, two fingers move the picture: the browser must not scroll the page with them. */
+.stage__frame[data-zoomed] {
+  touch-action: none;
+}
+/* What a pinch enlarges: the video and what is drawn on it, together. */
+.stage__zoom {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
 }
 .stage__frame[data-hidden] {
   visibility: hidden;
@@ -55,6 +67,75 @@
   pointer-events: auto;
   cursor: crosshair;
   touch-action: none;
+}
+
+/* What a double tap did: the seconds jumped, on the side tapped. */
+.stage__jump {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: grid;
+  width: 34%;
+  place-items: center;
+  color: #fff;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  animation: stage-jump 700ms var(--ease) both;
+}
+.stage__jump[data-side='back'] {
+  left: 0;
+  background: radial-gradient(ellipse at left center, rgba(255, 255, 255, 0.22), transparent 75%);
+}
+.stage__jump[data-side='forward'] {
+  right: 0;
+  background: radial-gradient(ellipse at right center, rgba(255, 255, 255, 0.22), transparent 75%);
+}
+@keyframes stage-jump {
+  from {
+    opacity: 0;
+  }
+  12%,
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Back to the whole picture. */
+.stage__zoom-reset {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(12, 13, 15, 0.6);
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.stage__zoom-reset:hover {
+  background: rgba(12, 13, 15, 0.8);
+  color: #fff;
+}
+/* The bar of the full screen is at the bottom: the chip goes to the middle of the side. */
+.stage[data-fullscreen] .stage__zoom-reset {
+  top: 50%;
+  bottom: auto;
+  left: max(12px, env(safe-area-inset-left));
+  transform: translateY(-50%);
 }
 
 /* The 3D pane keeps the page's colors: its drawing reads the theme tokens. */

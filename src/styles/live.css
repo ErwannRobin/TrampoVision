@@ -621,7 +621,7 @@
   :root:has(.app[data-mode='live'] .tl) {
     --pin-pad: var(--gutter);
     --pin-top: env(safe-area-inset-top, 0px);
-    --pin-stage: clamp(200px, 34dvh, 440px);
+    --pin-stage: clamp(200px, min(34dvh, var(--stage-fit)), 440px);
     /* What is pinned above the transport (nothing, when the video has a column of its own) and the transport's height. */
     --pin-above: var(--pin-stage);
     --pin-bar: 52px;
@@ -795,7 +795,7 @@
 @media (max-width: 640px) and (min-height: 521px) {
   :root:has(.app[data-mode='live'] .tl) {
     --pin-pad: 8px;
-    --pin-stage: clamp(180px, 28dvh, 420px);
+    --pin-stage: clamp(180px, min(28dvh, var(--stage-fit)), 420px);
   }
   .app[data-mode='live'] .workspace:has(.tl) .transport {
     padding-inline: calc(var(--pin-pad) + 4px);
