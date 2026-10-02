@@ -4,7 +4,7 @@ import { t } from '../i18n/core';
 /**
  * The sample videos are not part of the build (they would be copied into every deployment). They are read from the
  * asset host (samples/, see src/assets.ts), and only one is fetched, when requested. The list is not hard-coded:
- * `npm run upload-assets` writes samples/index.json (the file names in the store), read once at startup. Files that
+ * `npm run assets-upload` writes samples/index.json (the file names in the store), read once at startup. Files that
  * share a name and differ by extension are one clip (IMG_8368.mp4 and IMG_8368.MOV), and the browser gets the one it
  * decodes natively: the iPhone .mov in Safari, the H.264 .mp4 elsewhere (desktop Chrome cannot decode the HEVC .mov
  * without a slow in-browser conversion). Without an asset host, or without that index, there is no sample and the

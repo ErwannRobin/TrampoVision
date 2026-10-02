@@ -1,8 +1,8 @@
-// Shared by upload-assets.mjs and remove-asset.mjs: the token, the listing of the Blob store and the samples index.
+// Shared by assets-upload.mjs, asset-remove.mjs and assets-remove.mjs: the token, the listing of the Blob store and the samples index.
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { list, put } from '@vercel/blob';
+import { del, list, put } from '@vercel/blob';
 
 export const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -55,4 +55,19 @@ export async function writeSampleIndex(tag) {
     cacheControlMaxAge: 60, // the one file that changes: a new sample shows up within a minute
   });
   console.log(`[${tag}] samples/index.json -> ${files.length} sample file(s)`);
+}
+
+/** Prints, then deletes (unless dryRun) the given pathnames of `blobs`, and refreshes the samples index when a sample went. */
+export async function deleteFromStore(blobs, targets, dryRun) {
+  for (const pathname of targets) {
+    console.log(
+      `[remove] ${dryRun ? 'would delete' : 'deleting'} ${pathname} (${(blobs.get(pathname).size / 1e6).toFixed(1)} MB)`,
+    );
+  }
+  if (dryRun) return;
+  await del([...targets].map((p) => blobs.get(p).url));
+  if ([...targets].some((p) => p.startsWith('samples/'))) await writeSampleIndex('remove');
+  console.log(
+    `[remove] done. Anything cached by a browser or the CDN (a year for the files) can outlive the delete for a while.`,
+  );
 }

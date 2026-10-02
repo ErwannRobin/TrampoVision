@@ -1,8 +1,8 @@
 .DEFAULT_GOAL := help
-.PHONY: icons consistency eval jev-eval eval-fetch label-sheet worker-schema worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets upload-assets remove-asset precompute-samples convert clean distclean
+.PHONY: icons consistency eval jev-eval eval-fetch label-sheet worker-schema worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets assets-upload asset-remove assets-remove precompute-samples convert clean distclean
 
 help: ## Show this help
-	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 node_modules: package.json package-lock.json
 	npm ci
@@ -42,12 +42,22 @@ check: typecheck worker-check lint format-check test ## Typecheck, lint, format 
 assets: node_modules ## Re-download MediaPipe runtime + pose models into public/
 	npm run fetch-assets
 
-upload-assets: node_modules ## Upload models, wasm and samples to the Blob asset host: [SAMPLES=dir] [DRY_RUN=1] [FORCE=1] (skips what is already there; token from BLOB_READ_WRITE_TOKEN, .env.local or .env)
-	npm run upload-assets -- $(if $(SAMPLES),--samples $(SAMPLES)) $(if $(DRY_RUN),--dry-run) $(if $(FORCE),--force)
+assets-upload: node_modules ## Upload models, wasm and samples to the Blob asset host: [SAMPLES=dir] [DRY_RUN=1] [FORCE=1] (skips what is already there; token from BLOB_READ_WRITE_TOKEN, .env.local or .env)
+	npm run assets-upload -- $(if $(SAMPLES),--samples $(SAMPLES)) $(if $(DRY_RUN),--dry-run) $(if $(FORCE),--force)
 
-remove-asset: node_modules ## Delete from the Blob asset host: ASSET="path-in-store or sample name ..." [DRY_RUN=1] (a sample name without extension removes its .mp4 and .MOV)
-	@test -n "$(ASSET)" || { echo 'usage: make remove-asset ASSET=synchro.mp4 [DRY_RUN=1]'; exit 1; }
-	npm run remove-asset -- $(ASSET) $(if $(DRY_RUN),--dry-run)
+asset-remove: node_modules ## Delete files from the Blob asset host: make asset-remove NAME... [DRY_RUN=1] (a store path, or a sample name; without extension it removes the clip: .mp4, .MOV and .pose.json)
+	@test -n "$(ASSET_NAMES)" || { echo 'usage: make asset-remove synchro.mp4 [other ...] [DRY_RUN=1]'; exit 1; }
+	npm run asset-remove -- $(ASSET_NAMES) $(if $(DRY_RUN),--dry-run)
+
+assets-remove: node_modules ## Delete a kind of asset from the Blob asset host, after a confirmation: [WHAT=videos|samples|models|wasm|all] [YES=1] [DRY_RUN=1] (no WHAT: asks; videos = sample videos only, samples = videos + analysis)
+	npm run assets-remove -- $(WHAT) $(if $(YES),--yes) $(if $(DRY_RUN),--dry-run)
+
+# `make asset-remove synchro.mp4`: the other words of the command line are the names, not targets
+ifneq ($(filter asset-remove,$(MAKECMDGOALS)),)
+ASSET_NAMES := $(filter-out asset-remove,$(MAKECMDGOALS))
+$(ASSET_NAMES):
+	@:
+endif
 
 precompute-samples: node_modules ## Analyze the sample videos once so the app skips the pose model: [SAMPLES=dir] [FORCE=1] (needs Google Chrome; installs playwright-core if missing)
 	@test -d node_modules/playwright-core || npm i --no-save playwright-core

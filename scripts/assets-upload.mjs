@@ -1,9 +1,9 @@
 // Uploads the big files to a public Vercel Blob store, so the deployment does not carry them (see src/assets.ts).
 //
-//   npm run upload-assets                                      upload everything (token from BLOB_READ_WRITE_TOKEN, else .env.local, else .env)
-//   npm run upload-assets -- --force                           also re-upload what is already in the store (by default it is skipped)
-//   npm run upload-assets -- --dry-run                         list what would be uploaded
-//   npm run upload-assets -- --samples path/to/videos          folder with IMG_8368.mp4, IMG_8368.MOV and dong-dong-2011-landscape.mp4 (default: video-sample/)
+//   npm run assets-upload                                      upload everything (token from BLOB_READ_WRITE_TOKEN, else .env.local, else .env)
+//   npm run assets-upload -- --force                           also re-upload what is already in the store (by default it is skipped)
+//   npm run assets-upload -- --dry-run                         list what would be uploaded
+//   npm run assets-upload -- --samples path/to/videos          folder with IMG_8368.mp4, IMG_8368.MOV and dong-dong-2011-landscape.mp4 (default: video-sample/)
 //
 // Layout under the store (what the app reads):
 //   models/pose_landmarker_{lite,full,heavy}.task

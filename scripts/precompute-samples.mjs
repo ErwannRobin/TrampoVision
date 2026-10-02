@@ -7,7 +7,7 @@
 // It drives the real app in headless Chrome (advanced mode, "Save analysis (JSON)" of the Export menu), so the file is
 // exactly what a person would save, and the pose model, the video decoding and the settings are the app's own.
 // Needs `npm i --no-save playwright-core` and Google Chrome (CHROME_PATH to point elsewhere than the macOS default).
-// Then `make upload-assets` sends the .pose.json files next to the videos.
+// Then `make assets-upload` sends the .pose.json files next to the videos.
 // The file holds the pose landmarks only: the skills, the scores and the tips are computed again in the app, so a
 // change of the scoring needs no new run. Run it again when the pose model or its settings change.
 import { spawn } from 'node:child_process';
