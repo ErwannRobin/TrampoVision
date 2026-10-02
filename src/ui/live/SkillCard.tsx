@@ -6,6 +6,7 @@ import type { LiveJump } from '../../coaching/session';
 import { jumpName as nameOf } from '../../coaching/display';
 import { deductionText, difficultyText } from '../../coaching/summary';
 import { Button, Disclosure, Icon, cx } from '../kit';
+import { useRangeButton } from '../playhead';
 import { ElementPicker } from './ElementPicker';
 
 /** The deductions a person can give a skill, in points (§20.1: 0.0 to 0.5). */
@@ -123,6 +124,7 @@ export function SkillRow({
 
 function CallBlock({ jump, actions }: { jump: LiveJump; actions: SkillActions }) {
   const [changing, setChanging] = useState(false);
+  const play = useRangeButton('skill', actions.onPlay);
   const e = jump.element;
   const disabled = !actions.canLabel;
   const pick = (id: string) => {
@@ -159,12 +161,12 @@ function CallBlock({ jump, actions }: { jump: LiveJump; actions: SkillActions })
         <Button
           size="sm"
           variant="ghost"
-          icon="play"
+          icon={play.playing ? 'pause' : 'play'}
           className="live-actions__play"
-          title={t('live.playTitle')}
-          onClick={actions.onPlay}
+          title={play.playing ? t('transport.pause') : t('live.playTitle')}
+          onClick={play.press}
         >
-          {t('common.play')}
+          {play.playing ? t('transport.pause') : t('common.play')}
         </Button>
       </div>
       {changing && (
@@ -354,6 +356,7 @@ function TipsBlock({ jump }: { jump: LiveJump }) {
 
 /** The selected skill in full: what it was and whether that is right, how hard it is, what the pose earns, and what to fix. */
 export function SkillDetail({ jump, actions }: { jump: LiveJump; actions: SkillActions }) {
+  const play = useRangeButton('skill-partial', actions.onPlay);
   return (
     <div className="live-detail">
       {jump.complete ? (
@@ -368,8 +371,8 @@ export function SkillDetail({ jump, actions }: { jump: LiveJump; actions: SkillA
         <>
           <p className="live-quiet">{t('live.clipCutsSkill')}</p>
           <div className="live-actions">
-            <Button size="sm" icon="play" onClick={actions.onPlay}>
-              {t('common.play')}
+            <Button size="sm" icon={play.playing ? 'pause' : 'play'} onClick={play.press}>
+              {play.playing ? t('transport.pause') : t('common.play')}
             </Button>
           </div>
         </>

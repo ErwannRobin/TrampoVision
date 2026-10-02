@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type MouseEvent,
   type PointerEvent,
   type ReactNode,
 } from 'react';
@@ -20,7 +19,7 @@ import { useElementSize } from '../hooks';
 import { Icon, IconButton, Segmented } from '../kit';
 import type { Playhead } from '../playhead';
 import type { StageView } from '../types';
-import { clipOrientation, DEFAULT_RATIO, fitRatio, portraitStageWidth, splitLayout, type Box, type Size } from './fit';
+import { DEFAULT_RATIO, fitRatio, portraitStageWidth, splitLayout, type Box, type Size } from './fit';
 import { createClockVideo } from './clockVideo';
 import { FullscreenHud } from './FullscreenHud';
 import type { HudJump } from './hud';
@@ -167,7 +166,6 @@ export function Stage({
   const clipWidth = fromVideo?.width ?? dataMeta?.width ?? 0;
   const clipHeight = fromVideo?.height ?? dataMeta?.height ?? 0;
   const ratio = clipWidth > 0 && clipHeight > 0 ? clipWidth / clipHeight : DEFAULT_RATIO;
-  const portrait = clipOrientation({ width: clipWidth, height: clipHeight }) === 'portrait';
   useLayoutEffect(() => {
     onClipSize?.(clipWidth > 0 && clipHeight > 0 ? { width: clipWidth, height: clipHeight } : null);
     return () => onClipSize?.(null);
@@ -228,7 +226,17 @@ export function Stage({
     if (on) setHint(false);
   }, []);
   const toggleControls = useCallback(() => setControls((on) => !on), []);
-  const scrub = useScrub({ enabled: isFull, playhead, onTap: toggleControls, onSwipe, onExit: exitFull });
+  const togglePlay = useCallback(() => playhead.toggle(), [playhead]);
+  // The same touches work on the picture in the page and in the full screen: a swipe moves the video, a hold pauses it. A tap plays
+  // or pauses in the page (the full screen puts its controls away instead), and only the full screen has a way out to drag to.
+  const calibrating = !!calibration?.editing;
+  const scrub = useScrub({
+    enabled: isFull || (!calibrating && (!!url || !!result)),
+    playhead,
+    onTap: isFull ? toggleControls : togglePlay,
+    onSwipe,
+    onExit: isFull ? exitFull : undefined,
+  });
   // The labels are drawn by the full screen itself, in the page's type, where a finger does not cover them.
   const shownOverlay = useMemo(() => (isFull ? { ...overlay, hud: false } : overlay), [overlay, isFull]);
 
@@ -483,17 +491,12 @@ export function Stage({
     dragging.current = null;
   }, []);
 
-  const editing = !!calibration?.editing;
-  /** A click or a tap on the picture plays or pauses, at once; while the bed is being outlined a click places a corner instead. */
-  const onFrameClick = (e: MouseEvent<HTMLDivElement>) => {
-    // The full screen has its own touches (`useScrub`), which also work on the letterbox.
-    if (isFull || editing || (e.target as HTMLElement).closest('.stage__pick')) return;
-    playhead.toggle();
-  };
+  const editing = calibrating;
   const frame = layout.video;
   const showPane = !!pane && view !== 'video' && !isFull;
   // In the wide layout a portrait clip has a stage of its own width (shell.css) instead of a black one: it says how wide.
-  const portraitWidth = portrait ? portraitStageWidth(ratio, size.height) : 0;
+  // The stage says how wide the video is at its height (any clip): the page uses it where the stage has a column of its own.
+  const videoWidth = portraitStageWidth(ratio, size.height);
 
   return (
     <div
@@ -503,15 +506,15 @@ export function Stage({
       aria-label={t('stage.region')}
       data-fullscreen={isFull || undefined}
       data-swiping={swiping || undefined}
-      {...scrub}
-      style={portraitWidth > 0 ? ({ '--stage-w': `${portraitWidth}px` } as CSSProperties) : undefined}
+      {...(isFull ? scrub : null)}
+      style={videoWidth > 0 ? ({ '--stage-w': `${videoWidth}px` } as CSSProperties) : undefined}
     >
       {url ? (
         <div
           className="stage__frame"
           data-hidden={layout.hidden || undefined}
           style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height }}
-          onClick={onFrameClick}
+          {...(isFull ? null : scrub)}
         >
           <video
             ref={videoRef}
@@ -552,10 +555,10 @@ export function Stage({
           className="stage__frame stage__frame--data"
           data-hidden={layout.hidden || undefined}
           style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height }}
-          onClick={onFrameClick}
+          {...(isFull ? null : scrub)}
         >
           <canvas ref={canvasRef} className="stage__overlay" aria-hidden="true" />
-          <label className="btn btn--secondary stage__pick stage__pick--corner">
+          <label className="btn btn--secondary stage__pick stage__pick--corner" data-stage-control>
             <Icon name="upload" size={17} />
             {t('stage.choose')}
             <input

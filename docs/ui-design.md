@@ -90,6 +90,10 @@ code above, and except where this document says so.
 (`seekHandler`, `playRangeHandler`, `toggleHandler`, `pauseHandler`, `stepHandler`, `reverseHandler`) and publishes `setTime`,
 `setPlaying`, `setReverse`, `setDuration`. Everyone else calls `seek(t)`, `playRange(from, to, loop)`, `toggle()`, `pause()`,
 `step(frames)`, `reverse()` and reads with `usePlayheadTime`, `usePlaying`, `useReverse`, `useDuration`.
+The buttons that play a stretch of the clip ("Play jump" in the timeline, the live skill card, the insights answer, the coach rail and
+the review panel) use `useRangeButton(key, onPlay)` (the bus comes from `PlayheadContext`, which `App` provides): the button that
+started the range shows pause while it plays and a press pauses, whereas every other such button stays a play button and starts its own
+stretch at once. The bus keeps which button (`getRangeKey`); a pause, a step, a reverse or the end of the clip releases it.
 A `<video>` cannot play backwards, so `createPlayer` (`ui/stage/player.ts`) walks it back one frame at a time from `tick()`, at the
 playback speed and by the clock (frames are dropped while the decoder is busy, the speed stays true); while it does, the video is
 paused and `playing` and `reverse` are both true. Anything else that moves the video (play, pause, a step, a seek, a range) ends it. This is how the transport bar and the
@@ -134,7 +138,9 @@ wide (>= 1100px)                      narrow, live view with results
   frees. The rail is capped to its landscape width at the least (`max-width` on the stage). While the stage shows the 3D
   skeleton (split and 3D views, `.stage__pane`) the grid is the landscape one again: the pane needs the room, and the video
   keeps its place at the left. A landscape clip keeps `stage | var(--rail-w)`. The video is still fitted (`fitRatio`), never
-  cropped.
+  cropped. A phone on its side (live view, with results) does the same for any clip: `max-content | 1fr` with the stage as wide as the
+  video is at the height of the screen, between 26vw and 54vw (`live.css`), so a wide clip gets a bigger picture than equal columns
+  gave and a portrait clip leaves the rest to the transport and the skills.
 - In the narrow portrait stage the view switcher keeps to its icons (the labels drawn on the video need the room), the banners
   keep to its left edge, and the coach and athlete rails read in a column of at most 880px. The live rail uses the width
   itself, by its own width: at 720px and more the set sits in a column of its own beside the list (two columns, the selected
@@ -234,6 +240,10 @@ Files: `Stage.tsx`, `Transport.tsx`, `ProcessingOverlay.tsx`, `CalibrationBar.ts
   from where the finger left it. **A tap puts the controls away or brings them back** (it never plays or pauses); **a long press
   (`LONG_PRESS_MS`) pauses the video until the finger lifts**, and a video that was playing goes on then. **A small drag down (`EXIT_DRAG_PX`) leaves the full screen**; a drag up is left alone, and the controls are excluded (`data-stage-control`). The page's busy and
   ready panels are hidden while it is open. Escape and the browser's own way out close it.
+  **The picture in the page has the same touches** (the same `useScrub`, on `.stage__frame`, off while the bed is outlined): a swipe
+  moves the video, a long press pauses it until the finger lifts, and a tap plays or pauses (the controls are in the page, so there
+  are none to put away). A mouse swipes and clicks but a held button is a slow click, not a long press. Only the full screen has the
+  drag down; in the page a vertical drag is the page scrolling (`touch-action: pan-y`).
 - `view`: `video` (default), `split` (video and `pane` side by side when the viewport is wide, stacked when tall),
   `3d` (the `pane` fills it; keep the `<video>` mounted but hidden so playback and seeking continue). When `onView` is
   given, show a small translucent segmented switcher (video, split, cube icons) at the top right of the viewport.

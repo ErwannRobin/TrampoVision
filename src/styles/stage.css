@@ -12,6 +12,11 @@
 }
 .stage__frame {
   position: absolute;
+  /* A finger moves the video sideways (swipe) and holds it (long press): the page only scrolls up and down from here. */
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 .stage__frame[data-hidden] {
   visibility: hidden;
@@ -29,7 +34,7 @@
   object-fit: contain;
   background: #000;
 }
-/* A click or a tap on the picture plays or pauses it. */
+/* A click or a tap on the picture plays or pauses it (a swipe moves it, a hold pauses it: see scrub.ts). */
 .stage__video,
 .stage__frame--data {
   cursor: pointer;

@@ -1,6 +1,7 @@
 import { t } from '../../../i18n';
 import { TIER_TEXT, type JumpHeadline } from '../../insights';
 import { Button, ConfidenceMeter, cx } from '../../kit';
+import { useRangeButton } from '../../playhead';
 import { Fade } from './Fade';
 import { headlineSize } from './layout';
 
@@ -16,12 +17,18 @@ export function Answer({ headline: h, total, onPlayJump }: Props) {
   const named = h.tier === 'high' || h.tier === 'medium';
   // What the confidence bar is. Said in a tooltip and to screen readers instead of a percentage that looks precise.
   const scoreNote = t('ins.scoreNote');
+  const play = useRangeButton('answer', onPlayJump);
   return (
     <section className="ins-answer">
       <div className="ins-answer__top">
         <p className="ins-count">{t('ins.jumpOf', { n: h.number, total })}</p>
-        <Button size="sm" icon="play" title={t('ins.playJumpTitle')} onClick={onPlayJump}>
-          {t('ins.playJump')}
+        <Button
+          size="sm"
+          icon={play.playing ? 'pause' : 'play'}
+          title={play.playing ? t('transport.pause') : t('ins.playJumpTitle')}
+          onClick={play.press}
+        >
+          {play.playing ? t('transport.pause') : t('ins.playJump')}
         </Button>
       </div>
       <Fade on={h.index}>

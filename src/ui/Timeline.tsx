@@ -9,7 +9,7 @@ import { skillName } from './insights';
 import { useElementSize, useReducedMotion } from './hooks';
 import type { RoutineMark } from '../coaching/routine';
 import { Button, IconButton, Menu, Segmented } from './kit';
-import type { Playhead } from './playhead';
+import { useRangeButton, type Playhead } from './playhead';
 import { useThemeVersion } from './theme';
 import {
   drawCursor,
@@ -112,6 +112,7 @@ export function Timeline({
   onLoop,
   routine,
 }: TimelineProps) {
+  const play = useRangeButton('timeline', onPlayJump);
   const wrapRef = useRef<HTMLDivElement>(null);
   const staticRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLCanvasElement>(null);
@@ -331,8 +332,14 @@ export function Timeline({
           />
         </div>
         <div className="tl__actions">
-          <Button variant="secondary" size="sm" icon="play" disabled={selected === null} onClick={onPlayJump}>
-            {t('ins.playJump')}
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={play.playing ? 'pause' : 'play'}
+            disabled={selected === null}
+            onClick={play.press}
+          >
+            {play.playing ? t('transport.pause') : t('ins.playJump')}
           </Button>
           <IconButton
             icon="loop"

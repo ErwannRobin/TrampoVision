@@ -49,14 +49,15 @@ export interface ScrubOptions {
   onTap: () => void;
   /** A swipe began (true) or ended (false). */
   onSwipe: (swiping: boolean) => void;
-  /** A finger was dragged down the picture. */
-  onExit: () => void;
+  /** A finger was dragged down the picture (the full screen's way out). Without it a vertical drag is left to the page, which scrolls. */
+  onExit?: () => void;
 }
 
 /**
  * Moving the finger right or left on the stage moves the video, a frame at a time: the video pauses while the finger is
  * down and goes on from where it was left if it was playing. A tap is passed on (`onTap`). A finger held still pauses the
- * video until it lifts. A small drag down leaves the full screen (`onExit`); a drag up is left alone.
+ * video until it lifts (a mouse button held down does not: that is a slow click). A small drag down leaves the full screen
+ * (`onExit`); a drag up is left alone.
  */
 export function useScrub({ enabled, playhead, onTap, onSwipe, onExit }: ScrubOptions) {
   const touch = useRef<Touch | null>(null);
@@ -89,6 +90,7 @@ export function useScrub({ enabled, playhead, onTap, onSwipe, onExit }: ScrubOpt
       };
       touch.current = t;
       stopTimer();
+      if (e.pointerType === 'mouse') return;
       timer.current = window.setTimeout(() => {
         timer.current = 0;
         if (touch.current !== t || t.swipe) return;
@@ -108,8 +110,8 @@ export function useScrub({ enabled, playhead, onTap, onSwipe, onExit }: ScrubOpt
         const dy = e.clientY - t.y;
         if (!t.down && Math.abs(dy) > SWIPE_THRESHOLD_PX && Math.abs(dy) > Math.abs(dx)) {
           stopTimer();
-          if (dy < 0) {
-            // Up: not ours. A long press that began stays paused no longer than the finger.
+          if (dy < 0 || !onExit) {
+            // Up (or down, with nowhere to go): not ours. A long press that began stays paused no longer than the finger.
             if (t.hold?.resume) playhead.toggle();
             touch.current = null;
             return;
@@ -120,7 +122,7 @@ export function useScrub({ enabled, playhead, onTap, onSwipe, onExit }: ScrubOpt
           if (dy >= EXIT_DRAG_PX) {
             touch.current = null;
             if (t.hold?.resume) playhead.toggle();
-            onExit();
+            onExit?.();
           }
           return;
         }
