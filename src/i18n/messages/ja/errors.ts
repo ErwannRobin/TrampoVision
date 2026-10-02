@@ -7,7 +7,7 @@ export const errors: Translation<typeof en> = {
   'err.loadTimeout':
     '動画の読み込みがタイムアウトしました（readyState {ready}、networkState {network}）。MP4（H.264）ファイルをお試しください。',
   'err.seekTimeout':
-    '{time} 秒へのシークが {attempts} 回の試行後にタイムアウトしました（readyState {ready}、networkState {network}、seeking {seeking}、currentTime {current} 秒）。デコーダーが停止しました。iPhoneのHEVC/HDR .mov ファイルは、PCのChromeでよくこうなります。H.264に変換（make convert VIDEO=file.MOV）して .mp4 を開いてください。',
+    '{time} 秒へのシークが {attempts} 回の試行後にタイムアウトしました（readyState {ready}、networkState {network}、seeking {seeking}、currentTime {current} 秒）。デコーダーが停止しました。iPhoneのHEVC/HDR .mov ファイルは、PCのChromeでよくこうなります。H.264に変換（make video-convert VIDEO=file.MOV）して .mp4 を開いてください。',
   'err.sampleHttp': 'サンプル動画を読み込めませんでした（HTTP {status}）。',
   'err.ffmpegExit': 'ffmpeg が動画を変換できませんでした（終了コード {code}）。',
   'err.ffmpegNoData': 'ffmpeg が動画データを返しませんでした。',

@@ -5,7 +5,7 @@ export const errors = {
   'err.loadTimeout':
     'Loading the video timed out (readyState {ready}, networkState {network}). Try an MP4 (H.264) file.',
   'err.seekTimeout':
-    'Seek to {time}s timed out after {attempts} attempts (readyState {ready}, networkState {network}, seeking {seeking}, currentTime {current}s). The decoder stalled: iPhone HEVC/HDR .mov files often do this in desktop Chrome. Convert to H.264 (make convert VIDEO=file.MOV) and open the .mp4.',
+    'Seek to {time}s timed out after {attempts} attempts (readyState {ready}, networkState {network}, seeking {seeking}, currentTime {current}s). The decoder stalled: iPhone HEVC/HDR .mov files often do this in desktop Chrome. Convert to H.264 (make video-convert VIDEO=file.MOV) and open the .mp4.',
   'err.sampleHttp': 'Could not load the sample video (HTTP {status}).',
   'err.ffmpegExit': 'ffmpeg failed to convert the video (exit code {code}).',
   'err.ffmpegNoData': 'ffmpeg returned no video data.',

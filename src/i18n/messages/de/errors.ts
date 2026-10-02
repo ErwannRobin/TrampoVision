@@ -7,7 +7,7 @@ export const errors: Translation<typeof en> = {
   'err.loadTimeout':
     'Das Laden des Videos ist abgelaufen (readyState {ready}, networkState {network}). Versuchen Sie eine MP4-Datei (H.264).',
   'err.seekTimeout':
-    'Das Springen zu {time} s ist nach {attempts} Versuchen abgelaufen (readyState {ready}, networkState {network}, seeking {seeking}, currentTime {current} s). Der Decoder hat sich festgefahren: iPhone-HEVC/HDR-.mov-Dateien tun das im Desktop-Chrome oft. Konvertieren Sie zu H.264 (make convert VIDEO=datei.MOV) und öffnen Sie die .mp4.',
+    'Das Springen zu {time} s ist nach {attempts} Versuchen abgelaufen (readyState {ready}, networkState {network}, seeking {seeking}, currentTime {current} s). Der Decoder hat sich festgefahren: iPhone-HEVC/HDR-.mov-Dateien tun das im Desktop-Chrome oft. Konvertieren Sie zu H.264 (make video-convert VIDEO=datei.MOV) und öffnen Sie die .mp4.',
   'err.sampleHttp': 'Das Beispielvideo konnte nicht geladen werden (HTTP {status}).',
   'err.ffmpegExit': 'ffmpeg konnte das Video nicht konvertieren (Exit-Code {code}).',
   'err.ffmpegNoData': 'ffmpeg hat keine Videodaten zurückgegeben.',

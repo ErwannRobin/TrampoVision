@@ -269,7 +269,7 @@ export const review: Translation<typeof en> = {
   'rm.curves': 'Courbes de ce saut',
   'rm.autoAdvance': 'Passer au saut suivant après chaque étiquette',
   'rm.labelsDownload': 'Télécharger les étiquettes',
-  'rm.labelsDownloadHint': 'Un fichier d’étiquettes avec lequel make eval note le classifieur',
+  'rm.labelsDownloadHint': 'Un fichier d’étiquettes avec lequel make eval-run note le classifieur',
   'rm.labelsImport': 'Importer des étiquettes…',
   'rm.labelsMismatch':
     'Ce fichier d’étiquettes est pour une autre vidéo ({id}). L’appliquer quand même, en associant les sauts par leur instant ?',

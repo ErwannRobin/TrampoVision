@@ -96,7 +96,7 @@ interface UndoEntry {
 /**
  * The review mode: one jump at a time, looping in the video, with what the classifier made of it, what it measured and what is wrong
  * with the data on one side, and the buttons that say what it really was on the other. Labels are saved in the local dataset as they are
- * given (and can be downloaded in the format `make eval` scores against), and the review moves on by itself when a jump is done.
+ * given (and can be downloaded in the format `make eval-run` scores against), and the review moves on by itself when a jump is done.
  */
 export function ReviewMode({
   skills,

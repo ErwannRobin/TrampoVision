@@ -268,7 +268,7 @@ export const review: Translation<typeof en> = {
   'rm.curves': 'Kurven dieses Sprungs',
   'rm.autoAdvance': 'Nach jeder Beschriftung zum nächsten Sprung gehen',
   'rm.labelsDownload': 'Beschriftungen herunterladen',
-  'rm.labelsDownloadHint': 'Eine Beschriftungsdatei, mit der make eval den Klassifikator bewertet',
+  'rm.labelsDownloadHint': 'Eine Beschriftungsdatei, mit der make eval-run den Klassifikator bewertet',
   'rm.labelsImport': 'Beschriftungen importieren …',
   'rm.labelsMismatch':
     'Diese Beschriftungsdatei gehört zu einem anderen Video ({id}). Trotzdem anwenden und die Sprünge über ihre Zeit zuordnen?',

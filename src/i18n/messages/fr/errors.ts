@@ -7,7 +7,7 @@ export const errors: Translation<typeof en> = {
   'err.loadTimeout':
     'Le chargement de la vidéo a expiré (readyState {ready}, networkState {network}). Essayez un fichier MP4 (H.264).',
   'err.seekTimeout':
-    'Le positionnement à {time} s a expiré après {attempts} tentatives (readyState {ready}, networkState {network}, seeking {seeking}, currentTime {current} s). Le décodeur s’est bloqué : les fichiers .mov HEVC/HDR d’iPhone le font souvent dans Chrome sur ordinateur. Convertissez en H.264 (make convert VIDEO=fichier.MOV) et ouvrez le .mp4.',
+    'Le positionnement à {time} s a expiré après {attempts} tentatives (readyState {ready}, networkState {network}, seeking {seeking}, currentTime {current} s). Le décodeur s’est bloqué : les fichiers .mov HEVC/HDR d’iPhone le font souvent dans Chrome sur ordinateur. Convertissez en H.264 (make video-convert VIDEO=fichier.MOV) et ouvrez le .mp4.',
   'err.sampleHttp': 'Impossible de charger la vidéo d’exemple (HTTP {status}).',
   'err.ffmpegExit': 'ffmpeg n’a pas réussi à convertir la vidéo (code de sortie {code}).',
   'err.ffmpegNoData': 'ffmpeg n’a renvoyé aucune donnée vidéo.',

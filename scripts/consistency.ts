@@ -1,8 +1,8 @@
 /**
  * Label-free quality of the rotation measurement, no labels needed.
- *   make consistency FILE=eval/dong-dong.dataset.json     (a dataset JSON saved by the app, the review service's /export, or a saved pose series)
- *   make consistency FILE=... BASELINE=eval/consistency.json     fails when a share fell
- *   make consistency FILE=... SAVE=eval/consistency.json         records the current numbers as the baseline
+ *   make eval-consistency FILE=eval/dong-dong.dataset.json     (a dataset JSON saved by the app, the review service's /export, or a saved pose series)
+ *   make eval-consistency FILE=... BASELINE=eval/consistency.json     fails when a share fell
+ *   make eval-consistency FILE=... SAVE=eval/consistency.json         records the current numbers as the baseline
  * A pose series (Save analysis in the advanced mode) is analyzed again with the current code, so two versions of the pipeline can be compared on the same video.
  */
 import { readFileSync, writeFileSync } from 'node:fs';

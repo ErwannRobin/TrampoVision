@@ -264,7 +264,7 @@ export const review: Translation<typeof en> = {
   'rm.curves': 'このジャンプの曲線',
   'rm.autoAdvance': 'ラベルを付けるたびに次のジャンプへ進む',
   'rm.labelsDownload': 'ラベルをダウンロード',
-  'rm.labelsDownloadHint': 'make eval が分類器を採点するときに使うラベルファイル',
+  'rm.labelsDownloadHint': 'make eval-run が分類器を採点するときに使うラベルファイル',
   'rm.labelsImport': 'ラベルをインポート…',
   'rm.labelsMismatch':
     'このラベルファイルは別の動画（{id}）のものです。時刻でジャンプを対応づけて、それでも適用しますか？',
