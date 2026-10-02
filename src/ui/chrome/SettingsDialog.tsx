@@ -87,7 +87,7 @@ export interface SettingsDialogProps {
   // Data and look
   /** The sample videos on offer: none when there is no asset host. */
   samples: Sample[];
-  onSample: (path: string) => void;
+  onSample: (sample: Sample) => void;
   onOpenSeries: (file: File) => void;
   appearance: Appearance;
   onAppearance: (appearance: Appearance) => void;
@@ -480,7 +480,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
                               id: sample.id,
                               label: sample.label,
                               disabled: state.engineLocked,
-                              onSelect: () => props.onSample(sample.path),
+                              onSelect: () => props.onSample(sample),
                             })),
                           },
                         ]}

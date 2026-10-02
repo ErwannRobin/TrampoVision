@@ -53,4 +53,15 @@ describe('sample list from the store index', () => {
   it('is empty for an empty index', () => {
     expect(samplesFromFiles('https://blob.example/', [])).toEqual([]);
   });
+
+  it('attaches the saved analysis of a clip, and ignores one with no video', () => {
+    const list = samplesFromFiles(
+      'https://blob.example/',
+      ['synchro.mp4', 'synchro.pose.json', 'portrait.mp4', 'orphan.pose.json', 'index.json'],
+      CHROME,
+    );
+    expect(list.map((s) => s.id)).toEqual(['portrait', 'synchro']);
+    expect(list[0].series).toBeUndefined();
+    expect(list[1].series).toBe('https://blob.example/samples/synchro.pose.json');
+  });
 });

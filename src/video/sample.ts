@@ -9,12 +9,17 @@ import { t } from '../i18n/core';
  * decodes natively: the iPhone .mov in Safari, the H.264 .mp4 elsewhere (desktop Chrome cannot decode the HEVC .mov
  * without a slow in-browser conversion). Without an asset host, or without that index, there is no sample and the
  * button is hidden.
+ *
+ * A clip can come with its analysis, `<name>.pose.json` (the "Save analysis (JSON)" export, made by
+ * `npm run precompute-samples`): the app then opens the video with that analysis and skips the pose model.
  */
 export interface Sample {
   id: string;
   /** The file name without its extension, spaces for underscores and dashes: "dong-dong_2011" reads "dong dong 2011". */
   label: string;
   path: string;
+  /** The saved analysis of this clip (a pose series), when the store has one. */
+  series?: string;
 }
 
 /**
@@ -40,9 +45,11 @@ export function pickSample(paths: string[], userAgent?: string, maxTouchPoints?:
 }
 
 const VIDEO_FILE = /\.(mp4|mov)$/i;
+const SERIES_SUFFIX = '.pose.json';
 
 /** Groups the file names by clip (same name, different extension) and picks, for each, the file suited to this browser. */
 export function samplesFromFiles(base: string, files: string[], userAgent?: string, maxTouchPoints?: number): Sample[] {
+  const url = (name: string) => `${base}samples/${encodeURIComponent(name)}`;
   const clips = new Map<string, string[]>();
   for (const file of files.filter((f) => VIDEO_FILE.test(f))) {
     const id = file.slice(0, file.lastIndexOf('.'));
@@ -51,12 +58,10 @@ export function samplesFromFiles(base: string, files: string[], userAgent?: stri
   return [...clips]
     .sort(([a], [b]) => a.localeCompare(b))
     .flatMap(([id, names]) => {
-      const path = pickSample(
-        names.map((name) => `${base}samples/${encodeURIComponent(name)}`),
-        userAgent,
-        maxTouchPoints,
-      );
-      return path ? [{ id, label: id.replace(/[_-]+/g, ' ').trim(), path }] : [];
+      const path = pickSample(names.map(url), userAgent, maxTouchPoints);
+      if (!path) return [];
+      const series = files.includes(`${id}${SERIES_SUFFIX}`) ? url(`${id}${SERIES_SUFFIX}`) : undefined;
+      return [{ id, label: id.replace(/[_-]+/g, ' ').trim(), path, ...(series ? { series } : {}) }];
     });
 }
 
@@ -76,6 +81,17 @@ export async function loadSamples(): Promise<Sample[]> {
       : [];
   } catch {
     return [];
+  }
+}
+
+/** The saved analysis of a sample, as text; null when there is none or it cannot be read (the app then analyzes the video). */
+export async function loadSampleSeries(sample: Sample): Promise<string | null> {
+  if (!sample.series) return null;
+  try {
+    const response = await fetch(sample.series);
+    return response.ok ? await response.text() : null;
+  } catch {
+    return null;
   }
 }
 

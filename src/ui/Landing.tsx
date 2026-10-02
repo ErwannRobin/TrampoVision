@@ -15,7 +15,7 @@ export interface LandingProps {
   onFile: (file: File) => void;
   /** The sample videos on offer: none when there is no asset host. */
   samples: Sample[];
-  onSample: (path: string) => void;
+  onSample: (sample: Sample) => void;
   onOpenSeries: (file: File) => void;
   /** The dataset saved in this browser: shown as its own section when it holds something. */
   dataset: DatasetApi;
@@ -117,7 +117,7 @@ export function Landing({ onFile, samples, onSample, onOpenSeries, dataset, rece
                       id: sample.id,
                       label: sample.label,
                       disabled: busy,
-                      onSelect: () => onSample(sample.path),
+                      onSelect: () => onSample(sample),
                     })),
                   },
                 ]}
