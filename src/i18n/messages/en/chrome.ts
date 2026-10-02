@@ -239,7 +239,7 @@ export const chrome = {
   'fs.seek': 'Position in the video',
   'fs.prevJump': 'Previous jump',
   'fs.nextJump': 'Next jump',
-  'fs.hint': 'Swipe left or right to move through the video',
+  'fs.hint': 'Swipe to move through the video. Tap to show or hide the controls. Hold to pause. Drag down to exit.',
 
   // Transport
   'transport.back10': 'Back 10 frames (Shift + ←)',

@@ -98,6 +98,22 @@ const ICONS = {
       <line x1="18" y1="6" x2="6" y2="18" />
     </>
   ),
+  expand: (
+    <>
+      <polyline points="4 9 4 4 9 4" />
+      <polyline points="20 9 20 4 15 4" />
+      <polyline points="4 15 4 20 9 20" />
+      <polyline points="20 15 20 20 15 20" />
+    </>
+  ),
+  collapse: (
+    <>
+      <polyline points="9 4 9 9 4 9" />
+      <polyline points="15 4 15 9 20 9" />
+      <polyline points="9 20 9 15 4 15" />
+      <polyline points="15 20 15 15 20 15" />
+    </>
+  ),
   check: <polyline points="5 12.5 10 17.5 19 7.5" />,
   info: (
     <>

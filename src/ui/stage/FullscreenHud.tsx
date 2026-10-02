@@ -16,9 +16,9 @@ export interface FullscreenHudProps {
   selected: number;
   onJump: (delta: -1 | 1) => void;
   onClose: () => void;
-  /** A finger is moving the video. */
-  swiping: boolean;
-  /** Say how to swipe: until the first one. */
+  /** The controls are put away (a tap on the picture brings them back). */
+  hidden: boolean;
+  /** Say how to use the picture: until the first swipe. */
   hint: boolean;
 }
 
@@ -51,16 +51,10 @@ function SeekBar({ playhead, fps }: { playhead: Playhead; fps: number }) {
   );
 }
 
-/** The time shown large in the middle of the picture while a finger moves the video: the finger hides the rest. */
-function SwipeTime({ playhead }: { playhead: Playhead }) {
-  const time = usePlayheadTime(playhead);
-  return <span className="fs__swipe num">{timecode(time)}</span>;
-}
-
 /**
  * What the full screen shows over the picture, and nothing else: the skill under the playhead with its difficulty and execution,
- * the way out, and a slim bar to play, change the jump, change the speed and go anywhere in the clip. The video itself is moved
- * by swiping it (`useScrub`).
+ * a slim bar to play, change the jump, change the speed and go anywhere in the clip, and the way out, where the button to come
+ * in was. A tap on the picture puts all of it away or brings it back. The video itself is moved by swiping it (`useScrub`).
  */
 export function FullscreenHud({
   playhead,
@@ -71,7 +65,7 @@ export function FullscreenHud({
   selected,
   onJump,
   onClose,
-  swiping,
+  hidden,
   hint,
 }: FullscreenHudProps) {
   const playing = usePlaying(playhead);
@@ -79,18 +73,8 @@ export function FullscreenHud({
   const nextSpeed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1;
 
   return (
-    <div className="fs">
+    <div className="fs" data-hidden={hidden || undefined}>
       <div className="fs__top">
-        <IconButton
-          className="fs__close"
-          data-stage-control
-          data-fs-close
-          icon="close"
-          label={t('fs.exit')}
-          variant="solid"
-          tip={false}
-          onClick={onClose}
-        />
         {jump && (
           <div className="fs__skill" aria-live="polite">
             <span className="fs__jump num">{t('fs.jump', { n: selected + 1, total: jumps.length })}</span>
@@ -115,14 +99,10 @@ export function FullscreenHud({
         )}
       </div>
 
-      {swiping ? (
-        <SwipeTime playhead={playhead} />
-      ) : (
-        hint && (
-          <p className="fs__hint" role="status">
-            {t('fs.hint')}
-          </p>
-        )
+      {hint && (
+        <p className="fs__hint" role="status">
+          {t('fs.hint')}
+        </p>
       )}
 
       <div className="fs__bottom">
@@ -166,6 +146,17 @@ export function FullscreenHud({
           </button>
         </div>
       </div>
+
+      <IconButton
+        className="fs__exit"
+        data-stage-control
+        data-fs-close
+        icon="collapse"
+        label={t('fs.exit')}
+        variant="solid"
+        tip={false}
+        onClick={onClose}
+      />
     </div>
   );
 }

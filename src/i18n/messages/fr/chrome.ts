@@ -231,7 +231,8 @@ export const chrome: Translation<typeof en> = {
   'fs.seek': 'Position dans la vidéo',
   'fs.prevJump': 'Saut précédent',
   'fs.nextJump': 'Saut suivant',
-  'fs.hint': 'Glissez à gauche ou à droite pour parcourir la vidéo',
+  'fs.hint':
+    'Glissez pour parcourir la vidéo. Touchez pour afficher ou masquer les commandes. Maintenez pour mettre en pause.',
 
   'transport.back10': 'Reculer de 10 images (Maj + ←)',
   'transport.prev': 'Image précédente (←)',
