@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>TrampoVision</title>
+    <meta
+      name="description"
+      content="Film a trampoline set and TrampoVision tells you what each skill was, what it is worth, a proposed execution score and what to fix. It runs in your browser."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      /* Apply the saved theme before the first paint, so the page does not flash. */
+      try {
+        var t = localStorage.getItem('tv-theme');
+        if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+      document.documentElement.classList.add('preload');
+    </script>
+    <style>
+      /* Layout concept: one calm reading column, a short hero, then plain sections. Same colors and fonts as architecture.html. */
+      :root {
+        color-scheme: light;
+        --bg: #f1f4f1;
+        --surface: #ffffff;
+        --surface-2: #e9eeea;
+        --ink: #15201c;
+        --muted: #55655d;
+        --line: #cfd9d3;
+        --accent: #1c47c4;
+        --accent-ink: #ffffff;
+        --accent-soft: #e3eafc;
+        --warn: #a95800;
+        --warn-soft: #fbead2;
+        --shadow: 0 1px 2px rgba(20, 32, 28, 0.06), 0 4px 14px rgba(20, 32, 28, 0.06);
+        --display:
+          'Bricolage Grotesque', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', 'Segoe UI', system-ui, sans-serif;
+        --body:
+          'IBM Plex Sans', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', system-ui, -apple-system, 'Segoe UI',
+          sans-serif;
+        --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          color-scheme: dark;
+          --bg: #0f1512;
+          --surface: #17201c;
+          --surface-2: #1f2a25;
+          --ink: #e5ece8;
+          --muted: #9aaaa2;
+          --line: #2c3a33;
+          --accent: #86a3ff;
+          --accent-ink: #0f1512;
+          --accent-soft: #1a2750;
+          --warn: #f0a54f;
+          --warn-soft: #3a2810;
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
+        }
+      }
+      :root[data-theme='dark'] {
+        color-scheme: dark;
+        --bg: #0f1512;
+        --surface: #17201c;
+        --surface-2: #1f2a25;
+        --ink: #e5ece8;
+        --muted: #9aaaa2;
+        --line: #2c3a33;
+        --accent: #86a3ff;
+        --accent-ink: #0f1512;
+        --accent-soft: #1a2750;
+        --warn: #f0a54f;
+        --warn-soft: #3a2810;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      .preload *,
+      .preload *::before,
+      .preload *::after {
+        transition: none !important;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--body);
+        font-size: 17px;
+        line-height: 1.6;
+      }
+      a {
+        color: var(--accent);
+      }
+      .wrap {
+        max-width: 980px;
+        margin-inline: auto;
+        padding-inline: 20px;
+      }
+      section {
+        padding-block: 40px 8px;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: var(--display);
+        letter-spacing: -0.01em;
+        text-wrap: balance;
+        margin: 0;
+      }
+      h2 {
+        font-size: 1.7rem;
+        line-height: 1.2;
+        margin-bottom: 8px;
+      }
+      h3 {
+        font-size: 1.1rem;
+        line-height: 1.25;
+      }
+      p {
+        margin: 0 0 12px;
+        max-width: 66ch;
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .lead {
+        color: var(--muted);
+        margin-bottom: 22px;
+      }
+      .vh {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+
+      /* Top bar */
+      .bar {
+        border-bottom: 1px solid var(--line);
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+      .bar-in {
+        max-width: 1240px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 22px;
+        align-items: center;
+        justify-content: space-between;
+        padding-block: 14px;
+      }
+      .logo {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 1.25rem;
+        letter-spacing: -0.01em;
+        color: var(--ink);
+        text-decoration: none;
+      }
+      .bar nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px clamp(12px, 1.6vw, 20px);
+        font-size: 0.95rem;
+      }
+      .bar nav a,
+      .logo,
+      .switch,
+      .lang {
+        white-space: nowrap;
+      }
+      /* Wide screens: header never wraps, whatever the language */
+      @media (min-width: 1060px) {
+        .bar-in,
+        .bar nav,
+        .ctrls {
+          flex-wrap: nowrap;
+        }
+      }
+      .bar nav a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+      .bar nav a:hover {
+        color: var(--ink);
+        text-decoration: underline;
+      }
+      .ctrls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 14px;
+      }
+      .lang select {
+        font: inherit;
+        font-size: 0.88rem;
+        color: var(--ink);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 7px 10px;
+        cursor: pointer;
+      }
+      .switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        padding: 4px 2px;
+        font: inherit;
+        font-size: 0.88rem;
+        color: var(--ink);
+      }
+      .switch .track {
+        width: 40px;
+        height: 22px;
+        border-radius: 999px;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        position: relative;
+        transition: background 0.15s ease;
+        flex: none;
+      }
+      .switch .thumb {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--muted);
+        transition:
+          transform 0.15s ease,
+          background 0.15s ease;
+      }
+      .switch[aria-checked='true'] .track {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
+      .switch[aria-checked='true'] .thumb {
+        transform: translateX(18px);
+        background: var(--accent);
+      }
+
+      /* Hero */
+      .hero {
+        padding-block: 56px 28px;
+      }
+      .hero h1 {
+        font-size: clamp(2.2rem, 6vw, 3.6rem);
+        line-height: 1.1;
+        margin-bottom: 18px;
+        max-width: 22ch;
+      }
+      .hero p {
+        font-size: 1.15rem;
+        max-width: 56ch;
+      }
+      .cta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 24px;
+      }
+      .btn {
+        display: inline-block;
+        padding: 12px 22px;
+        border-radius: 10px;
+        font-weight: 600;
+        text-decoration: none;
+        border: 2px solid var(--accent);
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+      .btn.ghost {
+        background: transparent;
+        color: var(--accent);
+      }
+      .btn:hover {
+        box-shadow: var(--shadow);
+      }
+      .btn:focus-visible,
+      a:focus-visible,
+      .switch:focus-visible,
+      .lang select:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .fine {
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-top: 14px;
+      }
+
+      /* Cards */
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+        gap: 14px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px 18px 18px;
+        box-shadow: var(--shadow);
+        min-width: 0;
+      }
+      .card h3 {
+        margin-bottom: 6px;
+      }
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      /* Steps: a real sequence, so numbers are meaningful */
+      .steps {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 0;
+        max-width: 760px;
+      }
+      .steps li {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr);
+        gap: 16px;
+        padding-block: 14px;
+        border-top: 1px solid var(--line);
+      }
+      .steps li:last-child {
+        border-bottom: 1px solid var(--line);
+      }
+      .steps .n {
+        font-family: var(--mono);
+        font-weight: 500;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+      }
+      .steps p {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 0.97rem;
+      }
+
+      /* Notes */
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 18px 20px;
+        max-width: 760px;
+      }
+      .panel ul {
+        margin: 0;
+        padding-left: 20px;
+        display: grid;
+        gap: 8px;
+      }
+      .panel.warn {
+        border-left: 4px solid var(--warn);
+        background: var(--warn-soft);
+      }
+      .panel.warn h2 {
+        font-size: 1.25rem;
+      }
+
+      .links {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+        gap: 14px;
+      }
+      .links a {
+        display: block;
+        text-decoration: none;
+        color: var(--ink);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px 18px;
+        box-shadow: var(--shadow);
+      }
+      .links a:hover {
+        border-color: var(--accent);
+      }
+      .links strong {
+        display: block;
+        font-family: var(--display);
+        font-size: 1.05rem;
+        color: var(--accent);
+        margin-bottom: 2px;
+      }
+      .links span {
+        color: var(--muted);
+        font-size: 0.93rem;
+      }
+
+      footer {
+        margin-top: 48px;
+        padding-block: 22px 40px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.87rem;
+      }
+      footer p {
+        max-width: 80ch;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .switch .track,
+        .switch .thumb {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="bar">
+      <div class="wrap bar-in">
+        <a class="logo" href="#top">TrampoVision</a>
+        <nav id="nav" aria-label="Page" data-i18n-aria="navLabel">
+          <a href="#what" data-i18n="navWhat">What it does</a>
+          <a href="#how" data-i18n="navHow">How it works</a>
+          <a href="#privacy" data-i18n="navPrivacy">Privacy</a>
+          <a href="#limits" data-i18n="navLimits">Limits</a>
+          <a href="architecture.html" data-i18n="navMap">Architecture map</a>
+        </nav>
+        <div class="ctrls">
+          <label class="lang"
+            ><span class="vh" data-i18n="langLabel">Language</span>
+            <select id="lang" aria-label="Language" data-i18n-aria="langLabel">
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="ja">日本語</option>
+            </select>
+          </label>
+          <button type="button" id="theme" class="switch" role="switch" aria-checked="false">
+            <span class="track"><span class="thumb"></span></span>
+            <span data-i18n="darkMode">Dark mode</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="top">
+      <div class="wrap">
+        <div class="hero">
+          <p class="eyebrow" data-i18n="eyebrow">A trampoline video analysis prototype</p>
+          <h1 data-i18n="h1">Film your set. See what each skill was worth.</h1>
+          <p data-i18n="lead">
+            TrampoVision watches a trampoline video and tells you what each skill was, how hard it is, a proposed
+            execution score, and what to fix next. It runs in your browser, so your video stays with you.
+          </p>
+          <div class="cta">
+            <a class="btn" href="https://trampo-vision.vercel.app/" data-i18n="ctaApp">Open the app</a>
+            <a class="btn ghost" href="architecture.html" data-i18n="ctaMap">See how it is built</a>
+          </div>
+          <p class="fine" data-i18n="fine">
+            Works on a phone or a computer. Available in English, French, German and Japanese. It is a prototype, not an
+            official FIG tool.
+          </p>
+        </div>
+
+        <section id="what">
+          <p class="eyebrow" data-i18n="whatEyebrow">What you get</p>
+          <h2 data-i18n="whatH2">Four answers for every skill</h2>
+          <p class="lead" data-i18n="whatLead">
+            After a set is analysed, the app shows one row per skill. Tap a row to see the video at that moment.
+          </p>
+          <div class="cards">
+            <div class="card">
+              <h3 data-i18n="c1t">The name</h3>
+              <p data-i18n="c1p">
+                For example "Back somersault, tuck". When the app is not sure, it says so with a dashed mark and a
+                question mark.
+              </p>
+            </div>
+            <div class="card">
+              <h3 data-i18n="c2t">The difficulty</h3>
+              <p data-i18n="c2p">
+                Taken from the published FIG rule for trampoline, so the value is not a guess. It also shows how the
+                value is made.
+              </p>
+            </div>
+            <div class="card">
+              <h3 data-i18n="c3t">An execution score</h3>
+              <p data-i18n="c3p">
+                A proposal based on what one side camera can see, such as bent knees or a late opening. It is not a
+                judge's score.
+              </p>
+            </div>
+            <div class="card">
+              <h3 data-i18n="c4t">What to fix</h3>
+              <p data-i18n="c4p">
+                One clear tip for each thing that cost points, and the two things to work on first across the set.
+              </p>
+            </div>
+          </div>
+          <p style="margin-top: 16px" data-i18n="whatAfter">
+            If the app got a name wrong, you correct it in one tap. It remembers the correction and uses it for the next
+            skills.
+          </p>
+        </section>
+
+        <section id="how">
+          <p class="eyebrow" data-i18n="howEyebrow">How it works</p>
+          <h2 data-i18n="howH2">From video to score in five steps</h2>
+          <p class="lead" data-i18n="howLead">
+            Everything below happens on your device. There is no AI chatbot behind it: each number comes from simple
+            maths that the app can explain.
+          </p>
+          <ol class="steps">
+            <li>
+              <span class="n">1</span>
+              <div>
+                <h3 data-i18n="s1t">Read the video</h3>
+                <p data-i18n="s1p">
+                  The app steps through the video frame by frame, about 30 frames a second. If your browser cannot play
+                  the file, for example an iPhone video, it converts it first.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="n">2</span>
+              <div>
+                <h3 data-i18n="s2t">Find the body</h3>
+                <p data-i18n="s2p">
+                  A pose model (MediaPipe) places 33 points on the athlete in each frame: head, shoulders, hips, knees,
+                  feet and more. It follows the right person if others are in the picture.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="n">3</span>
+              <div>
+                <h3 data-i18n="s3t">Clean and measure</h3>
+                <p data-i18n="s3p">
+                  Doubtful points are removed and gaps are filled. From the cleaned skeleton the app works out the
+                  centre of mass, when each jump starts, peaks and lands, and how far the body turned.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="n">4</span>
+              <div>
+                <h3 data-i18n="s4t">Name the skill</h3>
+                <p data-i18n="s4p">
+                  The app counts somersaults and twists, checks the direction and the body position (tuck, pike or
+                  straight), and compares the shape of the jump with every element of the FIG table.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="n">5</span>
+              <div>
+                <h3 data-i18n="s5t">Score and coach</h3>
+                <p data-i18n="s5p">
+                  Difficulty comes from the rule. Execution comes from the pose. Tips come from the deductions. The set
+                  is then shown with its totals.
+                </p>
+              </div>
+            </li>
+          </ol>
+          <p style="margin-top: 18px" data-i18n="howMore">
+            Want the details, including the optional and experimental parts?
+            <a href="architecture.html">Open the interactive architecture map</a> and switch between the simplified and
+            the full view.
+          </p>
+        </section>
+
+        <section id="privacy">
+          <p class="eyebrow" data-i18n="privEyebrow">Privacy</p>
+          <h2 data-i18n="privH2">Your video does not leave your browser</h2>
+          <div class="panel">
+            <ul>
+              <li data-i18n="priv1">The video is analysed on your device. It is never uploaded and never stored.</li>
+              <li data-i18n="priv2">
+                The app keeps only numbers (measurements and your corrections) in your browser, so you can reopen a
+                recent set.
+              </li>
+              <li data-i18n="priv3">
+                Some builds can send the measurements, never the video, to a review service so a person can check the
+                answers. If yours does, a switch in the settings turns it off.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section id="limits">
+          <p class="eyebrow" data-i18n="limEyebrow">Be aware</p>
+          <div class="panel warn">
+            <h2 data-i18n="limH2">What it can and cannot do yet</h2>
+            <ul>
+              <li data-i18n="lim1">
+                <strong>It is a prototype.</strong> The scores are not official and they are not from FIG.
+              </li>
+              <li data-i18n="lim2">
+                <strong>Names are best guesses.</strong> The rules were tested on simulated athletes. They have not been
+                measured on a large set of real athletes yet.
+              </li>
+              <li data-i18n="lim3">
+                <strong>Execution is a proposal.</strong> One camera cannot see everything a judge sees, such as pointed
+                toes or feet together.
+              </li>
+              <li data-i18n="lim4">
+                <strong>Filming matters.</strong> Best results come from a fixed camera, level, filming the athlete from
+                the side.
+              </li>
+              <li data-i18n="lim5">
+                <strong>Twists are experimental.</strong> The app says when it cannot measure a twist reliably, instead
+                of guessing.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section id="more">
+          <p class="eyebrow" data-i18n="linksEyebrow">Go further</p>
+          <h2 data-i18n="linksH2">Links</h2>
+          <div class="links">
+            <a href="https://trampo-vision.vercel.app/"
+              ><strong data-i18n="k1t">The app</strong
+              ><span data-i18n="k1d">Open TrampoVision and analyse a set.</span></a
+            >
+            <a href="architecture.html"
+              ><strong data-i18n="k2t">Architecture map</strong
+              ><span data-i18n="k2d">Interactive overview of the pipeline, simplified or full.</span></a
+            >
+            <a href="https://github.com/ErwannRobin/TrampoVision#readme"
+              ><strong data-i18n="k3t">README</strong
+              ><span data-i18n="k3d">The full technical write-up, with the numbers behind each claim.</span></a
+            >
+            <a href="https://github.com/ErwannRobin/TrampoVision"
+              ><strong data-i18n="k4t">Source code</strong
+              ><span data-i18n="k4d">MIT licence. Contributions are welcome.</span></a
+            >
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <p data-i18n="footer">
+          Inspired by the French trampoline club Paris Trampo 12. Difficulty and execution follow the FIG Code of
+          Points. TrampoVision is not an official FIG tool.
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      (function () {
+        'use strict';
+        var LANGS = ['en', 'fr', 'de', 'ja'];
+        var D = {
+          fr: {
+            navLabel: 'Page',
+            langLabel: 'Langue',
+            darkMode: 'Mode sombre',
+            navWhat: 'Ce qu’il fait',
+            navHow: 'Comment ça marche',
+            navPrivacy: 'Confidentialité',
+            navLimits: 'Limites',
+            navMap: 'Carte d’architecture',
+            eyebrow: 'Un prototype d’analyse vidéo de trampoline',
+            h1: 'Filmez votre série. Voyez ce que valait chaque figure.',
+            lead: 'TrampoVision regarde une vidéo de trampoline et vous dit ce qu’était chaque figure, sa difficulté, une note d’exécution proposée et ce qu’il faut corriger ensuite. Tout se passe dans votre navigateur : votre vidéo reste chez vous.',
+            ctaApp: 'Ouvrir l’application',
+            ctaMap: 'Voir comment c’est construit',
+            fine: 'Fonctionne sur téléphone ou ordinateur. Disponible en anglais, français, allemand et japonais. C’est un prototype, pas un outil officiel de la FIG.',
+            whatEyebrow: 'Ce que vous obtenez',
+            whatH2: 'Quatre réponses pour chaque figure',
+            whatLead:
+              'Une fois la série analysée, l’application affiche une ligne par figure. Touchez une ligne pour voir la vidéo à ce moment.',
+            c1t: 'Le nom',
+            c1p: 'Par exemple « Salto arrière groupé ». Quand l’application n’est pas sûre, elle le signale par une marque en pointillés et un point d’interrogation.',
+            c2t: 'La difficulté',
+            c2p: 'Tirée de la règle publiée de la FIG pour le trampoline : la valeur n’est donc pas une supposition. L’application montre aussi comment elle se compose.',
+            c3t: 'Une note d’exécution',
+            c3p: 'Une proposition fondée sur ce qu’une caméra de côté peut voir, comme des jambes fléchies ou une ouverture tardive. Ce n’est pas la note d’un juge.',
+            c4t: 'Ce qu’il faut corriger',
+            c4p: 'Un conseil clair pour chaque chose qui a coûté des points, et les deux points à travailler d’abord sur l’ensemble de la série.',
+            whatAfter:
+              'Si l’application s’est trompée de nom, vous la corrigez d’un geste. Elle retient la correction et s’en sert pour les figures suivantes.',
+            howEyebrow: 'Comment ça marche',
+            howH2: 'De la vidéo à la note en cinq étapes',
+            howLead:
+              'Tout se passe sur votre appareil. Il n’y a pas de chatbot IA derrière : chaque nombre vient de calculs simples que l’application peut expliquer.',
+            s1t: 'Lire la vidéo',
+            s1p: 'L’application parcourt la vidéo image par image, environ 30 images par seconde. Si votre navigateur ne lit pas le fichier, par exemple une vidéo d’iPhone, elle la convertit d’abord.',
+            s2t: 'Trouver le corps',
+            s2p: 'Un modèle de pose (MediaPipe) place 33 points sur l’athlète dans chaque image : tête, épaules, hanches, genoux, pieds et plus. Il suit la bonne personne s’il y en a d’autres dans l’image.',
+            s3t: 'Nettoyer et mesurer',
+            s3p: 'Les points douteux sont retirés et les trous comblés. À partir du squelette nettoyé, l’application calcule le centre de masse, le moment où chaque saut démarre, culmine et se termine, et de combien le corps a tourné.',
+            s4t: 'Nommer la figure',
+            s4p: 'L’application compte les saltos et les vrilles, vérifie le sens et la position du corps (groupé, carpé ou tendu), et compare la forme du saut à chaque élément du tableau de la FIG.',
+            s5t: 'Noter et conseiller',
+            s5p: 'La difficulté vient de la règle. L’exécution vient de la pose. Les conseils viennent des déductions. La série est ensuite affichée avec ses totaux.',
+            howMore:
+              'Envie de détails, y compris les parties facultatives et expérimentales ? <a href="architecture.html">Ouvrez la carte d’architecture interactive</a> et passez de la vue simplifiée à la vue complète.',
+            privEyebrow: 'Confidentialité',
+            privH2: 'Votre vidéo ne quitte pas votre navigateur',
+            priv1: 'La vidéo est analysée sur votre appareil. Elle n’est jamais envoyée ni stockée.',
+            priv2:
+              'L’application ne garde que des nombres (mesures et corrections) dans votre navigateur, pour que vous puissiez rouvrir une série récente.',
+            priv3:
+              'Certaines versions peuvent envoyer les mesures, jamais la vidéo, à un service de relecture pour qu’une personne vérifie les réponses. Si c’est le cas de la vôtre, un interrupteur dans les réglages le désactive.',
+            limEyebrow: 'À savoir',
+            limH2: 'Ce qu’il sait et ne sait pas encore faire',
+            lim1: '<strong>C’est un prototype.</strong> Les notes ne sont pas officielles et ne viennent pas de la FIG.',
+            lim2: '<strong>Les noms sont des meilleures hypothèses.</strong> Les règles ont été testées sur des athlètes simulés. Elles n’ont pas encore été mesurées sur un grand nombre de vrais athlètes.',
+            lim3: '<strong>L’exécution est une proposition.</strong> Une seule caméra ne voit pas tout ce qu’un juge voit, comme les pointes de pieds tendues ou les pieds joints.',
+            lim4: '<strong>La façon de filmer compte.</strong> Les meilleurs résultats viennent d’une caméra fixe, de niveau, qui filme l’athlète de côté.',
+            lim5: '<strong>Les vrilles sont expérimentales.</strong> L’application dit quand elle ne peut pas mesurer une vrille de façon fiable, au lieu de deviner.',
+            linksEyebrow: 'Aller plus loin',
+            linksH2: 'Liens',
+            k1t: 'L’application',
+            k1d: 'Ouvrez TrampoVision et analysez une série.',
+            k2t: 'Carte d’architecture',
+            k2d: 'Vue d’ensemble interactive du pipeline, simplifiée ou complète.',
+            k3t: 'README',
+            k3d: 'L’exposé technique complet, avec les chiffres derrière chaque affirmation.',
+            k4t: 'Code source',
+            k4d: 'Licence MIT. Les contributions sont bienvenues.',
+            footer:
+              'Inspiré par le club de trampoline français Paris Trampo 12. La difficulté et l’exécution suivent le Code de pointage de la FIG. TrampoVision n’est pas un outil officiel de la FIG.',
+          },
+          de: {
+            navLabel: 'Seite',
+            langLabel: 'Sprache',
+            darkMode: 'Dunkler Modus',
+            navWhat: 'Was es kann',
+            navHow: 'So funktioniert es',
+            navPrivacy: 'Datenschutz',
+            navLimits: 'Grenzen',
+            navMap: 'Architekturkarte',
+            eyebrow: 'Ein Prototyp zur Videoanalyse im Trampolinturnen',
+            h1: 'Filmen Sie Ihre Übung. Sehen Sie, was jedes Element wert war.',
+            lead: 'TrampoVision sieht sich ein Trampolinvideo an und sagt Ihnen, was jedes Element war, wie schwer es ist, eine vorgeschlagene Haltungsnote und was als Nächstes zu verbessern ist. Alles läuft in Ihrem Browser, Ihr Video bleibt bei Ihnen.',
+            ctaApp: 'App öffnen',
+            ctaMap: 'Aufbau ansehen',
+            fine: 'Funktioniert auf dem Handy und am Computer. Verfügbar auf Englisch, Französisch, Deutsch und Japanisch. Es ist ein Prototyp und kein offizielles FIG-Werkzeug.',
+            whatEyebrow: 'Was Sie bekommen',
+            whatH2: 'Vier Antworten für jedes Element',
+            whatLead:
+              'Nach der Analyse einer Übung zeigt die App eine Zeile pro Element. Tippen Sie auf eine Zeile, um das Video an dieser Stelle zu sehen.',
+            c1t: 'Der Name',
+            c1p: 'Zum Beispiel „Salto rückwärts, gehockt“. Ist sich die App nicht sicher, sagt sie das mit einer gestrichelten Markierung und einem Fragezeichen.',
+            c2t: 'Die Schwierigkeit',
+            c2p: 'Aus der veröffentlichten FIG-Regel für Trampolin abgeleitet, der Wert ist also nicht geraten. Die App zeigt auch, wie sich der Wert zusammensetzt.',
+            c3t: 'Eine Haltungsnote',
+            c3p: 'Ein Vorschlag auf Grundlage dessen, was eine seitliche Kamera sehen kann, etwa gebeugte Knie oder eine späte Öffnung. Es ist nicht die Note eines Kampfrichters.',
+            c4t: 'Was zu verbessern ist',
+            c4p: 'Ein klarer Tipp für jede Sache, die Punkte gekostet hat, und die zwei Punkte, an denen Sie über die ganze Übung zuerst arbeiten sollten.',
+            whatAfter:
+              'Hat die App einen Namen falsch erkannt, korrigieren Sie ihn mit einem Tippen. Sie merkt sich die Korrektur und nutzt sie für die nächsten Elemente.',
+            howEyebrow: 'So funktioniert es',
+            howH2: 'Vom Video zur Note in fünf Schritten',
+            howLead:
+              'Alles läuft auf Ihrem Gerät. Dahinter steckt kein KI-Chatbot: Jede Zahl stammt aus einfacher Mathematik, die die App erklären kann.',
+            s1t: 'Das Video lesen',
+            s1p: 'Die App geht das Video Bild für Bild durch, etwa 30 Bilder pro Sekunde. Kann Ihr Browser die Datei nicht abspielen, zum Beispiel ein iPhone-Video, wandelt sie sie zuerst um.',
+            s2t: 'Den Körper finden',
+            s2p: 'Ein Posenmodell (MediaPipe) setzt in jedem Bild 33 Punkte auf den Sportler: Kopf, Schultern, Hüften, Knie, Füße und mehr. Es folgt der richtigen Person, wenn weitere im Bild sind.',
+            s3t: 'Bereinigen und messen',
+            s3p: 'Zweifelhafte Punkte werden entfernt und Lücken gefüllt. Aus dem bereinigten Skelett berechnet die App den Körperschwerpunkt, wann jeder Sprung beginnt, seinen Höhepunkt erreicht und endet, und wie weit sich der Körper gedreht hat.',
+            s4t: 'Das Element benennen',
+            s4p: 'Die App zählt Saltos und Schrauben, prüft die Richtung und die Körperhaltung (gehockt, gebückt oder gestreckt) und vergleicht die Form des Sprungs mit jedem Element der FIG-Tabelle.',
+            s5t: 'Bewerten und coachen',
+            s5p: 'Die Schwierigkeit kommt aus der Regel. Die Haltung kommt aus der Pose. Die Tipps kommen aus den Abzügen. Danach wird die Übung mit ihren Summen gezeigt.',
+            howMore:
+              'Möchten Sie die Einzelheiten, auch zu den optionalen und experimentellen Teilen? <a href="architecture.html">Öffnen Sie die interaktive Architekturkarte</a> und wechseln Sie zwischen der einfachen und der vollständigen Ansicht.',
+            privEyebrow: 'Datenschutz',
+            privH2: 'Ihr Video verlässt Ihren Browser nicht',
+            priv1: 'Das Video wird auf Ihrem Gerät analysiert. Es wird nie hochgeladen und nie gespeichert.',
+            priv2:
+              'Die App behält nur Zahlen (Messwerte und Ihre Korrekturen) in Ihrem Browser, damit Sie eine zuletzt verwendete Übung wieder öffnen können.',
+            priv3:
+              'Manche Versionen können die Messwerte, nie das Video, an einen Prüfdienst senden, damit eine Person die Antworten kontrolliert. Falls Ihre das tut, schaltet ein Schalter in den Einstellungen es ab.',
+            limEyebrow: 'Zur Beachtung',
+            limH2: 'Was es schon kann und was noch nicht',
+            lim1: '<strong>Es ist ein Prototyp.</strong> Die Noten sind nicht offiziell und stammen nicht von der FIG.',
+            lim2: '<strong>Namen sind beste Vermutungen.</strong> Die Regeln wurden an simulierten Sportlern getestet. An einer großen Zahl echter Sportler wurden sie noch nicht gemessen.',
+            lim3: '<strong>Die Haltungsnote ist ein Vorschlag.</strong> Eine Kamera sieht nicht alles, was ein Kampfrichter sieht, etwa gestreckte Fußspitzen oder geschlossene Füße.',
+            lim4: '<strong>Das Filmen zählt.</strong> Die besten Ergebnisse kommen von einer festen, waagerechten Kamera, die den Sportler von der Seite filmt.',
+            lim5: '<strong>Schrauben sind experimentell.</strong> Die App sagt, wenn sie eine Schraube nicht verlässlich messen kann, statt zu raten.',
+            linksEyebrow: 'Weiter',
+            linksH2: 'Links',
+            k1t: 'Die App',
+            k1d: 'TrampoVision öffnen und eine Übung analysieren.',
+            k2t: 'Architekturkarte',
+            k2d: 'Interaktive Übersicht über die Pipeline, einfach oder vollständig.',
+            k3t: 'README',
+            k3d: 'Die vollständige technische Beschreibung, mit den Zahlen hinter jeder Aussage.',
+            k4t: 'Quellcode',
+            k4d: 'MIT-Lizenz. Beiträge sind willkommen.',
+            footer:
+              'Inspiriert vom französischen Trampolinclub Paris Trampo 12. Schwierigkeit und Haltung folgen den FIG-Wertungsvorschriften. TrampoVision ist kein offizielles FIG-Werkzeug.',
+          },
+          ja: {
+            navLabel: 'ページ',
+            langLabel: '言語',
+            darkMode: 'ダークモード',
+            navWhat: 'できること',
+            navHow: '仕組み',
+            navPrivacy: 'プライバシー',
+            navLimits: '限界',
+            navMap: 'アーキテクチャマップ',
+            eyebrow: 'トランポリン動画解析のプロトタイプ',
+            h1: '演技を撮影。各技の価値が見えます。',
+            lead: 'TrampoVision はトランポリンの動画を見て、各技が何だったか、その難度、演技点の提案、次に直すべき点を教えます。すべてブラウザの中で動くので、動画はあなたの手元にとどまります。',
+            ctaApp: 'アプリを開く',
+            ctaMap: '作りを見る',
+            fine: 'スマートフォンでもパソコンでも使えます。英語、フランス語、ドイツ語、日本語に対応。プロトタイプであり、FIG の公式ツールではありません。',
+            whatEyebrow: '得られるもの',
+            whatH2: '技ごとに 4 つの答え',
+            whatLead:
+              '演技の解析が終わると、アプリは技ごとに 1 行を表示します。行をタップすると、その場面の動画が見られます。',
+            c1t: '名前',
+            c1p: 'たとえば「後方宙返り（抱え込み）」。確信が持てないときは、破線の印とクエスチョンマークで知らせます。',
+            c2t: '難度',
+            c2p: 'FIG が公表しているトランポリンの規則から求めるので、推測ではありません。値の内訳も表示します。',
+            c3t: '演技点の提案',
+            c3p: '膝の曲がりや開きの遅れなど、真横のカメラで見えるものに基づく提案です。審判の得点ではありません。',
+            c4t: '直すべき点',
+            c4p: '点を失った原因ごとの分かりやすいアドバイスと、セット全体でまず取り組むべき 2 点を示します。',
+            whatAfter: '名前が違っていたら、1 タップで直せます。アプリはその修正を覚えて、次の技に活かします。',
+            howEyebrow: '仕組み',
+            howH2: '動画から得点まで 5 ステップ',
+            howLead:
+              'すべてあなたの端末の中で行われます。裏に AI チャットボットはいません。数値はすべて、アプリが説明できる単純な計算から得られます。',
+            s1t: '動画を読む',
+            s1p: 'アプリは動画を 1 コマずつ、毎秒約 30 フレームで調べます。ブラウザがファイルを再生できない場合（たとえば iPhone の動画）は、先に変換します。',
+            s2t: '体を見つける',
+            s2p: '姿勢モデル（MediaPipe）が、各フレームで選手に 33 個の点を置きます。頭、肩、腰、膝、足などです。他の人が映っていても、正しい人を追います。',
+            s3t: '整えて計測する',
+            s3p: '疑わしい点を取り除き、欠けを埋めます。整えた骨格から、重心、各ジャンプの踏み切り・頂点・着地、体がどれだけ回ったかを求めます。',
+            s4t: '技に名前を付ける',
+            s4p: '宙返りとひねりの数を数え、方向と体の姿勢（抱え込み、屈伸、伸身）を調べ、ジャンプの形を FIG の表のすべての技と比べます。',
+            s5t: '採点してアドバイスする',
+            s5p: '難度は規則から、演技点は姿勢から、アドバイスは減点から導きます。その後、セットを合計とともに表示します。',
+            howMore:
+              '詳しく知りたい方へ。オプションや実験的な部分も含めて、<a href="architecture.html">インタラクティブなアーキテクチャマップ</a>を開き、シンプル表示とフル表示を切り替えてください。',
+            privEyebrow: 'プライバシー',
+            privH2: '動画はブラウザの外に出ません',
+            priv1: '動画はあなたの端末上で解析されます。アップロードも保存もされません。',
+            priv2: 'アプリがブラウザに残すのは数値（測定値と修正）だけで、最近のセットを開き直せるようにするためです。',
+            priv3:
+              'ビルドによっては、動画ではなく測定値だけをレビューサービスに送り、人が答えを確認することがあります。お使いのものが該当する場合は、設定のスイッチで止められます。',
+            limEyebrow: 'ご注意',
+            limH2: '今できること、まだできないこと',
+            lim1: '<strong>プロトタイプです。</strong>得点は公式のものではなく、FIG から出たものでもありません。',
+            lim2: '<strong>名前は最良の推測です。</strong>規則はシミュレーションした選手でテストされました。多数の実際の選手ではまだ測られていません。',
+            lim3: '<strong>演技点は提案です。</strong>カメラ 1 台では、つま先の伸びや足の閉じなど、審判が見るものすべては見えません。',
+            lim4: '<strong>撮り方が大切です。</strong>固定した水平のカメラで、選手を横から撮ると最良の結果になります。',
+            lim5: '<strong>ひねりは実験的です。</strong>ひねりを確実に測れないときは、推測せずにそう表示します。',
+            linksEyebrow: 'さらに詳しく',
+            linksH2: 'リンク',
+            k1t: 'アプリ',
+            k1d: 'TrampoVision を開いて、演技を解析します。',
+            k2t: 'アーキテクチャマップ',
+            k2d: 'パイプラインのインタラクティブな概観（シンプル／フル）。',
+            k3t: 'README',
+            k3d: '各主張の根拠となる数値を含む、技術的な詳細全文。',
+            k4t: 'ソースコード',
+            k4d: 'MIT ライセンス。貢献を歓迎します。',
+            footer:
+              'フランスのトランポリンクラブ Paris Trampo 12 に着想を得ました。難度と演技点は FIG の採点規則に従います。TrampoVision は FIG の公式ツールではありません。',
+          },
+        };
+        var TITLES = { en: 'TrampoVision', fr: 'TrampoVision', de: 'TrampoVision', ja: 'TrampoVision' };
+        var root = document.documentElement;
+        var EN = {};
+        var els = document.querySelectorAll('[data-i18n]');
+        els.forEach(function (el) {
+          EN[el.getAttribute('data-i18n')] = el.innerHTML;
+        });
+        var arias = document.querySelectorAll('[data-i18n-aria]');
+        arias.forEach(function (el) {
+          EN[el.getAttribute('data-i18n-aria')] =
+            EN[el.getAttribute('data-i18n-aria')] || el.getAttribute('aria-label');
+        });
+        EN.navLabel = 'Page';
+
+        function text(lang, key) {
+          var d = D[lang];
+          return d && d[key] != null ? d[key] : EN[key];
+        }
+        function setLang(lang, persist) {
+          if (LANGS.indexOf(lang) < 0) lang = 'en';
+          root.setAttribute('lang', lang);
+          els.forEach(function (el) {
+            el.innerHTML = text(lang, el.getAttribute('data-i18n'));
+          });
+          arias.forEach(function (el) {
+            el.setAttribute('aria-label', text(lang, el.getAttribute('data-i18n-aria')));
+          });
+          document.getElementById('lang').value = lang;
+          document.title = TITLES[lang];
+          if (persist) {
+            try {
+              localStorage.setItem('tv-lang', lang);
+            } catch (e) {}
+          }
+        }
+
+        function currentTheme() {
+          var a = root.getAttribute('data-theme');
+          if (a === 'dark' || a === 'light') return a;
+          return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        function syncSwitch() {
+          document.getElementById('theme').setAttribute('aria-checked', String(currentTheme() === 'dark'));
+        }
+        function setTheme(t) {
+          root.setAttribute('data-theme', t);
+          syncSwitch();
+          try {
+            localStorage.setItem('tv-theme', t);
+          } catch (e) {}
+        }
+
+        document.getElementById('lang').onchange = function () {
+          setLang(this.value, true);
+        };
+        document.getElementById('theme').onclick = function () {
+          setTheme(currentTheme() === 'dark' ? 'light' : 'dark');
+        };
+        if (window.matchMedia) {
+          var mq = matchMedia('(prefers-color-scheme: dark)');
+          if (mq.addEventListener) mq.addEventListener('change', syncSwitch);
+        }
+
+        var start = null;
+        try {
+          start = localStorage.getItem('tv-lang');
+        } catch (e) {}
+        if (!start) {
+          var nl = ((navigator.language || 'en') + '').slice(0, 2).toLowerCase();
+          start = LANGS.indexOf(nl) >= 0 ? nl : 'en';
+        }
+        syncSwitch();
+        setLang(start, false);
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            root.classList.remove('preload');
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
