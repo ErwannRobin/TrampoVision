@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: icons consistency eval jev-eval eval-fetch label-sheet worker-schema worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets upload-assets remove-asset convert clean distclean
+.PHONY: icons consistency eval jev-eval eval-fetch label-sheet worker-schema worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets upload-assets remove-asset precompute-samples convert clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -48,6 +48,10 @@ upload-assets: node_modules ## Upload models, wasm and samples to the Blob asset
 remove-asset: node_modules ## Delete from the Blob asset host: ASSET="path-in-store or sample name ..." [DRY_RUN=1] (a sample name without extension removes its .mp4 and .MOV)
 	@test -n "$(ASSET)" || { echo 'usage: make remove-asset ASSET=synchro.mp4 [DRY_RUN=1]'; exit 1; }
 	npm run remove-asset -- $(ASSET) $(if $(DRY_RUN),--dry-run)
+
+precompute-samples: node_modules ## Analyze the sample videos once so the app skips the pose model: [SAMPLES=dir] [FORCE=1] (needs Google Chrome; installs playwright-core if missing)
+	@test -d node_modules/playwright-core || npm i --no-save playwright-core
+	npm run precompute-samples -- $(if $(SAMPLES),--samples $(SAMPLES)) $(if $(FORCE),--force)
 
 icons: node_modules ## Re-render the home-screen icons in public/ from the logo
 	node scripts/icons.mjs
