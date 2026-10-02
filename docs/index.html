@@ -155,6 +155,7 @@
         padding-top: env(safe-area-inset-top, 0px);
       }
       .bar-in {
+        max-width: 1240px;
         display: flex;
         flex-wrap: wrap;
         gap: 10px 22px;
@@ -173,8 +174,22 @@
       .bar nav {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px 20px;
+        gap: 6px clamp(12px, 1.6vw, 20px);
         font-size: 0.95rem;
+      }
+      .bar nav a,
+      .logo,
+      .switch,
+      .lang {
+        white-space: nowrap;
+      }
+      /* Wide screens: header never wraps, whatever the language */
+      @media (min-width: 1060px) {
+        .bar-in,
+        .bar nav,
+        .ctrls {
+          flex-wrap: nowrap;
+        }
       }
       .bar nav a {
         color: var(--muted);
