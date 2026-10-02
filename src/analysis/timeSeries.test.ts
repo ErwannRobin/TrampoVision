@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { LANDMARK_COUNT } from '../pose/landmarks';
 import { computeAnalysis } from './computeAnalysis';
 import { addNoise, syntheticRoutine } from './testTracks';
-import { buildFeatureMatrix, buildPoseSeries, parsePoseSeries, SERIES_SCHEMA, toSeriesJson } from './timeSeries';
+import {
+  buildFeatureMatrix,
+  buildPoseSeries,
+  buildPoseSeriesSet,
+  parsePoseSeries,
+  SERIES_SCHEMA,
+  toSeriesJson,
+} from './timeSeries';
 import type { TrampolineCalibration } from './calibration';
 
 const calibration: TrampolineCalibration = {
@@ -169,5 +176,31 @@ describe('3D landmarks and the video id in the stored series', () => {
     const data = JSON.parse(toSeriesJson(buildPoseSeries(result, withWorld, info())));
     data.rawWorld[10] = data.rawWorld[10].slice(0, 5);
     expect(() => parsePoseSeries(JSON.stringify(data))).toThrow(/3D frame/);
+  });
+});
+
+describe('several athletes in one file', () => {
+  const a = syntheticRoutine({ jumps: [{ v0: 4.5 }] }).track;
+  const b = syntheticRoutine({ jumps: [{ v0: 4.5 }, { v0: 4.5 }] }).track;
+  const set = (list: (typeof a)[]) =>
+    toSeriesJson(
+      buildPoseSeriesSet(
+        list.map((track, i) => ({ result: computeAnalysis(track), track, videoId: `v#${i + 1}` })),
+        info(),
+      ),
+    );
+
+  it('round-trips every athlete, the first one being the file itself', () => {
+    const parsed = parsePoseSeries(set([a, b]));
+    expect(parsed.tracks).toHaveLength(2);
+    expect(parsed.track).toBe(parsed.tracks[0]);
+    expect(parsed.tracks[0].frames).toHaveLength(a.frames.length);
+    expect(parsed.tracks[1].frames).toHaveLength(b.frames.length);
+  });
+
+  it('is the same file as before for one athlete', () => {
+    const text = set([a]);
+    expect(text).not.toContain('"athletes"');
+    expect(parsePoseSeries(text).tracks).toHaveLength(1);
   });
 });

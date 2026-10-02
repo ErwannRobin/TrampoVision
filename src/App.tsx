@@ -41,7 +41,7 @@ import { analyzeSkills } from './skills/analyzeSkills';
 import { analyzeTwist2d } from './skills/twist2d';
 import { DEFAULT_SKILL_CONFIG, type SkillConfig } from './skills/config';
 import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from './skills/export';
-import { buildPoseSeries, parsePoseSeries, toSeriesJson, type ParsedSeries } from './analysis/timeSeries';
+import { buildPoseSeriesSet, parsePoseSeries, toSeriesJson, type ParsedSeries } from './analysis/timeSeries';
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point, PoseEngineId } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
@@ -113,6 +113,9 @@ function saveCalibration(file: File | null, cal: SavedCalibration) {
     /* storage unavailable: the calibration just isn't remembered */
   }
 }
+
+/** The id of the clip, whichever athlete's id it is given. */
+const clipVideoId = (id: string) => id.replace(/#\d+$/, '');
 
 /** Each athlete of a clip is a video of their own for the labels: the first keeps the id of the clip. */
 function athleteVideoId(base: string | null, index: number): string | null {
@@ -580,7 +583,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
       // A series opened over its own video (a sample) stays on the video, and keeps the id of that file.
       openedSeries.current = !opts?.withVideo;
       setAthleteIdx(0);
-      setTracks([parsed.track]);
+      setTracks(parsed.tracks);
+      setCompare(parsed.tracks.length > 1);
       setSeriesName(parsed.source.fileName);
       if (!opts?.withVideo) {
         setVideoId(parsed.source.videoId ?? fileVideoId ?? videoIdFromTrack(parsed.source.fileName, parsed.track));
@@ -695,13 +699,29 @@ function AppView({ playhead }: { playhead: Playhead }) {
   );
   // What the full screen says about each jump.
   const fullscreenJumps = useMemo(() => hudJumps(session), [session]);
+  /** The saved analysis of the clip: every athlete followed in it, the one on screen first. */
+  function serializeSeries(name: string, id: string | null, cal: typeof calibration): string {
+    const athletes = tracks.map((tr, i) => ({
+      result:
+        i === athleteIdx && result
+          ? result
+          : computeAnalysis(
+              tr,
+              { athleteHeightM: height, calibration: analysisCalibration, scaleSource },
+              stabilizePose(tr),
+            ),
+      track: tr,
+      videoId: athleteVideoId(id, i) ?? undefined,
+    }));
+    return toSeriesJson(buildPoseSeriesSet(athletes, { fileName: name, stride, minVisibility: 0.4, calibration: cal }));
+  }
   // The set on screen, as the recent sets keep it: stored when the analysis completes, and again whenever what the live view says about
   // it changes (a skill the coach confirms, changes or deletes). Only when the saved records are read, so a set that is reopened has its labels.
   const setSnapshot = useMemo<SetSnapshot | null>(() => {
     if (!track || !result || !session || !videoId || !dataset.ready) return null;
     const name = file?.name ?? seriesName ?? '';
     return {
-      id: videoId,
+      id: clipVideoId(videoId),
       fileName: name,
       track,
       settingsKey: JSON.stringify([height, scaleSource, stride, analysisCalibration]),
@@ -709,16 +729,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
       pending: session.summary.pending,
       difficulty: session.summary.difficulty,
       jumps: session.jumps.length,
-      serialize: () =>
-        toSeriesJson(
-          buildPoseSeries(result, track, {
-            fileName: name,
-            videoId,
-            stride,
-            minVisibility: 0.4,
-            calibration: analysisCalibration,
-          }),
-        ),
+      serialize: () => serializeSeries(name, clipVideoId(videoId), analysisCalibration),
     };
   }, [
     track,
@@ -957,16 +968,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
             onSelect: () =>
               track &&
               download(
-                `${base}-pose-series.json`,
-                toSeriesJson(
-                  buildPoseSeries(result, track, {
-                    fileName,
-                    videoId: videoId ?? undefined,
-                    stride,
-                    minVisibility: 0.4,
-                    calibration,
-                  }),
-                ),
+                `${clipBase}-pose-series.json`,
+                serializeSeries(fileName, videoId && clipVideoId(videoId), calibration),
                 'application/json',
               ),
           },
