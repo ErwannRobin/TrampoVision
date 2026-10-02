@@ -1,6 +1,6 @@
 /**
  * Jev against the current classifier on reviewed jumps, offline. Only measurements are sent to Jev, never a video.
- *   TYPESAFE_API_KEY=... make jev-eval FILE=eval/export.ndjson [DEBUG=1]
+ *   TYPESAFE_API_KEY=... make eval-jev FILE=eval/export.ndjson [DEBUG=1]
  * Options: --debug (signature, top 5, reason and final element of every jump), --all (also the jumps nobody labelled: lists where the two
  * disagree instead of scoring), --examples (give the local classifier the reviewed
  * jumps of the other videos too), --json out.json. Without a key, Jev is skipped and the local answer is the fallback.

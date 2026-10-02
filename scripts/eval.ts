@@ -1,9 +1,9 @@
 /**
  * Scores the current classifier on reviewed jumps, offline.
- *   make eval FILE=eval/export.ndjson        (the review service's /export, or a dataset JSON saved by the app; several files are fine)
- *   make eval FILE=... BASELINE=eval/baseline.json     fails when a change made things worse
- *   make eval FILE=... SAVE=eval/baseline.json         records the current numbers as the baseline
- *   make eval FILE=... LABELS=eval/labels              also reads the stage labels written by hand (default: eval/labels when it exists)
+ *   make eval-run FILE=eval/export.ndjson        (the review service's /export, or a dataset JSON saved by the app; several files are fine)
+ *   make eval-run FILE=... BASELINE=eval/baseline.json     fails when a change made things worse
+ *   make eval-run FILE=... SAVE=eval/baseline.json         records the current numbers as the baseline
+ *   make eval-run FILE=... LABELS=eval/labels              also reads the stage labels written by hand (default: eval/labels when it exists)
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { applyLabels, formatStageReport, parseLabelFile, runStageEval, type LabelFile } from '../src/eval/labels';

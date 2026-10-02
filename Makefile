@@ -1,8 +1,15 @@
 .DEFAULT_GOAL := help
-.PHONY: icons consistency eval jev-eval eval-fetch label-sheet worker-schema worker-dev worker-check worker-deploy help install dev build preview typecheck lint format format-check test test-watch check assets assets-upload asset-remove assets-remove precompute-samples convert clean distclean
+
+# Every target with a `##` description is phony (node_modules is the one real file target).
+.PHONY: $(shell grep -hoE '^[a-zA-Z0-9_-]+:.*\#\#' $(MAKEFILE_LIST) | cut -d: -f1)
+
+# $(call require,VAR,usage line): stop with the usage line when VAR is empty. Keep commas out of the usage line.
+require = @test -n "$($(1))" || { echo 'usage: $(2)'; exit 1; }
 
 help: ## Show this help
-	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "} /^##@/ {printf "\n\033[1m%s\033[0m\n", substr($$0, 5)} /^[a-zA-Z0-9_-]+:.*## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+##@ Develop
 
 node_modules: package.json package-lock.json
 	npm ci
@@ -18,6 +25,14 @@ build: node_modules ## Typecheck + production build into dist/
 
 preview: build ## Serve the production build locally
 	npm run preview
+
+clean: ## Remove build output
+	rm -rf dist *.tsbuildinfo
+
+distclean: clean ## Also remove node_modules and downloaded assets
+	rm -rf node_modules public/mediapipe public/models
+
+##@ Check
 
 typecheck: node_modules ## Typecheck only
 	npm run typecheck
@@ -37,19 +52,27 @@ test: node_modules ## Run unit tests once
 test-watch: node_modules ## Run tests in watch mode
 	npx vitest
 
-check: typecheck worker-check lint format-check test ## Typecheck, lint, format check, tests (what CI runs)
+check: typecheck worker-check lint format-check test ## Typecheck, lint, format check, tests
 
-assets: node_modules ## Re-download MediaPipe runtime + pose models into public/
+ci: check build ## Everything CI runs
+
+##@ Assets (the Blob asset host reads BLOB_READ_WRITE_TOKEN, .env.local or .env)
+
+assets-download: node_modules ## Re-download MediaPipe runtime + pose models into public/
 	npm run fetch-assets
 
-assets-upload: node_modules ## Upload models, wasm and samples to the Blob asset host: [SAMPLES=dir] [DRY_RUN=1] [FORCE=1] (skips what is already there; token from BLOB_READ_WRITE_TOKEN, .env.local or .env)
+assets-upload: node_modules ## Upload models, wasm, samples: [SAMPLES=dir] [FORCE=1] [DRY_RUN=1]
 	npm run assets-upload -- $(if $(SAMPLES),--samples $(SAMPLES)) $(if $(DRY_RUN),--dry-run) $(if $(FORCE),--force)
 
-asset-remove: node_modules ## Delete files from the Blob asset host: make asset-remove NAME... [DRY_RUN=1] (a store path, or a sample name; without extension it removes the clip: .mp4, .MOV and .pose.json)
-	@test -n "$(ASSET_NAMES)" || { echo 'usage: make asset-remove synchro.mp4 [other ...] [DRY_RUN=1]'; exit 1; }
+assets-precompute: node_modules ## Analyze sample videos so the app skips the pose model: [SAMPLES=dir] [FORCE=1]
+	@test -d node_modules/playwright-core || npm i --no-save playwright-core
+	npm run precompute-samples -- $(if $(SAMPLES),--samples $(SAMPLES)) $(if $(FORCE),--force)
+
+asset-remove: node_modules ## Delete from the host: make asset-remove NAME... [DRY_RUN=1]
+	$(call require,ASSET_NAMES,make asset-remove synchro.mp4 [other ...] [DRY_RUN=1]  (a store path or a sample name; a name without extension removes the clip: .mp4 .MOV .pose.json))
 	npm run asset-remove -- $(ASSET_NAMES) $(if $(DRY_RUN),--dry-run)
 
-assets-remove: node_modules ## Delete a kind of asset from the Blob asset host, after a confirmation: [WHAT=videos|samples|models|wasm|all] [YES=1] [DRY_RUN=1] (no WHAT: asks; videos = sample videos only, samples = videos + analysis)
+assets-remove: node_modules ## Delete a kind after a confirmation: [WHAT=videos|samples|models|wasm|all] [YES=1] [DRY_RUN=1]
 	npm run assets-remove -- $(WHAT) $(if $(YES),--yes) $(if $(DRY_RUN),--dry-run)
 
 # `make asset-remove synchro.mp4`: the other words of the command line are the names, not targets
@@ -59,53 +82,48 @@ $(ASSET_NAMES):
 	@:
 endif
 
-precompute-samples: node_modules ## Analyze the sample videos once so the app skips the pose model: [SAMPLES=dir] [FORCE=1] (needs Google Chrome; installs playwright-core if missing)
-	@test -d node_modules/playwright-core || npm i --no-save playwright-core
-	npm run precompute-samples -- $(if $(SAMPLES),--samples $(SAMPLES)) $(if $(FORCE),--force)
-
 icons: node_modules ## Re-render the home-screen icons in public/ from the logo
 	node scripts/icons.mjs
 
-convert: ## Re-encode VIDEO=path/to.MOV to a Chrome-friendly H.264 .mp4 next to it (needs ffmpeg)
-	@test -n "$(VIDEO)" || { echo "usage: make convert VIDEO=path/to/file.MOV"; exit 1; }
+video-convert: ## Re-encode VIDEO=path/to.MOV to a Chrome-friendly H.264 .mp4 (needs ffmpeg)
+	$(call require,VIDEO,make video-convert VIDEO=path/to/file.MOV)
 	ffmpeg -y -i "$(VIDEO)" -c:v libx264 -crf 18 -pix_fmt yuv420p -g 15 -an -movflags +faststart "$(basename $(VIDEO)).mp4"
 
-clean: ## Remove build output
-	rm -rf dist *.tsbuildinfo
+##@ Classifier evaluation
 
-distclean: clean ## Also remove node_modules and downloaded assets
-	rm -rf node_modules public/mediapipe public/models
-
-worker-check: node_modules ## Typecheck the review Worker (worker/)
-	cd worker && npx tsc -p .
-
-worker-dev: node_modules ## Run the review Worker locally on :8799 (needs worker/.dev.vars with INGEST_TOKEN and REVIEW_TOKEN)
-	cd worker && npx wrangler d1 execute trampovision-review --local --file=schema.sql && npx wrangler dev --local --port 8799
-
-worker-deploy: node_modules ## Deploy the review Worker (run worker-schema first, and only when schema.sql changes; needs d1 create + wrangler secret put INGEST_TOKEN / REVIEW_TOKEN)
-	cd worker && npx wrangler deploy
-
-eval: node_modules ## Score the classifier on reviewed jumps: FILE=eval/export.ndjson [LABELS=eval/labels] [BASELINE=eval/baseline.json | SAVE=eval/baseline.json]
-	@test -n "$(FILE)" || { echo "usage: make eval FILE=eval/export.ndjson [BASELINE=f.json | SAVE=f.json]  (get the file with: make eval-fetch)"; exit 1; }
-	npx vite-node scripts/eval.ts $(FILE) $(if $(LABELS),--labels $(LABELS)) $(if $(BASELINE),--baseline $(BASELINE)) $(if $(SAVE),--save $(SAVE))
-
-label-sheet: node_modules ## Make a labeling sheet, blank label file and filmstrip commands from a dataset: FILE=eval/x.dataset.json [VIDEO=clip.mp4] [STRIPS=1 runs ffmpeg]
-	@test -n "$(FILE)" || { echo "usage: make label-sheet FILE=eval/x.dataset.json [VIDEO=clip.mp4] [STRIPS=1]"; exit 1; }
-	npx vite-node scripts/label-sheet.ts $(FILE) $(if $(VIDEO),--video $(VIDEO)) $(if $(STRIPS),--strips)
-
-consistency: node_modules ## Label-free rotation quality of saved jumps or a pose series: FILE=eval/dong-dong.dataset.json [BASELINE=f.json | SAVE=f.json]
-	@test -n "$(FILE)" || { echo "usage: make consistency FILE=<dataset.json | export.ndjson | pose-series.json> [BASELINE=f.json | SAVE=f.json]"; exit 1; }
-	npx vite-node scripts/consistency.ts $(FILE) $(if $(BASELINE),--baseline $(BASELINE)) $(if $(SAVE),--save $(SAVE))
-
-jev-eval: node_modules ## Compare Jev with the classifier on reviewed jumps: FILE=eval/export.ndjson [DEBUG=1] [ALL=1] (needs TYPESAFE_API_KEY; only measurements are sent)
-	@test -n "$(FILE)" || { echo "usage: TYPESAFE_API_KEY=... make jev-eval FILE=eval/export.ndjson [DEBUG=1] [ALL=1]"; exit 1; }
-	npx vite-node scripts/jev-eval.ts $(FILE) $(if $(DEBUG),--debug) $(if $(ALL),--all)
-
-eval-fetch: ## Download the reviewed jumps to eval/export.ndjson (needs REVIEW_API_URL and REVIEW_TOKEN in the environment)
-	@test -n "$(REVIEW_API_URL)" -a -n "$(REVIEW_TOKEN)" || { echo "set REVIEW_API_URL and REVIEW_TOKEN"; exit 1; }
+eval-fetch: ## Download the reviewed jumps to eval/export.ndjson (REVIEW_API_URL, REVIEW_TOKEN)
+	$(call require,REVIEW_API_URL,set REVIEW_API_URL and REVIEW_TOKEN)
+	$(call require,REVIEW_TOKEN,set REVIEW_API_URL and REVIEW_TOKEN)
 	@mkdir -p eval
-	curl -sf -H "authorization: Bearer $(REVIEW_TOKEN)" "$(REVIEW_API_URL)/export" -o eval/export.ndjson
+	@printf 'authorization: Bearer %s' "$$REVIEW_TOKEN" | curl -sf -H @- "$(REVIEW_API_URL)/export" -o eval/export.ndjson
 	@wc -l eval/export.ndjson
 
-worker-schema: node_modules ## Apply worker/schema.sql to the remote D1 database (no deploy)
+eval-run: node_modules ## Score the classifier on reviewed jumps: FILE= [LABELS=dir] [BASELINE=f | SAVE=f]
+	$(call require,FILE,make eval-run FILE=eval/export.ndjson [LABELS=eval/labels] [BASELINE=f.json | SAVE=f.json]  (get the file with: make eval-fetch))
+	npx vite-node scripts/eval.ts $(FILE) $(if $(LABELS),--labels $(LABELS)) $(if $(BASELINE),--baseline $(BASELINE)) $(if $(SAVE),--save $(SAVE))
+
+eval-consistency: node_modules ## Label-free rotation quality of jumps or a pose series: FILE= [BASELINE=f | SAVE=f]
+	$(call require,FILE,make eval-consistency FILE=<dataset.json | export.ndjson | pose-series.json> [BASELINE=f.json | SAVE=f.json])
+	npx vite-node scripts/consistency.ts $(FILE) $(if $(BASELINE),--baseline $(BASELINE)) $(if $(SAVE),--save $(SAVE))
+
+eval-label-sheet: node_modules ## Labeling sheet, blank labels, filmstrip commands: FILE= [VIDEO=clip] [STRIPS=1]
+	$(call require,FILE,make eval-label-sheet FILE=eval/x.dataset.json [VIDEO=clip.mp4] [STRIPS=1])
+	npx vite-node scripts/label-sheet.ts $(FILE) $(if $(VIDEO),--video $(VIDEO)) $(if $(STRIPS),--strips)
+
+eval-jev: node_modules ## Compare Jev with the classifier (needs TYPESAFE_API_KEY): FILE= [DEBUG=1] [ALL=1]
+	$(call require,FILE,TYPESAFE_API_KEY=... make eval-jev FILE=eval/export.ndjson [DEBUG=1] [ALL=1])
+	npx vite-node scripts/jev-eval.ts $(FILE) $(if $(DEBUG),--debug) $(if $(ALL),--all)
+
+##@ Review Worker
+
+worker-check: node_modules ## Typecheck the Worker (worker/)
+	cd worker && npx tsc -p .
+
+worker-dev: node_modules ## Run it locally on :8799 (needs worker/.dev.vars)
+	cd worker && npx wrangler d1 execute trampovision-review --local --file=schema.sql && npx wrangler dev --local --port 8799
+
+worker-schema: node_modules ## Apply worker/schema.sql to the remote D1 database
 	cd worker && npx wrangler d1 execute trampovision-review --remote --file=schema.sql
+
+worker-deploy: node_modules ## Deploy it (worker-schema first when schema.sql changed)
+	cd worker && npx wrangler deploy

@@ -462,7 +462,7 @@ buttons), and the video loops the selected jump from a little before takeoff to 
 - Labels are saved in the local dataset as they are given (never sent to the review service from here), as the five-way label and the figure
   the rest of the app already reads, plus the answers as given (`truth.stages`: blanks stay blank, quarters allowed) and the flag
   (`truth.flag`). Only whole answers make a figure, and so a reference example; partly answered jumps and quarter rotations are kept for
-  the stage scores. **Download labels** writes the clip's labels as a `trampovision.jump-labels` file, the one `make eval` scores against;
+  the stage scores. **Download labels** writes the clip's labels as a `trampovision.jump-labels` file, the one `make eval-run` scores against;
   **Import labels** puts such a file on the jumps by apex time (it asks first when the file names another video).
 
 ### Chrome (`ui/Landing.tsx`, `ui/TopBar.tsx`, `ui/StatusBanners.tsx`, `ui/rail/SetupPanel.tsx`, `styles/chrome.css`)

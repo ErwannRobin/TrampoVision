@@ -16,7 +16,7 @@ import type { JumpRecord, ReviewFlag, StageAnswers, TruthLabel } from './types';
  * What a person says about a jump in the review mode: the four questions of the classifier answered one by one (how many somersaults,
  * which way, how many half twists, which position), any of them left blank, or the jump marked as impossible to tell or badly cut.
  * The answers are kept on the record as they were given and, when they are whole, also as the movement label and the figure that
- * the rest of the app (the metrics, the reference examples) reads. The same answers are what a label file of `make eval` holds.
+ * the rest of the app (the metrics, the reference examples) reads. The same answers are what a label file of `make eval-run` holds.
  */
 
 export const EMPTY_ANSWERS: StageAnswers = { somersaults: null, direction: null, halfTwists: null, position: null };
@@ -209,7 +209,7 @@ export function labelOfRecord(r: JumpRecord): JumpLabel {
   };
 }
 
-/** A label file (`trampovision.jump-labels` v1, the one `make eval` reads) with a line for each jump of one video, in time order. */
+/** A label file (`trampovision.jump-labels` v1, the one `make eval-run` reads) with a line for each jump of one video, in time order. */
 export function labelFileOfRecords(records: readonly JumpRecord[], videoId: string, fileName?: string): LabelFile {
   const jumps = records
     .filter((r) => r.videoId === videoId)

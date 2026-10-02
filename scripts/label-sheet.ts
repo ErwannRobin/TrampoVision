@@ -1,6 +1,6 @@
 /**
  * Makes what a person needs to label real jumps, from a dataset JSON saved by the app (or the review service's export):
- *   make label-sheet FILE=eval/dong-dong.dataset.json VIDEO=video-sample/dong-dong-2011-landscape.mp4
+ *   make eval-label-sheet FILE=eval/dong-dong.dataset.json VIDEO=video-sample/dong-dong-2011-landscape.mp4
  *
  * For every video in the file it writes, under `eval/sheets/` (`--out`): a markdown sheet and a CSV (one line per jump: times, the app's
  * guess, the measured rotation) and, with `--video`, a shell script with one ffmpeg command per jump that makes a filmstrip of the flight

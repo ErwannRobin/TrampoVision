@@ -267,7 +267,7 @@ export const review = {
   'rm.curves': 'Curves of this jump',
   'rm.autoAdvance': 'Go to the next jump after each label',
   'rm.labelsDownload': 'Download labels',
-  'rm.labelsDownloadHint': 'A label file that make eval scores the classifier against',
+  'rm.labelsDownloadHint': 'A label file that make eval-run scores the classifier against',
   'rm.labelsImport': 'Import labels…',
   'rm.labelsMismatch':
     'This label file is for another video ({id}). Apply it anyway, matching the jumps by their time?',

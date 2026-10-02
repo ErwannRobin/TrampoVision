@@ -176,7 +176,7 @@ describe('the label file of a video', () => {
     withStageAnswers(r2, { ...EMPTY_ANSWERS, position: 'pike' }, NOW),
   ];
 
-  it('has a line for each jump in time order, in the format `make eval` reads', () => {
+  it('has a line for each jump in time order, in the format `make eval-run` reads', () => {
     const file = labelFileOfRecords([...labelled].reverse(), 'va', 'clip.mp4');
     const back = parseLabelFile(labelFileText(file));
     expect(back).toMatchObject({ videoId: 'va', fileName: 'clip.mp4' });
