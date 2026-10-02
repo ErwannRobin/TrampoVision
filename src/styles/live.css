@@ -726,6 +726,16 @@
     grid-column: 1;
     grid-row: 1 / span 2;
   }
+  /* The column is as wide as the video at the height of the screen (the stage says it: --stage-w), no wider than a little over half the
+     screen, so that the transport and the skills keep room, and no narrower than a portrait clip needs to be read. The 3D skeleton needs the
+     space of the equal columns above. */
+  .app[data-mode='live'] .workspace:has(.tl):not(:has(.stage__pane)) {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+  .app[data-mode='live'] .workspace:has(.tl):not(:has(.stage__pane)) .workspace__stage > .stage {
+    flex: none;
+    width: clamp(26vw, var(--stage-w, 48vw), 54vw);
+  }
   /* The transport spans both rows so that it can stay pinned for the whole list; the timeline starts below it. */
   .app[data-mode='live'] .workspace:has(.tl) .transport {
     grid-column: 2;

@@ -53,7 +53,7 @@ import { EvaluatePanel, EvaluationReport } from './ui/EvaluationView';
 import { setName } from './ui/chrome/RecentSets';
 import { Landing } from './ui/Landing';
 import { Pose3DView } from './ui/Pose3DView';
-import { Playhead } from './ui/playhead';
+import { Playhead, PlayheadContext } from './ui/playhead';
 import { StatusBanners } from './ui/StatusBanners';
 import { TechnicalData } from './ui/TechnicalData';
 import { Timeline } from './ui/Timeline';
@@ -119,7 +119,7 @@ function athleteVideoId(base: string | null, index: number): string | null {
   return base && index > 0 ? `${base}#${index + 1}` : base;
 }
 
-export default function App() {
+function AppView({ playhead }: { playhead: Playhead }) {
   // Text made while analyzing (skill names, tips, warnings) follows the language: it is made again when the language changes.
   const locale = useLocale();
   const [url, setUrl] = useState<string | null>(null);
@@ -197,7 +197,6 @@ export default function App() {
   // Every finished analysis is kept on this device, so a set survives leaving it (see history/).
   const history = useHistory();
 
-  const playhead = useMemo(() => new Playhead(), []);
   const abort = useRef<AbortController | null>(null);
   const fileRef = useRef<File | null>(null); // latest selected file, to ignore stale async results
 
@@ -1438,5 +1437,15 @@ export default function App() {
         <ActivityToast label={t('app.exporting')} progress={annotated.progress ?? 0} onCancel={annotated.cancel} />
       )}
     </div>
+  );
+}
+
+/** The app, with the player bus offered to every button that plays part of the clip. */
+export default function App() {
+  const playhead = useMemo(() => new Playhead(), []);
+  return (
+    <PlayheadContext.Provider value={playhead}>
+      <AppView playhead={playhead} />
+    </PlayheadContext.Provider>
   );
 }

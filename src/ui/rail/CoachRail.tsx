@@ -5,7 +5,7 @@ import type { TwistAnalysis } from '../../pose3d/twist';
 import type { SkillAnalysis } from '../../skills/analyzeSkills';
 import type { SkillConfig } from '../../skills/config';
 import { Button, IconButton, panelId, tabId, Tabs, type TabDef } from '../kit';
-import type { Playhead } from '../playhead';
+import { useRangeButton, type Playhead } from '../playhead';
 import type { CoachTab } from '../types';
 import { ClassificationTab } from './coach/ClassificationTab';
 import { DataTab } from './coach/DataTab';
@@ -71,6 +71,7 @@ export function CoachRail({
   const total = skills.jumps.length;
   const k = Math.min(Math.max(selected, 0), Math.max(total - 1, 0));
   const TABS = tabs();
+  const play = useRangeButton('coach', onPlayJump);
 
   return (
     <div className="coach">
@@ -95,8 +96,8 @@ export function CoachRail({
               onClick={() => onSelect(k + 1)}
             />
           </div>
-          <Button size="sm" icon="play" disabled={total === 0} onClick={onPlayJump}>
-            {t('ins.playJump')}
+          <Button size="sm" icon={play.playing ? 'pause' : 'play'} disabled={total === 0} onClick={play.press}>
+            {play.playing ? t('transport.pause') : t('ins.playJump')}
           </Button>
         </header>
         <Tabs idPrefix={ID} ariaLabel={t('coach.sections')} value={tab} onChange={onTab} tabs={TABS} />

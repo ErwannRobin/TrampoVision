@@ -13,7 +13,7 @@ import type { DatasetApi } from '../dataset/useDataset';
 import { pct } from './format';
 import { confidenceTier, TIER_TEXT } from './insights';
 import { Badge, Button, ConfidenceMeter, Field, Segmented } from './kit';
-import type { Playhead } from './playhead';
+import { useRangeButton, type Playhead } from './playhead';
 import { DatasetBar } from './review/DatasetBar';
 import { Detected } from './review/Detected';
 import { FailureCase } from './review/FailureCase';
@@ -84,6 +84,11 @@ export function EvaluatePanel({
   const figureId = rec?.figure?.elementId ?? null;
   const labeled = useMemo(() => skills.jumps.map((_, j) => !!fresh[j]?.truth), [skills.jumps, fresh]);
   const labeledCount = labeled.filter(Boolean).length;
+  const playRange = useRangeButton('review', () => {
+    if (!jump) return;
+    const [start, end] = jumpPlayRange(jump.cycle);
+    playhead.playRange(start, end, false);
+  });
 
   const goNextUnlabeled = () => {
     const next = nextUnlabeled(labeled, k);
@@ -120,7 +125,6 @@ export function EvaluatePanel({
     );
   }
 
-  const [from, to] = jumpPlayRange(jump.cycle);
   const tier = confidenceTier(jump.prediction, skills.config.minConfidence);
   const agree = truth !== null && predicted !== null && agrees(truth, predicted);
   const saved = !!rec && savedIds.has(rec.id);
@@ -133,8 +137,8 @@ export function EvaluatePanel({
     <div className="review">
       <div className="review-section review-section--lead">
         <div className="review-actions">
-          <Button size="sm" icon="play" onClick={() => playhead.playRange(from, to, false)}>
-            {t('ins.playJump')}
+          <Button size="sm" icon={playRange.playing ? 'pause' : 'play'} onClick={playRange.press}>
+            {playRange.playing ? t('transport.pause') : t('ins.playJump')}
           </Button>
           <Button size="sm" disabled={labeledCount === n} aria-keyshortcuts="N" onClick={goNextUnlabeled}>
             {t('review.nextUnlabeled')}
