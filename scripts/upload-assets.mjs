@@ -12,6 +12,7 @@
 //   ort/<onnxruntime-web version>/ort-wasm-simd-threaded.jsep.wasm
 //   models/yolox_s.onnx, rtmpose_m_halpe26.onnx, vitpose_base_simple.onnx   (experimental pose engines; only the ones in public/models)
 //   samples/<name>.mp4|.MOV   any video of the sample folder (a .mp4 and a .MOV of the same name are one clip)
+//   samples/<name>.pose.json  the saved analysis of that clip (npm run precompute-samples): the app opens it instead of running the pose model
 //   samples/index.json        {"files": [...]}: the sample file names in the store, rewritten at each run; the app reads it to list the samples
 // Run it again after upgrading @mediapipe/tasks-vision, onnxruntime-web or @ffmpeg/core: the new version gets its own folder.
 // At the end it prints the value for VITE_ASSET_BASE_URL.
@@ -32,6 +33,7 @@ const contentTypes = {
   '.task': 'application/octet-stream',
   '.mp4': 'video/mp4',
   '.mov': 'video/quicktime',
+  '.json': 'application/json',
 };
 const typeOf = (name) => contentTypes[name.slice(name.lastIndexOf('.')).toLowerCase()] ?? 'application/octet-stream';
 
@@ -73,7 +75,7 @@ for (const variant of ['lite', 'full', 'heavy']) {
 }
 
 if (existsSync(samplesDir)) {
-  for (const name of readdirSync(samplesDir).filter((n) => /\.(mp4|mov)$/i.test(n))) {
+  for (const name of readdirSync(samplesDir).filter((n) => /\.(mp4|mov)$/i.test(n) || n.endsWith('.pose.json'))) {
     files.push([`samples/${name}`, () => readFileSync(join(samplesDir, name))]);
   }
 } else {
@@ -121,7 +123,8 @@ for (const [pathname, read] of files) {
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: typeOf(pathname),
-    cacheControlMaxAge: 60 * 60 * 24 * 365, // the version is in the path, so a file never changes
+    // The version is in the path, so a file never changes. A saved analysis is rewritten when the video is analyzed again: an hour.
+    cacheControlMaxAge: pathname.endsWith('.pose.json') ? 60 * 60 : 60 * 60 * 24 * 365,
     multipart: body.length > 20_000_000,
   });
   base = blob.url.slice(0, blob.url.length - pathname.length);

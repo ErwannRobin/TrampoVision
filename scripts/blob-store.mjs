@@ -34,7 +34,7 @@ export async function listStore() {
 export async function writeSampleIndex(tag) {
   const { blobs, base } = await listStore();
   const files = [...blobs.keys()]
-    .filter((p) => /^samples\/[^/]+\.(mp4|mov)$/i.test(p))
+    .filter((p) => /^samples\/[^/]+(\.(mp4|mov)|\.pose\.json)$/i.test(p))
     .map((p) => p.slice('samples/'.length))
     .sort();
   const index = JSON.stringify({ files }, null, 2);

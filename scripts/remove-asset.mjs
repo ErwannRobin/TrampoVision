@@ -3,7 +3,7 @@
 //   npm run remove-asset -- <name> [<name>...] [--dry-run]
 //
 // A name is a path in the store (models/pose_landmarker_lite.task) or, for a sample, its file name (synchro.mp4).
-// A sample name without extension (IMG_8368) removes the whole clip: its .mp4 and its .MOV.
+// A sample name without extension (IMG_8368) removes the whole clip: its .mp4, its .MOV and its saved analysis (.pose.json).
 // Nothing is guessed beyond that: a name that matches nothing is an error and nothing is deleted.
 // Removing a sample rewrites samples/index.json, so its button goes away within a minute.
 import { del } from '@vercel/blob';
@@ -21,13 +21,15 @@ if (!hasToken) {
   process.exit(1);
 }
 
+// samples/IMG_8368.mp4, samples/IMG_8368.MOV and samples/IMG_8368.pose.json are one clip
+const clipOf = (pathname) => pathname.replace(/(\.pose\.json|\.[^./]+)$/, '');
+
 const { blobs } = await listStore();
 const targets = new Set();
 const unknown = [];
 for (const name of names) {
-  const clip = [...blobs.keys()].filter(
-    (p) => p.startsWith('samples/') && p.slice(0, p.lastIndexOf('.')) === `samples/${name}`,
-  );
+  const clip = [...blobs.keys()].filter((p) => p.startsWith('samples/') && clipOf(p) === `samples/${name}`);
+
   const found = [name, `samples/${name}`].filter((p) => blobs.has(p) && p !== 'samples/index.json');
   const hits = found.length ? found : clip;
   if (!hits.length) unknown.push(name);
