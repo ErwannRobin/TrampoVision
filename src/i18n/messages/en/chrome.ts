@@ -274,9 +274,10 @@ export const chrome = {
 
   'app.closeAnalysis': 'This set could not be saved on this device, so closing it loses its numbers. Close it anyway?',
   'app.dropBusy': 'Analysis in progress',
-  'app.dropIdle': 'Drop a video to analyze it',
+  'app.dropIdle': 'Drop a video or a saved analysis',
+  'app.seriesOtherVideo': '{name} is not the analysis of this video, so it was not opened.',
   'app.dropWait': 'Wait for it to finish first.',
-  'app.dropFormats': 'MP4 or MOV',
+  'app.dropFormats': 'MP4, MOV or a saved analysis (JSON)',
   'app.analysis': 'Analysis',
   'app.analysisOf': 'Analysis of {name}',
   'app.setUp': 'Set up {name}',

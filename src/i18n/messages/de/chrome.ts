@@ -266,9 +266,10 @@ export const chrome: Translation<typeof en> = {
   'app.closeAnalysis':
     'Diese Übung konnte nicht auf diesem Gerät gespeichert werden. Beim Schließen gehen die Ergebnisse verloren. Trotzdem schließen?',
   'app.dropBusy': 'Analyse läuft',
-  'app.dropIdle': 'Video hier ablegen, um es zu analysieren',
+  'app.dropIdle': 'Video oder gespeicherte Analyse hier ablegen',
+  'app.seriesOtherVideo': '{name} ist nicht die Analyse dieses Videos und wurde nicht geöffnet.',
   'app.dropWait': 'Warten Sie, bis sie abgeschlossen ist.',
-  'app.dropFormats': 'MP4 oder MOV',
+  'app.dropFormats': 'MP4, MOV oder eine gespeicherte Analyse (JSON)',
   'app.analysis': 'Analyse',
   'app.analysisOf': 'Analyse von {name}',
   'app.setUp': 'Einrichtung von {name}',

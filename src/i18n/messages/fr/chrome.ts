@@ -265,9 +265,10 @@ export const chrome: Translation<typeof en> = {
   'app.closeAnalysis':
     'Cet enchaînement n’a pas pu être enregistré sur cet appareil : le fermer en perdrait les résultats. Le fermer quand même ?',
   'app.dropBusy': 'Analyse en cours',
-  'app.dropIdle': 'Déposez une vidéo pour l’analyser',
+  'app.dropIdle': 'Déposez une vidéo ou une analyse enregistrée',
+  'app.seriesOtherVideo': '{name} n’est pas l’analyse de cette vidéo : elle n’a pas été ouverte.',
   'app.dropWait': 'Attendez d’abord la fin.',
-  'app.dropFormats': 'MP4 ou MOV',
+  'app.dropFormats': 'MP4, MOV ou une analyse enregistrée (JSON)',
   'app.analysis': 'Analyse',
   'app.analysisOf': 'Analyse de {name}',
   'app.setUp': 'Configuration de {name}',

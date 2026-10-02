@@ -46,7 +46,8 @@ import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point, PoseEngineId } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
 import { loadSample, loadSampleSeries, loadSamples, type Sample } from './video/sample';
-import { dragHasFiles, pickDroppedVideo } from './video/drop';
+import { dragHasFiles, pickDroppedSeries, pickDroppedVideo } from './video/drop';
+import { matchClip, type ClipIdentity } from './analysis/seriesMatch';
 import { transcodeToH264 } from './video/transcode';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
 import { EvaluatePanel, EvaluationReport } from './ui/EvaluationView';
@@ -116,6 +117,26 @@ function saveCalibration(file: File | null, cal: SavedCalibration) {
 
 /** The id of the clip, whichever athlete's id it is given. */
 const clipVideoId = (id: string) => id.replace(/#\d+$/, '');
+
+/** What a video file is, to tell whether a saved analysis is of it. Its size and length stay unknown when the browser cannot decode it. */
+async function clipOfVideo(file: File): Promise<ClipIdentity> {
+  const videoId = await videoIdOf(file);
+  const url = URL.createObjectURL(file);
+  try {
+    const probe = await loadVideo(url);
+    const clip = { videoId, width: probe.videoWidth, height: probe.videoHeight, durationS: probe.duration };
+    disposeVideo(probe);
+    return clip;
+  } catch {
+    return { videoId, width: 0, height: 0, durationS: null };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function clipOfSeries({ source, track }: ParsedSeries): ClipIdentity {
+  return { videoId: source.videoId, width: track.width, height: track.height, durationS: track.times.at(-1) ?? null };
+}
 
 /** Each athlete of a clip is a video of their own for the labels: the first keeps the id of the clip. */
 function athleteVideoId(base: string | null, index: number): string | null {
@@ -837,9 +858,54 @@ function AppView({ playhead }: { playhead: Playhead }) {
   const analyzing = status.kind === 'analyzing' || (status.kind === 'loading' && status.stage === 'model');
   const loading = status.kind === 'loading';
 
-  // Drop a video anywhere on the page. The handlers read the latest onFile/analyzing through a ref.
-  const dropRef = useRef({ onFile, analyzing });
-  dropRef.current = { onFile, analyzing };
+  /**
+   * What is dropped on the page: a video, a saved analysis, or both. An analysis meets the video that is open (or the one dropped
+   * with it) only when it is of that clip, and a video dropped on an analysis that has none is added to it when it is its clip.
+   */
+  async function onDropped(files: ArrayLike<File> | null | undefined) {
+    const video = pickDroppedVideo(files);
+    const saved = pickDroppedSeries(files);
+    if (!saved) {
+      if (!video) return;
+      if (!url && result && track) {
+        // An analysis without its video: that video is added in place, with no new analysis.
+        const text = serializeSeries(fileName, videoId && clipVideoId(videoId), calibration);
+        if (matchClip(clipOfSeries(parsePoseSeries(text)), await clipOfVideo(video)) !== 'different') {
+          await onFile(video, text);
+          return;
+        }
+      }
+      await onFile(video);
+      return;
+    }
+    let text: string;
+    let parsed: ParsedSeries;
+    try {
+      text = await saved.text();
+      parsed = parsePoseSeries(text);
+    } catch (err) {
+      setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      return;
+    }
+    const target = video ?? (url ? file : null);
+    if (!target) {
+      openSeriesText(text, saved.name);
+      return;
+    }
+    const match = matchClip(clipOfSeries(parsed), await clipOfVideo(target));
+    if (match === 'different') {
+      setNotice(t('app.seriesOtherVideo', { name: saved.name }));
+      return;
+    }
+    if (video) await onFile(video, text);
+    else if (openSeriesText(text, saved.name, { withVideo: true }) && match === 'unknown') {
+      setNotice(t('app.openedWithVideo', { name: saved.name, frames: parsed.track.frames.length }));
+    }
+  }
+
+  // Drop a video or a saved analysis anywhere on the page. The handlers read the latest onFile/analyzing through a ref.
+  const dropRef = useRef({ onDropped, analyzing });
+  dropRef.current = { onDropped, analyzing };
   const [dragging, setDragging] = useState(false);
   useEffect(() => {
     let depth = 0;
@@ -864,8 +930,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
       e.preventDefault(); // otherwise the browser navigates to the file
       depth = 0;
       setDragging(false);
-      const video = pickDroppedVideo(e.dataTransfer?.files);
-      if (video && !dropRef.current.analyzing) void dropRef.current.onFile(video);
+      if (!dropRef.current.analyzing) void dropRef.current.onDropped(e.dataTransfer?.files);
     };
     window.addEventListener('dragenter', enter);
     window.addEventListener('dragover', over);
