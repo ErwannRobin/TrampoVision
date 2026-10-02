@@ -1,0 +1,2079 @@
+<title>TrampoVision Architecture Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  /* Layout concept: a vertical pipeline of stages (video -> verdict) beside a sticky detail panel; the Simplified/Full switch shows or hides the dashed branches. */
+  :root {
+    --bg: #f1f4f1;
+    --surface: #ffffff;
+    --surface-2: #e9eeea;
+    --ink: #15201c;
+    --muted: #55655d;
+    --line: #cfd9d3;
+    --core: #1c47c4;
+    --core-soft: #e3eafc;
+    --option: #0a7566;
+    --option-soft: #dcf1ed;
+    --exp: #a95800;
+    --exp-soft: #fbead2;
+    --service: #85296f;
+    --service-soft: #f5e1f0;
+    --shadow: 0 1px 2px rgba(20, 32, 28, 0.06), 0 4px 14px rgba(20, 32, 28, 0.06);
+    --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+    --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --bg: #0f1512;
+      --surface: #17201c;
+      --surface-2: #1f2a25;
+      --ink: #e5ece8;
+      --muted: #9aaaa2;
+      --line: #2c3a33;
+      --core: #86a3ff;
+      --core-soft: #1a2750;
+      --option: #4fc9b5;
+      --option-soft: #12332d;
+      --exp: #f0a54f;
+      --exp-soft: #3a2810;
+      --service: #dc90cf;
+      --service-soft: #3a1d34;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme='dark'] {
+    --bg: #0f1512;
+    --surface: #17201c;
+    --surface-2: #1f2a25;
+    --ink: #e5ece8;
+    --muted: #9aaaa2;
+    --line: #2c3a33;
+    --core: #86a3ff;
+    --core-soft: #1a2750;
+    --option: #4fc9b5;
+    --option-soft: #12332d;
+    --exp: #f0a54f;
+    --exp-soft: #3a2810;
+    --service: #dc90cf;
+    --service-soft: #3a1d34;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
+    color-scheme: dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  button {
+    font: inherit;
+    color: inherit;
+  }
+  code,
+  .mono {
+    font-family: var(--mono);
+    font-size: 0.86em;
+  }
+
+  .wrap {
+    max-width: 1280px;
+    margin-inline: auto;
+    padding-inline: 16px;
+    padding-block: 0 56px;
+  }
+
+  /* Header */
+  header.top {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 20;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .top-in {
+    max-width: 1280px;
+    margin-inline: auto;
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 20px;
+    justify-content: space-between;
+  }
+  .brand {
+    min-width: 0;
+  }
+  .brand h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1.35rem;
+    letter-spacing: -0.01em;
+    margin: 0;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+  .brand p {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .seg {
+    display: inline-flex;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 3px;
+  }
+  .seg button {
+    border: 0;
+    background: transparent;
+    padding: 7px 16px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .seg button[aria-pressed='true'] {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .seg button:focus-visible,
+  .node:focus-visible,
+  .chip:focus-visible,
+  .nav button:focus-visible,
+  .close:focus-visible {
+    outline: 2px solid var(--core);
+    outline-offset: 2px;
+  }
+
+  /* Intro / legend */
+  .intro {
+    padding-block: 22px 8px;
+    display: grid;
+    gap: 14px;
+  }
+  .lede {
+    margin: 0;
+    max-width: 70ch;
+    font-size: 1rem;
+  }
+  .lede b {
+    font-weight: 600;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    font-size: 0.82rem;
+    color: var(--muted);
+    align-items: center;
+  }
+  .key {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .sw {
+    width: 26px;
+    height: 16px;
+    border-radius: 5px;
+    border: 2px solid var(--core);
+    background: var(--core-soft);
+  }
+  .sw.option {
+    border: 2px dashed var(--option);
+    background: var(--option-soft);
+  }
+  .sw.exp {
+    border: 2px dashed var(--exp);
+    background: var(--exp-soft);
+  }
+  .sw.service {
+    border: 2px dotted var(--service);
+    background: var(--service-soft);
+  }
+  .mapnav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 999px;
+    padding: 4px 11px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    display: inline-flex;
+    gap: 6px;
+    align-items: baseline;
+    text-decoration: none;
+    color: var(--ink);
+  }
+  .chip:hover {
+    border-color: var(--core);
+  }
+  .chip .cn {
+    font-family: var(--mono);
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+  .chip[hidden] {
+    display: none;
+  }
+  .counts {
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .counts b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+    margin-top: 8px;
+  }
+  @media (min-width: 1000px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr) 390px;
+      gap: 32px;
+    }
+  }
+  .pipeline {
+    min-width: 0;
+  }
+
+  /* Stage */
+  .stage {
+    margin-top: 6px;
+    scroll-margin-top: 90px;
+  }
+  .stage[hidden] {
+    display: none;
+  }
+  .stage-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 14px;
+  }
+  .stage-head .sn {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .stage-head h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1.3rem;
+    margin: 0;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .stage-head .ss {
+    color: var(--muted);
+    font-size: 0.88rem;
+    flex-basis: 100%;
+    margin: 0;
+    max-width: 75ch;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+    gap: 10px;
+  }
+
+  /* Node */
+  .node {
+    text-align: left;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    padding: 11px 12px 12px;
+    background: var(--surface);
+    border: 2px solid var(--core);
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.12s ease;
+  }
+  .node:hover {
+    transform: translateY(-1px);
+  }
+  .node[data-kind='option'] {
+    border: 2px dashed var(--option);
+  }
+  .node[data-kind='experimental'] {
+    border: 2px dashed var(--exp);
+  }
+  .node[data-kind='service'] {
+    border: 2px dotted var(--service);
+  }
+  .node[aria-current='true'] {
+    box-shadow:
+      0 0 0 3px var(--core-soft),
+      0 0 0 5px var(--core),
+      var(--shadow);
+  }
+  .node[data-kind='option'][aria-current='true'] {
+    box-shadow:
+      0 0 0 3px var(--option-soft),
+      0 0 0 5px var(--option),
+      var(--shadow);
+  }
+  .node[data-kind='experimental'][aria-current='true'] {
+    box-shadow:
+      0 0 0 3px var(--exp-soft),
+      0 0 0 5px var(--exp),
+      var(--shadow);
+  }
+  .node[data-kind='service'][aria-current='true'] {
+    box-shadow:
+      0 0 0 3px var(--service-soft),
+      0 0 0 5px var(--service),
+      var(--shadow);
+  }
+  .node-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 22px;
+  }
+  .num {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    font-weight: 500;
+    min-width: 24px;
+    height: 22px;
+    padding-inline: 6px;
+    border-radius: 6px;
+    background: var(--core);
+    color: var(--surface);
+    display: inline-grid;
+    place-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .badge {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-weight: 500;
+  }
+  .badge.option {
+    background: var(--option-soft);
+    color: var(--option);
+  }
+  .badge.experimental {
+    background: var(--exp-soft);
+    color: var(--exp);
+  }
+  .badge.service {
+    background: var(--service-soft);
+    color: var(--service);
+  }
+  .runs {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+  .node h3 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1.02rem;
+    line-height: 1.2;
+    margin: 2px 0 0;
+    letter-spacing: -0.005em;
+  }
+  .node p {
+    margin: 0;
+    font-size: 0.84rem;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .enter {
+    animation: pop 0.28s ease both;
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Hand-off between stages */
+  .handoff {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-block: 14px 8px;
+    gap: 0;
+  }
+  .handoff .ln {
+    width: 2px;
+    height: 14px;
+    background: var(--core);
+    opacity: 0.55;
+  }
+  .handoff .pill {
+    font-size: 0.78rem;
+    padding: 5px 12px;
+    border: 1px solid var(--core);
+    background: var(--core-soft);
+    color: var(--ink);
+    border-radius: 999px;
+    text-align: center;
+    max-width: 100%;
+  }
+  .handoff .pill b {
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--core);
+  }
+  .handoff .arrow {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid var(--core);
+    opacity: 0.55;
+  }
+  .loop {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border: 2px dashed var(--option);
+    background: var(--option-soft);
+    border-radius: 10px;
+    font-size: 0.86rem;
+  }
+  .loop b {
+    color: var(--option);
+  }
+
+  /* Panel */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  @media (min-width: 1000px) {
+    .panel {
+      position: sticky;
+      top: calc(env(safe-area-inset-top, 0px) + 84px);
+      max-height: calc(100vh - 108px);
+    }
+    .close {
+      display: none;
+    }
+  }
+  .panel-body {
+    padding: 16px 18px 18px;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .panel-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .panel h2 {
+    font-family: var(--display);
+    font-size: 1.35rem;
+    line-height: 1.15;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .panel .sum {
+    margin: 0 0 12px;
+    font-size: 0.95rem;
+  }
+  .panel h4 {
+    margin: 14px 0 6px;
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .panel ul {
+    margin: 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 5px;
+    font-size: 0.88rem;
+  }
+  .io {
+    display: grid;
+    gap: 6px;
+    font-size: 0.86rem;
+  }
+  .io div {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 8px;
+    align-items: baseline;
+  }
+  .io span {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .facts {
+    display: grid;
+    gap: 4px;
+    font-size: 0.86rem;
+    margin: 0;
+  }
+  .facts div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    border-bottom: 1px dotted var(--line);
+    padding-block: 3px;
+  }
+  .facts dt {
+    color: var(--muted);
+  }
+  .facts dd {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .files code {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    padding: 2px 7px;
+    border-radius: 5px;
+    overflow-wrap: anywhere;
+  }
+  .caveat {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--exp);
+    background: var(--exp-soft);
+    border-radius: 0 8px 8px 0;
+    font-size: 0.85rem;
+  }
+  .caveat b {
+    color: var(--exp);
+    font-weight: 600;
+  }
+  .nav {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    align-items: center;
+  }
+  .nav button {
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.85rem;
+  }
+  .nav button:hover {
+    border-color: var(--core);
+  }
+  .nav .pos {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .close {
+    margin-left: auto;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 0.82rem;
+  }
+
+  @media (max-width: 999px) {
+    .panel {
+      position: fixed;
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      z-index: 30;
+      max-height: 64vh;
+      transform: translateY(calc(100% + 24px));
+      visibility: hidden;
+      transition:
+        transform 0.22s ease,
+        visibility 0s linear 0.22s;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    body.sheet-open .panel {
+      transform: none;
+      visibility: visible;
+      transition: transform 0.22s ease;
+    }
+    body.sheet-open .wrap {
+      padding-bottom: 66vh;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .enter {
+      animation: none;
+    }
+    .node,
+    .panel {
+      transition: none !important;
+    }
+  }
+
+  /* Simplified view hides the dashed branches */
+  body[data-view='simple'] .full-only {
+    display: none !important;
+  }
+
+  footer.note {
+    margin-top: 32px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.82rem;
+    max-width: 80ch;
+  }
+</style>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <h1>TrampoVision architecture map</h1>
+      <p>From a phone video to a named skill, a difficulty and an execution score. All in the browser.</p>
+    </div>
+    <div class="seg" role="group" aria-label="View">
+      <button type="button" id="b-simple" aria-pressed="true">Simplified</button>
+      <button type="button" id="b-full" aria-pressed="false">Full</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <section class="intro">
+    <p class="lede" id="lede"></p>
+    <div class="legend" aria-label="Legend">
+      <span class="key"><span class="sw"></span>Main flow</span>
+      <span class="key full-only"><span class="sw option"></span>Option or extra path</span>
+      <span class="key full-only"><span class="sw exp"></span>Experimental</span>
+      <span class="key full-only"><span class="sw service"></span>Outside the browser</span>
+      <span class="counts" id="counts"></span>
+    </div>
+    <nav class="mapnav" id="mapnav" aria-label="Stages"></nav>
+  </section>
+
+  <div class="layout">
+    <main class="pipeline" id="pipeline"></main>
+    <aside class="panel" id="panel" aria-label="Details" aria-live="polite">
+      <div class="panel-body" id="panel-body"></div>
+      <div class="nav">
+        <button type="button" id="prev">&larr; Previous</button>
+        <button type="button" id="next">Next &rarr;</button>
+        <span class="pos" id="pos"></span>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="note">
+    Built from the repository code and its README. The app was not run to make this map. Thresholds and accuracy claims
+    repeat what the README says; the README itself states that most of them are untuned and not yet checked on real
+    athlete footage.
+  </footer>
+</div>
+
+<script>
+  (function () {
+    'use strict';
+
+    var STAGES = [
+      {
+        id: 's1',
+        name: 'Ingestion',
+        sub: 'Get a video the browser can read, and decide how many frames to analyse.',
+        out: ['Video element', 'fps and frame stride'],
+      },
+      {
+        id: 's2',
+        name: 'Pose extraction',
+        sub: 'Find the body points of the athlete in every analysed frame.',
+        out: ['PoseTrack', '33 landmarks per frame, 3D world points, times'],
+      },
+      {
+        id: 's3',
+        name: 'Cleaning and measurement',
+        sub: 'Turn noisy points into a clean time series: centre of mass, rotation and jumps.',
+        out: ['AnalysisResult', 'clean joints, COM, orientation, jump cycles'],
+      },
+      {
+        id: 's4',
+        name: 'Per-jump features',
+        sub: 'Cut the clip into jumps and describe each one with the same normalized numbers.',
+        out: ['JumpFeatures + JumpSequence', '32 samples x 58 columns, plus a twist estimate'],
+      },
+      {
+        id: 's5',
+        name: 'Classification',
+        sub: 'Name the movement. It always ends in a row of the FIG element table.',
+        out: ['SkillPrediction', 'element, confidence, certainty, 5 best candidates'],
+      },
+      {
+        id: 's6',
+        name: 'Scoring and coaching',
+        sub: 'Difficulty from the rule, execution from the pose, tips from the deductions.',
+        out: ['Session', 'skills, totals, tips, focus of the set'],
+      },
+      {
+        id: 's7',
+        name: 'Screens',
+        sub: 'What the coach or athlete sees.',
+        out: ['Coach verdict', 'Yes that is it, Change, deduction'],
+      },
+      {
+        id: 's8',
+        name: 'Memory and learning',
+        sub: 'What is stored, what is sent, and how corrections come back.',
+        out: null,
+        loop: 'Confirmed, corrected and reviewed jumps return to <b>Classification (stage 5)</b> as reference examples. The same video is never compared with itself.',
+      },
+      { id: 's9', name: 'Around the pipeline', sub: 'Privacy, languages, tests and delivery.', out: null, full: true },
+    ];
+
+    // kind: core | option | experimental | service. level: core | full. runs: browser | server | dev.
+    var NODES = [
+      /* ---------- 1 Ingestion ---------- */
+      {
+        id: 'in-video',
+        st: 's1',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Video in',
+        sum: 'Film a set with the phone camera, pick a file, or drop a video anywhere on the page.',
+        how: [
+          'On a phone the picker opens the camera. On a computer it picks a file. MP4 and MOV are accepted.',
+          'A stable video id is computed in the background: SHA-256 of the file size plus the first and last 256 KiB. The same file gets the same id after a reload or a rename, so labels stay attached.',
+          'The live view analyses by itself as soon as the video is ready. Nothing is set up first.',
+        ],
+        io: ['A video file', 'A blob URL for the video, a video id'],
+        files: ['src/ui/Landing.tsx', 'src/video/drop.ts', 'src/dataset/videoId.ts', 'src/App.tsx (onFile)'],
+      },
+      {
+        id: 'in-probe',
+        st: 's1',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Check the video decodes',
+        sum: 'Load it in a hidden video element and test that a picture really comes out.',
+        how: [
+          'The element is 1 px, invisible, but kept in the page. Safari does not show frames for detached elements.',
+          'It fails on a decode error, on a video with no picture, or after 20 s without metadata.',
+          'A second probe (canDecode, 3 s) catches files whose metadata loads but whose codec cannot be decoded.',
+        ],
+        io: ['Blob URL', 'A ready video, or a failure that triggers conversion'],
+        files: ['src/video/frames.ts (loadVideo, canDecode)'],
+      },
+      {
+        id: 'in-transcode',
+        st: 's1',
+        level: 'full',
+        kind: 'option',
+        runs: 'browser',
+        title: 'Convert to H.264',
+        sum: 'If the browser cannot decode the file, it is re-encoded in the browser.',
+        how: [
+          'Typical case: iPhone HEVC .mov in desktop Chrome.',
+          'ffmpeg.wasm outputs an H.264 MP4 at 720 p maximum, because analysis needs no more.',
+          'The ffmpeg runtime (about 31 MB of wasm) is only fetched when a conversion is needed.',
+          "Progress is read from ffmpeg's own log lines, because its progress event stays at 0 for some HEVC files.",
+          'Offline alternative: make video-convert VIDEO=file.MOV.',
+        ],
+        io: ['Undecodable file', 'H.264 blob that replaces the original from here on'],
+        numbers: [
+          ['Max height', '720 px'],
+          ['Speed', 'about real time or slower'],
+        ],
+        files: ['src/video/transcode.ts'],
+        caveat: 'Software decoding in WebAssembly is slow. The wait is about the length of the video, or longer.',
+      },
+      {
+        id: 'in-fps',
+        st: 's1',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Measure fps, choose the stride',
+        sum: "Analyse about 30 frames a second, whatever the video's own rate.",
+        how: [
+          'estimateFps measures the real frame rate of the file.',
+          'analysisStride(fps) = round(fps / 30), at most 8. A 60 fps film is analysed every 2nd frame, a 240 fps slow-motion clip every 8th.',
+          'Why 30: a double somersault turns about 15 degrees between two frames. This keeps the rotation count safe and the wait short.',
+          'If the rate cannot be measured, 30 is assumed and a notice is shown.',
+        ],
+        io: ['Ready video', 'fps, stride'],
+        numbers: [
+          ['Target rate', '30 analysed fps'],
+          ['Max stride', '8'],
+        ],
+        files: ['src/analysis/stride.ts', 'src/video/frames.ts (estimateFps)'],
+      },
+      {
+        id: 'in-sample',
+        st: 's1',
+        level: 'full',
+        kind: 'option',
+        runs: 'browser',
+        title: 'Samples and saved analyses',
+        sum: 'Open a result without running the pose model.',
+        how: [
+          'A sample clip can ship with its analysis, name.pose.json. The app opens the video with it and skips pose extraction.',
+          'Advanced tools: Open saved analysis takes a Save analysis JSON file. seriesMatch tells whether the file and a video are the same clip (same, different, unknown).',
+          'Recent sets on the first screen reopen from the local database. They hold the analysis, never the video.',
+          'make assets-precompute creates the .pose.json files (headless Chrome, about a minute per clip).',
+        ],
+        io: ['A pose-series JSON', 'PoseTrack(s) and settings, straight into stage 3'],
+        files: [
+          'src/video/sample.ts',
+          'src/analysis/timeSeries.ts',
+          'src/analysis/seriesMatch.ts',
+          'src/history/store.ts',
+          'scripts/precompute-samples.mjs',
+        ],
+      },
+      {
+        id: 'in-assets',
+        st: 's1',
+        level: 'full',
+        kind: 'service',
+        runs: 'server',
+        title: 'Asset host',
+        sum: 'A public Vercel Blob folder that serves the heavy files, read only.',
+        how: [
+          'With VITE_ASSET_BASE_URL set, the build leaves out the pose models, the MediaPipe, ONNX Runtime and ffmpeg wasm, and the sample videos. The app reads them at run time.',
+          'Each library version gets its own folder, so a missing folder fails loudly and never mixes versions.',
+          'Without the variable, everything comes from the same origin (npm run fetch-assets).',
+        ],
+        numbers: [['Deploy size', 'about 146 MB to 2 MB']],
+        files: ['src/assets.ts', 'scripts/assets-upload.mjs', 'scripts/blob-store.mjs', 'scripts/fetch-assets.mjs'],
+        caveat:
+          "The upload script is untested against a real store, and Blob's CORS headers were not checked on a real store.",
+      },
+
+      /* ---------- 2 Pose extraction ---------- */
+      {
+        id: 'pe-seek',
+        st: 's2',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Seek frame by frame',
+        sum: 'For each analysed frame: seek the hidden video, then detect.',
+        how: [
+          'The target time is the middle of the frame interval, (k + 0.5) / fps, which avoids rounding errors.',
+          'Seeking, not live playback, makes the result independent of machine speed.',
+          'A missed seeked event is caught by polling. A seek has 3 attempts of 2.5 s before it fails with a clear message.',
+          'A progress bar with an estimated time is shown over the video.',
+        ],
+        io: ['Video, fps, stride', 'One decoded frame at a time'],
+        numbers: [['Seek attempts', '3 x 2.5 s']],
+        files: [
+          'src/analysis/extractPoseTrack.ts',
+          'src/video/frames.ts (seekTo)',
+          'src/ui/stage/ProcessingOverlay.tsx',
+        ],
+      },
+      {
+        id: 'pe-mp',
+        st: 's2',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'MediaPipe pose model',
+        sum: 'BlazePose finds 33 body points per person. GPU first, CPU as fallback.',
+        how: [
+          'Landmark = x, y in pixels plus a visibility score. The same call returns 3D world landmarks (metres, hip-centred), which are kept for the twist estimate.',
+          'GPU means the WebGL delegate. It is probed once on a blank canvas, and on failure the CPU (WebAssembly) delegate is used. WebGPU is not used by MediaPipe Tasks Vision.',
+          'Model size: lite, full or heavy. Full is the default.',
+          'It looks for the athletes plus 2 extra people, at least 4. Seeing the others lets the tracker ignore them.',
+          'Models and wasm come from the same origin, or from the asset host.',
+        ],
+        io: ['Frame', 'Up to N detections: 33 landmarks + 33 world points each'],
+        numbers: [
+          ['Detection / presence / tracking', '0.4 / 0.4 / 0.4'],
+          ['Default model', 'full'],
+        ],
+        files: ['src/pose/MediaPipePoseEstimator.ts', 'src/pose/types.ts', 'src/pose/landmarks.ts'],
+      },
+      {
+        id: 'pe-onnx',
+        st: 's2',
+        level: 'full',
+        kind: 'experimental',
+        runs: 'browser',
+        title: 'ONNX pose engines',
+        sum: 'RTMPose-m or ViTPose-B behind the same interface, to test other models on hard poses.',
+        how: [
+          'Advanced tools, Settings, Analysis, Experimental, Pose model. With advanced tools off, MediaPipe is always used.',
+          'YOLOX-s finds the people. A top-down pose model reads a 192 x 256 crop of each. The points are converted to the 33-point BlazePose layout.',
+          'ONNX Runtime Web runs on WebGPU when allowed and available, else WebAssembly. Models load only when picked.',
+          'RTMPose gives Halpe 26 points (heels and toes, no fingers). ViTPose gives COCO 17 (no heels, toes or fingers).',
+          '2D only. There are no 3D points, so no 3D twist.',
+        ],
+        io: ['Frame', "Detections in the same shape as MediaPipe's"],
+        files: [
+          'src/pose/engines.ts',
+          'src/pose/onnx/OnnxPoseEstimator.ts',
+          'src/pose/onnx/detector.ts',
+          'src/pose/onnx/decode.ts',
+          'src/pose/onnx/keypointMaps.ts',
+        ],
+        caveat:
+          'The README calls the result inconclusive: no clear gain over MediaPipe. Several input assumptions are unverified and the WebGPU path was not run. MediaPipe stays the default.',
+      },
+      {
+        id: 'pe-track',
+        st: 's2',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Follow the athlete',
+        sum: 'Pick the right person in every frame and keep that choice.',
+        how: [
+          'MultiAthleteTracker chooses among the detections by continuity of position and size.',
+          'Size uses the shoulder-to-hip length, which does not change when the body rotates in the image. It follows an athlete through a somersault.',
+          'The same person detected twice is merged: one box lies inside the other and is clearly smaller or on the same spot.',
+          'Output per frame is the chosen landmarks in pixels, and the matching 3D world points.',
+        ],
+        io: ['Detections per frame', 'PoseTrack: frames, world, times, fps, backend'],
+        files: ['src/pose/selectAthlete.ts', 'src/pose/appearance.ts', 'src/analysis/types.ts (PoseTrack)'],
+        caveat: 'A coach walking next to the athlete can still steal the track.',
+      },
+      {
+        id: 'pe-multi',
+        st: 's2',
+        level: 'full',
+        kind: 'option',
+        runs: 'browser',
+        title: 'Several athletes',
+        sum: 'Follow up to 3 people, keep those who jump, compare them side by side.',
+        how: [
+          'The People setting 0 means automatic. With more than one athlete, the colour of their clothes (bodySignature) helps keep tracks apart.',
+          'keepAthletes then drops tracks found in under 20 % of the frames or with no jump. A coach or judge is not an athlete. It never returns an empty set.',
+          'With several athletes the first view is the comparison. Synchro scoring is described in stage 6.',
+        ],
+        io: ['N tracks', 'The tracks of the athletes who jump'],
+        numbers: [
+          ['Auto athletes', 'up to 3'],
+          ['Min. found frames', '20 %'],
+        ],
+        files: ['src/analysis/athletes.ts', 'src/pose/appearance.ts', 'src/ui/rail/compare/AthleteCompare.tsx'],
+      },
+
+      /* ---------- 3 Cleaning and measurement ---------- */
+      {
+        id: 'an-stab',
+        st: 's3',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Stabilise the skeleton',
+        sum: 'Remove doubtful points, glitches and gaps. Smooth what is left.',
+        how: [
+          'Points with visibility under 0.4 are treated as missing.',
+          'Glitch: a joint farther than 20 % of the body length from the median of its own neighbours in time (plus or minus 0.07 s) is rejected. If 40 % or more of the core joints of a frame are glitches, the whole frame is dropped.',
+          'Gaps up to 0.3 s are bridged with a parabola through the samples on both sides. Longer gaps stay missing.',
+          'Every joint path gets a confidence-weighted local quadratic fit over 0.15 s.',
+          'Each sample keeps a state: missing, measured, interpolated or corrected. Filled samples never look as sure as measured ones.',
+        ],
+        io: ['PoseTrack', 'Clean landmarks, confidence, per-joint state'],
+        numbers: [
+          ['Min. visibility', '0.4'],
+          ['Glitch limit', '20 % of body length'],
+          ['Max gap', '0.3 s'],
+          ['Smoothing window', '0.15 s'],
+        ],
+        files: ['src/analysis/stabilize.ts', 'src/analysis/signal.ts'],
+      },
+      {
+        id: 'an-com',
+        st: 's3',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Centre of mass',
+        sum: 'A weighted average of 14 body segments.',
+        how: [
+          'Head, trunk, upper arms, forearms, hands, thighs, shanks and feet, with de Leva-style mass fractions.',
+          'It is only reported when at least half of the body mass was visible.',
+          'Its height and vertical velocity drive the whole jump detection.',
+        ],
+        io: ['Clean landmarks', 'COM x, y per frame, mass coverage'],
+        numbers: [
+          ['Segments', '14'],
+          ['Min. coverage', '50 %'],
+        ],
+        files: ['src/analysis/com.ts'],
+        caveat:
+          'The mass fractions were written from memory (they sum to 1, tested). The README asks to verify them before scientific use.',
+      },
+      {
+        id: 'an-scale',
+        st: 's3',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Scale in metres',
+        sum: "Pixels become metres from the athlete's height.",
+        how: [
+          'Default: the skeleton path nose to ankles is about 0.9 x standing height, which gives metres per pixel.',
+          'Alternative: the trampoline bed (next node).',
+          'A free-fall check fits the acceleration in the middle of each flight. It should be 9.81 m/s2. If not, the metres are off by about that ratio. This is the best check of the athlete height and the scale.',
+        ],
+        io: ['COM in pixels, athlete height', 'COM height and velocity in metres, m/s'],
+        files: ['src/analysis/computeAnalysis.ts', 'src/analysis/geometry.ts'],
+        caveat: 'Assumes the athlete stays at the distance of the bed centre. Treat metres and m/s as estimates.',
+      },
+      {
+        id: 'an-cal',
+        st: 's3',
+        level: 'full',
+        kind: 'option',
+        runs: 'browser',
+        title: 'Trampoline calibration',
+        sum: 'Click the four bed corners and get scale and a position on the bed.',
+        how: [
+          'Four corners and the bed size (default 4.28 x 2.14 m, written from memory) give an image to bed-plane mapping.',
+          'The athlete is in the air, so the athlete is not mapped through it. The camera is assumed level: vertical stays vertical.',
+          'Outputs: metres per pixel at the bed centre, horizontal displacement, xNorm (plus or minus 1 is the bed edge) and height above the bed (0 is the bed).',
+          'Stored per file name and size in localStorage. The panel compares this scale with the athlete-height scale and warns when they disagree.',
+        ],
+        io: ['4 corners, bed size', 'Scale, bed-normalised position'],
+        numbers: [
+          ['Athlete 1 m closer to camera', 'about +11 %'],
+          ['Camera tilted 8 / 15 / 25 deg', 'about 7 / 13 / 20 %'],
+        ],
+        files: ['src/analysis/calibration.ts', 'src/ui/stage/CalibrationBar.tsx'],
+        caveat:
+          'Error figures were measured on a synthetic pinhole camera. Only the on-screen horizontal direction can be measured with one camera.',
+      },
+      {
+        id: 'an-orient',
+        st: 's3',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Body orientation',
+        sum: 'The angle of the trunk (hips to shoulders), kept continuous through full turns.',
+        how: [
+          'Clockwise as seen in the video is positive. It is unwrapped so 350, 355, 360, 365 never falls back to 0.',
+          'Head/feet flips: the pose model sometimes puts the head where the feet are. Each frame gets two readings (as measured and 180 degrees away). A small dynamic-programming search picks the smoothest path, with a price per switch.',
+          'Frames where the trunk joints were replaced after a glitch are not trusted and are interpolated.',
+          'A flip can only be put back while the athlete is in the air.',
+        ],
+        io: ['Clean landmarks', 'Orientation wrapped and continuous, angular velocity'],
+        files: ['src/analysis/orientation.ts', 'src/analysis/signal.ts (unwrapDegrees)'],
+        caveat:
+          'On the one real clip checked, the repair put back only 4 frames. The bigger problem there was the pose model losing the trunk joints in inverted tucks.',
+      },
+      {
+        id: 'an-jumps',
+        st: 's3',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Jump cycles',
+        sum: 'Takeoff, apex and landing from the centre of mass height alone.',
+        how: [
+          'Apex: a COM height peak at least 0.3 m above its surroundings. Height and time come from a parabola fitted to the middle of the flight.',
+          'Takeoff and landing: first the largest upward / downward COM speed near the apex, then refined to the instant where free fall (a = -g) starts and ends, with a two-piece parabola fit. This avoids the lag of a smoothed velocity curve.',
+          'Each frame gets a phase: ground, takeoff, ascent, apex, descent, landing.',
+          'Per jump: flight time, time to apex, apex height, rise (g x T2 / 8), horizontal drift, rotation in quarter turns. A clip that starts or ends in the air keeps the missing event empty.',
+        ],
+        io: ['COM height, velocity, orientation', 'AnalysisResult with jump cycles'],
+        numbers: [
+          ['Min. rise', '0.3 m'],
+          ['Min. apex gap', '0.3 s'],
+        ],
+        files: ['src/analysis/jumpCycles.ts', 'src/analysis/computeAnalysis.ts'],
+      },
+
+      /* ---------- 4 Features ---------- */
+      {
+        id: 'ft-shape',
+        st: 's4',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Shape per frame',
+        sum: 'Angles and distances that describe the body at each sample.',
+        how: [
+          'Hip angle (shoulder, hip, knee), knee angle (hip, knee, ankle), knee-to-torso distance, compactness, leg separation.',
+          'Body-frame joint coordinates and facing cues (face ahead of the ears, knee in front of the hip-ankle line, toes ahead of heels).',
+        ],
+        io: ['AnalysisResult', 'FrameShape over the whole clip'],
+        files: ['src/skills/frameShape.ts', 'src/skills/config.ts'],
+      },
+      {
+        id: 'ft-seq',
+        st: 's4',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Normalized jump sequence',
+        sum: 'Every jump becomes the same 32 x 58 table, takeoff to landing.',
+        how: [
+          '32 samples from takeoff (u = 0) to landing (u = 1). Nothing depends on resolution, position in the frame, athlete size or pixels.',
+          "19 joints in the athlete's own frame (origin at the hip centre, y along the trunk, in body lengths), COM path, orientation as turns plus sin/cos, angular velocity, hip, knee, shoulder-hip axis, body-position code, pose quality.",
+          'Next to it, JumpFeatures: timing, trajectory, orientation, shape statistics, rotation, facing, position and data quality.',
+        ],
+        io: ['FrameShape, jump cycle', 'JumpSequence (32 x 58) + JumpFeatures'],
+        numbers: [
+          ['Samples', '32'],
+          ['Columns', '58'],
+        ],
+        files: ['src/skills/jumpFeatures.ts', 'src/skills/types.ts', 'src/skills/analyzeSkills.ts'],
+      },
+      {
+        id: 'ft-read',
+        st: 's4',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Rotation, facing, body position',
+        sum: 'Rule readings with a confidence, each from several checks.',
+        how: [
+          'Rotation: net trunk rotation between takeoff and landing in turns. The confidence is a product of five checks (close to a half-turn multiple, trunk joints measured, no big orientation jump, body line turns like the trunk, no there-and-back).',
+          'Facing: three cues, over bed contact and flight. It can be set by hand.',
+          'Body position (straight, tuck, pike): fuzzy rules on the hip and knee angle at the most closed moment of the flight. A shape between two definitions is reported as unknown, not forced.',
+        ],
+        io: ['Sequence', 'rotation, facing, position in JumpFeatures'],
+        numbers: [
+          ['Straight', 'hip >= 155, knee >= 150'],
+          ['Pike', 'hip <= 125, knee straight'],
+          ['Tuck', 'hip <= 125, knee <= 115'],
+        ],
+        files: ['src/skills/rotation.ts', 'src/skills/facing.ts', 'src/skills/bodyPosition.ts'],
+        caveat: "These starting thresholds are the author's estimates, not tuned on real athletes.",
+      },
+      {
+        id: 'ft-twist3d',
+        st: 's4',
+        level: 'full',
+        kind: 'experimental',
+        runs: 'browser',
+        title: '3D twist',
+        sum: 'Rotation about the long axis, from the 3D world landmarks.',
+        how: [
+          'Torso frame from the 3D shoulders and hips. The shoulder line of the previous frame is carried along with the axis by the smallest rotation, so a somersault adds nothing. The signed angle to the new shoulder line is the step. Steps are summed. Hips and shoulders are averaged.',
+          'A second estimate keeps the axis in the image plane. The two disagree exactly when the answer depends on a poorly estimated depth.',
+          'Confidence is the product of 7 consistency checks. Below 50 % the panel says Twist: not reliable and shows the raw value only as raw.',
+          'Only works with MediaPipe, which returns the world points.',
+        ],
+        io: ['World landmarks, jump cycles', 'TwistAnalysis per jump, with curves'],
+        numbers: [
+          ['Reliable at', '>= 50 %'],
+          ['Phantom twist on the one real test', '-94 deg'],
+        ],
+        files: ['src/pose3d/twist.ts', 'src/pose3d/torso.ts', 'src/pose3d/config.ts', 'src/pose3d/capabilities.ts'],
+        caveat:
+          'On a still photo with true twist 0, a 15-degree depth tilt of the trunk produced a phantom twist of about -94 degrees during a somersault. The app flagged it as not reliable. No real twisting athlete has been checked.',
+      },
+      {
+        id: 'ft-twist2d',
+        st: 's4',
+        level: 'full',
+        kind: 'experimental',
+        runs: 'browser',
+        title: '2D twist (second opinion)',
+        sum: 'Count half twists from the raw 2D shoulder and hip lines.',
+        how: [
+          'Seen from the side, a shoulder line twisted by angle phi projects as W x sin(phi0 + phi). Width has one minimum per half twist. Chirality (sign change) is used only when the face agrees.',
+          'The count is a model fit: 0 to 8 half twists and a family of twist profiles. The smallest residual wins. It reads the raw landmarks, because smoothing would flatten a fast twist.',
+          'Rule for use: a reliable 3D twist is kept and the 2D count is a second opinion. Without a reliable 3D twist, a reliable 2D count is used (marked pose2d, tolerance plus or minus 80 degrees, no direction, no timing). An unreliable 2D count is ignored.',
+          'twistContext decides which twist the classifier is told about.',
+        ],
+        io: ['Raw 2D landmarks, jump cycles', 'Twist2dAnalysis per jump'],
+        files: ['src/skills/twist2d.ts', 'src/skills/twistContext.ts', 'src/skills/twistTrajectory.ts'],
+        caveat:
+          'Exact on a simulated athlete only. No real twisting ground truth exists yet. It is not saved in dataset records, so make eval-run does not replay it.',
+      },
+
+      /* ---------- 5 Classification ---------- */
+      {
+        id: 'cl-struct',
+        st: 's5',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Four structural questions',
+        sum: 'Somersaults, direction, twists, position. Each gets a probability for every answer.',
+        how: [
+          '1. Rotation: 0 to 14 quarter rotations (up to 3 and a half somersaults).',
+          '2. Direction: front or back, only if the body somersaults. Needs the facing.',
+          '3. Twists: 0 to 8 half twists. A prior of 0.7 per extra half twist when the twist is not measured.',
+          '4. Position: tuck, pike or straight, also backed by the share of the flight spent in each shape.',
+          'Each measurement is compared with a tolerance (a Gaussian whose width follows measurement quality), never with an exact value. The rotation path and the twist trajectory back up the counts.',
+        ],
+        io: ['JumpFeatures, JumpSequence, TwistContext', 'Distribution per question'],
+        files: ['src/skills/hierarchical.ts'],
+      },
+      {
+        id: 'cl-table',
+        st: 's5',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'FIG element table',
+        sum: 'The only place where an element, its name and its difficulty live.',
+        how: [
+          'Rows are generated from direction x somersaults x twists x position. Every reachable movement has exactly one row.',
+          'The four answers are multiplied into a posterior for each row. The classifier never outputs a code or a difficulty. It outputs a Movement and movementToElement looks it up.',
+          'Probability that falls outside the table (quarter rotations, four somersaults) is kept and reported.',
+        ],
+        io: ['Four distributions', 'Posterior per element + mass outside the table'],
+        files: ['src/skills/fig/elements.ts'],
+      },
+      {
+        id: 'cl-dtw',
+        st: 's5',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Trajectory match (DTW)',
+        sum: "Compare the jump's shape over time with every element, by dynamic time warping.",
+        how: [
+          'The movement signature has 9 channels over normalized time: somersault, twist, hip, knee, shoulder-hip, COM height, angular velocity, orientation sin and cos.',
+          'References: an analytic model trajectory of every element (smooth ramps, fold and open of the hips and knees, parabola for the COM), plus any labelled example jumps.',
+          'Final score: posterior x similarity^gamma. Out-of-table mass gets a neutral similarity. An element needs both the right counts and the right shape.',
+          'Confidence = blended share x data quality.',
+        ],
+        io: ['Sequence + posteriors', 'Ranked elements with blend scores'],
+        files: [
+          'src/skills/temporal/classifier.ts',
+          'src/skills/temporal/signature.ts',
+          'src/skills/temporal/dtw.ts',
+          'src/skills/temporal/prototypes.ts',
+        ],
+        caveat:
+          'Confidence is a heuristic, not a calibrated probability. Model trajectories describe a clean execution; they are not measurements.',
+      },
+      {
+        id: 'cl-guess',
+        st: 's5',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Always name it, flag the doubt',
+        sum: 'A complete jump gets the closest element of the table, with a certainty label and alternatives.',
+        how: [
+          'forceGuess is on by default. Certainty: confident, probable or tentative. The video labels and timeline draw the confident line at 0.6.',
+          'A jump cut off by the clip is still not named.',
+          'Front vs back that the data cannot separate: the likelier direction (back) is given and flagged as assumed, with the twin movement offered first.',
+          'When the pose cannot be trusted, the same shape without rotation is offered first (a straight jump the pose model made look like a somersault).',
+          'callOf builds the final Call: element, confidence, certainty, forced, directionAssumed, alternatives.',
+        ],
+        io: ['Ranked elements', 'SkillPrediction -> Call'],
+        files: [
+          'src/coaching/guess.ts',
+          'src/skills/hierarchical.ts (diagnose, cutOff)',
+          'src/skills/analyzeSkills.ts',
+        ],
+      },
+      {
+        id: 'cl-refs',
+        st: 's5',
+        level: 'full',
+        kind: 'option',
+        runs: 'browser',
+        title: 'Labelled reference examples',
+        sum: 'Corrected jumps become examples the classifier compares with, at once.',
+        how: [
+          'Records with a figure are rebuilt into signatures from their stored sequence and twist curve. They work from a dataset file imported from another computer.',
+          "Sources: the coach's own labels, plus jumps confirmed or corrected by reviewers on the review service. The coach's label wins on the same jump.",
+          'The video being analysed is excluded (excludeSelf, same videoId and apex within 0.2 s), so a jump never sees itself.',
+        ],
+        io: ['JumpRecords with a figure', 'Reference signatures in cl-dtw'],
+        files: [
+          'src/dataset/references.ts',
+          'src/skills/temporal/prototypes.ts (excludeSelf)',
+          'src/sync/reviewSync.ts',
+        ],
+      },
+      {
+        id: 'cl-rule',
+        st: 's5',
+        level: 'full',
+        kind: 'option',
+        runs: 'browser',
+        title: 'Rule-based baseline',
+        sum: 'The first, fully transparent classifier. A swap point for a learned model.',
+        how: [
+          'Rules on rotation, position and facing give five skills: straight, tuck, pike, back, front. Anything else is unclassified with a reason.',
+          'SkillClassifier is an interface. analyzeSkills(result, { classifier }) takes any implementation that reads the features and the normalized sequence.',
+          'The default is the temporal classifier. The rule set remains in the code, the helpers it holds (limits, position words) are reused, and tests use it.',
+        ],
+        io: ['ClassifierInput', 'SkillPrediction'],
+        files: ['src/skills/classifier.ts', 'src/skills/types.ts'],
+        caveat: 'The role of the rule set today is read from the imports, not from running the app.',
+      },
+      {
+        id: 'cl-jev',
+        st: 's5',
+        level: 'full',
+        kind: 'service',
+        runs: 'server',
+        title: 'Jev comparison',
+        sum: "TypeSafe's Jev decision model, asked by hand, for comparison only.",
+        how: [
+          'Per jump, the movement signature and features are written as a text state. Jev answers four typed questions (somersaults, twists, direction, position). The element is found by table lookup and the 5 best come from the product of the four answers.',
+          'Only measurements are sent, never a video, a frame or a file name. A test checks the request body.',
+          "In the app: Coach rail, Classification tab, a button asks about one jump or all. The call goes to the app's own Vercel function api/jev/systemone, which holds the key. The browser never sees it.",
+          'Offline: make eval-jev with TYPESAFE_API_KEY. Without a key, Jev is skipped and the local answer is kept.',
+          'Guards: bad curves keep the local answer; a count just under a whole number is flagged as maybe cut off; answers that are no FIG element give the closest element at low confidence.',
+        ],
+        io: ['Signature + features', 'Jev answers shown beside the local ones'],
+        files: [
+          'src/skills/jev/classify.ts',
+          'src/skills/jev/client.ts',
+          'api/jev/systemone.ts',
+          'scripts/jev-eval.ts',
+          'src/ui/rail/coach/ClassificationTab.tsx',
+        ],
+        caveat:
+          'Proof of concept, never called on its own. The function is a public URL, so it accepts POST only, a fixed model, a small body and only those four questions.',
+      },
+
+      /* ---------- 6 Scoring ---------- */
+      {
+        id: 'sc-diff',
+        st: 's6',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Difficulty (FIG rule)',
+        sum: 'The recognised movement goes in, the published rule gives the value.',
+        how: [
+          'FIG Code of Points 2025-2028, Trampoline Part I section 17.1: somersault, each quarter, each half twist, the position, the backward multiple somersault, twisting doubles and triples.',
+          "No model decides it. The test suite reproduces all 139 values of the Code's own table of examples (Part II, appendix C).",
+          'A repeat counts once in the set total.',
+        ],
+        io: ['Element', 'Difficulty value'],
+        numbers: [['Code examples reproduced', '139 of 139']],
+        files: ['src/skills/fig/difficulty.ts', 'src/skills/fig/elements.ts'],
+        caveat:
+          'Not modelled: the exercise bonus (section 17.1.7) and the limits of junior and age-group competitions.',
+      },
+      {
+        id: 'sc-exec',
+        st: 's6',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Execution proposal',
+        sum: 'The FIG section 20.2 deductions that one side-on camera can see.',
+        how: [
+          'Reads the normalized sequence and the named element, so a coach who corrects the name gets the deductions of the real element.',
+          'Deductions: bent knees (0.1 to 0.2), late or missing opening (0.1 to 0.3), piking down after opening (0.1, 0.2), bent body line in a layout (0.1, 0.2), arms away or bent (0.1), twist finishing late (0.3, only when the 3D twist is reliable).',
+          "Nothing is judged after 3 o'clock, when the athlete prepares the landing. A skill loses at most 0.5.",
+          'Feet and knees together, and pointed toes, need a front view. They are listed as not checked, never guessed.',
+        ],
+        io: ['Sequence, element, twist', 'Execution: items, unchecked list, total deduction'],
+        numbers: [['Max per skill', '0.5']],
+        files: ['src/coaching/execution.ts', 'src/coaching/config.ts'],
+        caveat:
+          "A proposal, not a judge. The deciding angles are the author's estimates, more lenient than the Code, and not tuned on footage judged by FIG judges.",
+      },
+      {
+        id: 'sc-session',
+        st: 's6',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Build the set',
+        sum: 'One row per skill, with totals for the whole set.',
+        how: [
+          "For each jump: the coach's label if there is one, else the classifier's call.",
+          'Straight jumps between skills are folded into one bounce line.',
+          'A guess the classifier would not have named firmly is pending. It stays out of the totals until the coach checks it with one tap.',
+          "A pose easier than the element's position (a pike that was a tuck) says what a judge would give.",
+          'Totals: number of skills, difficulty sum, execution, time in the air.',
+        ],
+        io: ['Skills, result, twist, labels', 'Session'],
+        files: ['src/coaching/session.ts', 'src/coaching/display.ts', 'src/coaching/summary.ts'],
+      },
+      {
+        id: 'sc-tips',
+        st: 's6',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Tips and focus',
+        sum: 'One cue for each thing that cost points, ranked across the set.',
+        how: [
+          'Each deduction becomes a tip with the measurement behind it.',
+          'Extra notes: a skill that landed far from the bed centre (drift), and a long set whose last skills fly clearly lower than the first (height).',
+          'The focus of the set groups the tips and shows the two that cost the most points.',
+        ],
+        io: ['Executions, features', 'Tips, focus'],
+        files: ['src/coaching/tips.ts'],
+      },
+      {
+        id: 'sc-routine',
+        st: 's6',
+        level: 'full',
+        kind: 'option',
+        runs: 'browser',
+        title: 'Routine start',
+        sum: 'Find where the routine begins, and let the coach move it.',
+        how: [
+          'Detected as the first jump that is not a straight jump, or that was given an execution point.',
+          'Shown as a flag on the timeline and in the skill list. It can be moved to the selected jump or removed from the flag menu.',
+        ],
+        io: ['Jumps', 'Start index'],
+        files: ['src/coaching/routine.ts'],
+      },
+      {
+        id: 'sc-synchro',
+        st: 's6',
+        level: 'full',
+        kind: 'option',
+        runs: 'browser',
+        title: 'Synchro estimate',
+        sum: 'A simple score for athletes who jump together.',
+        how: [
+          'Each jump starts at 10 and loses points for what a judge sees first: timing gap at takeoff and landing (1 point per 0.1 s, at most 4), height difference (5 % is 0.5 point, at most 3), and different skills (3).',
+          'Jumps whose apexes are more than 0.75 s apart are not the same jump.',
+        ],
+        io: ['Jumps of several athletes', 'Synchro score per jump'],
+        numbers: [
+          ['Full mark', '10'],
+          ['Match window', '0.75 s'],
+        ],
+        files: ['src/analysis/synchro.ts'],
+        caveat: "This app's own simple measure. It is not the FIG synchro judging.",
+      },
+
+      /* ---------- 7 Screens ---------- */
+      {
+        id: 'ui-live',
+        st: 's7',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Live view',
+        sum: 'The default screen, built for a coach on the trampoline.',
+        how: [
+          'The set at a glance: skills, difficulty, execution, time in the air, what to work on next. Copy summary puts it into a message.',
+          'One row per skill. A guess is shown with a dashed mark and a question mark. Tap a skill to see it on the video and open it.',
+          'Skill card: what it was (Yes that is it, Change, It is none of these), difficulty by parts, deductions with how they were measured, what to fix.',
+          'Full screen: the picture, the skill under the playhead, and a slim bar with play, previous and next, speed and position. Swipe to step frames.',
+        ],
+        io: ['Session', 'A coach verdict per skill'],
+        files: [
+          'src/ui/live/LiveRail.tsx',
+          'src/ui/live/SetSummary.tsx',
+          'src/ui/live/SkillCard.tsx',
+          'src/ui/live/ElementPicker.tsx',
+          'src/ui/stage/FullscreenHud.tsx',
+        ],
+      },
+      {
+        id: 'ui-stage',
+        st: 's7',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Video, overlay, timeline',
+        sum: 'The video with the analysis drawn on it.',
+        how: [
+          'Overlay: skeleton, centre of mass with a trajectory comet, skill label chips, bed outline.',
+          'Timeline strip: arches for every flight with takeoff, apex and landing marks and a chip per jump. Press or drag to scrub.',
+          'Transport: play, 0.1x to 2x, frame steps, backwards play, previous / next jump.',
+        ],
+        io: ['Result, skills', 'Pictures and seeking'],
+        files: ['src/ui/stage/Stage.tsx', 'src/video/overlay.ts', 'src/ui/Timeline.tsx', 'src/ui/stage/Transport.tsx'],
+      },
+      {
+        id: 'ui-adv',
+        st: 's7',
+        level: 'full',
+        kind: 'option',
+        runs: 'browser',
+        title: 'Advanced tools',
+        sum: 'Everything else, behind one switch in the settings (off by default).',
+        how: [
+          'Athlete and Coach audiences. Coach rail tabs: Skill, Metrics, Twist, Review, Data and Classification.',
+          'Technical data charts, stage views (video, split with the 3D skeleton, 3D), trampoline outline, saved analyses.',
+          'Settings, Analysis: model size (lite, full, heavy), frame stride, number of people, GPU on/off, pose engine, athlete height, scale source, thresholds editor.',
+        ],
+        io: ['Everything the pipeline made', 'Inspection and tuning'],
+        files: [
+          'src/ui/rail/CoachRail.tsx',
+          'src/ui/rail/AthleteInsights.tsx',
+          'src/ui/TechnicalData.tsx',
+          'src/ui/Pose3DView.tsx',
+          'src/ui/chrome/SettingsDialog.tsx',
+        ],
+      },
+      {
+        id: 'ui-export',
+        st: 's7',
+        level: 'full',
+        kind: 'option',
+        runs: 'browser',
+        title: 'Exports',
+        sum: 'Files for analysis outside the app.',
+        how: [
+          'Annotated video, Frames CSV, Jumps CSV, Save analysis (the full frame-by-frame JSON), skills JSON and CSV, sequences CSV.',
+          'Save analysis (trampovision.pose-series) also keeps the raw model output and the 3D landmarks, so the analysis can be re-run with other settings without the pose model.',
+          'Exported names and field names stay English, whatever the interface language.',
+        ],
+        io: ['Result, skills', 'Downloaded files'],
+        files: [
+          'src/analysis/export.ts',
+          'src/analysis/timeSeries.ts',
+          'src/skills/export.ts',
+          'src/video/exportVideo.ts',
+          'src/dataset/export.ts',
+        ],
+      },
+      {
+        id: 'ui-review',
+        st: 's7',
+        level: 'full',
+        kind: 'option',
+        runs: 'browser',
+        title: 'Review mode (labelling)',
+        sum: 'Label real jumps stage by stage to build ground truth.',
+        how: [
+          'Open with Review in the top bar or #review. One jump at a time loops in the video, next to what the classifier measured at each stage.',
+          'Answer four questions: somersaults in quarters, direction, half twists, position. Keyboard shortcuts for all of them.',
+          'Download labels writes a label file for make eval-run. Import labels does the reverse, matching by apex time.',
+        ],
+        io: ['Analysis', 'Label file, dataset entries'],
+        files: ['src/ui/review/mode/ReviewMode.tsx', 'src/dataset/stageLabel.ts', 'src/eval/labels.ts'],
+      },
+
+      /* ---------- 8 Memory and learning ---------- */
+      {
+        id: 'pr-auto',
+        st: 's8',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Autosave recent sets',
+        sum: 'Every finished analysis is kept on this device.',
+        how: [
+          'The text of the Save analysis JSON plus one line of figures, in IndexedDB. Never the video.',
+          'Written when an analysis completes and again, after a short wait, when the coach changes the set. A correction only updates the list line. The multi-megabyte series is rewritten only when the analysis or its settings change.',
+          'One set per video. The 21st set pushes the oldest out.',
+          'A failed write never throws. Leaving a set asks first only if it could not be stored.',
+        ],
+        io: ['Analysis snapshot', 'Recent sets list on the first screen'],
+        numbers: [
+          ['Sets kept', '20'],
+          ['Wait before writing', '800 ms'],
+        ],
+        files: ['src/history/autosave.ts', 'src/history/store.ts', 'src/history/useHistory.ts', 'src/dataset/db.ts'],
+      },
+      {
+        id: 'pr-fix',
+        st: 's8',
+        level: 'core',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Coach confirms or corrects',
+        sum: 'One tap saves a labelled jump and makes it an example straight away.',
+        how: [
+          'Yes that is it, Change and It is none of these are stored as a JumpRecord in the local dataset (IndexedDB database trampovision).',
+          'A record holds the video id, timestamps, the 32 x 58 sequence, features, prediction, analysis settings, twist, and the label. The execution deduction a coach gives is saved next to the proposed one, which is what would tune the thresholds later.',
+          'The skill becomes a reference example at once, so other skills of the clip and the next clips profit.',
+          'Opening the same video again brings the labels back.',
+        ],
+        io: ['Coach verdict', 'JumpRecord (local), a verdict for the outbox'],
+        files: ['src/dataset/record.ts', 'src/dataset/store.ts', 'src/dataset/useDataset.ts', 'src/dataset/types.ts'],
+      },
+      {
+        id: 'pr-sync',
+        st: 's8',
+        level: 'full',
+        kind: 'service',
+        runs: 'browser',
+        title: 'Review upload and outbox',
+        sum: 'Numbers only go to the review service, after the analysis, without delaying it.',
+        how: [
+          'Each jump is posted (measurements, prediction with candidates, pose sequence), 25 per call. The file name is blanked before upload, because it can name the athlete.',
+          "The live view sends the coach's answers as confirm or correct (reviewer live). Verdicts wait in an outbox in the browser until delivered.",
+          'A switch in the settings turns the upload off. Without VITE_REVIEW_API_URL the app is local-only.',
+          'Reviewed jumps come back via GET /references.',
+        ],
+        io: ['JumpRecords, verdicts', 'HTTP calls to the Worker'],
+        files: ['src/sync/reviewSync.ts', 'src/sync/useReviewSync.ts', 'src/localOnlyGuard.ts'],
+        caveat:
+          'The ingest token ships in the bundle. It is not a secret; it only prevents accidental writes. Use Cloudflare Access for real access control.',
+      },
+      {
+        id: 'pr-worker',
+        st: 's8',
+        level: 'full',
+        kind: 'service',
+        runs: 'server',
+        title: 'Review Worker and reviewer page',
+        sum: 'A Cloudflare Worker with a D1 database. It never classifies.',
+        how: [
+          'Routes: POST /jumps, GET /references, GET /elements, GET /jumps?queue=1, GET /jumps/:id, PUT /jumps/:id/review, GET /stats, GET /export, DELETE.',
+          'Verdicts: confirm, correct (a figure of the table), unknown, bad-data. Only confirmed and corrected jumps become reference examples.',
+          'Reviewer page (/review.html): the automatic answer, a 3D skeleton replay, the measured curves, and a bottom bar to confirm, correct, skip or flag. Tabs: To review, Confirmed, Corrected, Unknown, Bad data.',
+          'Deployed by GitHub Actions on pushes to main that touch worker/, src/skills/, src/i18n/ or the dependencies.',
+        ],
+        io: ['Posted jumps, verdicts', 'Reference records, NDJSON export'],
+        files: [
+          'worker/src/index.ts',
+          'worker/schema.sql',
+          'worker/wrangler.toml',
+          'review.html',
+          'src/reviewPage/main.js',
+          '.github/workflows/deploy-worker.yml',
+        ],
+        caveat: 'With the shared token, anyone who opens the reviewer page can delete jumps (both buttons ask first).',
+      },
+      {
+        id: 'pr-eval',
+        st: 's8',
+        level: 'full',
+        kind: 'option',
+        runs: 'dev',
+        title: 'Offline evaluation',
+        sum: 'Score the classifier on reviewed jumps, without any video.',
+        how: [
+          'make eval-fetch downloads the reviewed jumps. make eval-run replays the current classifier on the stored features and sequences and scores it. The run is done twice: table only, and with other videos as examples (leave one video out).',
+          'Reports top-1, top-3, top-5, unclassified rate, balanced accuracy, confident-wrong counts, commonest confusions, which question failed (rotation, twist, direction, position), and confidence honesty.',
+          'make eval-consistency scores rotation quality with no labels: monotonic, noFlip, crossCheck, onGrid, facing known, twist reliable.',
+          'make eval-label-sheet writes label sheets and ffmpeg filmstrip commands. In the app, Review tab shows accuracy with Wilson 95 % intervals, per-class precision and recall, a confusion matrix and failure cards.',
+          'SAVE= and BASELINE= fail a change that lowers top-1 or raises confident-wrong.',
+        ],
+        io: ['Review export, label files', 'Scores and baselines'],
+        files: [
+          'scripts/eval.ts',
+          'scripts/consistency.ts',
+          'scripts/label-sheet.ts',
+          'src/eval/replay.ts',
+          'src/dataset/metrics.ts',
+          'src/dataset/failures.ts',
+        ],
+        caveat:
+          'No set of real athlete jumps exists yet. The 17 reviewed jumps available when the README was written come from the synthetic athlete, so accuracy on real footage is unknown.',
+      },
+
+      /* ---------- 9 Around ---------- */
+      {
+        id: 'x-guard',
+        st: 's9',
+        level: 'full',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Local-only guard and CSP',
+        sum: 'No cross-origin request unless the build allows it.',
+        how: [
+          'The MediaPipe runtime contains a usage-logging call to odml.pa.googleapis.com. A runtime guard refuses any cross-origin fetch, XHR or sendBeacon.',
+          "The production build adds a Content-Security-Policy with connect-src 'self' blob: data:.",
+          'Only three origins are let through, all set by the build: the review service, the asset host, and an absolute Jev URL. The default Jev path is same-origin.',
+          'Stored in the browser: calibration corners (localStorage) and the dataset and recent sets (IndexedDB). Never the video.',
+        ],
+        files: ['src/localOnlyGuard.ts', 'vite.config.ts', 'src/main.tsx'],
+      },
+      {
+        id: 'x-i18n',
+        st: 's9',
+        level: 'full',
+        kind: 'core',
+        runs: 'browser',
+        title: 'Four languages',
+        sum: 'English, French, German and Japanese, with English as the source.',
+        how: [
+          'One message file per part of the app and per language. The Dictionary type makes a missing key a compile error. A test checks the same keys, the same {holes}, no untranslated English and no duplicate key.',
+          'Analysis text (a summary, a tip, a limitation) is written in the language in use and rebuilt when it changes. Stored names stay English.',
+          'Each language is a separate build chunk. The first screen waits for the one in use.',
+        ],
+        files: ['src/i18n/core.ts', 'src/i18n/messages/en/*', 'src/i18n/i18n.test.ts'],
+      },
+      {
+        id: 'x-test',
+        st: 's9',
+        level: 'full',
+        kind: 'core',
+        runs: 'dev',
+        title: 'Synthetic athletes and tests',
+        sum: 'Ground truth that the real footage does not have.',
+        how: [
+          'testTracks: synthetic routines with analytic truth (30 and 60 fps, noise, glitches, dropouts).',
+          'testMannequin: an articulated 2D athlete with known angles. 300 jumps per row in the skill evaluation.',
+          'testTwistMannequin: a rigid 3D athlete with known somersaults and twists, with degradations (depth noise, missing frames, left/right swaps, depth tilt).',
+          'A headless Chromium check ran real MediaPipe on a photo moved along an exact trajectory.',
+        ],
+        files: [
+          'src/analysis/testTracks.ts',
+          'src/skills/testMannequin.ts',
+          'src/skills/evaluation.ts',
+          'src/pose3d/testTwistMannequin.ts',
+          'src/pose3d/evaluation.ts',
+        ],
+        caveat:
+          'These tables show the logic works if the pose model is as good as the simulation. They do not show accuracy on real athletes.',
+      },
+      {
+        id: 'x-ship',
+        st: 's9',
+        level: 'full',
+        kind: 'core',
+        runs: 'dev',
+        title: 'Build, CI and delivery',
+        sum: 'Vite + React + TypeScript, deployed on Vercel.',
+        how: [
+          'make check = typecheck, worker typecheck, oxlint, Prettier check, tests. CI runs make check and make build on every pull request and on main.',
+          'The app is a static build with an optional Vercel function (api/jev). The Worker is deployed separately by its own workflow.',
+          'Installable on a home screen (web manifest, no service worker), so it needs a connection to load.',
+        ],
+        files: ['Makefile', '.github/workflows/ci.yml', 'vite.config.ts', 'public/manifest.webmanifest'],
+      },
+    ];
+
+    var KIND_LABEL = { option: 'Option', experimental: 'Experimental', service: 'Outside browser', core: 'Main flow' };
+    var RUNS_LABEL = { browser: 'browser', server: 'server', dev: 'dev tools' };
+
+    var $ = function (id) {
+      return document.getElementById(id);
+    };
+    var esc = function (s) {
+      return String(s).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    };
+    var pipeline = $('pipeline'),
+      panelBody = $('panel-body'),
+      pos = $('pos');
+    var view = 'simple',
+      selected = null;
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var wide = window.matchMedia('(min-width: 1000px)');
+
+    // Number the main flow once, so a step keeps its number in both views.
+    var n = 0;
+    NODES.forEach(function (x) {
+      if (x.level === 'core') x.num = ++n;
+    });
+    var byId = {};
+    NODES.forEach(function (x) {
+      byId[x.id] = x;
+    });
+
+    function render() {
+      var html = '';
+      STAGES.forEach(function (s, si) {
+        var nodes = NODES.filter(function (x) {
+          return x.st === s.id;
+        });
+        html +=
+          '<section class="stage' + (s.full ? ' full-only' : '') + '" id="' + s.id + '" data-stage="' + s.id + '">';
+        html +=
+          '<div class="stage-head"><span class="sn">Stage ' +
+          (si + 1) +
+          '</span><h2>' +
+          esc(s.name) +
+          '</h2><p class="ss">' +
+          esc(s.sub) +
+          '</p></div>';
+        html += '<div class="grid">';
+        nodes.forEach(function (x) {
+          html +=
+            '<button type="button" class="node' +
+            (x.level === 'full' ? ' full-only' : '') +
+            '" data-id="' +
+            x.id +
+            '" data-kind="' +
+            x.kind +
+            '" data-level="' +
+            x.level +
+            '">';
+          html += '<span class="node-top">';
+          if (x.num) html += '<span class="num">' + x.num + '</span>';
+          if (x.kind !== 'core') html += '<span class="badge ' + x.kind + '">' + KIND_LABEL[x.kind] + '</span>';
+          else if (!x.num)
+            html += '<span class="badge" style="background:var(--surface-2);color:var(--muted)">Support</span>';
+          html += '<span class="runs">' + RUNS_LABEL[x.runs] + '</span></span>';
+          html += '<h3>' + esc(x.title) + '</h3><p>' + esc(x.sum) + '</p></button>';
+        });
+        html += '</div>';
+        if (s.loop) html += '<div class="loop full-only"><b>&#8635; Feedback loop.</b> ' + s.loop + '</div>';
+        if (s.out) {
+          html +=
+            '<div class="handoff" aria-label="Output of stage ' +
+            (si + 1) +
+            '"><span class="ln"></span><span class="pill"><b>' +
+            esc(s.out[0]) +
+            '</b> &middot; ' +
+            esc(s.out[1]) +
+            '</span><span class="ln"></span><span class="arrow"></span></div>';
+        }
+        html += '</section>';
+      });
+      pipeline.innerHTML = html;
+
+      var nav = '';
+      STAGES.forEach(function (s, si) {
+        nav +=
+          '<a class="chip' +
+          (s.full ? ' full-only' : '') +
+          '" href="#' +
+          s.id +
+          '" data-stage="' +
+          s.id +
+          '"><span class="cn">' +
+          (si + 1) +
+          '</span>' +
+          esc(s.name) +
+          '</a>';
+      });
+      $('mapnav').innerHTML = nav;
+    }
+
+    function visibleNodes() {
+      return NODES.filter(function (x) {
+        return view === 'full' || x.level === 'core';
+      });
+    }
+
+    function updateCounts() {
+      var core = NODES.filter(function (x) {
+        return x.level === 'core';
+      }).length;
+      var extra = NODES.length - core;
+      $('counts').innerHTML =
+        view === 'full'
+          ? '<b>' + NODES.length + '</b> blocks: ' + core + ' main flow + ' + extra + ' extras'
+          : '<b>' + core + '</b> steps in the main flow &middot; ' + extra + ' more in the Full view';
+      $('lede').innerHTML =
+        view === 'full'
+          ? '<b>Full view.</b> The main flow plus every option, experimental path, outside service and development tool. Dashed outlines are things you can switch on, or that are still being tested. Click any block.'
+          : "<b>Simplified view.</b> The normal path only: a video goes in, the athlete's skeleton is found, each jump is measured and named, then scored. Click a block for details, or switch to Full for the options and experiments.";
+    }
+
+    function setView(v, fromUser) {
+      view = v;
+      document.body.setAttribute('data-view', v);
+      $('b-simple').setAttribute('aria-pressed', String(v === 'simple'));
+      $('b-full').setAttribute('aria-pressed', String(v === 'full'));
+      updateCounts();
+      if (!reduce && fromUser && v === 'full') {
+        document.querySelectorAll('.node[data-level="full"]').forEach(function (el, i) {
+          el.classList.remove('enter');
+          void el.offsetWidth;
+          el.style.animationDelay = Math.min(i, 14) * 18 + 'ms';
+          el.classList.add('enter');
+        });
+      }
+      try {
+        localStorage.setItem('tv-arch-view', v);
+      } catch (e) {}
+      try {
+        history.replaceState(null, '', v === 'full' ? '#full' : '#simple');
+      } catch (e) {}
+      if (
+        selected &&
+        !visibleNodes().some(function (x) {
+          return x.id === selected;
+        })
+      )
+        select(visibleNodes()[0].id, false);
+      else updatePos();
+    }
+
+    function list(items, tag) {
+      return items && items.length
+        ? '<' +
+            tag +
+            '>' +
+            items
+              .map(function (i) {
+                return '<li>' + esc(i) + '</li>';
+              })
+              .join('') +
+            '</' +
+            tag +
+            '>'
+        : '';
+    }
+
+    function updatePos() {
+      var v = visibleNodes(),
+        i = v.findIndex(function (x) {
+          return x.id === selected;
+        });
+      pos.textContent = i >= 0 ? i + 1 + ' / ' + v.length : '';
+    }
+
+    function select(id, open) {
+      var x = byId[id];
+      if (!x) return;
+      selected = id;
+      document.querySelectorAll('.node').forEach(function (el) {
+        if (el.getAttribute('data-id') === id) el.setAttribute('aria-current', 'true');
+        else el.removeAttribute('aria-current');
+      });
+      var st = STAGES.filter(function (s) {
+        return s.id === x.st;
+      })[0];
+      var h = '<div class="panel-top">';
+      if (x.num) h += '<span class="num">' + x.num + '</span>';
+      h +=
+        '<span class="badge ' +
+        (x.kind === 'core' ? '' : x.kind) +
+        '"' +
+        (x.kind === 'core' ? ' style="background:var(--core-soft);color:var(--core)"' : '') +
+        '>' +
+        (x.kind === 'core' && !x.num ? 'Support' : KIND_LABEL[x.kind]) +
+        '</span>';
+      h +=
+        '<span class="mono" style="color:var(--muted)">' +
+        esc(st.name) +
+        ' &middot; runs in ' +
+        RUNS_LABEL[x.runs] +
+        '</span>';
+      h += '<button type="button" class="close" id="close">Close</button></div>';
+      h += '<h2>' + esc(x.title) + '</h2><p class="sum">' + esc(x.sum) + '</p>';
+      h += '<h4>How it works</h4>' + list(x.how, 'ul');
+      if (x.io)
+        h +=
+          '<h4>Data</h4><div class="io"><div><span>In</span><span style="text-transform:none;letter-spacing:0;font-family:var(--body);font-size:.86rem;color:var(--ink)">' +
+          esc(x.io[0]) +
+          '</span></div><div><span>Out</span><span style="text-transform:none;letter-spacing:0;font-family:var(--body);font-size:.86rem;color:var(--ink)">' +
+          esc(x.io[1]) +
+          '</span></div></div>';
+      if (x.numbers)
+        h +=
+          '<h4>Key numbers</h4><dl class="facts">' +
+          x.numbers
+            .map(function (p) {
+              return '<div><dt>' + esc(p[0]) + '</dt><dd>' + esc(p[1]) + '</dd></div>';
+            })
+            .join('') +
+          '</dl>';
+      if (x.files)
+        h +=
+          '<h4>Where in the code</h4><div class="files">' +
+          x.files
+            .map(function (f) {
+              return '<code>' + esc(f) + '</code>';
+            })
+            .join('') +
+          '</div>';
+      if (x.caveat) h += '<div class="caveat"><b>Limit.</b> ' + esc(x.caveat) + '</div>';
+      panelBody.innerHTML = h;
+      panelBody.scrollTop = 0;
+      var c = $('close');
+      if (c)
+        c.onclick = function () {
+          document.body.classList.remove('sheet-open');
+        };
+      if (open !== false && !wide.matches) document.body.classList.add('sheet-open');
+      updatePos();
+    }
+
+    function step(d) {
+      var v = visibleNodes(),
+        i = v.findIndex(function (x) {
+          return x.id === selected;
+        });
+      var j = (i + d + v.length) % v.length;
+      select(v[j].id);
+      var el = document.querySelector('.node[data-id="' + v[j].id + '"]');
+      if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+    }
+
+    render();
+    pipeline.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('.node') : null;
+      if (b) select(b.getAttribute('data-id'));
+    });
+    $('b-simple').onclick = function () {
+      setView('simple', true);
+    };
+    $('b-full').onclick = function () {
+      setView('full', true);
+    };
+    $('prev').onclick = function () {
+      step(-1);
+    };
+    $('next').onclick = function () {
+      step(1);
+    };
+
+    var start = 'simple';
+    try {
+      var saved = localStorage.getItem('tv-arch-view');
+      if (saved === 'full' || saved === 'simple') start = saved;
+    } catch (e) {}
+    if (location.hash === '#full') start = 'full';
+    else if (location.hash === '#simple') start = 'simple';
+    setView(start, false);
+    select('in-video', false);
+  })();
+</script>
