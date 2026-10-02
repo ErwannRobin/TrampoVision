@@ -45,7 +45,7 @@ import { buildPoseSeries, parsePoseSeries, toSeriesJson, type ParsedSeries } fro
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point, PoseEngineId } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
-import { loadSample, samples } from './video/sample';
+import { loadSample, loadSampleSeries, loadSamples, type Sample } from './video/sample';
 import { dragHasFiles, pickDroppedVideo } from './video/drop';
 import { transcodeToH264 } from './video/transcode';
 import type { CalibrationDraw, OverlayOptions } from './video/overlay';
@@ -123,6 +123,7 @@ export default function App() {
   // Text made while analyzing (skill names, tips, warnings) follows the language: it is made again when the language changes.
   const locale = useLocale();
   const [url, setUrl] = useState<string | null>(null);
+  const [samples, setSamples] = useState<Sample[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [fps, setFps] = useState(30);
   const [model, setModel] = useState<ModelVariant>('full');
@@ -317,6 +318,14 @@ export default function App() {
 
   useEffect(() => () => abort.current?.abort(), []);
 
+  useEffect(() => {
+    let live = true;
+    void loadSamples().then((found) => live && setSamples(found));
+    return () => {
+      live = false;
+    };
+  }, []);
+
   // A new analysis starts at the first jump.
   const firstSkillPending = useRef(false);
   useEffect(() => {
@@ -403,18 +412,22 @@ export default function App() {
     [corners, editingCal, calibrationModel],
   );
 
-  async function onSample(path: string) {
+  async function onSample(sample: Sample) {
     setStatus({ kind: 'loading', stage: 'downloading', progress: 0 });
     try {
-      await onFile(
-        await loadSample(path, (progress) => setStatus({ kind: 'loading', stage: 'downloading', progress })),
-      );
+      // The saved analysis (when the store has one) comes along with the video: the pose model is then skipped.
+      const [video, series] = await Promise.all([
+        loadSample(sample.path, (progress) => setStatus({ kind: 'loading', stage: 'downloading', progress })),
+        loadSampleSeries(sample),
+      ]);
+      await onFile(video, series ?? undefined);
     } catch (err) {
       setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
     }
   }
 
-  async function onFile(next: File) {
+  /** `series`: the saved analysis of this very video (a sample's): opened in place of running the pose model. */
+  async function onFile(next: File, series?: string) {
     abort.current?.abort();
     if (url) URL.revokeObjectURL(url);
     const nextUrl = URL.createObjectURL(next);
@@ -478,6 +491,7 @@ export default function App() {
       disposeVideo(probe);
       if (!isCurrent()) return;
       setFps(measured ?? 30);
+      if (series && openSeriesText(series, next.name, { withVideo: true })) return;
       if (!advanced) {
         // The live view goes straight to the analysis: a coach on the trampoline has nothing to set up first.
         if (!measured) setNotice(t('app.fpsAssumed'));
@@ -561,14 +575,17 @@ export default function App() {
   }, [autoUrl, url, status.kind]); // oxlint-disable-line react-hooks/exhaustive-deps
 
   /** Opens a saved analysis (JSON): no need to run the pose model again. Null when the text is not one (the error is shown). */
-  function openSeriesText(text: string, name: string): ParsedSeries | null {
+  function openSeriesText(text: string, name: string, opts?: { withVideo: boolean }): ParsedSeries | null {
     try {
       const parsed = parsePoseSeries(text);
-      openedSeries.current = true;
+      // A series opened over its own video (a sample) stays on the video, and keeps the id of that file.
+      openedSeries.current = !opts?.withVideo;
       setAthleteIdx(0);
       setTracks([parsed.track]);
       setSeriesName(parsed.source.fileName);
-      setVideoId(parsed.source.videoId ?? fileVideoId ?? videoIdFromTrack(parsed.source.fileName, parsed.track));
+      if (!opts?.withVideo) {
+        setVideoId(parsed.source.videoId ?? fileVideoId ?? videoIdFromTrack(parsed.source.fileName, parsed.track));
+      }
       setBackend(t('app.fromFile', { backend: parsed.source.backend }));
       setHeight(parsed.settings.athleteHeightM);
       setScaleSource(parsed.settings.scaleSource);
@@ -582,7 +599,11 @@ export default function App() {
         setBedShort(Math.min(firstSideM, secondSideM));
       }
       setStatus({ kind: 'idle' });
-      setNotice(t(url ? 'app.openedWithVideo' : 'app.openedNoVideo', { name, frames: parsed.track.frames.length }));
+      setNotice(
+        opts?.withVideo
+          ? ''
+          : t(url ? 'app.openedWithVideo' : 'app.openedNoVideo', { name, frames: parsed.track.frames.length }),
+      );
       return parsed;
     } catch (err) {
       setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
@@ -1088,9 +1109,9 @@ export default function App() {
       onFirstSide={setFirstSide}
       onScaleSource={setScaleSource}
       samples={samples}
-      onSample={(path) => {
+      onSample={(sample) => {
         closeSetup();
-        void onSample(path);
+        void onSample(sample);
       }}
       onOpenSeries={(f) => {
         closeSetup();
@@ -1195,7 +1216,7 @@ export default function App() {
             <Landing
               onFile={(f) => void onFile(f)}
               samples={samples}
-              onSample={(path) => void onSample(path)}
+              onSample={(sample) => void onSample(sample)}
               onOpenSeries={(f) => void openSeries(f)}
               dataset={dataset}
               recent={{

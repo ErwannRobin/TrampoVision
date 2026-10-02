@@ -215,8 +215,8 @@ describe('the first screen', () => {
       createElement(Landing, {
         onFile: () => {},
         samples: [
-          { id: 'portrait', label: 'sample.portrait', path: 'portrait.mp4' },
-          { id: 'landscape', label: 'sample.landscape', path: 'landscape.mp4' },
+          { id: 'portrait', label: 'portrait', path: 'portrait.mp4' },
+          { id: 'landscape', label: 'landscape', path: 'landscape.mp4' },
         ],
         onSample: () => {},
         onOpenSeries: () => {},
@@ -230,8 +230,9 @@ describe('the first screen', () => {
     const html = landing(false);
     expect(html).toContain('Score every skill.');
     expect(html).toContain('Choose a video');
-    expect(html).toContain('Sample video (portrait)');
-    expect(html).toContain('Sample video (landscape)');
+    // The samples sit behind one menu: the home page shows two actions, the clips only once it is open.
+    expect(html).toContain('Try a sample');
+    expect(html).not.toContain('>portrait<');
     expect(html).not.toContain('Open a saved analysis');
   });
 

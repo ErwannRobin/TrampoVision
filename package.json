@@ -11,6 +11,8 @@
     "test": "vitest run",
     "fetch-assets": "node scripts/fetch-assets.mjs",
     "upload-assets": "node scripts/upload-assets.mjs",
+    "remove-asset": "node scripts/remove-asset.mjs",
+    "precompute-samples": "node scripts/precompute-samples.mjs",
     "postinstall": "node scripts/fetch-assets.mjs",
     "lint": "oxlint",
     "format": "prettier --write .",

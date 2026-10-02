@@ -540,6 +540,10 @@
 .menu__panel--end {
   right: 0;
 }
+.menu__panel--up {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
 .menu__title {
   padding: 8px 10px 4px;
   color: var(--text-3);
