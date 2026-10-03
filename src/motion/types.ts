@@ -1,3 +1,5 @@
+import type { CameraType } from './config';
+
 /** A small gray picture, row by row, intensities 0 (black) to 1 (white). The detector measures motion on this, not on the video. */
 export interface GrayFrame {
   width: number;
@@ -38,4 +40,15 @@ export interface MotionResult {
   noise: number;
   /** How far the whole picture moved down since the last frame, in picture pixels: the shake of the camera, taken out of the motion. */
   shift: number;
+  /** The camera: the kind of shot in use, how the picture moved since the last frame, and how far it wanders. */
+  camera: {
+    type: CameraType;
+    /** Picture pixels, right and down positive; 0 when the move could not be told. */
+    dx: number;
+    dy: number;
+    /** True when the move of the picture was told. */
+    known: boolean;
+    /** How fast the camera moves, shorter sides of the picture a second, smoothed (what tells a moving camera from a still one). */
+    speed: number;
+  };
 }
