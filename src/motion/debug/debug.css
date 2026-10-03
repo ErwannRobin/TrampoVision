@@ -1,0 +1,146 @@
+/* The motion detector's debug page. The design tokens and the buttons are the app's; this file only lays the page out. */
+
+.md-page {
+  display: grid;
+  gap: var(--sp-4);
+  max-width: 1760px;
+  margin: 0 auto;
+  padding: var(--sp-5) max(var(--sp-4), env(safe-area-inset-right)) var(--sp-7)
+    max(var(--sp-4), env(safe-area-inset-left));
+}
+
+.md-head h1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-3);
+  font-size: var(--fs-xl);
+}
+.md-head p {
+  max-width: 78ch;
+  margin-top: var(--sp-2);
+  color: var(--text-2);
+}
+.md-tag {
+  padding: 2px 10px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-pill);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.md-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.md-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.md-seek {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.md-seek input {
+  width: 100%;
+}
+.md-seek output {
+  min-width: 6ch;
+  color: var(--text-2);
+  text-align: right;
+}
+.md-status {
+  min-height: 1.5em;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.md-status[data-kind='error'] {
+  color: var(--danger);
+}
+
+.md-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--sp-4) var(--sp-3);
+}
+.md-panel canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #000;
+  border-radius: var(--r-input);
+}
+.md-panel figcaption {
+  margin-top: var(--sp-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.md-panel strong {
+  display: block;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.md-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--sp-3) var(--sp-4);
+  margin: 0;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+}
+.md-stats dt {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.md-stats dd {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-stretch: var(--wd-figure);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.md-settings {
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+}
+.md-settings summary {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.md-sliders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--sp-4);
+  margin-top: var(--sp-3);
+}
+.md-sliders label {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-1) var(--sp-3);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.md-sliders input[type='range'],
+.md-sliders select {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+.md-sliders select {
+  height: 34px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-input);
+  background: var(--panel);
+  color: var(--text);
+}

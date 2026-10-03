@@ -94,8 +94,9 @@ export default defineConfig(({ mode }) => ({
       },
     },
   ],
-  // The app and the reviewer page (/review.html) share the build, the CSP and the review service settings.
-  build: { rollupOptions: { input: { main: 'index.html', review: 'review.html' } } },
+  // The app, the reviewer page (/review.html) and the debug page of the motion detector (/motion.html, experimental, not linked) share
+  // the build, the CSP and the review service settings.
+  build: { rollupOptions: { input: { main: 'index.html', review: 'review.html', motion: 'motion.html' } } },
   optimizeDeps: { exclude: ['@ffmpeg/ffmpeg'] },
   test: {
     environment: 'node',
