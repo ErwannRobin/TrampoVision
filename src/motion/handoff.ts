@@ -38,7 +38,12 @@ export interface Handoff {
 }
 
 const toStored = (file: File): StoredFile => ({ name: file.name, type: file.type, blob: file });
-const toFile = ({ name, type, blob }: StoredFile): File => new File([blob], name, { type });
+/**
+ * The file, with its bytes in memory. A blob that comes out of IndexedDB is backed by a file of the browser's, and Safari does not play
+ * a video from one (it says the format is not supported), so the bytes are copied out and the file is made from them.
+ */
+const toFile = async ({ name, type, blob }: StoredFile): Promise<File> =>
+  new File([await blob.arrayBuffer()], name, { type });
 
 function openStore(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -69,17 +74,21 @@ export function putHandoff({ original, masked }: Handoff): Promise<void> {
   return inStore((store) => void store.put(stored, KEY));
 }
 
-/** Takes the videos out and leaves nothing behind: null when there are none (or a single video, as an earlier version left it). */
-function takeStored(): Promise<Handoff | null> {
-  return inStore(async (store) => {
-    // Read, then delete, in the same transaction: the read sees the video, and a second page that asks finds nothing.
-    const found = wrap(store.get(KEY)) as Promise<Partial<Stored> | undefined>;
-    store.delete(KEY);
-    const stored = await found;
+/**
+ * Takes the videos out and leaves nothing behind: null when there are none (or a single video, as an earlier version left it).
+ * The record is deleted only once the bytes are read: Safari backs a stored blob with a file that goes when the record goes, and a blob
+ * read after that fails ("The object can not be found here", WebKitBlobResource error 1).
+ */
+async function takeStored(): Promise<Handoff | null> {
+  const stored = await inStore((store) => wrap(store.get(KEY)) as Promise<Partial<Stored> | undefined>);
+  try {
     return stored?.original && stored.masked
-      ? { original: toFile(stored.original), masked: toFile(stored.masked) }
+      ? { original: await toFile(stored.original), masked: await toFile(stored.masked) }
       : null;
-  });
+  } finally {
+    // A video that could not be cleaned away is no reason to lose the one that was read.
+    await inStore((store) => void store.delete(KEY)).catch(() => undefined);
+  }
 }
 
 const FROM = 'from';

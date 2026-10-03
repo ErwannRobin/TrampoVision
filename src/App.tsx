@@ -44,7 +44,7 @@ import { buildSkillReport, toSequencesCsv, toSkillReportJson, toSkillsCsv } from
 import { buildPoseSeriesSet, parsePoseSeries, toSeriesJson, type ParsedSeries } from './analysis/timeSeries';
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point, PoseEngineId } from './pose/types';
-import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
+import { canDecode, decodeProblem, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
 import { fitTrackToClip } from './motion/fitTrack';
 import { receiveHandoff } from './motion/handoff';
 import { loadSample, loadSampleSeries, loadSamples, type Sample } from './video/sample';
@@ -556,16 +556,22 @@ function AppView({ playhead }: { playhead: Playhead }) {
       // Metadata may fail to load, or load even though the codec cannot be decoded (iPhone HEVC in
       // desktop Chrome). Either way convert to H.264 in the browser and use the converted video from here on.
       let probe: HTMLVideoElement | null = null;
+      // Why it is converted: shown with the notice, as a phone has no console to read.
+      let why = '';
       try {
         probe = await loadVideo(nextUrl);
-        if (isCurrent() && !(await canDecode(probe))) {
+        const problem = isCurrent() ? await decodeProblem(probe) : null;
+        if (problem) {
+          why = problem;
           disposeVideo(probe);
           probe = null;
         }
-      } catch {
+      } catch (err) {
+        why = err instanceof Error ? err.message : String(err);
         probe = null;
       }
       if (isCurrent() && !probe) {
+        console.warn(`Video converted to H.264, as it cannot be decoded as it is: ${why} [${next.type || 'no type'}]`);
         setStatus({ kind: 'loading', stage: 'converting', progress: 0 });
         const blob = await transcodeToH264(next, {
           signal: ctl.signal,
@@ -579,7 +585,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
         finalUrl = convertedUrl;
         setUrl(convertedUrl);
         probe = await loadVideo(convertedUrl);
-        setNotice(t('app.converted'));
+        setNotice(`${t('app.converted')} (${why}; ${next.type || '?'}, ${(next.size / 1e6).toFixed(1)} MB)`);
       }
       if (!probe) return;
       if (isCurrent()) setStatus({ kind: 'loading', stage: 'measuring' });
