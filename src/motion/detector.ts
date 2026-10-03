@@ -1,8 +1,10 @@
-import { mergeMotionConfig, type MotionConfig } from './config';
-import { boxFilter, clamp01, dilate, labelPieces, ramp } from './grid';
+import { CameraMotion, type CameraEstimate } from './camera';
+import { CAMERA_PROFILES, CameraTypeEstimator } from './cameraType';
+import { mergeMotionConfig, type CameraType, type MotionConfig } from './config';
+import { boxFilter, clamp01, dilate, labelPieces, ramp, shiftPicture, wholePixels } from './grid';
 import { ColumnRhythm } from './rhythm';
 import type { GrayFrame, MotionResult } from './types';
-import { VerticalFlow } from './verticalFlow';
+import { VerticalFlow, type Compensation } from './verticalFlow';
 
 /** Columns on each side that share their motion when the direction of a column is read, as a share of the picture width: a body is wider than one column. */
 const COLUMN_SPREAD_SHARE = 0.016;
@@ -25,16 +27,35 @@ const MIN_DT_S = 1 / 240;
  * 4. Mask: the evidence is kept as a region with hysteresis (it enters high and leaves low), small pieces are dropped, the region
  *    gets a margin and soft edges, and the mask moves toward it quickly where it opens and slowly where it closes, so it does not flicker.
  *
- * It never hides the picture when it is not sure: with no region the mask is all 1, which is the picture as it was. Camera: it has to be
- * still enough that the background stays put; one that follows the athlete or tilts with the jumps makes the whole picture move, and
- * then there is nothing to tell the athlete from.
+ * It never hides the picture when it is not sure: with no region the mask is all 1, which is the picture as it was.
+ *
+ * Camera: the whole picture is measured first (`CameraMotion`: one translation, fitted on the background), and the kind of shot is read from it
+ * (`CameraTypeEstimator`), because each kind needs the picture prepared in another way:
+ * - `fixed`, a wide shot on a tripod or in a hand: the shake of the picture is taken out of the motion (the whole move, found on the
+ *   background; the vertical shake the columns agree on when that cannot be told).
+ * - `lowAngle`, a still camera at the bed looking up, the athlete big in the picture: the same, with the athlete excluded from the fit
+ *   by where the detector found them, and a bigger piece of motion needed to count as an athlete.
+ * - `tracking`, a camera that follows the athlete or pans: the move is taken out, and everything the detector remembers (what went up and
+ *   down through a pixel, the rhythm of the columns, the mask) moves with the picture, so it stays on the same place of the scene. What
+ *   is left to see is the athlete against a background that stands still, as in a fixed shot. When the move cannot be told (a plain
+ *   wall) nothing is said about the frame, and the mask opens by itself as what was remembered fades.
  */
 export class TrampolineMotionDetector {
+  /** What the person set, and what is in use: the same plus what the kind of shot changes (`CAMERA_PROFILES`). The parts of the detector share the second. */
+  private readonly user: MotionConfig;
   private readonly cfg: MotionConfig;
   private width = 0;
   private height = 0;
   private flow: VerticalFlow | null = null;
   private rhythm: ColumnRhythm | null = null;
+  private camera: CameraMotion | null = null;
+  private readonly typeEstimator: CameraTypeEstimator;
+  private cameraType: CameraType = 'fixed';
+  private estimate: CameraEstimate | null = null;
+  /** The move of the picture that is not yet a whole pixel, kept for the next frames (what the detector remembers moves by whole pixels). */
+  private readonly panX = { value: 0 };
+  private readonly panY = { value: 0 };
+  private athleteWidth: number | null = null;
   private lastTimeMs: number | null = null;
   private fps = 0;
   private found = false;
@@ -65,29 +86,54 @@ export class TrampolineMotionDetector {
   private gateWide = new Float32Array(0);
 
   constructor(config?: Partial<MotionConfig>) {
-    this.cfg = mergeMotionConfig(config);
+    this.user = mergeMotionConfig(config);
+    this.cfg = { ...this.user };
+    this.typeEstimator = new CameraTypeEstimator(this.cfg);
   }
 
-  /** The thresholds in use. */
+  /** The thresholds as they were set. */
   get config(): Readonly<MotionConfig> {
-    return this.cfg;
+    return this.user;
   }
 
   /** Changes thresholds while running (the debug page's sliders). `workWidth` and `rhythmWindowS` apply to the next `reset`. */
   configure(partial: Partial<MotionConfig>): void {
-    Object.assign(this.cfg, partial);
+    Object.assign(this.user, partial);
+    this.useProfile();
+  }
+
+  /** What the detector believes the shot is: the person's choice, or what the video says. */
+  private wantedType(): CameraType {
+    return this.user.cameraType === 'auto' ? this.typeEstimator.type : this.user.cameraType;
+  }
+
+  /** The thresholds in use: the person's, and the changes of the kind of shot. */
+  private useProfile(): void {
+    Object.assign(this.cfg, this.user, CAMERA_PROFILES[this.cameraType]);
   }
 
   /** Forgets everything learned about the last frames: the next frame starts again, with the picture shown as it is. */
   reset(): void {
     this.flow?.reset();
+    this.camera?.reset();
+    this.typeEstimator.reset();
+    this.cameraType = 'fixed';
+    this.estimate = null;
+    this.athleteWidth = null;
+    this.forget();
+    this.mask.fill(1);
+    this.lastTimeMs = null;
+    this.fps = 0;
+    this.useProfile();
+  }
+
+  /** Forgets what was learned about where things went up and down: it was learned in another kind of shot, or another place. */
+  private forget(): void {
     this.rhythm?.reset();
     for (const picture of [this.up, this.down, this.evidence, this.motion, this.strength, this.gate, this.gateWide])
       picture.fill(0);
     this.on.fill(0);
-    this.mask.fill(1);
-    this.lastTimeMs = null;
-    this.fps = 0;
+    this.panX.value = this.panY.value = 0;
     this.found = false;
     this.periodS = null;
     this.rhythmFit = 0;
@@ -107,7 +153,8 @@ export class TrampolineMotionDetector {
     }
     this.lastTimeMs = timeMs;
 
-    const noise = this.flow!.step(frame.data, this.motion);
+    const compensation = dt > 0 ? this.readCamera(frame, dt) : this.firstCamera(frame);
+    const noise = this.flow!.step(frame.data, this.motion, compensation);
     if (noise === null || dt === 0) return this.result();
     dt = Math.max(dt, MIN_DT_S);
     this.noise = noise;
@@ -119,12 +166,78 @@ export class TrampolineMotionDetector {
     return this.result();
   }
 
+  /** The first frame has nothing to be compared with: the camera takes it in. */
+  private firstCamera(frame: GrayFrame): Compensation {
+    this.camera!.step(frame.data, null);
+    this.applyType();
+    return { kind: 'shake' };
+  }
+
+  /** Switches to the kind of shot the detector believes in now, and returns it. */
+  private applyType(): CameraType {
+    const type = this.wantedType();
+    if (type !== this.cameraType) {
+      // What was learned before the camera was known to follow was learned from a background that moved, and is dropped. Leaving
+      // `tracking` keeps it: the memory is in the place of the picture as it is now, which is where a still camera looks.
+      if (type === 'tracking') this.forget();
+      this.cameraType = type;
+      this.useProfile();
+    }
+    return type;
+  }
+
+  /**
+   * How the picture moved since the last frame, what kind of shot that makes it, and what to do about it: for `tracking` what the
+   * detector remembers moves with the picture. Returns how the motion between the two frames is to be read.
+   */
+  private readCamera(frame: GrayFrame, dt: number): Compensation {
+    const estimate = this.camera!.step(frame.data, this.found ? this.mask : null);
+    this.estimate = estimate;
+    if (estimate) {
+      this.typeEstimator.push(
+        {
+          dt: Math.max(dt, MIN_DT_S),
+          dx: estimate.dx,
+          dy: estimate.dy,
+          athleteWidthShare: this.found ? this.athleteWidth : null,
+        },
+        Math.min(this.width, this.height),
+      );
+    }
+    const type = this.applyType();
+    if (!estimate) return { kind: 'shake' };
+    if (!estimate.ok) return type === 'tracking' ? { kind: 'unknown' } : { kind: 'shake' };
+    if (type === 'tracking') this.moveMemory(estimate.dx, estimate.dy);
+    return { kind: 'move', dx: estimate.dx, dy: estimate.dy };
+  }
+
+  /** The picture moved by (dx, dy): what is remembered of the scene moves with it, so that it stays on the same place of the scene. */
+  private moveMemory(dx: number, dy: number): void {
+    const sx = wholePixels(this.panX, dx);
+    const sy = wholePixels(this.panY, dy);
+    if (sx === 0 && sy === 0) return;
+    const { width: w, height: h } = this;
+    for (const picture of [this.up, this.down, this.mask]) {
+      shiftPicture(picture, this.tmpFloats, w, h, sx, sy, picture === this.mask ? null : 0);
+      picture.set(this.tmpFloats);
+    }
+    shiftPicture(this.on, this.tmpBytes, w, h, sx, sy, 0);
+    this.on.set(this.tmpBytes);
+    this.rhythm!.shift(sx);
+    for (const column of [this.strength, this.gate, this.gateWide]) {
+      const keep = column.slice();
+      column.fill(0);
+      for (let x = 0; x < w; x++) if (x - sx >= 0 && x - sx < w) column[x] = keep[x - sx];
+    }
+  }
+
   private allocate(width: number, height: number): void {
     const n = width * height;
     this.width = width;
     this.height = height;
     this.flow = new VerticalFlow(width, height, this.cfg);
     this.rhythm = new ColumnRhythm(width, this.cfg);
+    this.camera = new CameraMotion(width, height, this.cfg);
     this.motion = new Float32Array(n);
     this.up = new Float32Array(n);
     this.down = new Float32Array(n);
@@ -219,12 +332,14 @@ export class TrampolineMotionDetector {
     // Pieces of the region that are near each other are one athlete; a piece that is too small is not an athlete.
     dilate(on, this.merged, w, h, Math.max(1, Math.round(cfg.mergeShare * short)), this.tmpBytes);
     const areas = labelPieces(this.merged, this.labels, w, h, this.stack);
-    const regionArea = areas.map(() => 0);
-    for (let i = 0; i < n; i++) if (on[i]) regionArea[this.labels[i]]++;
+    const pieces = this.measurePieces(areas.length);
     // Hysteresis again, on the size: a region that is just big enough must not make the mask come and go.
     const minArea = Math.max(4, cfg.minAreaShare * n) * (this.found ? 0.5 : 1);
-    const big = regionArea.map((area, label) => label > 0 && area >= minArea);
+    const big = pieces.area.map((area, label) => label > 0 && area >= minArea);
     this.found = big.some(Boolean);
+    this.athleteWidth = this.found
+      ? Math.max(0, ...big.map((isBig, label) => (isBig ? pieces.width[label] : 0))) / w
+      : null;
 
     // The mask a frame asks for: the region with its margin and soft edges, or everything when there is no region.
     if (this.found) {
@@ -249,6 +364,28 @@ export class TrampolineMotionDetector {
     }
   }
 
+  /** The area and width of every piece of the region (labels of `merged`), counting the pixels with evidence and not their margin. */
+  private measurePieces(count: number): { area: number[]; width: number[] } {
+    const { width: w, height: h, labels, on } = this;
+    const area = new Array<number>(count).fill(0);
+    const left = new Array<number>(count).fill(w);
+    const right = new Array<number>(count).fill(-1);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (!on[i]) continue;
+        const label = labels[i];
+        area[label]++;
+        if (x < left[label]) left[label] = x;
+        if (x > right[label]) right[label] = x;
+      }
+    }
+    return {
+      area,
+      width: right.map((r, label) => Math.max(0, r - left[label] + 1)),
+    };
+  }
+
   private result(): MotionResult {
     let sum = 0;
     for (let i = 0; i < this.mask.length; i++) sum += this.mask[i];
@@ -265,6 +402,13 @@ export class TrampolineMotionDetector {
       coverage: this.mask.length > 0 ? sum / this.mask.length : 1,
       noise: this.noise,
       shift: this.flow?.shift ?? 0,
+      camera: {
+        type: this.cameraType,
+        dx: this.estimate?.dx ?? 0,
+        dy: this.estimate?.dy ?? 0,
+        known: this.estimate?.ok ?? false,
+        speed: this.typeEstimator.speed,
+      },
     };
   }
 }

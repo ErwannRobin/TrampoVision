@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boxFilter, clamp01, dilate, labelPieces, medianOf, ramp } from './grid';
+import { boxFilter, clamp01, dilate, labelPieces, medianOf, ramp, shiftPicture, wholePixels } from './grid';
 
 describe('ramp', () => {
   it('is 0 below the low end, 1 above the high end and a straight line between', () => {
@@ -118,5 +118,59 @@ describe('medianOf', () => {
     const values = new Float32Array(100).fill(0.004);
     values.fill(0.9, 90);
     expect(medianOf(values, 0.25, 1024)).toBeCloseTo(0.004, 3);
+  });
+});
+
+describe('shiftPicture', () => {
+  const w = 4;
+  const h = 3;
+  // 0  1  2  3
+  // 4  5  6  7
+  // 8  9 10 11
+  const src = Float32Array.from({ length: w * h }, (_, i) => i);
+  const shifted = (sx: number, sy: number, fill: number | null) => {
+    const dst = new Float32Array(w * h);
+    shiftPicture(src, dst, w, h, sx, sy, fill);
+    return Array.from(dst);
+  };
+
+  it('moves the picture right and down by whole pixels, and fills what comes into view', () => {
+    expect(shifted(1, 1, -1)).toEqual([-1, -1, -1, -1, -1, 0, 1, 2, -1, 4, 5, 6]);
+  });
+
+  it('moves it left and up the same way', () => {
+    expect(shifted(-2, -1, -1)).toEqual([6, 7, -1, -1, 10, 11, -1, -1, -1, -1, -1, -1]);
+  });
+
+  it('leaves it alone for no move, and clears it for a move of the whole picture or more', () => {
+    expect(shifted(0, 0, -1)).toEqual(Array.from(src));
+    expect(shifted(4, 0, -1).every((v) => v === -1)).toBe(true);
+    expect(shifted(0, -3, -1).every((v) => v === -1)).toBe(true);
+  });
+
+  it('goes on with the nearest pixel past the edge when there is no fill value', () => {
+    expect(shifted(1, 1, null)).toEqual([0, 0, 1, 2, 0, 0, 1, 2, 4, 4, 5, 6]);
+    expect(shifted(0, -1, null)).toEqual([4, 5, 6, 7, 8, 9, 10, 11, 8, 9, 10, 11]);
+    expect(shifted(9, 0, null)).toEqual([0, 0, 0, 0, 4, 4, 4, 4, 8, 8, 8, 8]);
+  });
+
+  it('works on byte pictures', () => {
+    const bytes = Uint8Array.from([1, 2, 3, 4, 5, 6]);
+    const out = new Uint8Array(6);
+    shiftPicture(bytes, out, 3, 2, 1, 0, 0);
+    expect(Array.from(out)).toEqual([0, 1, 2, 0, 4, 5]);
+  });
+});
+
+describe('wholePixels', () => {
+  it('hands out whole pixels and keeps the rest for the next move', () => {
+    const rest = { value: 0 };
+    expect([0.4, 0.4, 0.4, 0.4, 0.4].map((m) => wholePixels(rest, m))).toEqual([0, 1, 0, 1, 0]);
+    expect(rest.value).toBeCloseTo(0);
+  });
+
+  it('works for moves the other way', () => {
+    const rest = { value: 0 };
+    expect([-0.6, -0.6, -0.6].map((m) => wholePixels(rest, m))).toEqual([-1, 0, -1]);
   });
 });

@@ -24,6 +24,7 @@ function frame(coverage: number): MotionResult {
     coverage,
     noise: 0,
     shift: 0,
+    camera: { type: 'fixed', dx: 0, dy: 0, known: false, speed: 0 },
   };
 }
 

@@ -1,21 +1,13 @@
 import type { MotionConfig } from './config';
-import { boxFilter, medianOf, ramp } from './grid';
+import { blur121, boxFilter, medianOf, ramp } from './grid';
 
-/** Blur kernel [1 2 1] / 4 in both directions: widens the edges so the flow can follow a moving body that is not slow. */
-function blur121(src: Float32Array, dst: Float32Array, w: number, h: number, tmp: Float32Array): void {
-  for (let y = 0; y < h; y++) {
-    const row = y * w;
-    for (let x = 0; x < w; x++) {
-      tmp[row + x] =
-        0.25 * src[row + Math.max(0, x - 1)] + 0.5 * src[row + x] + 0.25 * src[row + Math.min(w - 1, x + 1)];
-    }
-  }
-  for (let y = 0; y < h; y++) {
-    const up = Math.max(0, y - 1) * w;
-    const down = Math.min(h - 1, y + 1) * w;
-    for (let x = 0; x < w; x++) dst[y * w + x] = 0.25 * tmp[up + x] + 0.5 * tmp[y * w + x] + 0.25 * tmp[down + x];
-  }
-}
+/**
+ * What is known about the camera when a frame is compared with the last one:
+ * - `shake`: nothing from outside; a vertical shake is looked for in the pictures themselves (a camera on a tripod or in a hand).
+ * - `move`: the whole picture moved by this much (`CameraMotion`), and the last frame is shifted by it before the two are compared.
+ * - `unknown`: the picture moved and by how much cannot be told: nothing can be said about what moves in it.
+ */
+export type Compensation = { kind: 'shake' } | { kind: 'move'; dx: number; dy: number } | { kind: 'unknown' };
 
 /** The share of the picture width at each side where the columns that agree on a shake must be found. */
 const SHAKE_BORDER = 0.2;
@@ -56,6 +48,9 @@ export class VerticalFlow {
   private readonly sumYY: Float32Array;
   private readonly sumXX: Float32Array;
   private readonly sumXY: Float32Array;
+  private readonly warped: Float32Array;
+  private readonly outside: Uint8Array;
+  private lastNoise = 0;
   private readonly columnSpeeds: number[] = [];
   private readonly columnsAt: number[] = [];
   private hasPrev = false;
@@ -69,6 +64,8 @@ export class VerticalFlow {
   ) {
     const n = width * height;
     const picture = () => new Float32Array(n);
+    this.warped = picture();
+    this.outside = new Uint8Array(n);
     this.cur = picture();
     this.prev = picture();
     [
@@ -96,16 +93,29 @@ export class VerticalFlow {
    * Takes the next picture and writes the vertical motion since the last one into `motion` (-1 up to 1 down, 0 for nothing).
    * Returns the noise level of the difference, or null for the first picture, where there is nothing to compare with.
    */
-  step(frame: Float32Array, motion: Float32Array): number | null {
+  step(frame: Float32Array, motion: Float32Array, camera: Compensation = { kind: 'shake' }): number | null {
     const { width: w, height: h, cfg } = this;
     const n = w * h;
     blur121(frame, this.cur, w, h, this.tmp);
-    const { cur, prev, delta } = this;
+    const { cur, delta } = this;
+    let { prev } = this;
     if (!this.hasPrev) {
       this.hasPrev = true;
       motion.fill(0);
       [this.cur, this.prev] = [prev, cur];
       return null;
+    }
+    if (camera.kind === 'unknown') {
+      this.shift = 0;
+      motion.fill(0);
+      [this.cur, this.prev] = [prev, cur];
+      return this.lastNoise;
+    }
+    // The last picture where the camera says its content went: after it, what moves is what moves in the scene.
+    const moved = camera.kind === 'move';
+    if (moved) {
+      this.warp(prev, camera.dx, camera.dy);
+      prev = this.warped;
     }
 
     // The change between the pictures, without the brightness change of the whole picture (a light that flickers), and the gradients
@@ -123,16 +133,25 @@ export class VerticalFlow {
         this.gradY[row + x] = (cur[below + x] - cur[above + x] + prev[below + x] - prev[above + x]) * 0.25;
         this.gradX[row + x] = (cur[row + right] - cur[row + left] + prev[row + right] - prev[row + left]) * 0.25;
         delta[row + x] = cur[row + x] - prev[row + x] - gain;
+        // Where the last picture had nothing (what came into view): no change, no gradient, nothing to say.
+        if (moved && this.outside[row + x]) this.gradY[row + x] = this.gradX[row + x] = delta[row + x] = 0;
       }
     }
 
     // The shake of the camera, taken out of the change, so the background that shakes is background again and the noise level is not
     // raised by it.
     for (let i = 0; i < n; i++) this.change[i] = Math.abs(delta[i]);
-    this.shift = this.pictureShift(noiseOf(this.change, cfg.noiseFloor));
-    if (this.shift !== 0) for (let i = 0; i < n; i++) delta[i] += this.shift * this.gradY[i];
+    this.shift = moved ? camera.dy : this.pictureShift(noiseOf(this.change, cfg.noiseFloor));
+    if (!moved && this.shift !== 0) for (let i = 0; i < n; i++) delta[i] += this.shift * this.gradY[i];
     for (let i = 0; i < n; i++) this.change[i] = Math.abs(delta[i]);
     const noise = noiseOf(this.change, cfg.noiseFloor);
+    this.lastNoise = noise;
+
+    // A picture that was moved by the camera's estimate is not exactly where the scene is: the background is left moving a little, as
+    // much as the camera did and so as slowly as it does. Motion has to be faster than that.
+    const slack = moved ? cfg.cameraSlack * Math.hypot(camera.dx, camera.dy) : 0;
+    const minSpeed = cfg.minSpeed + slack;
+    const fullSpeed = cfg.fullSpeed + slack;
 
     // The sums of every window.
     const sum = (a: Float32Array, b: Float32Array, out: Float32Array) => {
@@ -170,12 +189,34 @@ export class VerticalFlow {
       const significance = Math.abs(v) / (noise * Math.sqrt(c / det));
       const strength =
         ramp(significance, cfg.minSignificance, cfg.fullSignificance) *
-        ramp(Math.abs(v), cfg.minSpeed, cfg.fullSpeed) *
+        ramp(Math.abs(v), minSpeed, fullSpeed) *
         ramp(Math.abs(v) / (Math.abs(v) + Math.abs(u) + 1e-6), cfg.minDominance, cfg.fullDominance);
       motion[i] = v < 0 ? -strength : strength;
     }
-    [this.cur, this.prev] = [prev, cur];
+    [this.cur, this.prev] = [this.prev, cur];
     return noise;
+  }
+
+  /** `src` moved by (dx, dy) pixels into `this.warped` (linear between pixels); `this.outside` marks where `src` had nothing to give. */
+  private warp(src: Float32Array, dx: number, dy: number): void {
+    const { width: w, height: h, warped, outside } = this;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const sx = x - dx;
+        const sy = y - dy;
+        const i = y * w + x;
+        outside[i] = sx < 0 || sy < 0 || sx > w - 1 || sy > h - 1 ? 1 : 0;
+        const cx = Math.min(w - 1, Math.max(0, sx));
+        const cy = Math.min(h - 1, Math.max(0, sy));
+        const x0 = Math.min(w - 2, Math.floor(cx));
+        const y0 = Math.min(h - 2, Math.floor(cy));
+        const fx = cx - x0;
+        const fy = cy - y0;
+        const p = y0 * w + x0;
+        warped[i] =
+          (src[p] * (1 - fx) + src[p + 1] * fx) * (1 - fy) + (src[p + w] * (1 - fx) + src[p + w + 1] * fx) * fy;
+      }
+    }
   }
 
   /**

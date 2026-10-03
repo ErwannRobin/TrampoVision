@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TrampolineMotionDetector } from './detector';
-import type { MotionConfig } from './config';
+import { DEFAULT_MOTION_CONFIG, type MotionConfig } from './config';
 import { ONE_ATHLETE, renderScene, type SceneSpec } from './testScenes';
 import type { MotionResult } from './types';
 
@@ -18,6 +18,8 @@ interface Run {
   /** Pixels that crossed 0.5 since the frame before, per frame. */
   flips: number[];
   period: (number | null)[];
+  /** The kind of shot the detector was working with, per frame. */
+  shot: string[];
   lastResult: MotionResult;
 }
 
@@ -40,6 +42,7 @@ function run(name: string, spec: SceneSpec, config?: Partial<MotionConfig>): Run
     change: [],
     flips: [],
     period: [],
+    shot: [],
     lastResult: undefined as unknown as MotionResult,
   };
   // The columns far from every athlete: what the mask should hide.
@@ -77,6 +80,7 @@ function run(name: string, spec: SceneSpec, config?: Partial<MotionConfig>): Run
     out.change.push(before ? change / before.length : 0);
     out.flips.push(flips);
     out.period.push(result.periodS);
+    out.shot.push(result.camera.type);
     before = Float32Array.from(result.mask);
     out.lastResult = result;
   });
@@ -245,6 +249,105 @@ describe('the video', () => {
       clip({ texture: 0, noise: 0.004, jumpers: [{ x: 64, bedY: 70, size: 50, periodS: 1.1, apex: 14, startS: 1 }] }),
     );
     expect(mean(between(r, r.athleteKept, 8))).toBeGreaterThan(0.99);
+  });
+});
+
+describe('a camera that moves', () => {
+  // A close-up: the camera tilts up and down with the jumps, so the athlete stays about where they are in the picture, and the wall goes by.
+  const follow = run('follow', clip({ camera: { kind: 'follow', gain: 0.9 } }));
+  // A wide shot where the person who films pans from side to side.
+  const sway = run('sway', clip({ camera: { kind: 'sway', ax: 20, periodS: 6 } }));
+
+  it('reads a camera that follows the athlete, or pans, as one that moves, within the first seconds', () => {
+    expect(follow.shot.indexOf('tracking') / follow.fps).toBeLessThan(4);
+    expect(follow.shot[follow.shot.length - 1]).toBe('tracking');
+    expect(sway.shot.indexOf('tracking') / sway.fps).toBeLessThan(4);
+    expect(sway.shot[sway.shot.length - 1]).toBe('tracking');
+  });
+
+  it('keeps the athlete and hides the wall that goes by, as it does when the camera stands still', () => {
+    for (const r of [follow, sway]) {
+      expect(r.found.some(Boolean)).toBe(true);
+      expect(mean(between(r, r.athleteKept, 8))).toBeGreaterThan(0.97);
+      expect(mean(between(r, r.farKept, 8))).toBeLessThan(0.06);
+    }
+  });
+
+  it('would take the wall for the athlete without knowing the camera moves', () => {
+    // The same close-up, with the kind of shot forced to a still camera: the wall that goes up and down with the jumps is evidence too.
+    const blind = run('follow-blind', clip({ camera: { kind: 'follow', gain: 0.9 } }), { cameraType: 'fixed' });
+    expect(mean(between(blind, blind.farKept, 8))).toBeGreaterThan(0.2);
+  });
+
+  it('does not take the move of the camera for an athlete', () => {
+    const empty = run('sway-empty', clip({ jumpers: [], camera: { kind: 'sway', ax: 20, periodS: 6 } }));
+    const walker = run(
+      'sway-walker',
+      clip({
+        jumpers: [],
+        walkers: [{ y: 62, size: 22, from: 8, to: 110, speed: 14 }],
+        camera: { kind: 'sway', ax: 20, periodS: 6 },
+      }),
+    );
+    for (const r of [empty, walker]) {
+      expect(r.found.some(Boolean)).toBe(false);
+      expect(Math.min(...r.coverage)).toBeGreaterThan(0.999);
+    }
+  });
+
+  it('works as well when the kind of shot is forced to tracking on a camera that stands still', () => {
+    const r = run('still-tracking', clip({}), { cameraType: 'tracking' });
+    expect(r.shot.every((shot) => shot === 'tracking')).toBe(true);
+    expect(mean(between(r, r.athleteKept, 8))).toBeGreaterThan(0.99);
+    expect(mean(between(r, r.farKept, 8))).toBeLessThan(0.02);
+  });
+
+  it('reports how the picture moved, and that the move was told', () => {
+    const { camera } = follow.lastResult;
+    expect(camera.known).toBe(true);
+    expect(camera.speed).toBeGreaterThan(DEFAULT_MOTION_CONFIG.cameraMovingSpeed);
+  });
+});
+
+describe('the kinds of shot', () => {
+  // A low camera at the bed, looking up: the athlete is most of the picture high, and the camera stands still (with a little shake).
+  const bigAthlete = [{ x: 64, bedY: 68, size: 60, periodS: 1.1, apex: 8, startS: 1 }];
+
+  it('reads a wide shot with a still camera as fixed', () => {
+    const r = run('one', { ...ONE_ATHLETE, seconds: 12 });
+    expect(new Set(r.shot).size).toBe(1);
+    expect(r.shot[0]).toBe('fixed');
+  });
+
+  it('reads a still camera with an athlete who is most of the picture as low-angle, and keeps them', () => {
+    const r = run('low', clip({ jumpers: bigAthlete, jitter: 0.7 }));
+    expect(r.shot[r.shot.length - 1]).toBe('lowAngle');
+    expect(mean(between(r, r.athleteKept, 8))).toBeGreaterThan(0.97);
+    expect(mean(between(r, r.farKept, 8))).toBeLessThan(0.05);
+  });
+
+  it('copes with a low-angle camera that shakes more than a still one should, once it is told what it is', () => {
+    const r = run('low-shake', clip({ jumpers: bigAthlete, jitter: 1.5 }), { cameraType: 'lowAngle' });
+    expect(r.found.slice(-30).every(Boolean)).toBe(true);
+    expect(mean(between(r, r.athleteKept, 8))).toBeGreaterThan(0.97);
+    expect(mean(between(r, r.farKept, 8))).toBeLessThan(0.05);
+  });
+
+  it('uses the kind of shot the person chose, whatever the video looks like', () => {
+    for (const shot of ['fixed', 'tracking', 'lowAngle'] as const) {
+      const r = run(`forced-${shot}`, clip({ seconds: 4 }), { cameraType: shot });
+      expect(new Set(r.shot)).toEqual(new Set([shot]));
+    }
+  });
+
+  it('shows the thresholds as they were set, and the kind of shot changes only the ones in use', () => {
+    const detector = new TrampolineMotionDetector({ minAreaShare: 0.01 });
+    const scene = renderScene(clip({ seconds: 2 }));
+    scene.frames.forEach((frame, f) => detector.push(frame, scene.timesMs[f]));
+    detector.configure({ cameraType: 'lowAngle' });
+    scene.frames.forEach((frame, f) => detector.push(frame, scene.timesMs[f] + 3000));
+    expect(detector.config.minAreaShare).toBe(0.01);
+    expect(detector.config.cameraType).toBe('lowAngle');
   });
 });
 

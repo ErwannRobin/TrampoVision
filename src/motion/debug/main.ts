@@ -10,7 +10,7 @@ import { LM } from '../../pose/landmarks';
 import type { PoseDetection, PoseEstimator } from '../../pose/types';
 import { disposeVideo, estimateFps, frameSeekTime, loadVideo, seekTo } from '../../video/frames';
 import { loadSample, loadSamples, type Sample } from '../../video/sample';
-import { DEFAULT_MOTION_CONFIG, type MotionConfig } from '../config';
+import { DEFAULT_MOTION_CONFIG, type CameraSetting, type CameraType, type MotionConfig } from '../config';
 import { APP_WITH_RESULT, putHandoff } from '../handoff';
 import { CanvasMaskLayer } from '../layer';
 import { hidesSomething } from '../maskedEstimator';
@@ -100,6 +100,8 @@ const STAT_LABELS = [
   ['period', 'Jump period'],
   ['fit', 'Rhythm fit'],
   ['kept', 'Picture kept'],
+  ['shot', 'Kind of shot'],
+  ['camera', 'Camera move'],
   ['shake', 'Camera shake'],
   ['noise', 'Noise level'],
   ['people', 'People found'],
@@ -121,6 +123,18 @@ for (const [key, label] of STAT_LABELS) {
 const stat = (key: StatKey, text: string) => ($(`stat-${key}`).textContent = text);
 const ms = (value: number) => `${value.toFixed(1)} ms`;
 
+const SHOT_NAMES: Record<CameraType, string> = {
+  fixed: 'Fixed wide-angle',
+  tracking: 'Close-up that follows',
+  lowAngle: 'Low-angle',
+};
+
+/** How the picture moved since the last frame, picture pixels, or why it could not be told. */
+function cameraMove(result: MotionResult): string {
+  const { camera } = result;
+  return camera.known ? `${camera.dx.toFixed(1)}, ${camera.dy.toFixed(1)} px` : 'Not known';
+}
+
 function showStats(
   s: Session,
   result: MotionResult | null,
@@ -132,6 +146,8 @@ function showStats(
   stat('period', result?.periodS ? `${result.periodS.toFixed(2)} s` : '–');
   stat('fit', result?.rhythmFit ? `${Math.round(result.rhythmFit * 100)} %` : '–');
   stat('kept', result ? `${Math.round(result.coverage * 100)} %` : '–');
+  stat('shot', result ? SHOT_NAMES[result.camera.type] : '–');
+  stat('camera', result ? cameraMove(result) : '–');
   stat('shake', result ? `${result.shift.toFixed(2)} px` : '–');
   stat('noise', result ? `${(result.noise * 100).toFixed(2)} %` : '–');
   stat('people', people ? String(people.length) : '–');
@@ -185,6 +201,10 @@ bindSlider(
   (v) => `${v.toFixed(1)} s`,
   (v) => ({ closeS: v }),
 );
+$<HTMLSelectElement>('camera').addEventListener('change', (event) => {
+  layer.detector.configure({ cameraType: (event.target as HTMLSelectElement).value as CameraSetting });
+  if (session && !playing) void run('show');
+});
 $<HTMLSelectElement>('fill').addEventListener('change', (event) => {
   layer.fill = (event.target as HTMLSelectElement).value;
   if (session && !playing) void run('show');

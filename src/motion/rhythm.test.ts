@@ -100,3 +100,34 @@ describe('the rhythm of a column', () => {
     expect(rhythm.read(FPS).strength[1]).toBe(0);
   });
 });
+
+describe('moving the columns with the camera', () => {
+  /** A rhythm in column 1 of 5, then the camera moves by `by` columns, and the rhythm is read again. */
+  function readAfterShift(by: number) {
+    const columns = 5;
+    const rhythm = new ColumnRhythm(columns, DEFAULT_MOTION_CONFIG);
+    const sample = new Float32Array(columns);
+    const signal = jumping(1.2);
+    for (let f = 0; f < 8 * FPS; f++) {
+      sample[1] = signal(f / FPS);
+      rhythm.push(sample);
+    }
+    rhythm.shift(by);
+    return rhythm.read(FPS).strength;
+  }
+
+  it('moves what a column knew to the column the athlete is in now', () => {
+    expect(readAfterShift(0)[1]).toBeGreaterThan(0.5);
+    const right = readAfterShift(2);
+    expect(right[3]).toBeGreaterThan(0.5);
+    expect(right[1]).toBe(0);
+    const left = readAfterShift(-1);
+    expect(left[0]).toBeGreaterThan(0.5);
+    expect(left[1]).toBe(0);
+  });
+
+  it('starts again in the columns that come into view, and forgets all of it for a move of the whole picture', () => {
+    expect(Math.max(...readAfterShift(4))).toBe(0);
+    expect(Math.max(...readAfterShift(-9))).toBe(0);
+  });
+});

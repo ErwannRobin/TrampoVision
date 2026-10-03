@@ -1,3 +1,4 @@
+import { blur121 } from './grid';
 import type { GrayFrame } from './types';
 
 /**
@@ -51,6 +52,18 @@ export interface StanderSpec {
   size: number;
 }
 
+/** What the camera does. The scene is bigger than the picture, and the picture is a window that moves over it. */
+export type CameraSpec =
+  /** Pans at a constant speed, picture pixels a second (right and down are positive). */
+  | { kind: 'pan'; vx: number; vy?: number }
+  /** Pans back and forth, a sine of this amplitude (picture pixels) and period, so the athlete stays in the picture. */
+  | { kind: 'sway'; ax: number; ay?: number; periodS: number }
+  /**
+   * Tilts to follow the first jumper: the camera moves up with the athlete by `gain` of their height above the bed (1 keeps the athlete at
+   * the same height in the picture), a little late (`lagS`, seconds).
+   */
+  | { kind: 'follow'; gain: number; lagS?: number };
+
 export interface SceneSpec {
   width: number;
   height: number;
@@ -66,6 +79,8 @@ export interface SceneSpec {
   flicker?: number;
   /** Amplitude of the vertical shake of the whole picture, picture pixels (a camera in the hand). */
   jitter?: number;
+  /** A camera that moves (missing: it stands still, apart from `jitter`). */
+  camera?: CameraSpec;
   /** How much texture the wall has, 0 (a plain wall) to 1 (the default). */
   texture?: number;
   seed?: number;
@@ -194,23 +209,59 @@ function flightAt(j: JumperSpec, t: number): { lift: number; jump: number; share
   return { lift: 4 * j.apex * ramp * share * (1 - share), jump, share };
 }
 
-/** The wall, the bed and the things around it that never move. Rows are indexed by y; the scene shakes by sampling between two rows. */
-function backdrop(spec: SceneSpec, rand: () => number): Float32Array {
+/**
+ * The wall, the bed and the things around it that never move, `pad` pixels bigger than the picture on every side (for a camera that
+ * moves). Rows are indexed by y + pad, columns by x + pad; the scene is sampled between rows and columns.
+ */
+function backdrop(spec: SceneSpec, rand: () => number, pad: number): Float32Array {
   const { width: w, height: h } = spec;
   const texture = spec.texture ?? 1;
   const bed = spec.jumpers.length ? Math.max(...spec.jumpers.map((j) => j.bedY)) : h * 0.85;
-  const out = new Float32Array(w * h);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
+  const big = w + 2 * pad;
+  const out = new Float32Array(big * (h + 2 * pad));
+  for (let row = 0; row < h + 2 * pad; row++) {
+    const y = row - pad;
+    for (let col = 0; col < big; col++) {
+      const x = col - pad;
       const grain = 0.03 * Math.sin(0.55 * x + 0.31 * y) * Math.sin(0.43 * y - 0.2 * x) + 0.03 * rand();
       let v = 0.62 + 0.1 * (y / h - 0.5) + texture * grain;
       if (y > bed + 1 && x > 0.2 * w && x < 0.8 * w) v = 0.22 + 0.04 * rand() + (y % 14 === 0 ? 0.12 : 0);
       if (texture > 0 && x >= 0.12 * w && x < 0.12 * w + 2) v = 0.85;
       if (texture > 0 && y >= 0.22 * h && y < 0.22 * h + 2) v = 0.3;
-      out[y * w + x] = v;
+      out[row * big + col] = v;
     }
   }
+  // A scene that is looked at from moving places is sampled between its pixels: its texture is smoothed first, so that the picture does
+  // not get sharper and blurrier with where the camera happens to be in between two pixels.
+  if (pad > 0) {
+    const soft = new Float32Array(out.length);
+    blur121(out, soft, big, h + 2 * pad, new Float32Array(out.length));
+    return soft;
+  }
   return out;
+}
+
+/** Where the camera is at every frame: how far the picture's top left corner is from the scene's, picture pixels. */
+function cameraPath(spec: SceneSpec): { x: number; y: number }[] {
+  const count = Math.round(spec.seconds * spec.fps);
+  const camera = spec.camera;
+  const path: { x: number; y: number }[] = [];
+  let followed = 0;
+  for (let f = 0; f < count; f++) {
+    const t = f / spec.fps;
+    if (!camera) path.push({ x: 0, y: 0 });
+    else if (camera.kind === 'pan') path.push({ x: camera.vx * t, y: (camera.vy ?? 0) * t });
+    else if (camera.kind === 'sway') {
+      const phase = Math.sin((2 * Math.PI * t) / camera.periodS);
+      path.push({ x: camera.ax * phase, y: (camera.ay ?? 0) * phase });
+    } else {
+      const wanted = -camera.gain * flightAt(spec.jumpers[0], t).lift;
+      const lag = camera.lagS ?? 0.1;
+      followed += (wanted - followed) * (lag > 0 ? 1 - Math.exp(-1 / (spec.fps * lag)) : 1);
+      path.push({ x: 0, y: followed });
+    }
+  }
+  return path;
 }
 
 /** One frame of a scene: the picture, its time, and the pixels where a jumper is. */
@@ -224,29 +275,45 @@ export interface SceneFrame {
 export function* sceneFrames(spec: SceneSpec): Generator<SceneFrame> {
   const { width: w, height: h, fps, seconds } = spec;
   const rand = random(spec.seed ?? 1);
-  const wall = backdrop(spec, rand);
+  const path = cameraPath(spec);
+  const pad = spec.camera ? Math.ceil(Math.max(...path.map((p) => Math.max(Math.abs(p.x), Math.abs(p.y))))) + 4 : 0;
+  const wall = backdrop(spec, rand, pad);
+  const bigW = w + 2 * pad;
+  const bigH = h + 2 * pad;
   const count = Math.round(seconds * fps);
 
   for (let f = 0; f < count; f++) {
     const t = f / fps;
     const shake = spec.jitter ? (rand() * 2 - 1) * spec.jitter : 0;
+    // The scene shown at frame (x, y) is the one at (x + viewX, y + viewY): a camera that moves right looks further right, and a camera
+    // that shakes down sees the scene higher.
+    const viewX = path[f].x;
+    const viewY = path[f].y - shake;
     const data = new Float32Array(w * h);
-    // The wall, shifted by the shake (linear between two rows).
-    const row0 = Math.floor(-shake);
-    const frac = -shake - row0;
+    // The wall, seen from where the camera is (linear between two rows and two columns).
+    const col0 = Math.floor(viewX);
+    const fracX = viewX - col0;
+    const row0 = Math.floor(viewY);
+    const fracY = viewY - row0;
     for (let y = 0; y < h; y++) {
-      const a = Math.min(h - 1, Math.max(0, y + row0)) * w;
-      const b = Math.min(h - 1, Math.max(0, y + row0 + 1)) * w;
-      for (let x = 0; x < w; x++) data[y * w + x] = wall[a + x] * (1 - frac) + wall[b + x] * frac;
+      const a = Math.min(bigH - 1, Math.max(0, y + row0 + pad)) * bigW;
+      const b = Math.min(bigH - 1, Math.max(0, y + row0 + 1 + pad)) * bigW;
+      for (let x = 0; x < w; x++) {
+        const c = Math.min(bigW - 1, Math.max(0, x + col0 + pad));
+        const d = Math.min(bigW - 1, Math.max(0, x + col0 + 1 + pad));
+        data[y * w + x] =
+          (wall[a + c] * (1 - fracX) + wall[a + d] * fracX) * (1 - fracY) +
+          (wall[b + c] * (1 - fracX) + wall[b + d] * fracX) * fracY;
+      }
     }
 
     const truth = new Uint8Array(w * h);
     const draw = (shapes: Shape[], isJumper: boolean) => {
       for (const shape of shapes) {
         const [x0, y0, x1, y1] = boundsOf(shape);
-        for (let y = Math.max(0, Math.floor(y0 + shake) - 1); y <= Math.min(h - 1, Math.ceil(y1 + shake) + 1); y++) {
-          for (let x = Math.max(0, Math.floor(x0) - 1); x <= Math.min(w - 1, Math.ceil(x1) + 1); x++) {
-            const c = coverage(shape, x, y - shake);
+        for (let y = Math.max(0, Math.floor(y0 - viewY) - 1); y <= Math.min(h - 1, Math.ceil(y1 - viewY) + 1); y++) {
+          for (let x = Math.max(0, Math.floor(x0 - viewX) - 1); x <= Math.min(w - 1, Math.ceil(x1 - viewX) + 1); x++) {
+            const c = coverage(shape, x + viewX, y + viewY);
             if (c <= 0) continue;
             data[y * w + x] += (shape.value - data[y * w + x]) * c;
             if (isJumper && c >= 0.5) truth[y * w + x] = 1;

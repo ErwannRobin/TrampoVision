@@ -3,6 +3,10 @@
  * tuned on synthetic scenes (`testScenes.ts`) and not on real trampoline footage. Sizes marked "picture pixels" are pixels of
  * the small working picture (`workWidth` wide), not of the video; shares of the picture are shares of its shorter side.
  */
+/** The kind of shot: what the camera does and where it stands, which decides how the picture is prepared (`cameraType.ts`). `auto` finds it out. */
+export type CameraType = 'fixed' | 'tracking' | 'lowAngle';
+export type CameraSetting = 'auto' | CameraType;
+
 export interface MotionConfig {
   /**
    * Width of the small picture the motion is measured on, picture pixels (the height follows the video). Small on purpose: it
@@ -34,6 +38,29 @@ export interface MotionConfig {
    */
   minShakeColumns: number;
   shakeSpread: number;
+
+  // Camera: how the whole picture moves, and what kind of shot it is (see `CameraMotion` and `CameraTypeEstimator`).
+  /** `auto` reads the kind of shot from the video; the others force it (the debug page's choice). */
+  cameraType: CameraSetting;
+  /** The camera estimate is trusted when its standard error is below this, picture pixels. */
+  cameraMaxError: number;
+  /**
+   * The camera counts as moving (a close-up that follows the athlete, a pan) when its speed, in shorter sides of the picture a second,
+   * averaged as a root mean square over `cameraWindowS` seconds, is at `cameraMovingSpeed` or more, and as still again below
+   * `cameraStillSpeed`. The speed is smoothed over `cameraSmoothS` seconds first: the shake of a hand goes back and forth, and a camera
+   * that follows goes somewhere.
+   */
+  cameraMovingSpeed: number;
+  cameraStillSpeed: number;
+  cameraWindowS: number;
+  cameraSmoothS: number;
+  /** What a camera that moves leaves of the background, as a share of its own speed: motion that slow, on top of the thresholds, is not the scene. */
+  cameraSlack: number;
+  /** A still camera is low-angle when the athlete is this wide (share of the picture width) or wider, and a normal wide shot below the lower one. */
+  lowAngleShare: number;
+  lowAngleFreeShare: number;
+  /** The kind of shot stays this long before it can change, seconds. */
+  cameraHoldS: number;
 
   // Stage 2: following the movement over consecutive frames.
   /** How long a pixel remembers that something moved up or down through it, seconds (a jump is 1 to 2.5 s long). */
@@ -89,6 +116,17 @@ export const DEFAULT_MOTION_CONFIG: MotionConfig = {
   regularization: 0.1,
   minShakeColumns: 0.4,
   shakeSpread: 0.15,
+
+  cameraType: 'auto',
+  cameraMaxError: 0.12,
+  cameraMovingSpeed: 0.065,
+  cameraStillSpeed: 0.035,
+  cameraWindowS: 1.5,
+  cameraSmoothS: 0.5,
+  cameraSlack: 0.25,
+  lowAngleShare: 0.2,
+  lowAngleFreeShare: 0.17,
+  cameraHoldS: 2,
 
   holdS: 2.5,
 

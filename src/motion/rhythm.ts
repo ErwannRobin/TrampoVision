@@ -61,6 +61,31 @@ export class ColumnRhythm {
     this.strength.fill(0);
   }
 
+  /**
+   * Moves what is known about the columns `columns` to the right (to the left when negative), because the camera moved: the column
+   * that showed the athlete now sits there. The columns that come into view know nothing, and start again.
+   */
+  shift(columns: number): void {
+    const { width, capacity } = this;
+    if (columns === 0) return;
+    if (Math.abs(columns) >= width) {
+      this.samples.fill(0);
+      this.strength.fill(0);
+      return;
+    }
+    if (columns > 0) {
+      this.samples.copyWithin(columns * capacity, 0, (width - columns) * capacity);
+      this.samples.fill(0, 0, columns * capacity);
+      this.strength.copyWithin(columns, 0, width - columns);
+      this.strength.fill(0, 0, columns);
+    } else {
+      this.samples.copyWithin(0, -columns * capacity, width * capacity);
+      this.samples.fill(0, (width + columns) * capacity);
+      this.strength.copyWithin(0, -columns, width);
+      this.strength.fill(0, width + columns);
+    }
+  }
+
   /** Adds one sample per column (length `width`). */
   push(direction: Float32Array): void {
     for (let x = 0; x < this.width; x++) this.samples[x * this.capacity + this.head] = direction[x];
