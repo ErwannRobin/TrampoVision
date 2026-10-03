@@ -56,8 +56,8 @@ const layer = new CanvasMaskLayer();
 
 interface Session {
   url: string;
-  /** The file name of the clip: the masked video is named after it. */
-  name: string;
+  /** The clip as it was chosen: the app is given it too, to show it. */
+  file: File;
   video: HTMLVideoElement;
   fps: number;
   /** Every how many frames of the video are analyzed, so that the analysis runs at about 30 a second as the app does. */
@@ -240,7 +240,7 @@ async function openVideo(file: File): Promise<void> {
     }
     const stride = analysisStride(fps);
     const total = Math.max(1, Math.floor((video.duration * fps) / stride));
-    session = { url, name: file.name, video, fps, stride, total, index: 0, closed: false };
+    session = { url, file, video, fps, stride, total, index: 0, closed: false };
     panels.resize(video.videoWidth, video.videoHeight);
     layer.detector.reset();
     seek.max = String(total - 1);
@@ -451,8 +451,8 @@ gpuBox.addEventListener('change', () => {
 // --- The result, in the app --------------------------------------------------------------------------------------
 
 /**
- * Makes the masked video of the whole clip with the settings as they are now, leaves it for the app and goes there. It is a video like any
- * other (named after the clip), so the app opens it as one the person chose, and its analysis is unchanged.
+ * Makes the masked video of the whole clip with the settings as they are now, leaves it with the clip itself for the app and goes there. The
+ * app shows the clip and gives the masked video (named after the clip) to the pose model: its analysis is unchanged.
  */
 async function loadInApp(): Promise<void> {
   const s = session;
@@ -495,7 +495,10 @@ async function loadInApp(): Promise<void> {
       }
     }
     setLoadStatus(`The background is hidden in ${share} % of the frames. Opening TrampoVision…`);
-    await putHandoff(new File([made.blob], maskedName(s.name), { type: made.blob.type }));
+    await putHandoff({
+      original: s.file,
+      masked: new File([made.blob], maskedName(s.file.name), { type: made.blob.type }),
+    });
     location.assign(APP_WITH_RESULT);
   } catch (error) {
     if (control.signal.aborted) setLoadStatus('Cancelled.');

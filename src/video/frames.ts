@@ -78,7 +78,7 @@ const SEEK_ATTEMPT_MS = 2500;
 const SEEK_ATTEMPTS = 3;
 
 /** One seek attempt. Resolves on `seeked`, or by polling if the event was missed (seen on desktop Chrome). */
-function seekOnce(video: HTMLVideoElement, time: number, timeoutMs: number): Promise<boolean> {
+function seekOnce(video: HTMLVideoElement, time: number, timeoutMs: number, tolerance = 0.5 / 1000): Promise<boolean> {
   return new Promise((resolve) => {
     const done = (ok: boolean) => {
       clearTimeout(timer);
@@ -89,7 +89,7 @@ function seekOnce(video: HTMLVideoElement, time: number, timeoutMs: number): Pro
     const onSeeked = () => done(true);
     const timer = setTimeout(() => done(false), timeoutMs);
     const poll = setInterval(() => {
-      if (!video.seeking && video.readyState >= 2 && Math.abs(video.currentTime - time) < 0.5 / 1000) done(true);
+      if (!video.seeking && video.readyState >= 2 && Math.abs(video.currentTime - time) < tolerance) done(true);
     }, 50);
     video.addEventListener('seeked', onSeeked);
     video.currentTime = time;
@@ -128,13 +128,64 @@ export async function seekTo(video: HTMLVideoElement, time: number, timeoutMs = 
  * tells the app to convert the file. Leaves the playhead at the start.
  */
 export async function canDecode(video: HTMLVideoElement, timeoutMs = 3000): Promise<boolean> {
+  return (await decodeProblem(video, timeoutMs)) === null;
+}
+
+/** What the element reports, to tell why a video could not be decoded (a phone has no console to read). */
+export const videoState = (video: HTMLVideoElement): string =>
+  `ready ${video.readyState}, network ${video.networkState}, error ${video.error?.code ?? 'none'}, ${video.videoWidth}x${video.videoHeight}, ${video.duration.toFixed(2)}s, seeking ${video.seeking}, at ${video.currentTime.toFixed(2)}s`;
+
+/**
+ * Starts the loading of a video that has only its metadata. iPhone Safari ignores `preload` and loads no frame until the video plays,
+ * so a seek gets no answer from a video that is fine. A muted play, stopped at once, is allowed without a tap.
+ */
+async function wake(video: HTMLVideoElement, timeoutMs: number): Promise<void> {
+  const loaded = new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, timeoutMs);
+    video.addEventListener(
+      'loadeddata',
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
+  video.muted = true;
+  video.play().catch(() => undefined);
+  await loaded;
+  video.pause();
+}
+
+const SAME_FRAME_S = 0.1;
+
+/**
+ * Why the browser cannot decode this video (the first seek that gets no frame), or null when it can. One seek that shows a frame is enough:
+ * a video that cannot be decoded gets no frame at any point, and a phone can be slow to seek far into a good one.
+ */
+export async function decodeProblem(video: HTMLVideoElement, timeoutMs = 3000): Promise<string | null> {
   try {
+    let woken = false;
+    let first: string | null = null;
     for (const fraction of [0.3, 0.6, 0.9]) {
-      if (!(await seekOnce(video, video.duration * fraction, timeoutMs))) return false;
+      const time = video.duration * fraction;
+      // Safari puts the playhead on a frame, a little off the asked time, and may not say "seeked": a frame of difference is a done seek.
+      let seen = await seekOnce(video, time, timeoutMs, SAME_FRAME_S);
+      if (!seen && !woken && video.readyState < 2) {
+        // Nothing is loaded yet, which is not the same as nothing that can be decoded: wake the video once and ask again.
+        woken = true;
+        await wake(video, timeoutMs);
+        seen = await seekOnce(video, time, timeoutMs, SAME_FRAME_S);
+      }
+      if (seen) {
+        await seekOnce(video, 0, timeoutMs, SAME_FRAME_S);
+        return null;
+      }
+      first ??= `no frame at ${time.toFixed(2)}s (${videoState(video)}${woken ? ', woken' : ''})`;
     }
-    return await seekOnce(video, 0, timeoutMs);
-  } catch {
-    return false;
+    return first;
+  } catch (err) {
+    return `${err instanceof Error ? err.message : String(err)} (${videoState(video)})`;
   }
 }
 

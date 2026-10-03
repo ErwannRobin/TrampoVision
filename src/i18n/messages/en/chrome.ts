@@ -266,6 +266,8 @@ export const chrome = {
   // Notices and errors of the app
   'app.converted':
     'This browser cannot decode the original file, so it was converted to H.264 (max 720p) in the browser.',
+  'app.maskedFallback':
+    'The masked video could not be opened, so the pose model reads the original video (the background is not hidden).',
   'app.fpsAssumed': 'Could not measure the frame rate, so 30 fps is assumed.',
   'app.fpsAssumedAdvanced':
     'Could not measure the frame rate, so 30 fps is assumed. Set the real value under Analysis in the settings.',

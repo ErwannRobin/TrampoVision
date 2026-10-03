@@ -251,6 +251,7 @@ export const chrome: Translation<typeof en> = {
 
   'app.converted':
     'このブラウザーでは元のファイルをデコードできないため、ブラウザー内で H.264（最大720p）に変換しました。',
+  'app.maskedFallback': 'マスク済みの動画を開けなかったため、姿勢モデルは元の動画を読み取ります（背景は隠れません）。',
   'app.fpsAssumed': 'フレームレートを測定できなかったため、30 fps と仮定します。',
   'app.fpsAssumedAdvanced':
     'フレームレートを測定できなかったため、30 fps と仮定します。設定の「解析」で実際の値を指定してください。',

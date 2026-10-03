@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { exportSize, pickConfig } from './exportVideo';
+import { exportSize, muxerFrameRate, pickConfig } from './exportVideo';
+
+describe('muxerFrameRate', () => {
+  it('passes a whole frame rate on', () => {
+    expect(muxerFrameRate(30)).toBe(30);
+  });
+
+  it('leaves out a fractional one, which the muxer rejects (29.97 fps clips)', () => {
+    expect(muxerFrameRate(29.97)).toBeUndefined();
+    expect(muxerFrameRate(30000 / 1001 / 2)).toBeUndefined();
+  });
+});
 
 describe('exportSize', () => {
   it('keeps small videos as they are', () => {
@@ -54,6 +65,12 @@ describe('the codec of an exported video', () => {
     encoderThatKnows('avc1');
     const { config } = await pickConfig(1920, 1080, 30);
     expect([config.width, config.height, config.framerate]).toEqual([1920, 1080, 30]);
+  });
+
+  it('asks for AVC samples, not Annex B, which the MP4 muxer cannot write (Safari)', async () => {
+    encoderThatKnows('avc1');
+    const { config } = await pickConfig(1280, 720, 30);
+    expect(config.avc).toEqual({ format: 'avc' });
   });
 
   it('fails when the browser can encode neither', async () => {
