@@ -67,6 +67,12 @@ describe('the codec of an exported video', () => {
     expect([config.width, config.height, config.framerate]).toEqual([1920, 1080, 30]);
   });
 
+  it('asks for AVC samples, not Annex B, which the MP4 muxer cannot write (Safari)', async () => {
+    encoderThatKnows('avc1');
+    const { config } = await pickConfig(1280, 720, 30);
+    expect(config.avc).toEqual({ format: 'avc' });
+  });
+
   it('fails when the browser can encode neither', async () => {
     encoderThatKnows();
     await expect(pickConfig(1280, 720, 30, true)).rejects.toThrow('H.264');

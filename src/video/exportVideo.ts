@@ -128,7 +128,15 @@ export async function pickConfig(
     ...(allowVp9 ? ['vp09.00.41.08', 'vp09.00.51.08'].map((codec) => ({ codec, container: 'vp9' as const })) : []),
   ];
   for (const { codec, container } of choices) {
-    const config: VideoEncoderConfig = { codec, width, height, bitrate, framerate: fps };
+    // `avc: { format: 'avc' }` is the default of the spec, but the MP4 muxer cannot use Annex B, which some browsers (Safari) may give otherwise.
+    const config: VideoEncoderConfig = {
+      codec,
+      width,
+      height,
+      bitrate,
+      framerate: fps,
+      ...(container === 'avc' ? { avc: { format: 'avc' as const } } : {}),
+    };
     if ((await VideoEncoder.isConfigSupported(config)).supported) return { config, container };
   }
   throw new Error(t('err.exportH264'));

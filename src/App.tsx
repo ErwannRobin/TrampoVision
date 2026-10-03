@@ -154,11 +154,35 @@ interface MaskedCopy {
   clip: { width: number; height: number };
 }
 
-/** Opens the masked copy of a clip of the size `clip`: an object URL for the pose model, and the rate of its frames. */
-async function openMasked(file: File, clip: MaskedCopy['clip']): Promise<MaskedCopy> {
-  const url = URL.createObjectURL(file);
+/**
+ * Opens the masked copy of a clip of the size `clip`: an object URL for the pose model, and the rate of its frames. The motion page writes
+ * VP9 in the MP4 where its browser cannot encode H.264, and a browser may not decode that: it is then converted to H.264, like an original.
+ */
+async function openMasked(
+  file: File,
+  clip: MaskedCopy['clip'],
+  signal: AbortSignal,
+  onProgress: (fraction: number) => void,
+): Promise<MaskedCopy> {
+  let url = URL.createObjectURL(file);
   try {
-    const probe = await loadVideo(url);
+    let probe: HTMLVideoElement | null = null;
+    try {
+      probe = await loadVideo(url);
+      if (!(await canDecode(probe))) {
+        disposeVideo(probe);
+        probe = null;
+      }
+    } catch {
+      probe = null;
+    }
+    if (!probe) {
+      onProgress(0);
+      const blob = await transcodeToH264(file, { signal, onProgress });
+      URL.revokeObjectURL(url);
+      url = URL.createObjectURL(blob);
+      probe = await loadVideo(url);
+    }
     const measured = await estimateFps(probe);
     disposeVideo(probe);
     return { url, fps: measured ?? 30, clip };
@@ -250,6 +274,9 @@ function AppView({ playhead }: { playhead: Playhead }) {
   const fileRef = useRef<File | null>(null); // latest selected file, to ignore stale async results
   // The masked copy of the clip (from the motion detector) that the pose model reads while the clip is what is shown; null without one.
   const maskedRef = useRef<MaskedCopy | null>(null);
+  /** The masked copy could not be opened: the analysis reads the original, and says so (it starts by clearing the notice). */
+  // The notice about a masked copy that could not be opened ('' when it was).
+  const maskedFailed = useRef('');
 
   useEffect(() => {
     const root = document.documentElement;
@@ -562,12 +589,23 @@ function AppView({ playhead }: { playhead: Playhead }) {
       if (!isCurrent()) return;
       setFps(measured ?? 30);
       if (masked) {
-        const copy = await openMasked(masked, shown);
-        if (!isCurrent()) {
-          URL.revokeObjectURL(copy.url);
-          return;
+        try {
+          const copy = await openMasked(masked, shown, ctl.signal, (progress) => {
+            if (isCurrent()) setStatus({ kind: 'loading', stage: 'converting', progress });
+          });
+          if (!isCurrent()) {
+            URL.revokeObjectURL(copy.url);
+            return;
+          }
+          maskedRef.current = copy;
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          // Without the masked copy the original is analyzed, background and all: better than no analysis.
+          if (!isCurrent()) return;
+          // The cause goes with the notice: on a phone there is no console to read it in.
+          maskedFailed.current = `${t('app.maskedFallback')} (${err instanceof Error ? err.message : String(err)})`;
+          setNotice(maskedFailed.current);
         }
-        maskedRef.current = copy;
       }
       if (series && openSeriesText(series, next.name, { withVideo: true })) return;
       if (!advanced) {
@@ -596,6 +634,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
   function dropMasked() {
     if (maskedRef.current) URL.revokeObjectURL(maskedRef.current.url);
     maskedRef.current = null;
+    maskedFailed.current = '';
   }
 
   async function analyze() {
@@ -604,7 +643,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
     const ctl = new AbortController();
     abort.current = ctl;
     setTracks([]);
-    setNotice('');
+    setNotice(maskedFailed.current);
     // The pose model loads first, which can take long (a download for the experimental ones).
     setStatus({ kind: 'loading', stage: 'model' });
     // The live view analyzes about 30 frames a second, so a phone film at 60 or 120 fps does not make the wait longer.

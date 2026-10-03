@@ -256,6 +256,8 @@ export const chrome: Translation<typeof en> = {
 
   'app.converted':
     'Dieser Browser kann die Originaldatei nicht dekodieren; sie wurde deshalb im Browser in H.264 (max. 720p) umgewandelt.',
+  'app.maskedFallback':
+    'Das maskierte Video konnte nicht geöffnet werden; das Posenmodell liest deshalb das Originalvideo (der Hintergrund wird nicht ausgeblendet).',
   'app.fpsAssumed': 'Die Bildrate konnte nicht gemessen werden; es werden 30 fps angenommen.',
   'app.fpsAssumedAdvanced':
     'Die Bildrate konnte nicht gemessen werden; es werden 30 fps angenommen. Stellen Sie den tatsächlichen Wert in den Einstellungen unter „Analyse“ ein.',

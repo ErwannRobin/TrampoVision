@@ -256,6 +256,8 @@ export const chrome: Translation<typeof en> = {
 
   'app.converted':
     'Ce navigateur ne peut pas décoder le fichier d’origine : il a donc été converti en H.264 (720p max) dans le navigateur.',
+  'app.maskedFallback':
+    'La vidéo masquée n’a pas pu être ouverte : le modèle de pose lit donc la vidéo d’origine (l’arrière-plan n’est pas masqué).',
   'app.fpsAssumed': 'Impossible de mesurer la cadence : 30 im/s sont supposées.',
   'app.fpsAssumedAdvanced':
     'Impossible de mesurer la cadence : 30 im/s sont supposées. Indiquez la vraie valeur dans Analyse, dans les réglages.',
