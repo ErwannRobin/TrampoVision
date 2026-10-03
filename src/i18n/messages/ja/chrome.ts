@@ -54,6 +54,8 @@ export const chrome: Translation<typeof en> = {
   'landing.review': 'ジャンプを確認',
   'landing.reviewIdle': 'アプリの判定を確認・修正します',
   'landing.reviewWaiting': '{n}件が確認待ち',
+  'landing.motion': 'モーション検出',
+  'landing.motionHint': '実験的：姿勢モデルの前に選手を切り出します',
   'landing.noteCamera':
     '最良の結果を得るには、カメラを横から水平に固定し、トランポリン全体を画角に収め、最初の技の踏み切りから最後の技の着地まで選手が映るようにしてください。',
   'landing.notePrivacy': 'ブラウザー上で動作します。動画が端末の外に出ることはありません。',

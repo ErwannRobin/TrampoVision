@@ -239,6 +239,13 @@ describe('the first screen', () => {
   it('brings back the saved analyses with the advanced tools', () => {
     expect(landing(true)).toContain('Open a saved analysis');
   });
+
+  it('links the motion detector only with the advanced tools', () => {
+    const html = landing(true);
+    expect(html).toContain('href="/motion.html"');
+    expect(html).toContain('Motion detector');
+    expect(landing(false)).not.toContain('/motion.html');
+  });
 });
 
 describe('the settings', () => {

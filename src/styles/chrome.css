@@ -327,7 +327,7 @@
 .landing__link:hover {
   text-decoration-color: currentColor;
 }
-.landing__review {
+.landing__tool {
   display: flex;
   width: fit-content;
   align-items: center;
@@ -340,16 +340,16 @@
   font-weight: 600;
   text-decoration: none;
 }
-.landing__review small {
+.landing__tool small {
   display: block;
   color: var(--text-2);
   font-size: var(--fs-sm);
   font-weight: 400;
 }
-.landing__review:hover {
+.landing__tool:hover {
   border-color: currentColor;
 }
-.landing__review:focus-visible {
+.landing__tool:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }

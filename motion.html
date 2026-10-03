@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex" />
+    <title>Motion detector (experimental)</title>
+  </head>
+  <body>
+    <main class="md-page">
+      <header class="md-head">
+        <h1>Motion detector <span class="md-tag">experimental</span></h1>
+        <p>
+          Finds the athlete from the way they move, before the pose model runs: the motion between frames, the columns
+          where things go up and down again and again like jumps, and a mask around them. Nothing is trained and the
+          pose model is not used to make the mask. Best with a camera that does not move. Your video stays on this
+          device.
+        </p>
+      </header>
+
+      <section class="md-bar" aria-label="Video">
+        <label id="pick" class="btn btn--primary">
+          Choose a video
+          <input id="file" type="file" accept="video/*" hidden />
+        </label>
+        <!-- The sample clips of the app (the asset host). Hidden when the build has no asset host, like the app's own sample menu. -->
+        <select id="sample" class="select select--pill" aria-label="Open a sample video" hidden>
+          <option value="">Try a sample</option>
+        </select>
+        <button id="play" class="btn btn--secondary" type="button" disabled>Play</button>
+        <button id="step" class="btn btn--secondary" type="button" disabled>Step</button>
+        <button id="restart" class="btn btn--ghost" type="button" disabled>Restart</button>
+        <label class="md-check"><input id="pose" type="checkbox" checked /> Run the pose model</label>
+        <label class="md-check"><input id="gpu" type="checkbox" checked /> Use the GPU for it</label>
+        <label class="md-check"
+          ><input id="hide" type="checkbox" checked /> Hide the background before the pose model</label
+        >
+      </section>
+
+      <div class="md-seek">
+        <input id="seek" type="range" min="0" max="0" value="0" step="1" disabled aria-label="Position in the video" />
+        <output id="clock" class="num">0.00 s</output>
+      </div>
+      <p id="status" class="md-status" role="status">
+        Choose a video to start. Seeking starts the detector again from that frame.
+      </p>
+
+      <section class="md-panels" aria-label="Stages">
+        <figure class="md-panel">
+          <canvas id="c-original" role="img" aria-label="The original frame"></canvas>
+          <figcaption><strong>Original frame</strong> The video as it is.</figcaption>
+        </figure>
+        <figure class="md-panel">
+          <canvas id="c-motion" role="img" aria-label="The motion map"></canvas>
+          <figcaption>
+            <strong>Motion map</strong> Blue moves up, orange moves down. The gold strip shows how well each column
+            repeats like a jump.
+          </figcaption>
+        </figure>
+        <figure class="md-panel">
+          <canvas id="c-mask" role="img" aria-label="The athlete mask"></canvas>
+          <figcaption>
+            <strong>Athlete mask</strong> White stays, black is hidden. It stays open until it is sure.
+          </figcaption>
+        </figure>
+        <figure class="md-panel">
+          <canvas id="c-masked" role="img" aria-label="The masked frame"></canvas>
+          <figcaption><strong>Masked frame</strong> The frame with the background painted over.</figcaption>
+        </figure>
+        <figure class="md-panel">
+          <canvas id="c-skeleton" role="img" aria-label="The skeleton found by MediaPipe"></canvas>
+          <figcaption>
+            <strong>MediaPipe skeleton</strong> What the pose model finds in the picture it is given.
+          </figcaption>
+        </figure>
+      </section>
+
+      <dl id="stats" class="md-stats" aria-label="Measurements"></dl>
+
+      <details class="md-settings">
+        <summary>Settings</summary>
+        <div class="md-sliders">
+          <label>
+            <span>Margin around the athlete</span>
+            <input id="margin" type="range" min="0.02" max="0.3" step="0.01" />
+            <output id="margin-out" class="num"></output>
+          </label>
+          <label>
+            <span>Memory of a jump</span>
+            <input id="hold" type="range" min="1" max="5" step="0.1" />
+            <output id="hold-out" class="num"></output>
+          </label>
+          <label>
+            <span>Motion that counts (noise levels)</span>
+            <input id="threshold" type="range" min="2" max="12" step="0.5" />
+            <output id="threshold-out" class="num"></output>
+          </label>
+          <label>
+            <span>Time to close the mask</span>
+            <input id="close" type="range" min="0.1" max="3" step="0.1" />
+            <output id="close-out" class="num"></output>
+          </label>
+          <label>
+            <span>Hidden part</span>
+            <select id="fill">
+              <option value="rgb(128, 128, 128)">Gray</option>
+              <option value="rgb(0, 0, 0)">Black</option>
+              <option value="rgb(255, 255, 255)">White</option>
+            </select>
+          </label>
+        </div>
+      </details>
+
+      <section class="md-load" aria-labelledby="load-title">
+        <h2 id="load-title">Use the result</h2>
+        <p>
+          Runs the whole video through the detector, with the settings above, and opens the masked video in TrampoVision
+          as if you had chosen it there. The pose model is not used to make it, and the start stays as it is until the
+          mask has seen about two and a half jumps. It can take a while for a long video.
+        </p>
+        <div class="md-load__bar">
+          <button id="load" class="btn btn--primary" type="button" disabled>Load in TrampoVision</button>
+          <button id="load-cancel" class="btn btn--ghost" type="button" hidden>Cancel</button>
+          <progress id="load-progress" max="1" value="0" aria-label="Progress of the masked video" hidden></progress>
+        </div>
+        <p id="load-status" class="md-status" role="status"></p>
+      </section>
+    </main>
+    <script type="module" src="/src/motion/debug/main.ts"></script>
+  </body>
+</html>
