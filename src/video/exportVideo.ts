@@ -36,6 +36,14 @@ export interface EncodeOptions {
   allowVp9?: boolean;
 }
 
+/**
+ * The muxer takes the frame rate as the track's timescale, so it must be a whole number, and a rounded 29.97 would put the frame times off.
+ * A fractional rate (NTSC clips) is left out: the muxer then uses a fine timescale and keeps the exact times.
+ */
+export function muxerFrameRate(fps: number): number | undefined {
+  return Number.isInteger(fps) && fps > 0 ? fps : undefined;
+}
+
 /** Encodes `frames` painted canvases as an MP4: H.264, or VP9 when `allowVp9` and there is no H.264 encoder. Shared by every export. */
 export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
   if (!canExportVideo()) throw new Error(t('err.exportUnsupported'));
@@ -49,7 +57,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
 
   const muxer = new Muxer({
     target: new ArrayBufferTarget(),
-    video: { codec: container, width, height, frameRate: fps },
+    video: { codec: container, width, height, frameRate: muxerFrameRate(fps) },
     fastStart: 'in-memory',
   });
   let encodeError: Error | null = null;

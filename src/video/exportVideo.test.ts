@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { exportSize, pickConfig } from './exportVideo';
+import { exportSize, muxerFrameRate, pickConfig } from './exportVideo';
+
+describe('muxerFrameRate', () => {
+  it('passes a whole frame rate on', () => {
+    expect(muxerFrameRate(30)).toBe(30);
+  });
+
+  it('leaves out a fractional one, which the muxer rejects (29.97 fps clips)', () => {
+    expect(muxerFrameRate(29.97)).toBeUndefined();
+    expect(muxerFrameRate(30000 / 1001 / 2)).toBeUndefined();
+  });
+});
 
 describe('exportSize', () => {
   it('keeps small videos as they are', () => {
