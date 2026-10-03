@@ -54,6 +54,8 @@ export const chrome: Translation<typeof en> = {
   'landing.review': 'Sprünge prüfen',
   'landing.reviewIdle': 'Bestätigen oder korrigieren Sie, was die App erkannt hat',
   'landing.reviewWaiting': '{n} warten auf Prüfung',
+  'landing.motion': 'Bewegungsdetektor',
+  'landing.motionHint': 'Experimentell: den Athleten vor dem Pose-Modell freistellen',
   'landing.noteCamera':
     'Die besten Ergebnisse liefert eine feststehende, waagerechte Kamera an der Seite, mit dem ganzen Trampolin im Bild und dem Athleten im Blick – vom Absprung des ersten bis zur Landung des letzten Elements.',
   'landing.notePrivacy': 'Läuft in Ihrem Browser. Das Video verlässt Ihr Gerät nie.',

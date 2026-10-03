@@ -20,10 +20,14 @@
       </header>
 
       <section class="md-bar" aria-label="Video">
-        <label class="btn btn--primary">
+        <label id="pick" class="btn btn--primary">
           Choose a video
           <input id="file" type="file" accept="video/*" hidden />
         </label>
+        <!-- The sample clips of the app (the asset host). Hidden when the build has no asset host, like the app's own sample menu. -->
+        <select id="sample" class="select select--pill" aria-label="Open a sample video" hidden>
+          <option value="">Try a sample</option>
+        </select>
         <button id="play" class="btn btn--secondary" type="button" disabled>Play</button>
         <button id="step" class="btn btn--secondary" type="button" disabled>Step</button>
         <button id="restart" class="btn btn--ghost" type="button" disabled>Restart</button>
@@ -107,6 +111,21 @@
           </label>
         </div>
       </details>
+
+      <section class="md-load" aria-labelledby="load-title">
+        <h2 id="load-title">Use the result</h2>
+        <p>
+          Runs the whole video through the detector, with the settings above, and opens the masked video in TrampoVision
+          as if you had chosen it there. The pose model is not used to make it, and the start stays as it is until the
+          mask has seen about two and a half jumps. It can take a while for a long video.
+        </p>
+        <div class="md-load__bar">
+          <button id="load" class="btn btn--primary" type="button" disabled>Load in TrampoVision</button>
+          <button id="load-cancel" class="btn btn--ghost" type="button" hidden>Cancel</button>
+          <progress id="load-progress" max="1" value="0" aria-label="Progress of the masked video" hidden></progress>
+        </div>
+        <p id="load-status" class="md-status" role="status"></p>
+      </section>
     </main>
     <script type="module" src="/src/motion/debug/main.ts"></script>
   </body>

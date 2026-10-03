@@ -45,6 +45,7 @@ import { buildPoseSeriesSet, parsePoseSeries, toSeriesJson, type ParsedSeries } 
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point, PoseEngineId } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
+import { receiveHandoff } from './motion/handoff';
 import { loadSample, loadSampleSeries, loadSamples, type Sample } from './video/sample';
 import { dragHasFiles, pickDroppedSeries, pickDroppedVideo } from './video/drop';
 import { matchClip, type ClipIdentity } from './analysis/seriesMatch';
@@ -348,6 +349,20 @@ function AppView({ playhead }: { playhead: Playhead }) {
       live = false;
     };
   }, []);
+
+  // The motion detector's page (/motion.html, advanced tools) sends its result here as a video kept in a small store: it opens like a chosen one.
+  useEffect(() => {
+    let live = true;
+    receiveHandoff().then(
+      (video) => {
+        if (live && video) void onFile(video);
+      },
+      (err) => live && setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) }),
+    );
+    return () => {
+      live = false;
+    };
+  }, []); // oxlint-disable-line react-hooks/exhaustive-deps
 
   // A new analysis starts at the first jump.
   const firstSkillPending = useRef(false);

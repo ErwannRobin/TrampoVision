@@ -61,6 +61,8 @@ export const chrome = {
   'landing.review': 'Review jumps',
   'landing.reviewIdle': 'Confirm or correct what the app found',
   'landing.reviewWaiting': '{n} waiting for a check',
+  'landing.motion': 'Motion detector',
+  'landing.motionHint': 'Experimental: isolate the athlete before the pose model',
   'landing.noteCamera':
     'Best results come from a fixed, level camera at the side, with the whole trampoline in frame and the athlete in view from the takeoff of the first skill to the landing of the last.',
   'landing.notePrivacy': 'Runs in your browser. The video never leaves your device.',

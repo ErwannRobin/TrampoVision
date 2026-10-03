@@ -19,7 +19,7 @@ import { drawCalibration, drawOverlay, type CalibrationDraw, type OverlayOptions
 const REFERENCE_WIDTH = 960;
 const MAX_LONG_SIDE = 1920;
 
-interface EncodeOptions {
+export interface EncodeOptions {
   width: number;
   height: number;
   fps: number;
@@ -28,13 +28,19 @@ interface EncodeOptions {
   drawFrame: (k: number, ctx: CanvasRenderingContext2D) => Promise<void> | void;
   onProgress?: (fraction: number) => void;
   signal?: AbortSignal;
+  /**
+   * Where the browser has no H.264 encoder (the Chromium the motion page was tested in has none), write VP9 in the MP4 instead of failing.
+   * A browser that encodes VP9 decodes it, so a video made for this device's own use plays. Off by default: the exports are meant to be
+   * shared, and H.264 is what plays everywhere.
+   */
+  allowVp9?: boolean;
 }
 
-/** Encodes `frames` painted canvases as an H.264 MP4. Shared by every export. */
-async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
+/** Encodes `frames` painted canvases as an MP4: H.264, or VP9 when `allowVp9` and there is no H.264 encoder. Shared by every export. */
+export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
   if (!canExportVideo()) throw new Error(t('err.exportUnsupported'));
   const { width, height, fps, frames, signal } = opts;
-  const config = await pickConfig(width, height, fps);
+  const { config, container } = await pickConfig(width, height, fps, opts.allowVp9);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -43,7 +49,7 @@ async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
 
   const muxer = new Muxer({
     target: new ArrayBufferTarget(),
-    video: { codec: 'avc', width, height, frameRate: fps },
+    video: { codec: container, width, height, frameRate: fps },
     fastStart: 'in-memory',
   });
   let encodeError: Error | null = null;
@@ -95,12 +101,27 @@ export function exportSize(width: number, height: number): { width: number; heig
   return { width: even(width), height: even(height) };
 }
 
-/** Highest AVC level the encoder accepts for this size (level 4.0 covers 1080p30, 5.1 covers the rest). */
-async function pickConfig(width: number, height: number, fps: number): Promise<VideoEncoderConfig> {
+/**
+ * Highest AVC level the encoder accepts for this size (level 4.0 covers 1080p30, 5.1 covers the rest). With `allowVp9`, VP9 (level 4.1 covers
+ * 1080p at up to 60 fps, 5.1 the rest) is the second choice. `container` is the codec the MP4 muxer is told about.
+ */
+export async function pickConfig(
+  width: number,
+  height: number,
+  fps: number,
+  allowVp9 = false,
+): Promise<{ config: VideoEncoderConfig; container: 'avc' | 'vp9' }> {
   const bitrate = Math.round(Math.min(20_000_000, Math.max(2_000_000, width * height * Math.min(fps, 60) * 0.1)));
-  for (const codec of ['avc1.640028', 'avc1.640033', 'avc1.4d0033', 'avc1.42001f']) {
+  const choices = [
+    ...['avc1.640028', 'avc1.640033', 'avc1.4d0033', 'avc1.42001f'].map((codec) => ({
+      codec,
+      container: 'avc' as const,
+    })),
+    ...(allowVp9 ? ['vp09.00.41.08', 'vp09.00.51.08'].map((codec) => ({ codec, container: 'vp9' as const })) : []),
+  ];
+  for (const { codec, container } of choices) {
     const config: VideoEncoderConfig = { codec, width, height, bitrate, framerate: fps };
-    if ((await VideoEncoder.isConfigSupported(config)).supported) return config;
+    if ((await VideoEncoder.isConfigSupported(config)).supported) return { config, container };
   }
   throw new Error(t('err.exportH264'));
 }

@@ -9,21 +9,27 @@ import { createMediaPipeEstimator } from '../../pose/MediaPipePoseEstimator';
 import { LM } from '../../pose/landmarks';
 import type { PoseDetection, PoseEstimator } from '../../pose/types';
 import { disposeVideo, estimateFps, frameSeekTime, loadVideo, seekTo } from '../../video/frames';
+import { loadSample, loadSamples, type Sample } from '../../video/sample';
 import { DEFAULT_MOTION_CONFIG, type MotionConfig } from '../config';
+import { APP_WITH_RESULT, putHandoff } from '../handoff';
 import { CanvasMaskLayer } from '../layer';
 import { hidesSomething } from '../maskedEstimator';
+import { maskedName, renderMaskedVideo } from '../resultVideo';
 import type { MotionResult } from '../types';
 import { Panels } from './panels';
 
 /**
  * The debug page of the motion detector (motion.html): a video goes through the detector and the pose model frame by frame, and the stages
  * are shown side by side. It reads the video like the analysis does (seeking to every frame, on a hidden video element), so what is seen
- * does not depend on the speed of the machine. English only: it is a tool for the people who work on the detector.
+ * does not depend on the speed of the machine. The video is one the person chooses, or one of the app's samples; and the result, the video
+ * with the background hidden, can be sent to the app (`handoff.ts`). English only: it is a tool for the people who work on the detector.
  */
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
+const pickLabel = $('pick');
 const fileInput = $<HTMLInputElement>('file');
+const sampleSelect = $<HTMLSelectElement>('sample');
 const playButton = $<HTMLButtonElement>('play');
 const stepButton = $<HTMLButtonElement>('step');
 const restartButton = $<HTMLButtonElement>('restart');
@@ -34,6 +40,10 @@ const seek = $<HTMLInputElement>('seek');
 const clock = $<HTMLOutputElement>('clock');
 const status = $('status');
 const stats = $('stats');
+const loadButton = $<HTMLButtonElement>('load');
+const loadCancel = $<HTMLButtonElement>('load-cancel');
+const loadProgress = $<HTMLProgressElement>('load-progress');
+const loadStatus = $('load-status');
 
 const panels = new Panels({
   original: $<HTMLCanvasElement>('c-original'),
@@ -46,6 +56,8 @@ const layer = new CanvasMaskLayer();
 
 interface Session {
   url: string;
+  /** The file name of the clip: the masked video is named after it. */
+  name: string;
   video: HTMLVideoElement;
   fps: number;
   /** Every how many frames of the video are analyzed, so that the analysis runs at about 30 a second as the app does. */
@@ -65,10 +77,19 @@ let playing = false;
 let busy = false;
 /** What was asked while a frame was being processed. It is done next, so that no click is lost. */
 let pending: 'step' | 'show' | null = null;
+/** Set while the masked video is being made for the app; aborting it stops the work. */
+let rendering: AbortController | null = null;
+/** Bumped by every attempt to open a video. One that is overtaken (another video was chosen while it was loading) lets go of what it made. */
+let opening = 0;
 
 function setStatus(text: string, kind: 'info' | 'error' = 'info'): void {
   status.textContent = text;
   status.dataset.kind = kind;
+}
+
+function setLoadStatus(text: string, kind: 'info' | 'error' = 'info'): void {
+  loadStatus.textContent = text;
+  loadStatus.dataset.kind = kind;
 }
 
 // --- Measurements ------------------------------------------------------------------------------------------------
@@ -183,14 +204,27 @@ function closeSession(): void {
 
 function updateControls(): void {
   const ready = session !== null;
-  playButton.disabled = !ready;
-  stepButton.disabled = !ready || playing || (session !== null && session.index >= session.total);
-  restartButton.disabled = !ready;
-  seek.disabled = !ready;
+  // While the masked video is made, the clip and the settings stay as they are: the video is being read, with these settings.
+  const working = rendering !== null;
+  playButton.disabled = !ready || working;
+  stepButton.disabled = !ready || working || playing || (session !== null && session.index >= session.total);
+  restartButton.disabled = !ready || working;
+  seek.disabled = !ready || working;
   playButton.textContent = playing ? 'Pause' : session && session.index >= session.total ? 'Play again' : 'Play';
+  fileInput.disabled = working;
+  sampleSelect.disabled = working;
+  pickLabel.classList.toggle('is-busy', working);
+  for (const control of document.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
+    '.md-settings input, .md-settings select',
+  ))
+    control.disabled = working;
+  loadButton.disabled = !ready || working;
+  loadCancel.hidden = !working;
+  loadProgress.hidden = !working;
 }
 
 async function openVideo(file: File): Promise<void> {
+  const mine = ++opening;
   closeSession();
   updateControls();
   const url = URL.createObjectURL(file);
@@ -198,23 +232,59 @@ async function openVideo(file: File): Promise<void> {
     setStatus('Opening the video…');
     const video = await loadVideo(url);
     const fps = (await estimateFps(video)) ?? 30;
+    if (mine !== opening) {
+      // Another video was chosen while this one was opening: that one is the one that counts.
+      disposeVideo(video);
+      URL.revokeObjectURL(url);
+      return;
+    }
     const stride = analysisStride(fps);
     const total = Math.max(1, Math.floor((video.duration * fps) / stride));
-    session = { url, video, fps, stride, total, index: 0, closed: false };
+    session = { url, name: file.name, video, fps, stride, total, index: 0, closed: false };
     panels.resize(video.videoWidth, video.videoHeight);
     layer.detector.reset();
     seek.max = String(total - 1);
     seek.value = '0';
+    setLoadStatus('');
     setStatus(
-      `${video.videoWidth} × ${video.videoHeight}, ${fps} frames a second, every ${stride === 1 ? 'frame' : `${stride}th frame`} is analyzed. Press Play.`,
+      `${file.name}: ${video.videoWidth} × ${video.videoHeight}, ${fps} frames a second, every ${stride === 1 ? 'frame' : `${stride}th frame`} is analyzed. Press Play.`,
     );
     updateControls();
     await run('show');
   } catch (error) {
     URL.revokeObjectURL(url);
-    setStatus(error instanceof Error ? error.message : String(error), 'error');
+    if (mine === opening) setStatus(error instanceof Error ? error.message : String(error), 'error');
   }
 }
+
+/** Downloads one of the app's samples and opens it like a video that was chosen. */
+async function openSample(sample: Sample): Promise<void> {
+  const mine = ++opening;
+  closeSession();
+  updateControls();
+  try {
+    setStatus(`Downloading ${sample.label}…`);
+    const file = await loadSample(sample.path, (done) => {
+      if (mine === opening) setStatus(`Downloading ${sample.label}… ${Math.round(done * 100)} %`);
+    });
+    if (mine === opening) await openVideo(file);
+  } catch (error) {
+    if (mine === opening) setStatus(error instanceof Error ? error.message : String(error), 'error');
+  }
+}
+
+// The samples of the app. None without an asset host (nor an index of its samples): the picker stays hidden, as the app's sample menu does.
+void loadSamples().then((samples) => {
+  if (samples.length === 0) return;
+  for (const sample of samples) sampleSelect.append(new Option(sample.label, sample.id));
+  sampleSelect.hidden = false;
+  sampleSelect.addEventListener('change', () => {
+    const sample = samples.find((s) => s.id === sampleSelect.value);
+    // Back to the first line: choosing the same sample again (after another video) is a change too.
+    sampleSelect.value = '';
+    if (sample) void openSample(sample);
+  });
+});
 
 /** The pose model's turn: it gets `given`, and its people are returned (null when the pose model is off or did not load). */
 async function detectPose(s: Session, given: CanvasImageSource): Promise<PoseDetection[] | null> {
@@ -378,7 +448,74 @@ gpuBox.addEventListener('change', () => {
   estimator = null;
 });
 
+// --- The result, in the app --------------------------------------------------------------------------------------
+
+/**
+ * Makes the masked video of the whole clip with the settings as they are now, leaves it for the app and goes there. It is a video like any
+ * other (named after the clip), so the app opens it as one the person chose, and its analysis is unchanged.
+ */
+async function loadInApp(): Promise<void> {
+  const s = session;
+  if (!s || rendering) return;
+  playing = false;
+  pending = null;
+  const control = new AbortController();
+  rendering = control;
+  loadProgress.value = 0;
+  setLoadStatus('Making the video…');
+  updateControls();
+  let shown = -1;
+  try {
+    const made = await renderMaskedVideo({
+      url: s.url,
+      sourceFps: s.fps,
+      stride: s.stride,
+      config: { ...layer.detector.config },
+      fill: layer.fill,
+      signal: control.signal,
+      onProgress: (done, total, hidden) => {
+        loadProgress.value = done / total;
+        // The text is a live region: it says something new when the percent moves, not at every frame.
+        const percent = Math.floor((100 * done) / total);
+        if (percent === shown) return;
+        shown = percent;
+        setLoadStatus(
+          `Making the video: ${percent} %. The background is hidden in ${Math.round((100 * hidden) / Math.max(1, done))} % of the frames so far.`,
+        );
+      },
+    });
+    const share = Math.round((100 * made.hidden) / made.frames);
+    if (made.hidden === 0) {
+      // The mask never closed in: what the app would be given is the clip as it was, under a name that says it is masked.
+      const ask =
+        'The detector did not find an athlete in this video, so it hid nothing and the video would be the clip as it was. Open it in TrampoVision anyway?';
+      if (!window.confirm(ask)) {
+        setLoadStatus('Nothing was loaded: the detector hid nothing in this video.');
+        return;
+      }
+    }
+    setLoadStatus(`The background is hidden in ${share} % of the frames. Opening TrampoVision…`);
+    await putHandoff(new File([made.blob], maskedName(s.name), { type: made.blob.type }));
+    location.assign(APP_WITH_RESULT);
+  } catch (error) {
+    if (control.signal.aborted) setLoadStatus('Cancelled.');
+    else setLoadStatus(error instanceof Error ? error.message : String(error), 'error');
+  } finally {
+    rendering = null;
+    updateControls();
+  }
+}
+
+loadButton.addEventListener('click', () => void loadInApp());
+loadCancel.addEventListener('click', () => rendering?.abort());
+
 window.addEventListener('pagehide', () => {
+  rendering?.abort();
   closeSession();
   estimator?.dispose();
+});
+
+// Back from the app can bring this page back from the browser's cache, after `pagehide` has closed its video: it starts again instead.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) location.reload();
 });

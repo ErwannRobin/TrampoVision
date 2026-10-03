@@ -144,3 +144,42 @@
   background: var(--panel);
   color: var(--text);
 }
+
+/* The sample picker sits in the bar like a button: the kit's select is a full-width field. */
+.md-bar .select {
+  width: auto;
+  max-width: 100%;
+}
+/* While the result video is made, the controls that would change the video are locked. */
+.md-bar .is-busy {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.md-load {
+  display: grid;
+  gap: var(--sp-3);
+  justify-items: start;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.md-load h2 {
+  font-size: var(--fs-lg);
+}
+.md-load p {
+  max-width: 78ch;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.md-load .md-status {
+  min-height: 1.5em;
+}
+.md-load__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.md-load progress {
+  width: min(260px, 100%);
+}

@@ -9,7 +9,7 @@ import { DemoSkeleton } from './DemoSkeleton';
 import { DatasetBar, EvaluationReport } from './EvaluationView';
 import type { Sample } from '../video/sample';
 import { useMediaQuery } from './hooks';
-import { Icon, Menu } from './kit';
+import { Icon, Menu, type IconName } from './kit';
 
 export interface LandingProps {
   onFile: (file: File) => void;
@@ -27,6 +27,19 @@ export interface LandingProps {
   advanced: boolean;
 }
 
+/** A link to a tool that has a page of its own (the advanced tools): its icon, its name and a line about it. */
+function ToolLink({ href, icon, title, hint }: { href: string; icon: IconName; title: string; hint: string }) {
+  return (
+    <a className="landing__tool" href={href}>
+      <Icon name={icon} size={18} />
+      <span>
+        {title}
+        <small>{hint}</small>
+      </span>
+    </a>
+  );
+}
+
 /** A link to the reviewer page, with the number of jumps waiting. Only when the build has a review service. */
 function ReviewLink() {
   const [waiting, setWaiting] = useState<number | null>(null);
@@ -38,13 +51,12 @@ function ReviewLink() {
     };
   }, []);
   return (
-    <a className="landing__review" href="/review.html">
-      <Icon name="check" size={18} />
-      <span>
-        {t('landing.review')}
-        <small>{waiting === null ? t('landing.reviewIdle') : t('landing.reviewWaiting', { n: waiting })}</small>
-      </span>
-    </a>
+    <ToolLink
+      href="/review.html"
+      icon="check"
+      title={t('landing.review')}
+      hint={waiting === null ? t('landing.reviewIdle') : t('landing.reviewWaiting', { n: waiting })}
+    />
   );
 }
 
@@ -140,6 +152,9 @@ export function Landing({ onFile, samples, onSample, onOpenSeries, dataset, rece
             </label>
           )}
           {advanced && REVIEW_API_URL && <ReviewLink />}
+          {advanced && (
+            <ToolLink href="/motion.html" icon="target" title={t('landing.motion')} hint={t('landing.motionHint')} />
+          )}
           <a className="landing__link" href={ABOUT_HASH}>
             {t('landing.about')}
           </a>
