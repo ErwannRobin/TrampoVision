@@ -45,6 +45,7 @@ import { buildPoseSeriesSet, parsePoseSeries, toSeriesJson, type ParsedSeries } 
 import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point, PoseEngineId } from './pose/types';
 import { canDecode, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
+import { fitTrackToClip } from './motion/fitTrack';
 import { receiveHandoff } from './motion/handoff';
 import { loadSample, loadSampleSeries, loadSamples, type Sample } from './video/sample';
 import { dragHasFiles, pickDroppedSeries, pickDroppedVideo } from './video/drop';
@@ -144,6 +145,29 @@ function athleteVideoId(base: string | null, index: number): string | null {
   return base && index > 0 ? `${base}#${index + 1}` : base;
 }
 
+/** The masked copy of the clip that the pose model reads, and the clip it stands for. */
+interface MaskedCopy {
+  url: string;
+  /** Its own frame rate: it holds only the frames that are analyzed. */
+  fps: number;
+  /** The size of the clip that is shown. */
+  clip: { width: number; height: number };
+}
+
+/** Opens the masked copy of a clip of the size `clip`: an object URL for the pose model, and the rate of its frames. */
+async function openMasked(file: File, clip: MaskedCopy['clip']): Promise<MaskedCopy> {
+  const url = URL.createObjectURL(file);
+  try {
+    const probe = await loadVideo(url);
+    const measured = await estimateFps(probe);
+    disposeVideo(probe);
+    return { url, fps: measured ?? 30, clip };
+  } catch (err) {
+    URL.revokeObjectURL(url);
+    throw err;
+  }
+}
+
 function AppView({ playhead }: { playhead: Playhead }) {
   // Text made while analyzing (skill names, tips, warnings) follows the language: it is made again when the language changes.
   const locale = useLocale();
@@ -224,6 +248,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
 
   const abort = useRef<AbortController | null>(null);
   const fileRef = useRef<File | null>(null); // latest selected file, to ignore stale async results
+  // The masked copy of the clip (from the motion detector) that the pose model reads while the clip is what is shown; null without one.
+  const maskedRef = useRef<MaskedCopy | null>(null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -350,12 +376,13 @@ function AppView({ playhead }: { playhead: Playhead }) {
     };
   }, []);
 
-  // The motion detector's page (/motion.html, advanced tools) sends its result here as a video kept in a small store: it opens like a chosen one.
+  // The motion detector's page (/motion.html, advanced tools) sends its result here: the clip, which opens like a chosen one, and its masked copy,
+  // which the pose model reads in place of the clip.
   useEffect(() => {
     let live = true;
     receiveHandoff().then(
       (video) => {
-        if (live && video) void onFile(video);
+        if (live && video) void onFile(video.original, undefined, video.masked);
       },
       (err) => live && setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) }),
     );
@@ -464,10 +491,14 @@ function AppView({ playhead }: { playhead: Playhead }) {
     }
   }
 
-  /** `series`: the saved analysis of this very video (a sample's): opened in place of running the pose model. */
-  async function onFile(next: File, series?: string) {
+  /**
+   * `series`: the saved analysis of this very video (a sample's): opened in place of running the pose model.
+   * `masked`: the same clip with the background hidden: it is shown as `next` is, and the pose model reads it.
+   */
+  async function onFile(next: File, series?: string, masked?: File) {
     abort.current?.abort();
     if (url) URL.revokeObjectURL(url);
+    dropMasked();
     const nextUrl = URL.createObjectURL(next);
     setTracks([]);
     setBackend('');
@@ -526,9 +557,18 @@ function AppView({ playhead }: { playhead: Playhead }) {
       if (!probe) return;
       if (isCurrent()) setStatus({ kind: 'loading', stage: 'measuring' });
       const measured = isCurrent() ? await estimateFps(probe) : null;
+      const shown = { width: probe.videoWidth, height: probe.videoHeight };
       disposeVideo(probe);
       if (!isCurrent()) return;
       setFps(measured ?? 30);
+      if (masked) {
+        const copy = await openMasked(masked, shown);
+        if (!isCurrent()) {
+          URL.revokeObjectURL(copy.url);
+          return;
+        }
+        maskedRef.current = copy;
+      }
       if (series && openSeriesText(series, next.name, { withVideo: true })) return;
       if (!advanced) {
         // The live view goes straight to the analysis: a coach on the trampoline has nothing to set up first.
@@ -552,6 +592,12 @@ function AppView({ playhead }: { playhead: Playhead }) {
     }
   }
 
+  /** Lets go of the masked copy of the clip, when there is one. */
+  function dropMasked() {
+    if (maskedRef.current) URL.revokeObjectURL(maskedRef.current.url);
+    maskedRef.current = null;
+  }
+
   async function analyze() {
     if (!url) return;
     abort.current?.abort();
@@ -565,18 +611,23 @@ function AppView({ playhead }: { playhead: Playhead }) {
     const strideNow = advanced ? stride : analysisStride(fps);
     if (strideNow !== stride) setStride(strideNow);
     try {
-      const ts = await extractPoseTracks(url, {
+      // With a masked copy, the pose model reads it at its own rate (it holds only the frames that are analyzed): every frame of it.
+      const masked = maskedRef.current;
+      const read = await extractPoseTracks(masked?.url ?? url, {
         engine: advanced ? engine : 'mediapipe',
         model,
         numPoses,
         preferGpu,
-        sourceFps: fps,
-        stride: strideNow,
+        sourceFps: masked ? masked.fps : fps,
+        stride: masked ? 1 : strideNow,
         signal: ctl.signal,
         onBackend: setBackend,
         onLoad: (progress) => setStatus({ kind: 'loading', stage: 'model', progress }),
         onProgress: (done, total) => setStatus({ kind: 'analyzing', done, total }),
       });
+      const ts = masked
+        ? read.map((tr) => fitTrackToClip(tr, { ...masked.clip, sourceFps: fps, stride: strideNow }))
+        : read;
       // Left to the app, the people who do not jump (a coach, a judge) are not athletes.
       const athletes =
         numPoses > 0
@@ -667,6 +718,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
     autosave.reset();
     abort.current?.abort();
     if (url) URL.revokeObjectURL(url);
+    dropMasked();
     fileRef.current = null;
     setUrl(null);
     setFile(null);
