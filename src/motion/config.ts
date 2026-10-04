@@ -56,7 +56,11 @@ export interface MotionConfig {
   cameraSmoothS: number;
   /** What a camera that moves leaves of the background, as a share of its own speed: motion that slow, on top of the thresholds, is not the scene. */
   cameraSlack: number;
-  /** A still camera is low-angle when the athlete is this wide (share of the picture width) or wider, and a normal wide shot below the lower one. */
+  /**
+   * A still camera is low-angle when the athlete is this wide (share of the picture's shorter side, so that a video held upright and one held
+   * sideways read the same) or wider, and a normal wide shot below the lower one. The box of an athlete is about 0.22 of the shorter side wide when
+   * they are a third of its height, and 0.37 when they are more than half of it.
+   */
   lowAngleShare: number;
   lowAngleFreeShare: number;
   /** The kind of shot stays this long before it can change, seconds. */
@@ -82,21 +86,42 @@ export interface MotionConfig {
   /** Columns whose direction signal has less power than this (mean square) are too quiet to have a rhythm. */
   minActivity: number;
 
-  // Stage 4: the mask, and keeping it still.
+  // Stage 4: the athlete, and the mask around them.
   /** Evidence (motion that is both repeated up and down, and periodic) at which a pixel joins the athlete region / stays in it. */
   enterEvidence: number;
   stayEvidence: number;
-  /** Pieces of the region closer than this are one athlete: the share of the picture. */
+  /** Pieces of the region closer than this are one region: the share of the picture. */
   mergeShare: number;
   /** A region needs this share of the picture to be an athlete: a hand waving is not. */
   minAreaShare: number;
-  /** How far the mask reaches around the region, share of the picture. The pose model needs the arms and the legs too. */
+  /**
+   * How many people are kept: the regions with the strongest up and down motion, and no others. The video is of one person who jumps, so 1;
+   * 2 for synchro (two trampolines). A person who stands, or who moves less than `otherAthleteShare` of the strongest, is hidden.
+   */
+  maxAthletes: number;
+  /** A region after the first is kept only when its evidence is this share of the strongest region's. */
+  otherAthleteShare: number;
+  /** The region that was followed is replaced by another only when that one has this many times its evidence (it counts as stronger than it is). */
+  switchRatio: number;
+
+  // The box around the athlete: what moves in the jump's columns right now.
+  /** A pixel is moving when its change since the last frame is this many noise levels (after the shake of the camera is taken out). */
+  activeLevel: number;
+  /** A pixel that moved counts as moving this long, seconds: at the top of a jump the athlete stops for a frame. */
+  activeHoldS: number;
+  /** Moving pixels closer than this are one body (a hand and a trunk): the share of the picture. */
+  joinShare: number;
+  /** A group of moving pixels needs this many pixels (picture pixels) to be the athlete: a speck of noise is not. */
+  minActivePixels: number;
+  /** Another group is part of the athlete (a leg, an arm) when it has this share of the pixels of the biggest group. */
+  partShare: number;
+  /** How far the mask reaches around the box of the athlete, share of the picture. The pose model needs the hands and the feet too. */
   marginShare: number;
   /** Softness of the mask edge, share of the picture. */
   featherShare: number;
-  /** Time the mask takes to open where the athlete is / to close where the athlete is not, seconds. Closing slowly is what stops flicker. */
-  openS: number;
-  closeS: number;
+  /** Time the background takes to fade once an athlete is found / the picture takes to come back when they are lost, seconds. */
+  fadeInS: number;
+  fadeOutS: number;
   /** A gap between two frames longer than this is a cut (a seek): what was learned about the last frames no longer applies, seconds. */
   maxGapS: number;
 }
@@ -124,8 +149,8 @@ export const DEFAULT_MOTION_CONFIG: MotionConfig = {
   cameraWindowS: 1.5,
   cameraSmoothS: 0.5,
   cameraSlack: 0.25,
-  lowAngleShare: 0.2,
-  lowAngleFreeShare: 0.17,
+  lowAngleShare: 0.36,
+  lowAngleFreeShare: 0.3,
   cameraHoldS: 2,
 
   holdS: 2.5,
@@ -143,10 +168,19 @@ export const DEFAULT_MOTION_CONFIG: MotionConfig = {
   stayEvidence: 0.1,
   mergeShare: 0.04,
   minAreaShare: 0.004,
-  marginShare: 0.1,
+  maxAthletes: 1,
+  otherAthleteShare: 0.3,
+  switchRatio: 1.6,
+
+  activeLevel: 5,
+  activeHoldS: 0.15,
+  joinShare: 0.03,
+  minActivePixels: 4,
+  partShare: 0.25,
+  marginShare: 0.05,
   featherShare: 0.04,
-  openS: 0.15,
-  closeS: 0.8,
+  fadeInS: 0.6,
+  fadeOutS: 0.6,
   maxGapS: 0.5,
 };
 

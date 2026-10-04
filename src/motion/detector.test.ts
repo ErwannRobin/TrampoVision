@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TrampolineMotionDetector } from './detector';
 import { DEFAULT_MOTION_CONFIG, type MotionConfig } from './config';
+import { AthleteScout } from './scout';
 import { ONE_ATHLETE, renderScene, type SceneSpec } from './testScenes';
 import type { MotionResult } from './types';
 
@@ -17,6 +18,14 @@ interface Run {
   change: number[];
   /** Pixels that crossed 0.5 since the frame before, per frame. */
   flips: number[];
+  /** Pixels that crossed 0.5 and came back the frame after: a mask that follows an athlete moves its edge by, and never blinks. */
+  blinks: number[];
+  /** Per person who stands (`standers`, in the order of the scene): the share of their body that the mask keeps, per frame. */
+  standerKept: number[][];
+  /** How many athletes the detector reported, per frame. */
+  athletes: number[];
+  /** The middle of the box of the first athlete, per frame; NaN where there is none. */
+  centerX: number[];
   period: (number | null)[];
   /** The kind of shot the detector was working with, per frame. */
   shot: string[];
@@ -41,6 +50,10 @@ function run(name: string, spec: SceneSpec, config?: Partial<MotionConfig>): Run
     farKept: [],
     change: [],
     flips: [],
+    blinks: [],
+    standerKept: (spec.standers ?? []).map(() => []),
+    athletes: [],
+    centerX: [],
     period: [],
     shot: [],
     lastResult: undefined as unknown as MotionResult,
@@ -51,6 +64,7 @@ function run(name: string, spec: SceneSpec, config?: Partial<MotionConfig>): Run
   );
   const farCount = farColumns.filter(Boolean).length * h;
   let before: Float32Array | null = null;
+  let beforeThat: Float32Array | null = null;
   scene.frames.forEach((frame, f) => {
     const result = detector.push(frame, scene.timesMs[f]);
     const truth = scene.jumperPixels[f];
@@ -67,20 +81,43 @@ function run(name: string, spec: SceneSpec, config?: Partial<MotionConfig>): Run
     }
     let change = 0;
     let flips = 0;
+    let blinks = 0;
     if (before) {
       for (let i = 0; i < before.length; i++) {
         change += Math.abs(result.mask[i] - before[i]);
         if (result.mask[i] >= 0.5 !== before[i] >= 0.5) flips++;
+        if (beforeThat && before[i] >= 0.5 !== beforeThat[i] >= 0.5 && result.mask[i] >= 0.5 === beforeThat[i] >= 0.5)
+          blinks++;
       }
     }
+    (spec.standers ?? []).forEach((s, n) => {
+      // The body of a person who stands: a box a fifth of their height each side of them, from the feet up.
+      const x0 = Math.max(0, Math.round(s.x - 0.2 * s.size));
+      const x1 = Math.min(w - 1, Math.round(s.x + 0.2 * s.size));
+      const y0 = Math.max(0, Math.round(s.y - s.size));
+      const y1 = Math.min(h - 1, Math.round(s.y));
+      let visible = 0;
+      let all = 0;
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          all++;
+          if (result.mask[y * w + x] >= 0.5) visible++;
+        }
+      }
+      out.standerKept[n].push(all ? visible / all : NaN);
+    });
     out.found.push(result.found);
     out.coverage.push(result.coverage);
     out.athleteKept.push(athlete ? kept / athlete : NaN);
     out.farKept.push(farCount ? farKept / farCount : NaN);
     out.change.push(before ? change / before.length : 0);
     out.flips.push(flips);
+    out.blinks.push(blinks);
+    out.athletes.push(result.athletes.length);
+    out.centerX.push(result.athletes.length ? (result.athletes[0].x0 + result.athletes[0].x1) / 2 : NaN);
     out.period.push(result.periodS);
     out.shot.push(result.camera.type);
+    beforeThat = before;
     before = Float32Array.from(result.mask);
     out.lastResult = result;
   });
@@ -127,10 +164,22 @@ describe('finding one athlete on a trampoline', () => {
     expect(mean(periods)).toBeLessThan(1.2);
   });
 
-  it('does not flicker once it has settled', () => {
-    expect(mean(between(r, r.change, 8))).toBeLessThan(0.0002);
-    expect(Math.max(...between(r, r.flips, 8))).toBeLessThan(25);
-    expect(mean(between(r, r.flips, 8))).toBeLessThan(2);
+  it('follows the athlete without flicker: its edge moves, and no pixel blinks', () => {
+    // The mask is the box of what moves, so its edge goes with the athlete and pixels cross it; a pixel that crosses and comes back is flicker.
+    // (A few pixels do, in the frame where the athlete turns round at the top or the bottom of a jump.)
+    const blinks = between(r, r.blinks, 8).sort((a, b) => a - b);
+    expect(mean(blinks)).toBeLessThan(4);
+    expect(blinks[Math.floor(blinks.length * 0.95)]).toBeLessThan(20);
+  });
+
+  it('reports one athlete, as a box that has the athlete in it', () => {
+    expect(new Set(between(r, r.athletes, 8))).toEqual(new Set([1]));
+    const [box] = r.lastResult.athletes;
+    // The athlete is at x = 64 of 128, and their feet are on the bed at y = 60.
+    expect(box.x0).toBeLessThan(64);
+    expect(box.x1).toBeGreaterThan(64);
+    expect(box.y1).toBeGreaterThanOrEqual(40);
+    expect(box.x1 - box.x0).toBeLessThan(40);
   });
 
   it('gives masks and maps in range', () => {
@@ -181,18 +230,174 @@ describe('an athlete among other people', () => {
     expect(mean(between(r, r.farKept, 8))).toBeLessThan(0.02);
   });
 
-  it('keeps both athletes on two trampolines', () => {
-    const two = run(
-      'two',
+  const twoTrampolines = clip({
+    jumpers: [
+      { x: 40, bedY: 60, size: 22, periodS: 1.1, apex: 24, startS: 1 },
+      { x: 90, bedY: 60, size: 22, periodS: 1.1, apex: 22, startS: 1.4 },
+    ],
+  });
+
+  it('keeps both athletes on two trampolines when it is told there are two (synchro)', () => {
+    const two = run('two', twoTrampolines, { maxAthletes: 2 });
+    expect(new Set(between(two, two.athletes, 8))).toEqual(new Set([2]));
+    expect(mean(between(two, two.athleteKept, 8))).toBeGreaterThan(0.99);
+    expect(mean(between(two, two.farKept, 8))).toBeLessThan(0.02);
+  });
+
+  it('keeps one person only by default, the one who jumps the most, and hides the other jumper', () => {
+    const one = run('two-default', twoTrampolines);
+    expect(new Set(between(one, one.athletes, 8))).toEqual(new Set([1]));
+    // Half of the pixels of the two jumpers are the one that is kept.
+    const kept = mean(between(one, one.athleteKept, 8));
+    expect(kept).toBeGreaterThan(0.45);
+    expect(kept).toBeLessThan(0.55);
+    // And it is the same person all the way: the box does not go from one trampoline to the other.
+    const [box] = one.lastResult.athletes;
+    expect(box.x1 < 65 || box.x0 > 65).toBe(true);
+  });
+});
+
+describe('the one person who jumps', () => {
+  // The athlete is 22 pixels tall and 8 wide, at x = 64. People who stand are 22 pixels tall too.
+  it('hides a person who stands still next to the athlete, a body height away or more', () => {
+    const r = run(
+      'still-next',
       clip({
-        jumpers: [
-          { x: 40, bedY: 60, size: 22, periodS: 1.1, apex: 24, startS: 1 },
-          { x: 90, bedY: 60, size: 22, periodS: 1.1, apex: 22, startS: 1.4 },
+        noise: 0.008,
+        standers: [
+          { x: 64 + 26, y: 64, size: 22 },
+          { x: 64 - 30, y: 64, size: 22 },
         ],
       }),
     );
-    expect(mean(between(two, two.athleteKept, 8))).toBeGreaterThan(0.99);
-    expect(mean(between(two, two.farKept, 8))).toBeLessThan(0.02);
+    expect(mean(between(r, r.athleteKept, 8))).toBeGreaterThan(0.99);
+    for (const kept of r.standerKept) expect(mean(between(r, kept, 8))).toBeLessThan(0.05);
+  });
+
+  it('shows less of a person who stands closer, and none of the athlete is lost for it', () => {
+    const r = run('still-close', clip({ standers: [{ x: 64 + 15, y: 64, size: 22 }] }));
+    expect(mean(between(r, r.athleteKept, 8))).toBeGreaterThan(0.99);
+    // Their body starts 11 pixels from the athlete's centre, and the box of what moves reaches about 10 of them: a part of the edge shows.
+    expect(mean(between(r, r.standerKept[0], 8))).toBeLessThan(0.5);
+  });
+
+  it('hides a person who only bounces a little while the athlete jumps high', () => {
+    const r = run(
+      'light-bouncer',
+      clip({
+        jumpers: [
+          { x: 64, bedY: 60, size: 22, periodS: 1.1, apex: 24, startS: 1 },
+          { x: 104, bedY: 60, size: 20, periodS: 0.9, apex: 5, startS: 1.2 },
+        ],
+      }),
+    );
+    // The truth of the scene counts both as jumpers: the athlete, who is kept, and the second one, whose pixels are not.
+    expect(new Set(between(r, r.athletes, 8))).toEqual(new Set([1]));
+    const [box] = r.lastResult.athletes;
+    expect(box.x1).toBeLessThan(90);
+  });
+
+  it('keeps the same person when two jump about as much, instead of going from one to the other', () => {
+    const r = run(
+      'rivals',
+      clip({
+        seconds: 16,
+        jumpers: [
+          { x: 36, bedY: 60, size: 22, periodS: 1.1, apex: 24, startS: 1 },
+          { x: 92, bedY: 60, size: 22, periodS: 1.15, apex: 23, startS: 1.3 },
+        ],
+      }),
+    );
+    expect(new Set(between(r, r.athletes, 6))).toEqual(new Set([1]));
+    // Once one is chosen the box stays on that side of the picture in every frame.
+    const sides = new Set(between(r, r.centerX, 6).map((x) => (x < 64 ? 'left' : 'right')));
+    expect(sides.size).toBe(1);
+  });
+
+  it('hides the background gradually: the picture does not jump when the athlete is found', () => {
+    const r = run('one', { ...ONE_ATHLETE, seconds: 12 });
+    let steepest = 0;
+    for (let f = 1; f < r.coverage.length; f++) steepest = Math.max(steepest, r.coverage[f - 1] - r.coverage[f]);
+    expect(steepest).toBeLessThan(0.06);
+  });
+});
+
+describe('a look ahead at the start of the clip', () => {
+  // The athlete is found a few seconds in; run once over the clip, the detector says where they jump, and a second run is told before it starts.
+  const spec = clip({ noise: 0.008, standers: [{ x: 64 + 28, y: 64, size: 22 }] });
+  const scene = renderScene(spec);
+  const first = new TrampolineMotionDetector();
+  const scout = new AthleteScout();
+  for (let f = 0; f < scene.frames.length; f++) {
+    if (scout.push(first.push(scene.frames[f], scene.timesMs[f]), scene.timesMs[f] / 1000)) break;
+  }
+  const place = scout.box();
+
+  it('finds the place the athlete jumps in', () => {
+    expect(place).not.toBeNull();
+    expect(place!.x0).toBeLessThan(64);
+    expect(place!.x1).toBeGreaterThan(64);
+    expect(place!.y1).toBeGreaterThan(50);
+  });
+
+  it('hides the people around the bed from the very first frame, without losing the athlete', () => {
+    const detector = new TrampolineMotionDetector();
+    detector.hint(place);
+    const kept: number[] = [];
+    const still: number[] = [];
+    const coverage: number[] = [];
+    const frames = Math.round(2.5 * spec.fps);
+    for (let f = 0; f < frames; f++) {
+      const result = detector.push(scene.frames[f], scene.timesMs[f]);
+      expect(result.found).toBe(false);
+      let a = 0;
+      let k = 0;
+      for (let i = 0; i < scene.jumperPixels[f].length; i++) {
+        if (!scene.jumperPixels[f][i]) continue;
+        a++;
+        if (result.mask[i] >= 0.5) k++;
+      }
+      kept.push(a ? k / a : NaN);
+      let seen = 0;
+      let all = 0;
+      for (let y = 42; y <= 64; y++) {
+        for (let x = 85; x <= 99; x++) {
+          all++;
+          if (result.mask[y * spec.width + x] >= 0.5) seen++;
+        }
+      }
+      still.push(seen / all);
+      coverage.push(result.coverage);
+    }
+    // Before the first jump the athlete stands, and from 1 s they bounce, a little at first.
+    expect(Math.min(...kept.filter((v) => !Number.isNaN(v)))).toBeGreaterThan(0.95);
+    expect(Math.max(...still)).toBeLessThan(0.05);
+    expect(Math.max(...coverage)).toBeLessThan(0.3);
+    expect(coverage[0]).toBeLessThan(0.3);
+  });
+
+  it('lets the detector take over when it finds the athlete, and shows the picture as it was with no hint', () => {
+    const hinted = new TrampolineMotionDetector();
+    hinted.hint(place);
+    let last = hinted.push(scene.frames[0], scene.timesMs[0]);
+    for (let f = 1; f < scene.frames.length; f++) last = hinted.push(scene.frames[f], scene.timesMs[f]);
+    expect(last.found).toBe(true);
+    expect(last.athletes.length).toBe(1);
+    // The same box as without the hint: it is the detector's own now.
+    const plain = new TrampolineMotionDetector();
+    let same = plain.push(scene.frames[0], scene.timesMs[0]);
+    for (let f = 1; f < scene.frames.length; f++) same = plain.push(scene.frames[f], scene.timesMs[f]);
+    expect(last.athletes[0]).toEqual(same.athletes[0]);
+    // And nothing was hidden without it, in the first frames.
+    const early = new TrampolineMotionDetector();
+    expect(early.push(scene.frames[0], scene.timesMs[0]).coverage).toBeGreaterThan(0.999);
+  });
+
+  it('forgets the hint after a cut in the video', () => {
+    const detector = new TrampolineMotionDetector();
+    detector.hint(place);
+    detector.push(scene.frames[0], scene.timesMs[0]);
+    expect(detector.push(scene.frames[1], scene.timesMs[1] + 5000).coverage).toBeGreaterThan(0.999);
   });
 });
 
@@ -317,6 +522,25 @@ describe('the kinds of shot', () => {
     const r = run('one', { ...ONE_ATHLETE, seconds: 12 });
     expect(new Set(r.shot).size).toBe(1);
     expect(r.shot[0]).toBe('fixed');
+  });
+
+  it('reads the same athlete as the same shot in a video held upright and in one held sideways', () => {
+    // An athlete a third of the picture's shorter side tall, then more than half of it, in a landscape picture and in a portrait one.
+    const landscape = (size: number) =>
+      run(`land-${size}`, clip({ jumpers: [{ x: 64, bedY: 68, size, periodS: 1.1, apex: 28 - size / 2, startS: 1 }] }));
+    const portrait = (size: number) =>
+      run(
+        `port-${size}`,
+        clip({
+          width: 72,
+          height: 128,
+          jumpers: [{ x: 36, bedY: 118, size, periodS: 1.1, apex: 50 - size / 2, startS: 1 }],
+        }),
+      );
+    expect(landscape(22).shot.at(-1)).toBe('fixed');
+    expect(portrait(22).shot.at(-1)).toBe('fixed');
+    expect(landscape(50).shot.at(-1)).toBe('lowAngle');
+    expect(portrait(50).shot.at(-1)).toBe('lowAngle');
   });
 
   it('reads a still camera with an athlete who is most of the picture as low-angle, and keeps them', () => {

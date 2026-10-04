@@ -5,12 +5,14 @@ import '../../styles/base.css';
 import '../../styles/kit.css';
 import './debug.css';
 import { analysisStride } from '../../analysis/stride';
+import { AthleteView, type Prepared } from '../athleteView';
 import { createMediaPipeEstimator } from '../../pose/MediaPipePoseEstimator';
 import { LM } from '../../pose/landmarks';
 import type { PoseDetection, PoseEstimator } from '../../pose/types';
 import { disposeVideo, estimateFps, frameSeekTime, loadVideo, seekTo } from '../../video/frames';
 import { loadSample, loadSamples, type Sample } from '../../video/sample';
 import { DEFAULT_MOTION_CONFIG, type CameraSetting, type CameraType, type MotionConfig } from '../config';
+import { focusOnAthletes } from '../focus';
 import { APP_WITH_RESULT, putHandoff } from '../handoff';
 import { CanvasMaskLayer } from '../layer';
 import { hidesSomething } from '../maskedEstimator';
@@ -36,6 +38,8 @@ const restartButton = $<HTMLButtonElement>('restart');
 const poseBox = $<HTMLInputElement>('pose');
 const gpuBox = $<HTMLInputElement>('gpu');
 const hideBox = $<HTMLInputElement>('hide');
+const zoomBox = $<HTMLInputElement>('zoom');
+const turnBox = $<HTMLInputElement>('turn');
 const seek = $<HTMLInputElement>('seek');
 const clock = $<HTMLOutputElement>('clock');
 const status = $('status');
@@ -50,9 +54,16 @@ const panels = new Panels({
   motion: $<HTMLCanvasElement>('c-motion'),
   mask: $<HTMLCanvasElement>('c-mask'),
   masked: $<HTMLCanvasElement>('c-masked'),
+  given: $<HTMLCanvasElement>('c-given'),
   skeleton: $<HTMLCanvasElement>('c-skeleton'),
 });
 const layer = new CanvasMaskLayer();
+/** What is done to the picture before the pose model, once the athlete is found; null when neither box is ticked. Made again when a box changes. */
+let viewer: AthleteView | null = null;
+function updateViewer(): void {
+  viewer =
+    zoomBox.checked || turnBox.checked ? new AthleteView({ zoom: zoomBox.checked, rotate: turnBox.checked }) : null;
+}
 
 interface Session {
   url: string;
@@ -101,9 +112,11 @@ const STAT_LABELS = [
   ['fit', 'Rhythm fit'],
   ['kept', 'Picture kept'],
   ['shot', 'Kind of shot'],
+  ['readings', 'What the shot is read from'],
   ['camera', 'Camera move'],
   ['shake', 'Camera shake'],
   ['noise', 'Noise level'],
+  ['view', 'Given to the pose model'],
   ['people', 'People found'],
   ['detector', 'Detector'],
   ['pose', 'Pose model'],
@@ -135,22 +148,58 @@ function cameraMove(result: MotionResult): string {
   return camera.known ? `${camera.dx.toFixed(1)}, ${camera.dy.toFixed(1)} px` : 'Not known';
 }
 
+/** The two readings the kind of shot is made from, against the level at which each one counts: how fast the camera goes, and how big the athlete is. */
+function shotReadings(result: MotionResult): string {
+  const { speed, athleteShare } = result.camera;
+  const D = DEFAULT_MOTION_CONFIG;
+  const fast = `camera ${(speed * 100).toFixed(1)} % of the picture a second (a move from ${(D.cameraMovingSpeed * 100).toFixed(1)} %)`;
+  const big =
+    athleteShare > 0
+      ? `athlete ${Math.round(athleteShare * 100)} % wide (low-angle from ${Math.round(D.lowAngleShare * 100)} %)`
+      : 'no athlete yet';
+  return `${fast}; ${big}`;
+}
+
+/** What was done to the picture before the pose model: how it was cut and turned, or that nothing was. */
+function viewText(prepared: Prepared | null, frame: { width: number; height: number }): string {
+  if (!viewer) return 'The frame as it is';
+  if (!prepared?.view) return 'The frame as it is (no athlete yet, or nothing to do)';
+  const { view } = prepared;
+  // The square of the frame that was cut, against the frame's shorter side: 2 is a square half as high as the frame.
+  const side = view.width / view.scale;
+  const zoom = view.scale !== 1 ? `zoomed ×${(Math.min(frame.width, frame.height) / side).toFixed(1)}` : 'whole frame';
+  const turn =
+    view.angle !== 0 ? `, turned ${Math.round(-view.angle)}° (the athlete leans ${Math.round(view.angle)}°)` : '';
+  return `${zoom}${turn}`;
+}
+
 function showStats(
   s: Session,
   result: MotionResult | null,
   people: PoseDetection[] | null,
+  athlete: PoseDetection[] | null,
+  prepared: Prepared | null,
   timing: [number, number],
 ): void {
   stat('frame', `${s.index + 1} of ${s.total}`);
-  stat('athlete', result ? (result.found ? 'Found' : 'Not yet') : '–');
+  stat('athlete', result ? (result.found ? `Found (${result.athletes.length})` : 'Not yet') : '–');
   stat('period', result?.periodS ? `${result.periodS.toFixed(2)} s` : '–');
   stat('fit', result?.rhythmFit ? `${Math.round(result.rhythmFit * 100)} %` : '–');
   stat('kept', result ? `${Math.round(result.coverage * 100)} %` : '–');
   stat('shot', result ? SHOT_NAMES[result.camera.type] : '–');
+  stat('readings', result ? shotReadings(result) : '–');
   stat('camera', result ? cameraMove(result) : '–');
   stat('shake', result ? `${result.shift.toFixed(2)} px` : '–');
   stat('noise', result ? `${(result.noise * 100).toFixed(2)} %` : '–');
-  stat('people', people ? String(people.length) : '–');
+  stat('view', viewText(prepared, { width: s.video.videoWidth, height: s.video.videoHeight }));
+  stat(
+    'people',
+    people
+      ? athlete && athlete.length < people.length
+        ? `${people.length} (${athlete.length} jumps)`
+        : String(people.length)
+      : '–',
+  );
   stat('detector', ms(timing[0]));
   stat('pose', people ? ms(timing[1]) : '–');
 }
@@ -197,12 +246,16 @@ bindSlider(
 );
 bindSlider(
   'close',
-  D.closeS,
+  D.fadeInS,
   (v) => `${v.toFixed(1)} s`,
-  (v) => ({ closeS: v }),
+  (v) => ({ fadeInS: v }),
 );
 $<HTMLSelectElement>('camera').addEventListener('change', (event) => {
   layer.detector.configure({ cameraType: (event.target as HTMLSelectElement).value as CameraSetting });
+  if (session && !playing) void run('show');
+});
+$<HTMLSelectElement>('athletes').addEventListener('change', (event) => {
+  layer.detector.configure({ maxAthletes: Number((event.target as HTMLSelectElement).value) });
   if (session && !playing) void run('show');
 });
 $<HTMLSelectElement>('fill').addEventListener('change', (event) => {
@@ -357,12 +410,27 @@ async function processFrame(s: Session): Promise<void> {
   const t1 = performance.now();
   // What the pose model is given: the frame with the background painted over (once the detector hides something), or the video.
   const given = hideBox.checked && hidesSomething(result) ? masked : s.video;
-  const people = await detectPose(s, given);
+  // Once the athlete is found the picture can be cut around them and turned upright (the boxes under the video), and what the pose model finds is put back in the frame.
+  const size = { width: s.video.videoWidth, height: s.video.videoHeight };
+  const prepared = viewer && result ? viewer.prepare(given, size, result.athletes[0] ?? null, result) : null;
+  const found = await detectPose(s, prepared?.source ?? given);
   if (s.closed) return;
   const t2 = performance.now();
+  const people =
+    found && viewer && prepared && result ? viewer.finish(found, prepared, size, result.athletes, result) : found;
+  // Of the people the pose model found, the one who jumps: the others are people who stand near the bed.
+  const athlete = people && result ? focusOnAthletes(people, result.athletes, result) : people;
 
-  panels.draw({ video: s.video, result, masked, given, people });
-  showStats(s, result, people, [t1 - t0, t2 - t1]);
+  panels.draw({
+    video: s.video,
+    result,
+    masked,
+    given,
+    people,
+    athlete,
+    view: prepared?.view ? prepared.source : null,
+  });
+  showStats(s, result, people, athlete, prepared, [t1 - t0, t2 - t1]);
   announce(s, result, people);
   seek.value = String(s.index);
   clock.textContent = `${(frame / s.fps).toFixed(2)} s`;
@@ -446,6 +514,7 @@ function restart(): void {
   if (!session) return;
   session.index = 0;
   layer.detector.reset();
+  viewer?.reset();
   updateControls();
 }
 
@@ -459,8 +528,16 @@ seek.addEventListener('input', () => {
   if (!session) return;
   session.index = Number(seek.value);
   layer.detector.reset();
+  viewer?.reset();
   void run('show');
 });
+
+for (const box of [zoomBox, turnBox]) {
+  box.addEventListener('change', () => {
+    updateViewer();
+    if (session && !playing) void run('show');
+  });
+}
 
 // The pose model is made again, with the other delegate, at the next frame.
 gpuBox.addEventListener('change', () => {
@@ -493,6 +570,12 @@ async function loadInApp(): Promise<void> {
       config: { ...layer.detector.config },
       fill: layer.fill,
       signal: control.signal,
+      onScout: (done, total) => {
+        const percent = Math.floor((100 * done) / total);
+        if (percent === shown) return;
+        shown = percent;
+        setLoadStatus(`Looking at the start of the clip to find where the athlete jumps: ${percent} %.`);
+      },
       onProgress: (done, total, hidden) => {
         loadProgress.value = done / total;
         // The text is a live region: it says something new when the percent moves, not at every frame.

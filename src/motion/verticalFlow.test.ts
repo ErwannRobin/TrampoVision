@@ -126,6 +126,26 @@ describe('vertical motion between two pictures', () => {
     expect(active(twoFrames(picture(still), brighter).motion)).toBeLessThan(0.005);
   });
 
+  it('says how much every pixel changed, in noise levels: a lot where the box moved, nothing elsewhere', () => {
+    const { flow } = twoFrames(picture(still, 0), picture(moved(0, 2), 0));
+    // The rows at the box's top and bottom edges changed; the wall far from it did not.
+    const at = (x: number, y: number) => flow.energy[y * W + x];
+    expect(Math.max(at(31, 13), at(31, 14), at(31, 30), at(31, 31))).toBeGreaterThan(10);
+    expect(Math.max(at(5, 5), at(58, 40), at(10, 44))).toBeLessThan(2);
+  });
+
+  it('says nothing changed for the first picture, and after a reset', () => {
+    const flow = new VerticalFlow(W, H, { ...DEFAULT_MOTION_CONFIG });
+    const motion = new Float32Array(W * H);
+    flow.step(picture(still), motion);
+    expect(Math.max(...flow.energy)).toBe(0);
+    flow.step(picture(moved(0, 2)), motion);
+    expect(Math.max(...flow.energy)).toBeGreaterThan(10);
+    flow.reset();
+    flow.step(picture(moved(0, 3)), motion);
+    expect(Math.max(...flow.energy)).toBe(0);
+  });
+
   it('starts again after a reset: the next picture has nothing to be compared with', () => {
     const flow = new VerticalFlow(W, H, { ...DEFAULT_MOTION_CONFIG });
     const motion = new Float32Array(W * H);

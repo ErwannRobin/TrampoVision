@@ -4,10 +4,15 @@ import type { CameraType, MotionConfig } from './config';
 export interface CameraSample {
   /** Seconds since the last frame. */
   dt: number;
-  /** How the picture moved since the last frame, picture pixels (0 when the camera estimate was not sure). */
+  /** How the picture moved since the last frame, picture pixels. */
   dx: number;
   dy: number;
-  /** The width of the athlete's region, as a share of the picture's width; null while no athlete is found. */
+  /**
+   * False when the camera estimate was not sure: the frame then says nothing about the camera, and is not counted as a camera that stood still
+   * (a picture that cannot be followed is not one that does not move). Default true.
+   */
+  known?: boolean;
+  /** The width of the athlete's box, as a share of the picture's shorter side; null while no athlete is found. */
   athleteWidthShare: number | null;
 }
 
@@ -37,9 +42,13 @@ const WIDTH_FORGET_S = 4;
  * - `tracking`: the camera moves, a close-up that follows the athlete, or a pan. Seen as its speed: the moves of the picture, smoothed over
  *   `cameraSmoothS`, and their root mean square over `cameraWindowS`. A speed and not a position, because the error of every frame adds up
  *   in a position (a camera that stands still seems to wander) and does not in a speed; and smoothed, because the shake of a hand is a
- *   position that jumps back and forth, which makes a speed that averages out.
+ *   position that jumps back and forth, which makes a speed that averages out. (A camera that goes up and down with the jumps shows in its
+ *   speed too: what is left of a swing once it is smoothed is its size over the time constant, whatever its pace.) A frame whose move could not
+ *   be told (`known` false) is left out: a picture that cannot be followed is not a camera that stands still.
  * - `lowAngle`: the camera stands still, close to the bed and looking up, so the athlete is big in the picture: wider than
- *   `lowAngleShare` of it. It is told from the width, not the height: the region an athlete jumps through is tall in every shot.
+ *   `lowAngleShare` of its shorter side. It is told from the width, not the height: the place an athlete jumps through is tall in every shot.
+ *   And against the shorter side, not the width: against the width a video held upright would read every athlete as a big one, and one held
+ *   sideways none.
  * - `fixed`: the camera stands still and the athlete is small in a wide picture.
  *
  * Every change has a high and a low threshold, and the shot stays what it is for `cameraHoldS` seconds before it can change, so it does not
@@ -56,6 +65,10 @@ export class CameraTypeEstimator {
   private kind: CameraType = 'fixed';
   /** How fast the camera moves, shorter sides of the picture a second (smoothed). */
   speed = 0;
+  /** The width of the athlete as a share of the picture's, smoothed; 0 while no athlete is found. */
+  get athleteShare(): number {
+    return this.width;
+  }
 
   constructor(private readonly cfg: MotionConfig) {}
 
@@ -75,12 +88,14 @@ export class CameraTypeEstimator {
   push(sample: CameraSample, short: number): CameraType {
     const { cfg } = this;
     const { dt } = sample;
-    const smooth = 1 - Math.exp(-dt / Math.max(1e-3, cfg.cameraSmoothS));
-    this.smoothX += (sample.dx / dt - this.smoothX) * smooth;
-    this.smoothY += (sample.dy / dt - this.smoothY) * smooth;
-    const window = 1 - Math.exp(-dt / Math.max(1e-3, cfg.cameraWindowS));
-    this.power += (this.smoothX ** 2 + this.smoothY ** 2 - this.power) * window;
-    this.speed = Math.sqrt(this.power) / Math.max(1, short);
+    if (sample.known !== false) {
+      const smooth = 1 - Math.exp(-dt / Math.max(1e-3, cfg.cameraSmoothS));
+      this.smoothX += (sample.dx / dt - this.smoothX) * smooth;
+      this.smoothY += (sample.dy / dt - this.smoothY) * smooth;
+      const window = 1 - Math.exp(-dt / Math.max(1e-3, cfg.cameraWindowS));
+      this.power += (this.smoothX ** 2 + this.smoothY ** 2 - this.power) * window;
+      this.speed = Math.sqrt(this.power) / Math.max(1, short);
+    }
 
     if (sample.athleteWidthShare !== null) {
       const follow = this.width > 0 ? 1 - Math.exp(-dt / WIDTH_SMOOTH_S) : 1;

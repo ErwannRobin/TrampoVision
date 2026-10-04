@@ -23,16 +23,20 @@ function feed(
   position: (t: number) => { x: number; y: number },
   athleteWidth: (t: number) => number | null = () => null,
   estimator = new CameraTypeEstimator(mergeMotionConfig()),
+  /** Frames (by number) where the camera estimate was not sure: the move is then given as nothing, like the detector does. */
+  unsure: (frame: number) => boolean = () => false,
 ) {
   const kinds: string[] = [];
   let before = position(0);
   for (let f = 1; f <= Math.round(seconds * FPS); f++) {
     const t = f / FPS;
     const now = position(t);
+    const doubt = unsure(f);
     const sample: CameraSample = {
       dt: 1 / FPS,
-      dx: now.x - before.x,
-      dy: now.y - before.y,
+      dx: doubt ? 0 : now.x - before.x,
+      dy: doubt ? 0 : now.y - before.y,
+      known: !doubt,
       athleteWidthShare: athleteWidth(t),
     };
     // The picture moves the other way from the camera; the sign does not matter to the speed.
@@ -61,6 +65,47 @@ describe('the kind of shot', () => {
     expect(follow.kinds.indexOf('tracking') / FPS).toBeLessThan(3);
   });
 
+  it('does not count a frame whose move could not be told as a camera that stood still', () => {
+    const pan = (t: number) => ({ x: 12 * t, y: 0 });
+    // Every other frame cannot be told, and the camera is still read as moving.
+    expect(
+      feed(
+        8,
+        pan,
+        () => null,
+        new CameraTypeEstimator(mergeMotionConfig()),
+        (f) => f % 2 === 0,
+      ).last,
+    ).toBe('tracking');
+    // A stretch of frames that cannot be told does not make it a still camera, and does not make a still camera a moving one.
+    const stretch = feed(
+      12,
+      (t) => ({ x: 12 * Math.min(t, 5), y: 0 }),
+      () => null,
+      new CameraTypeEstimator(mergeMotionConfig()),
+      (f) => f > 6 * FPS && f < 11 * FPS,
+    );
+    expect(stretch.kinds[Math.round(10 * FPS)]).toBe('tracking');
+    const still = feed(
+      10,
+      () => ({ x: 0, y: 0 }),
+      () => null,
+      new CameraTypeEstimator(mergeMotionConfig()),
+      (f) => f > 3 * FPS,
+    );
+    expect(still.kinds.every((k) => k === 'fixed')).toBe(true);
+  });
+
+  it('says what it measured: how fast the camera goes and how wide the athlete is', () => {
+    const run = feed(
+      10,
+      (t) => ({ x: 10 * t, y: 0 }),
+      () => 0.12,
+    );
+    expect(run.estimator.speed).toBeGreaterThan(0.1);
+    expect(run.estimator.athleteShare).toBeCloseTo(0.12, 1);
+  });
+
   it('reads a pan as tracking', () => {
     expect(feed(8, (t) => ({ x: 10 * t, y: 0 })).last).toBe('tracking');
     expect(feed(8, (t) => ({ x: 20 * Math.sin(t), y: 0 })).last).toBe('tracking');
@@ -75,17 +120,17 @@ describe('the kind of shot', () => {
 
   it('reads a still camera with a big athlete as low-angle, and a small one as a wide shot', () => {
     const still = () => ({ x: 0, y: 0 });
-    expect(feed(10, still, () => 0.38).last).toBe('lowAngle');
-    expect(feed(10, still, () => 0.12).last).toBe('fixed');
+    expect(feed(10, still, () => 0.45).last).toBe('lowAngle');
+    expect(feed(10, still, () => 0.2).last).toBe('fixed');
   });
 
   it('does not flicker between kinds for a width that hovers between the two thresholds', () => {
     const wobble = noise(9);
-    // Mean 0.185: between the low (0.17) and high (0.2) edge. It starts below, so it stays a wide shot.
+    // Mean 0.33: between the low (0.30) and high (0.36) edge. It starts below, so it stays a wide shot.
     const run = feed(
       30,
       () => ({ x: 0, y: 0 }),
-      () => 0.185 + 0.008 * wobble(),
+      () => 0.33 + 0.008 * wobble(),
     );
     expect(new Set(run.kinds).size).toBe(1);
   });

@@ -36,6 +36,10 @@
         <label class="md-check"
           ><input id="hide" type="checkbox" checked /> Hide the background before the pose model</label
         >
+        <label class="md-check"
+          ><input id="zoom" type="checkbox" /> Zoom on the athlete (a crop around them, made big)</label
+        >
+        <label class="md-check"><input id="turn" type="checkbox" /> Turn the athlete upright (a somersault)</label>
       </section>
 
       <div class="md-seek">
@@ -55,13 +59,14 @@
           <canvas id="c-motion" role="img" aria-label="The motion map"></canvas>
           <figcaption>
             <strong>Motion map</strong> Blue moves up, orange moves down. The gold strip shows how well each column
-            repeats like a jump.
+            repeats like a jump, and the gold box is the athlete.
           </figcaption>
         </figure>
         <figure class="md-panel">
           <canvas id="c-mask" role="img" aria-label="The athlete mask"></canvas>
           <figcaption>
-            <strong>Athlete mask</strong> White stays, black is hidden. It stays open until it is sure.
+            <strong>Athlete mask</strong> White stays, black is hidden. Only the one person who jumps stays, and the
+            picture is left as it is until the detector is sure.
           </figcaption>
         </figure>
         <figure class="md-panel">
@@ -69,9 +74,17 @@
           <figcaption><strong>Masked frame</strong> The frame with the background painted over.</figcaption>
         </figure>
         <figure class="md-panel">
+          <canvas id="c-given" role="img" aria-label="The picture the pose model was given"></canvas>
+          <figcaption>
+            <strong>Given to the pose model</strong> The masked frame, or the athlete zoomed and turned upright when
+            those are on.
+          </figcaption>
+        </figure>
+        <figure class="md-panel">
           <canvas id="c-skeleton" role="img" aria-label="The skeleton found by MediaPipe"></canvas>
           <figcaption>
-            <strong>MediaPipe skeleton</strong> What the pose model finds in the picture it is given.
+            <strong>MediaPipe skeleton</strong> What the pose model finds in the picture it is given. The person who
+            jumps is in colour, anybody else it still finds is faint.
           </figcaption>
         </figure>
       </section>
@@ -97,7 +110,7 @@
             <output id="threshold-out" class="num"></output>
           </label>
           <label>
-            <span>Time to close the mask</span>
+            <span>Time to hide the background</span>
             <input id="close" type="range" min="0.1" max="3" step="0.1" />
             <output id="close-out" class="num"></output>
           </label>
@@ -108,6 +121,13 @@
               <option value="fixed">Fixed wide-angle camera</option>
               <option value="tracking">Close-up that follows the athlete</option>
               <option value="lowAngle">Low-angle camera</option>
+            </select>
+          </label>
+          <label>
+            <span>People kept</span>
+            <select id="athletes">
+              <option value="1">One: the one who jumps the most</option>
+              <option value="2">Two: synchro, two trampolines</option>
             </select>
           </label>
           <label>
