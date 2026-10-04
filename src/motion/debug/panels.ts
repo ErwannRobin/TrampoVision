@@ -54,6 +54,8 @@ export interface PanelCanvases {
   motion: HTMLCanvasElement;
   mask: HTMLCanvasElement;
   masked: HTMLCanvasElement;
+  /** What the pose model was given: the frame, or the view of the athlete when it is zoomed or turned. */
+  given: HTMLCanvasElement;
   skeleton: HTMLCanvasElement;
 }
 
@@ -67,9 +69,13 @@ export interface PanelFrame {
   given: CanvasImageSource;
   /** What the pose model found in that picture; null when it did not run. */
   people: PoseDetection[] | null;
+  /** Of those, the person who jumps (the one in the box of the athlete): drawn in colour, and the others dimmed. Null when the pose model did not run. */
+  athlete: PoseDetection[] | null;
+  /** The view of the athlete the pose model was given (zoomed, turned), or null when it was given the picture `given` as it is. */
+  view: CanvasImageSource | null;
 }
 
-/** Draws the original frame, the motion map, the athlete mask, the masked frame and the skeleton. */
+/** Draws the original frame, the motion map, the athlete mask, the masked frame, what the pose model was given and the skeleton. */
 export class Panels {
   private readonly motionScratch = new Scratch();
   private readonly maskScratch = new Scratch();
@@ -85,8 +91,8 @@ export class Panels {
     }
   }
 
-  draw({ video, result, masked, given, people }: PanelFrame): void {
-    const { original, motion, mask, masked: maskedPanel, skeleton } = this.canvases;
+  draw({ video, result, masked, given, people, athlete, view }: PanelFrame): void {
+    const { original, motion, mask, masked: maskedPanel, given: givenPanel, skeleton } = this.canvases;
     const w = original.width;
     const h = original.height;
 
@@ -95,6 +101,7 @@ export class Panels {
     this.drawMotion(motion, video, result);
     this.drawMask(mask, result);
     maskedPanel.getContext('2d')!.drawImage(masked, 0, 0, w, h);
+    this.drawGiven(givenPanel, view ?? given);
 
     const ctx = skeleton.getContext('2d')!;
     ctx.drawImage(given, 0, 0, w, h);
@@ -102,7 +109,7 @@ export class Panels {
     ctx.fillRect(0, 0, w, h);
     if (people === null) note(ctx, 'The pose model is off', w, h);
     else if (people.length === 0) note(ctx, 'No person found', w, h);
-    else for (const person of people) drawPerson(ctx, person, w, h);
+    else for (const person of people) drawPerson(ctx, person, w, h, athlete === null || athlete.includes(person));
   }
 
   /** The video, dimmed; on it what moves up (blue) and down (orange), and along the bottom how well each column repeats (gold). */
@@ -118,12 +125,33 @@ export class Panels {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(small, 0, 0, w, h);
     ctx.imageSmoothingEnabled = true;
+    // The box of the athlete: what the mask keeps, before its margin.
+    ctx.strokeStyle = `rgb(${GOLD})`;
+    ctx.lineWidth = Math.max(1.5, w / 320);
+    for (const box of result.athletes) {
+      const sx = w / result.width;
+      const sy = h / result.height;
+      ctx.strokeRect(box.x0 * sx, box.y0 * sy, (box.x1 - box.x0 + 1) * sx, (box.y1 - box.y0 + 1) * sy);
+    }
     const column = w / result.width;
     const strip = Math.max(6, h * 0.025);
     for (let x = 0; x < result.width; x++) {
       ctx.fillStyle = `rgba(${GOLD}, ${Math.min(1, result.rhythm[x])})`;
       ctx.fillRect(x * column, h - strip, column + 0.5, strip);
     }
+  }
+
+  /** What the pose model was given, in the frame of the panel: a view that is not the shape of the frame (a square) is fitted inside it on black. */
+  private drawGiven(canvas: HTMLCanvasElement, source: CanvasImageSource): void {
+    const ctx = canvas.getContext('2d')!;
+    const { width: w, height: h } = canvas;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    const size = source as { width?: number; height?: number; videoWidth?: number; videoHeight?: number };
+    const sw = size.videoWidth ?? size.width ?? w;
+    const sh = size.videoHeight ?? size.height ?? h;
+    const fit = Math.min(w / sw, h / sh);
+    ctx.drawImage(source, (w - sw * fit) / 2, (h - sh * fit) / 2, sw * fit, sh * fit);
   }
 
   /** The mask as it is applied: white where the picture stays, black where it is hidden. */
@@ -145,10 +173,17 @@ function note(ctx: CanvasRenderingContext2D, text: string, w: number, h: number)
   ctx.fillText(text, w / 2, h / 2);
 }
 
-/** One skeleton: the stick figure of the app (left blue, right orange), on the picture of the panel. */
-function drawPerson(ctx: CanvasRenderingContext2D, person: PoseDetection, w: number, h: number): void {
+/** One skeleton: the stick figure of the app (left blue, right orange), on the picture of the panel; faint when it is not the person who jumps. */
+function drawPerson(
+  ctx: CanvasRenderingContext2D,
+  person: PoseDetection,
+  w: number,
+  h: number,
+  athlete: boolean,
+): void {
   const wire = buildWireframe(person.landmarks.map((p) => ({ x: p.x * w, y: p.y * h, visibility: p.visibility })));
   ctx.save();
+  if (!athlete) ctx.globalAlpha = 0.3;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(2, w / 190);

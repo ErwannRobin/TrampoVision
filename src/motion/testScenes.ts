@@ -83,6 +83,8 @@ export interface SceneSpec {
   camera?: CameraSpec;
   /** How much texture the wall has, 0 (a plain wall) to 1 (the default). */
   texture?: number;
+  /** A picture to use as the wall in place of the made-up one, for the texture of a real scene: it is stretched to cover the whole scene. */
+  backdropImage?: GrayFrame;
   seed?: number;
 }
 
@@ -209,11 +211,8 @@ function flightAt(j: JumperSpec, t: number): { lift: number; jump: number; share
   return { lift: 4 * j.apex * ramp * share * (1 - share), jump, share };
 }
 
-/**
- * The wall, the bed and the things around it that never move, `pad` pixels bigger than the picture on every side (for a camera that
- * moves). Rows are indexed by y + pad, columns by x + pad; the scene is sampled between rows and columns.
- */
-function backdrop(spec: SceneSpec, rand: () => number, pad: number): Float32Array {
+/** The wall, the bed and a few lines that are made up, `pad` pixels bigger than the picture on every side. */
+function madeUpWall(spec: SceneSpec, rand: () => number, pad: number): Float32Array {
   const { width: w, height: h } = spec;
   const texture = spec.texture ?? 1;
   const bed = spec.jumpers.length ? Math.max(...spec.jumpers.map((j) => j.bedY)) : h * 0.85;
@@ -231,12 +230,56 @@ function backdrop(spec: SceneSpec, rand: () => number, pad: number): Float32Arra
       out[row * big + col] = v;
     }
   }
+  return out;
+}
+
+/**
+ * The wall, the bed and the things around it that never move, `pad` pixels bigger than the picture on every side (for a camera that
+ * moves). Rows are indexed by y + pad, columns by x + pad; the scene is sampled between rows and columns. Made up, or a photo.
+ */
+function backdrop(spec: SceneSpec, rand: () => number, pad: number): Float32Array {
+  const { width: w, height: h } = spec;
+  const big = w + 2 * pad;
+  const out = spec.backdropImage ? fitImage(spec.backdropImage, big, h + 2 * pad) : madeUpWall(spec, rand, pad);
   // A scene that is looked at from moving places is sampled between its pixels: its texture is smoothed first, so that the picture does
   // not get sharper and blurrier with where the camera happens to be in between two pixels.
   if (pad > 0) {
     const soft = new Float32Array(out.length);
     blur121(out, soft, big, h + 2 * pad, new Float32Array(out.length));
     return soft;
+  }
+  return out;
+}
+
+/** A picture made `width` × `height` by averaging the blocks of pixels it covers (so a big photo does not alias) and then blending between pixels. */
+function fitImage(image: GrayFrame, width: number, height: number): Float32Array {
+  let { width: sw, height: sh, data } = image;
+  // Halve it until it is less than twice as big as what is wanted: a block average keeps the detail a smaller picture can show.
+  while (sw >= 2 * width && sh >= 2 * height) {
+    const dw = sw >> 1;
+    const dh = sh >> 1;
+    const next = new Float32Array(dw * dh);
+    for (let y = 0; y < dh; y++) {
+      for (let x = 0; x < dw; x++) {
+        const i = 2 * y * sw + 2 * x;
+        next[y * dw + x] = 0.25 * (data[i] + data[i + 1] + data[i + sw] + data[i + sw + 1]);
+      }
+    }
+    [sw, sh, data] = [dw, dh, next];
+  }
+  const out = new Float32Array(width * height);
+  for (let y = 0; y < height; y++) {
+    const fy = Math.min(sh - 1, Math.max(0, ((y + 0.5) * sh) / height - 0.5));
+    const y0 = Math.min(sh - 2, Math.floor(fy));
+    for (let x = 0; x < width; x++) {
+      const fx = Math.min(sw - 1, Math.max(0, ((x + 0.5) * sw) / width - 0.5));
+      const x0 = Math.min(sw - 2, Math.floor(fx));
+      const ax = fx - x0;
+      const ay = fy - y0;
+      const p = y0 * sw + x0;
+      out[y * width + x] =
+        (data[p] * (1 - ax) + data[p + 1] * ax) * (1 - ay) + (data[p + sw] * (1 - ax) + data[p + sw + 1] * ax) * ay;
+    }
   }
   return out;
 }

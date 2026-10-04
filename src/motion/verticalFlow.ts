@@ -56,6 +56,11 @@ export class VerticalFlow {
   private hasPrev = false;
   /** The vertical shift of the whole picture taken out of the last frame, picture pixels (for the debug view). */
   shift = 0;
+  /**
+   * How much every pixel changed since the last frame, in noise levels, once the move of the camera was taken out: what moves in the
+   * scene, whichever way. All 0 when there was nothing to compare with or the camera's move could not be told.
+   */
+  readonly energy: Float32Array;
 
   constructor(
     readonly width: number,
@@ -65,6 +70,7 @@ export class VerticalFlow {
     const n = width * height;
     const picture = () => new Float32Array(n);
     this.warped = picture();
+    this.energy = picture();
     this.outside = new Uint8Array(n);
     this.cur = picture();
     this.prev = picture();
@@ -102,12 +108,14 @@ export class VerticalFlow {
     if (!this.hasPrev) {
       this.hasPrev = true;
       motion.fill(0);
+      this.energy.fill(0);
       [this.cur, this.prev] = [prev, cur];
       return null;
     }
     if (camera.kind === 'unknown') {
       this.shift = 0;
       motion.fill(0);
+      this.energy.fill(0);
       [this.cur, this.prev] = [prev, cur];
       return this.lastNoise;
     }
@@ -146,6 +154,7 @@ export class VerticalFlow {
     for (let i = 0; i < n; i++) this.change[i] = Math.abs(delta[i]);
     const noise = noiseOf(this.change, cfg.noiseFloor);
     this.lastNoise = noise;
+    for (let i = 0; i < n; i++) this.energy[i] = this.change[i] / noise;
 
     // A picture that was moved by the camera's estimate is not exactly where the scene is: the background is left moving a little, as
     // much as the camera did and so as slowly as it does. Motion has to be faster than that.

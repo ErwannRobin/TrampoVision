@@ -1,5 +1,7 @@
-import type { PoseEstimatorFactory } from '../pose/types';
+import type { PoseDetection, PoseEstimatorFactory } from '../pose/types';
 import type { MotionConfig } from './config';
+import { AthleteView, type AthleteViewOptions, type Painter, type Prepared } from './athleteView';
+import { focusOnAthletes } from './focus';
 import { CanvasMaskLayer, type MaskLayer } from './layer';
 import type { MotionResult } from './types';
 
@@ -17,6 +19,19 @@ export interface MotionMaskOptions {
   fill?: string;
   /** Told what the detector found in every frame (null when the frame could not be read), for a debug view. */
   onFrame?: (result: MotionResult | null) => void;
+  /**
+   * Give back only the person who jumps (the one in the box the detector reports) and not the people who stand near the bed and are still
+   * seen through the margin of the mask. Default true. Nobody is dropped while the detector does not know where the athlete is.
+   */
+  focus?: boolean;
+  /**
+   * What is done to the picture after the background is hidden and before the pose model looks at it, once the athlete is found (`AthleteView`):
+   * `zoom` gives it a square around the athlete, made big, and `rotate` turns the picture so that an athlete in a somersault stands upright. What
+   * the model finds is taken back to the frame. Both are off by default: neither has been tried on real footage.
+   */
+  view?: Partial<AthleteViewOptions>;
+  /** Where the views are painted. Default: a canvas. Tests give a fake one. */
+  paint?: Painter;
   /** Where the frames are read and painted. Default: canvases. Tests give a fake one. */
   layer?: () => MaskLayer;
 }
@@ -29,7 +44,8 @@ export interface MotionMaskOptions {
  *     extractPoseTracks(url, { ...options, createEstimator: withMotionMask(estimatorFactory('mediapipe')) })
  *
  * It never makes things worse than they were: while no athlete is found, or when a frame cannot be read, the pose model gets the video
- * itself; and if the layer fails once, it is switched off for the rest of the analysis.
+ * itself; and if the layer fails once, it is switched off for the rest of the analysis. Once it knows who jumps, the people the pose model
+ * finds are narrowed to that person (`focus`), and the picture can be zoomed on them and turned upright (`view`).
  *
  * Only for MediaPipe, which takes a canvas as well as a video. `PoseEstimator.detect` says "video" because the app has only ever given it
  * one, and the pose code is not to be touched yet: the canvas is passed through one cast, here. The experimental ONNX engines read
@@ -42,6 +58,11 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
     }
     const estimator = await inner(estimatorOptions);
     const layer = options.layer?.() ?? new CanvasMaskLayer(options.config, options.fill);
+    const focus = options.focus ?? true;
+    const viewer =
+      options.view?.zoom || options.view?.rotate
+        ? new AthleteView({ zoom: options.view.zoom ?? false, rotate: options.view.rotate ?? false }, options.paint)
+        : null;
     let broken = false;
     return {
       get backend() {
@@ -49,17 +70,38 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
       },
       detect(video, timestampMs) {
         let source: HTMLVideoElement = video;
+        let athletes: MotionResult | null = null;
+        let prepared: Prepared | null = null;
+        const frame = { width: video.videoWidth, height: video.videoHeight };
         if (!broken) {
           try {
             const result = layer.process(video, timestampMs);
             options.onFrame?.(result);
             if (hidesSomething(result)) source = layer.render(video) as unknown as HTMLVideoElement;
+            athletes = result;
+            if (viewer && result) {
+              prepared = viewer.prepare(
+                source as unknown as CanvasImageSource,
+                frame,
+                result.athletes[0] ?? null,
+                result,
+              );
+              source = prepared.source as unknown as HTMLVideoElement;
+            }
           } catch (error) {
             broken = true;
             console.warn('[motion] the mask failed; the pose model gets the video as it is from now on:', error);
           }
         }
-        return estimator.detect(source, timestampMs);
+        const found = estimator.detect(source, timestampMs);
+        const narrow = (people: PoseDetection[]): PoseDetection[] => {
+          const inFrame =
+            viewer && prepared && athletes
+              ? viewer.finish(people, prepared, frame, athletes.athletes, athletes)
+              : people;
+          return focus && athletes ? focusOnAthletes(inFrame, athletes.athletes, athletes) : inFrame;
+        };
+        return found instanceof Promise ? found.then(narrow) : narrow(found);
       },
       dispose() {
         layer.dispose();

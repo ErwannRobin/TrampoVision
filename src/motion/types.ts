@@ -7,6 +7,14 @@ export interface GrayFrame {
   data: Float32Array;
 }
 
+/** A box of picture pixels, the pixels at both ends included. */
+export interface Box {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 /**
  * What the detector knows after one frame. The pictures are the size of the gray frame and are reused by the next call: copy
  * what has to outlive it.
@@ -30,6 +38,11 @@ export interface MotionResult {
   mask: Float32Array;
   /** True while a region with the movement of a jumping athlete is in the mask. */
   found: boolean;
+  /**
+   * Where the athlete is now, in picture pixels: one box for the one person who jumps (more with `maxAthletes`), around what moves in the
+   * jump's columns; empty while none is found. When nothing moves at the moment (the athlete stands on the bed) it is the place they jump in.
+   */
+  athletes: Box[];
   /** The jump period read from the moving columns, seconds; null while nothing repeats. */
   periodS: number | null;
   /** How well that period fits, 0 to 1 (the autocorrelation at the period). */
@@ -48,7 +61,9 @@ export interface MotionResult {
     dy: number;
     /** True when the move of the picture was told. */
     known: boolean;
-    /** How fast the camera moves, shorter sides of the picture a second, smoothed (what tells a moving camera from a still one). */
+    /** How fast the camera moves, shorter sides of the picture a second, smoothed (what tells a pan from a still camera). */
     speed: number;
+    /** The width of the athlete as a share of the picture's shorter side, smoothed; 0 while none is found (what tells a low-angle shot from a wide one). */
+    athleteShare: number;
   };
 }
