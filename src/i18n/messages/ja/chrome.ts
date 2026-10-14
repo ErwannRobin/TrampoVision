@@ -197,6 +197,8 @@ export const chrome: Translation<typeof en> = {
   'stage.athleteTitle': '選手{n}の解析を表示',
   'stage.compare': '並べて表示',
   'stage.compareTitle': 'すべての選手を並べて表示',
+  'stage.merge': '選手を統合',
+  'stage.mergeConfirm': 'これらの選手は二重に検出された同じ人物です。1人の選手にまとめますか？',
   'compare.title': '選手を並べて比較',
   'compare.jumps': 'ジャンプ数',
   'compare.maxHeight': '最高到達点',

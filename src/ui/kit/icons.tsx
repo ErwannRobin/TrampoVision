@@ -192,6 +192,7 @@ const ICONS = {
       <line x1="12" y1="5" x2="12" y2="19" />
     </>
   ),
+  merge: <path d="M6 4v4a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4M12 14v6M9 17l3 3 3-3" />,
   keyboard: (
     <>
       <rect x="2.5" y="6" width="19" height="12" rx="2.6" />

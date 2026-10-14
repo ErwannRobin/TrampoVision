@@ -202,6 +202,8 @@ export const chrome: Translation<typeof en> = {
   'stage.athleteTitle': 'Die Analyse von Athlet {n} zeigen',
   'stage.compare': 'Nebeneinander',
   'stage.compareTitle': 'Alle Athleten nebeneinander',
+  'stage.merge': 'Athleten zusammenführen',
+  'stage.mergeConfirm': 'Diese Athleten sind dieselbe Person, zweimal erkannt: zu einem Athleten zusammenführen?',
   'compare.title': 'Athleten nebeneinander',
   'compare.jumps': 'Sprünge',
   'compare.maxHeight': 'Höchster Punkt',

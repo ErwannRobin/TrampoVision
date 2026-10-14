@@ -57,6 +57,8 @@ export interface StageProps {
     onChange: (index: number) => void;
     compare: boolean;
     onCompare: () => void;
+    /** The athletes were one person found more than once: make them one. */
+    onMerge: () => void;
   };
   /** The other athletes, drawn on the video next to the main one (side by side view). */
   others?: OtherAthlete[];
@@ -703,36 +705,50 @@ export function Stage({
         </div>
       )}
 
-      {athletes && !isFull && (
-        <div className="stage__views stage__athletes">
-          <Segmented<string>
-            ariaLabel={t('stage.athletes')}
-            size="sm"
-            value={athletes.compare ? COMPARE : String(athletes.value)}
-            onChange={(v) => (v === COMPARE ? athletes.onCompare() : athletes.onChange(Number(v)))}
-            options={[
-              ...Array.from({ length: athletes.count }, (_, i) => ({
-                value: String(i),
-                label: t('stage.athlete', { n: i + 1 }),
-                title: t('stage.athleteTitle', { n: i + 1 }),
-              })),
-              { value: COMPARE, label: t('stage.compare'), title: t('stage.compareTitle') },
-            ]}
-          />
-        </div>
-      )}
+      {((athletes && !isFull) || (onView && !isFull)) && (
+        <div className="stage__top">
+          {athletes && !isFull && (
+            <div className="stage__views stage__athletes">
+              <Segmented<string>
+                ariaLabel={t('stage.athletes')}
+                size="sm"
+                value={athletes.compare ? COMPARE : String(athletes.value)}
+                onChange={(v) => (v === COMPARE ? athletes.onCompare() : athletes.onChange(Number(v)))}
+                options={[
+                  ...Array.from({ length: athletes.count }, (_, i) => ({
+                    value: String(i),
+                    label: t('stage.athlete', { n: i + 1 }),
+                    title: t('stage.athleteTitle', { n: i + 1 }),
+                  })),
+                  { value: COMPARE, label: t('stage.compare'), title: t('stage.compareTitle') },
+                ]}
+              />
+              <IconButton
+                className="stage__merge"
+                icon="merge"
+                label={t('stage.merge')}
+                variant="solid"
+                size="sm"
+                onClick={() => {
+                  if (window.confirm(t('stage.mergeConfirm'))) athletes.onMerge();
+                }}
+              />
+            </div>
+          )}
 
-      {onView && !isFull && (
-        <div className="stage__views">
-          <Segmented<StageView>
-            ariaLabel={t('stage.views')}
-            size="sm"
-            value={view}
-            onChange={onView}
-            options={viewOptions().map((o) =>
-              url || o.value === '3d' ? { ...o } : { ...o, disabled: true, title: t('stage.noVideo') },
-            )}
-          />
+          {onView && !isFull && (
+            <div className="stage__views stage__views--mode">
+              <Segmented<StageView>
+                ariaLabel={t('stage.views')}
+                size="sm"
+                value={view}
+                onChange={onView}
+                options={viewOptions().map((o) =>
+                  url || o.value === '3d' ? { ...o } : { ...o, disabled: true, title: t('stage.noVideo') },
+                )}
+              />
+            </div>
+          )}
         </div>
       )}
 

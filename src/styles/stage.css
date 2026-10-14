@@ -146,18 +146,48 @@
   background: var(--panel);
 }
 
-.stage__views {
+/* The switchers along the top of the stage: the athletes on the left, the view on the right. On a narrow stage (a portrait clip)
+   they wrap onto two rows instead of covering each other. */
+.stage__top {
   position: absolute;
   top: 12px;
   right: 12px;
+  left: 12px;
   z-index: 3;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  pointer-events: none;
 }
-.stage__athletes {
-  right: auto;
-  left: 12px;
+.stage__views {
+  display: flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 8px;
+  pointer-events: auto;
+}
+.stage__views--mode {
+  margin-left: auto;
+}
+.stage__views .seg {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.stage__merge {
+  flex: none;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(12, 13, 15, 0.6);
+  color: rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.stage__merge:hover:not(:disabled) {
+  background: rgba(12, 13, 15, 0.8);
+  color: #fff;
 }
 .stage__views .seg {
   border-color: rgba(255, 255, 255, 0.16);
@@ -178,9 +208,9 @@
 }
 
 /* The narrow stage of a portrait clip (shell.css) has no room for words: the view switcher keeps to its icons, clear of the labels drawn on
-   the video. */
+   the video. The athlete switcher has no icons, so it keeps its words. */
 @media (min-width: 1100px) {
-  .workspace[data-orientation='portrait']:not(:has(.stage__pane)) .stage__views .seg__opt {
+  .workspace[data-orientation='portrait']:not(:has(.stage__pane)) .stage__views--mode .seg__opt {
     gap: 0;
     padding-inline: 12px;
     font-size: 0;
