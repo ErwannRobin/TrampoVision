@@ -115,6 +115,18 @@ export interface MotionConfig {
   minActivePixels: number;
   /** Another group is part of the athlete (a leg, an arm) when it has this share of the pixels of the biggest group. */
   partShare: number;
+  /**
+   * A real bed moves with the jumps: it goes down at every landing, shakes after takeoff, and carries the athlete's shadow. It is a bar, and
+   * a body is not: a row whose moving pixels spread over more than `bedRowShare` times the typical row of the window is a bar (the bed,
+   * its pads, a line of the wall that flickers) and is taken out before the groups are made (`dropBars`). Of the groups, a
+   * body is about as tall as it is wide or taller: one wider than `flatShape` times its height counts for less (its pixels divided by how
+   * many times wider it is) when the athlete's group is chosen; and a part joins the body only when it is within `partReachShare` body
+   * lengths of it and at most `partWidthShare` bodies wide.
+   */
+  flatShape: number;
+  partWidthShare: number;
+  partReachShare: number;
+  bedRowShare: number;
   /** How far the mask reaches around the box of the athlete, share of the picture. The pose model needs the hands and the feet too. */
   marginShare: number;
   /** Softness of the mask edge, share of the picture. */
@@ -177,6 +189,10 @@ export const DEFAULT_MOTION_CONFIG: MotionConfig = {
   joinShare: 0.03,
   minActivePixels: 4,
   partShare: 0.25,
+  flatShape: 2,
+  partWidthShare: 1.5,
+  partReachShare: 1,
+  bedRowShare: 2.5,
   marginShare: 0.05,
   featherShare: 0.04,
   fadeInS: 0.6,
