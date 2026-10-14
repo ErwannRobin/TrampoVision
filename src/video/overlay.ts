@@ -18,6 +18,8 @@ export interface OverlayOptions {
   detail?: 'simple' | 'full';
   /** Draws the skeleton in this one color instead of the left/right colors: how athletes are told apart when several are shown. */
   tint?: string;
+  /** Css pixels at the top of the picture the label chips keep clear of: controls laid over the video there. */
+  labelTop?: number;
 }
 
 /*
@@ -299,6 +301,7 @@ function drawLabels(
   skills: SkillAnalysis | null,
   detail: 'simple' | 'full',
   f: Frame,
+  top = 0,
 ) {
   const { left, right } = buildLabels(result, sample, skills, detail);
   if (left.length === 0 && !right) return;
@@ -313,12 +316,13 @@ function drawLabels(
     rows.push(warning);
     warning = null;
   }
-  let y = ts.margin;
+  const y0 = Math.max(ts.margin, top);
+  let y = y0;
   for (const row of rows) {
     paintChip(ctx, row, ts.margin, y, ts);
     y += ts.height + ts.gap;
   }
-  if (warning) paintChip(ctx, warning, f.w - ts.margin - warning.width, ts.margin, ts);
+  if (warning) paintChip(ctx, warning, f.w - ts.margin - warning.width, y0, ts);
   ctx.restore();
 }
 
@@ -596,7 +600,7 @@ export function drawOverlay(
   if (opts.com && Number.isFinite(result.comX[sample]) && Number.isFinite(result.comY[sample])) {
     drawCenterOfMass(ctx, result.comX[sample] * f.sx, result.comY[sample] * f.sy, f);
   }
-  if (opts.hud) drawLabels(ctx, result, sample, skills, detail, f);
+  if (opts.hud) drawLabels(ctx, result, sample, skills, detail, f, opts.labelTop);
 }
 
 // --- Trampoline calibration ----------------------------------------------------------------------------------
