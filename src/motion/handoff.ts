@@ -27,6 +27,8 @@ interface StoredFile {
 interface Stored {
   original: StoredFile;
   masked: StoredFile;
+  /** Absent in records left by an earlier version: read as false. */
+  zoom?: boolean;
 }
 
 /** What the motion page leaves for the app. */
@@ -35,6 +37,12 @@ export interface Handoff {
   original: File;
   /** The clip with the background hidden: what the pose model is given. */
   masked: File;
+  /**
+   * True when the app should analyze the clip live through the motion detector with the zoomed view of the athlete
+   * (`withMotionMask`, `view.zoom`) instead of reading `masked`: the motion page saw that the athlete is small on a steady
+   * shot in most frames (`ZOOM_WINS_SHARE`), where only the zoomed view lets the pose model see them.
+   */
+  zoom: boolean;
 }
 
 const toStored = (file: File): StoredFile => ({ name: file.name, type: file.type, blob: file });
@@ -69,8 +77,8 @@ async function inStore<T>(use: (store: IDBObjectStore) => Promise<T> | T): Promi
 }
 
 /** Leaves the two videos for the app. */
-export function putHandoff({ original, masked }: Handoff): Promise<void> {
-  const stored: Stored = { original: toStored(original), masked: toStored(masked) };
+export function putHandoff({ original, masked, zoom }: Handoff): Promise<void> {
+  const stored: Stored = { original: toStored(original), masked: toStored(masked), zoom };
   return inStore((store) => void store.put(stored, KEY));
 }
 
@@ -83,7 +91,7 @@ async function takeStored(): Promise<Handoff | null> {
   const stored = await inStore((store) => wrap(store.get(KEY)) as Promise<Partial<Stored> | undefined>);
   try {
     return stored?.original && stored.masked
-      ? { original: await toFile(stored.original), masked: await toFile(stored.masked) }
+      ? { original: await toFile(stored.original), masked: await toFile(stored.masked), zoom: stored.zoom ?? false }
       : null;
   } finally {
     // A video that could not be cleaned away is no reason to lose the one that was read.

@@ -54,6 +54,8 @@ export interface PoseEvalOptions {
   numPoses?: number;
   /** Default 'full', the app's default. */
   model?: ModelVariant;
+  /** Try the GPU delegate first, as the app does by default. Default false: the CPU delegate is deterministic across machines. */
+  preferGpu?: boolean;
   /** Stop after this many seconds of the clip. */
   maxS?: number;
   /**
@@ -64,6 +66,8 @@ export interface PoseEvalOptions {
   zoom?: boolean;
   /** With `zoom`: also turn the view so that an athlete in a somersault stands upright (`AthleteView.rotate`). */
   rotate?: boolean;
+  /** With `zoom`: let `withMotionMask` narrow the people to the chosen athlete, exactly as the app reads them (default false: everybody is captured and the choice is replayed offline). */
+  focused?: boolean;
   /** Told every few seconds of the clip, to show life. */
   onProgress?: (atS: number) => void;
 }
@@ -79,14 +83,14 @@ export async function runPoseEval(url: string, options: PoseEvalOptions = {}): P
     let atMs = 0;
     const factory = options.zoom
       ? withMotionMask(estimatorFactory('mediapipe'), {
-          focus: false,
+          focus: options.focused ?? false,
           view: { zoom: true, rotate: options.rotate },
           onFrame: (r) => {
             if (r && gate.helps(r, atMs)) zoomed++;
           },
         })
       : estimatorFactory('mediapipe');
-    const estimator = await factory({ model, numPoses, preferGpu: false });
+    const estimator = await factory({ model, numPoses, preferGpu: options.preferGpu ?? false });
     try {
       const frames: EvalFrame[] = [];
       const end = Math.max(0, Math.min(video.duration - 1e-3, options.maxS ?? Infinity));

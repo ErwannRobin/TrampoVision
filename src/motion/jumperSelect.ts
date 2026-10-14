@@ -44,11 +44,13 @@ const SIZE_SMOOTHING = 0.2;
 const DUPLICATE_APART = 0.5;
 /** How far under everything the athlete has flown through a track may lie and still be the athlete, picture heights: the bed gives a little, and the camera may drift. */
 const BAND_SLACK = 0.08;
+/** How recent the track's highest point must be, seconds: a track that took a few of the jumper's hips before settling on the spotter would otherwise carry her height for a whole window. */
+const TOP_WINDOW_S = 1;
 /** How much of the newest heights enters the remembered band. */
 const BAND_SMOOTHING = 0.2;
 /** A fast body is the athlete without waiting for a turn when it reaches this far into the flight band from its bottom (0 the bottom, 1 the top): a spotter's bend stays below. */
 const BAND_REACH = 0.3;
-/** A person is at a station when their hips are within this of it, picture heights. */
+/** A person is at a station when their hips are within this of it, picture heights. A deep bend leaves the station (and breaks its run): that is fine, the station only has to have held one long run, and a stander does not bend most of the time. */
 const STATION_RADIUS = 0.08;
 /** A station is a stander's spot once somebody was there without leaving for this long: the jumper dwells at her apex a third of a second every jump, a spotter is at their spot for whole seconds. */
 const STANDER_RUN_S = 2;
@@ -271,6 +273,12 @@ export class JumperSelector {
       // flight band is known: a spotter who bends down fast turns once at speed too, and must not make the first choice.
       const turns = verticalTurns(track.samples, WINDOW_S, Math.max(0.03, track.travel / 3));
       const speed = peakVerticalSpeed(track.samples, WINDOW_S);
+      // The one-turn shortcut needs more than the turn: an athlete's known flight band, or hips lately well above a stander
+      // in the track's columns — a spotter who bends down fast turns once at speed too, but at their own station's height.
+      const recentTop = Math.min(...track.samples.filter((s) => s.t >= timeS - TOP_WINDOW_S).map((s) => s.y));
+      // Above every stander, wherever they stand: the jumper travels sideways across the bed, and a spotter who bends must
+      // not qualify by being above somebody else's lower station.
+      const aboveAStander = standers.length > 0 && recentTop < Math.min(...standers.map((s) => s.y)) - RISE_ABOVE;
       // The model loses the jumper for whole jumps and her tracks are short: once her flight band is known, a body moving
       // at a jumper's speed well inside that band is her, without waiting for a turn.
       const hot =
@@ -281,7 +289,11 @@ export class JumperSelector {
       track.jumps =
         hot ||
         (track.travel >= MIN_TRAVEL &&
-          (turns >= MIN_TURNS || (this.band !== null && turns >= 1 && speed >= MIN_SPEED)));
+          (turns >= MIN_TURNS ||
+            // One descent or one rise is enough at a jumper's speed — with evidence beyond the motion itself: hips lately
+            // well above a stander (no turn needed: the model may hold the jumper through half an arc only), or, inside the
+            // known flight band, at least the one turn.
+            (speed >= MIN_SPEED && (aboveAStander || (this.band !== null && turns >= 1)))));
     }
 
     // A person nobody claimed starts a track of their own.
@@ -307,7 +319,9 @@ export class JumperSelector {
     // title against a challenger who does not clearly out-travel them.
     const jumping = this.tracks.filter((track) => {
       if (!track.jumps) return false;
-      const top = Math.min(...track.samples.map((s) => s.y));
+      // The highest the track has been lately: over the last second only, so a few of the jumper's hips taken by mistake
+      // before the track settled on somebody low do not carry her height for a whole window.
+      const top = Math.min(...track.samples.filter((s) => s.t >= timeS - TOP_WINDOW_S).map((s) => s.y));
       if (this.band !== null && top > this.band.high + BAND_SLACK) return false;
       if (this.athleteTorso !== null && track.torso / this.athleteTorso > MAX_SIZE_RATIO) return false;
       return standers.every((s) => Math.abs(track.hip.x - s.x) > SAME_COLUMNS || top < s.y - RISE_ABOVE);

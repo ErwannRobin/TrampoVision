@@ -48,6 +48,14 @@ describe('keepAthletes', () => {
     expect(keepAthletes([low, high], () => 3)).toEqual([high, low]);
   });
 
+  it('keeps a sparse jumper over an ever-present spotter: the model sees a small jumper in a tenth of the frames', () => {
+    const spotter = moving((t) => 800 + 10 * Math.sin(t * 4));
+    const sparse = moving(jump);
+    // The jumper is seen in 10% of the frames only (below MIN_FOUND), scattered over the clip.
+    sparse.frames = sparse.frames.map((f, i) => (i % 10 === 0 ? f : null));
+    expect(keepAthletes([spotter, sparse], (t) => (t === spotter ? 1 : 0))).toEqual([sparse]);
+  });
+
   it('keeps the people who jump, in order, and drops those who do not', () => {
     const [a, coach, b] = [track(10), track(10), track(10)];
     const jumps = new Map([

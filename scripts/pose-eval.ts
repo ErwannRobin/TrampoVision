@@ -47,6 +47,8 @@ const cachePath = flag('--cache');
 const masked = args.includes('--masked');
 const model = flag('--model') ?? 'full';
 const zoom = args.includes('--zoom');
+const gpu = args.includes('--gpu');
+const focused = args.includes('--focused');
 const rotate = args.includes('--rotate');
 
 /** The model's output over the clip: from the cache when one is given and filled, else from a headless Chrome run (and into the cache). */
@@ -135,7 +137,7 @@ async function captureInBrowser(): Promise<PoseEvalCapture> {
       },
       {
         url: `/node_modules/.pose-eval/${servedName}`,
-        options: { rateHz, numPoses, maxS, zoom, rotate, model },
+        options: { rateHz, numPoses, maxS, zoom, rotate, model, preferGpu: gpu, focused },
         maskFirst: masked,
         sourceFps: probe(file!).fps,
       },

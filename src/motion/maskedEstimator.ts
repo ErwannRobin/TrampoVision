@@ -15,23 +15,30 @@ const NOTHING_HIDDEN = 0.999;
  * tripod shot (share 0.21) 7% → 55%, a synchro one (0.31) 28% → 61%, a competition clip filmed from behind the end deck (0.26) 0% → 54% —
  * and it hurts a big one (a phone close-up, 0.60: 87% → 58%) and a broadcast with cuts and tilts (55% → 36%), whose box is often wrong.
  */
-const ZOOM_MAX_SHARE = 0.35;
-/** ... and stays in use until the athlete grows past this: the smoothed share wobbles around a threshold. */
-const ZOOM_OFF_SHARE = 0.45;
-/** The shot must have been steady, with a small athlete, this long before the zoom view cuts in: the phone close-up passes below `ZOOM_MAX_SHARE` for stray moments. */
+const ZOOM_MAX_SHARE = 0.4;
+/** ... and stays in use until the athlete grows past this: the smoothed share wobbles around a threshold (it reaches 0.45 on the competition clip when the boxes of the jumper and the spotter join). */
+const ZOOM_OFF_SHARE = 0.5;
+/** The camera must be slower than this, shorter sides of the picture a second: tripod shots measure 0 to 0.10 (the subject's own motion), a broadcast that follows the athlete 0.2 to 0.8. The kind of shot is not used — a tripod synchro clip is called "tracking" from the jumpers' own motion. */
+const ZOOM_MAX_SPEED = 0.12;
+/** ... and the zoom view lets go above this: the speed wobbles too. */
+const ZOOM_OFF_SPEED = 0.18;
+/** The shot must have been steady, with a small athlete, this long before the zoom view cuts in: the phone close-up passes below `ZOOM_MAX_SHARE` for about a second while its share settles. */
 const ZOOM_WARMUP_S = 2;
 
 /**
- * Says, frame by frame, whether the zoomed view of the athlete would help the pose model: yes once the shot has been steady with a small
- * athlete for `ZOOM_WARMUP_S`, and until the athlete grows or the camera moves (see `ZOOM_MAX_SHARE`).
+ * Says, frame by frame, whether the zoomed view of the athlete would help the pose model: yes once the shot has been steady (slow) with a
+ * small athlete for `ZOOM_WARMUP_S`, and until the athlete grows or the camera moves (`ZOOM_MAX_SHARE`, `ZOOM_MAX_SPEED`).
  */
 export class ZoomGate {
   private smallSinceMs: number | null = null;
   private on = false;
 
   helps(result: MotionResult, timestampMs: number): boolean {
-    const share = result.camera.athleteShare;
-    const small = result.camera.type === 'fixed' && share > 0 && share < (this.on ? ZOOM_OFF_SHARE : ZOOM_MAX_SHARE);
+    const { athleteShare, speed } = result.camera;
+    const small =
+      athleteShare > 0 &&
+      athleteShare < (this.on ? ZOOM_OFF_SHARE : ZOOM_MAX_SHARE) &&
+      speed < (this.on ? ZOOM_OFF_SPEED : ZOOM_MAX_SPEED);
     if (!small) {
       this.smallSinceMs = null;
       this.on = false;
@@ -58,9 +65,15 @@ export interface MotionMaskOptions {
    * Give back only the person who jumps, and not the people who stand near the bed and are still seen through the margin of the mask.
    * The person whose hips travel up and down like a jumper's is the athlete (`JumperSelector`); while no one has travelled yet (the
    * first jump, or a camera that follows the athlete and keeps them still in the picture), the person in the box the detector reports
-   * is. Default true. Nobody is dropped while neither knows where the athlete is.
+   * is. Default true. Nobody is dropped while neither knows where the athlete is. `'travel'` trusts the travel alone: until it knows,
+   * every frame is left empty — for the app's tracker, which locks on the first person it is given and must not be given the spotter.
    */
-  focus?: boolean;
+  focus?: boolean | 'travel';
+  /**
+   * How many people the choice of the jumper keeps (synchro films two). Defaults to the detector's `maxAthletes`. Separate
+   * from the detector's own count: two tracks of hips can be told apart in a single motion box.
+   */
+  athletes?: number;
   /**
    * What is done to the picture after the background is hidden and before the pose model looks at it, once the athlete is found (`AthleteView`):
    * `zoom` gives it a square around the athlete, made big, and `rotate` turns the picture so that an athlete in a somersault stands upright. What
@@ -96,7 +109,7 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
     const estimator = await inner(estimatorOptions);
     const layer = options.layer?.() ?? new CanvasMaskLayer(options.config, options.fill);
     const focus = options.focus ?? true;
-    const selector = new JumperSelector(Math.max(1, Math.floor(options.config?.maxAthletes ?? 1)));
+    const selector = new JumperSelector(Math.max(1, Math.floor(options.athletes ?? options.config?.maxAthletes ?? 1)));
     const zoomGate = new ZoomGate();
     const viewer =
       options.view?.zoom || options.view?.rotate
@@ -139,9 +152,11 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
               ? viewer.finish(people, prepared, frame, athletes.athletes, athletes)
               : people;
           if (!focus) return inFrame;
-          // The person whose hips travel like a jumper's; until a track has travelled, the person in the motion box.
+          // The person whose hips travel like a jumper's; until a track has travelled, the person in the motion box — or,
+          // trusting the travel alone, nobody.
           const byTravel = selector.push(inFrame, timestampMs / 1000);
           if (byTravel !== null) return byTravel;
+          if (focus === 'travel') return [];
           return athletes ? focusOnAthletes(inFrame, athletes.athletes, athletes) : inFrame;
         };
         return found instanceof Promise ? found.then(narrow) : narrow(found);

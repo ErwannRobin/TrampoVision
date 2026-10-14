@@ -180,6 +180,29 @@ describe('the motion mask in front of a pose estimator', () => {
       expect(last).toHaveLength(1);
       expect(last[0].landmarks[LM.L_HIP].x).toBeCloseTo(0.3);
     });
+
+    it('trusts the travel alone when asked: nobody is given back before it knows, the spotter in the box least of all', async () => {
+      const body = (x: number, y: number, torso: number): PoseDetection => {
+        const landmarks = Array.from({ length: LANDMARK_COUNT }, () => ({ x, y: y - torso / 2, visibility: 1 }));
+        landmarks[LM.L_HIP] = landmarks[LM.R_HIP] = { x, y, visibility: 1 };
+        landmarks[LM.L_SHOULDER] = landmarks[LM.R_SHOULDER] = { x, y: y - torso, visibility: 1 };
+        return { landmarks };
+      };
+      const jumper = (t: number) => body(0.3, 0.55 - 0.3 * Math.abs(Math.sin((Math.PI * t) / 1.6)), 0.08);
+      const spotter = body(0.52, 0.8, 0.2);
+      const boxOnSpotter = [{ x0: 42, y0: 70, x1: 62, y1: 95 }];
+      let now = 0;
+      const { factory } = setup([frameWith(0.2, boxOnSpotter)], () => [spotter, jumper(now / 1000)], {
+        focus: 'travel',
+      });
+      const estimator = await factory(options);
+      const first = estimator.detect(video, 0) as PoseDetection[];
+      expect(first).toEqual([]);
+      let last: PoseDetection[] = [];
+      for (now = 33; now < 8000; now += 33) last = estimator.detect(video, now) as PoseDetection[];
+      expect(last).toHaveLength(1);
+      expect(last[0].landmarks[LM.L_HIP].x).toBeCloseTo(0.3);
+    });
   });
 
   describe('the view of the athlete', () => {

@@ -49,13 +49,22 @@ export function trackTravel(track: PoseTrack): number {
  */
 export function keepAthletes(tracks: PoseTrack[], jumpCount: (track: PoseTrack) => number): PoseTrack[] {
   const found = (t: PoseTrack) => t.frames.filter(Boolean).length;
-  const kept = tracks.filter((t) => found(t) >= MIN_FOUND * t.frames.length && jumpCount(t) > 0);
+  const travel = new Map(tracks.map((t) => [t, trackTravel(t)]));
+  // A track that travels like a jumper is an athlete however sparse it is, and whether or not its jumps could be counted:
+  // on a hard clip the pose model sees the jumper in a tenth of the frames, scattered, and the person it sees all the time
+  // is the spotter.
+  const kept = tracks.filter(
+    (t) => (found(t) >= MIN_FOUND * t.frames.length && jumpCount(t) > 0) || travel.get(t)! >= MIN_TRAVEL,
+  );
   if (kept.length) {
-    const travel = new Map(kept.map((t) => [t, trackTravel(t)]));
-    const best = Math.max(...travel.values());
+    const best = Math.max(...kept.map((t) => travel.get(t)!));
     if (best < MIN_TRAVEL) return kept;
     return kept.filter((t) => travel.get(t)! >= TRAVEL_SHARE * best).sort((a, b) => travel.get(b)! - travel.get(a)!);
   }
+  // Nobody jumps by the count: the track that travels most (a sparse jumper's jumps may not be countable), else the one
+  // with the most poses, so a clip always has an athlete to show.
+  const traveling = tracks.filter((t) => travel.get(t)! >= MIN_TRAVEL);
+  if (traveling.length) return [traveling.reduce((a, b) => (travel.get(b)! > travel.get(a)! ? b : a))];
   const best = tracks.reduce((a, b) => (found(b) > found(a) ? b : a), tracks[0]);
   return best ? [best] : [];
 }

@@ -2,9 +2,17 @@ import { disposeVideo, frameSeekTime, loadVideo, seekTo } from '../video/frames'
 import { encodeMp4, exportSize } from '../video/exportVideo';
 import type { MotionConfig } from './config';
 import { CanvasMaskLayer } from './layer';
-import { hidesSomething } from './maskedEstimator';
+import { hidesSomething, ZoomGate } from './maskedEstimator';
 import { AthleteScout, SCOUT_MAX_S } from './scout';
 import type { Box } from './types';
+
+/**
+ * With the zoom view worth it in at least this share of a clip's frames, the app is told to analyze the clip live through the motion
+ * detector (`withMotionMask` with `view.zoom`) rather than read this rendered video: the zoomed view is what lets the pose model see a
+ * small athlete at all. Measured with `make pose-eval`: the gate is on in 78 to 80 % of the frames of the clips it helps (a wide tripod
+ * shot, a synchro one, a competition clip with a spotter under the jumper) and 0 % of those it would hurt (a phone close-up, a broadcast).
+ */
+export const ZOOM_WINS_SHARE = 0.5;
 
 /**
  * The result of the motion detector as a video: the clip, run through the detector from its first frame, with every frame painted the way
@@ -56,6 +64,8 @@ export interface RenderedVideo {
   frames: number;
   /** Frames in which the detector hid something. None means the athlete was never found and the result is the clip as it was. */
   hidden: number;
+  /** The share of the frames in which the zoomed view of the athlete would help the pose model (`ZoomGate`): at `ZOOM_WINS_SHARE` or more, the app should analyze the clip live and zoomed instead of reading this video. */
+  zoomShare: number;
 }
 
 /**
@@ -98,6 +108,8 @@ export async function renderMaskedVideo(options: RenderOptions): Promise<Rendere
     const plan = resultPlan(video.duration, sourceFps, stride);
     layer.detector.hint(await scoutAthlete(video, options, plan));
     let hidden = 0;
+    const gate = new ZoomGate();
+    let zoomFrames = 0;
     const blob = await encodeMp4({
       width,
       height,
@@ -109,12 +121,15 @@ export async function renderMaskedVideo(options: RenderOptions): Promise<Rendere
       drawFrame: async (k, ctx) => {
         const frame = k * stride;
         await seekTo(video, Math.min(frameSeekTime(frame, sourceFps), video.duration - 1e-3));
-        if (hidesSomething(layer.process(video, Math.round((frame / sourceFps) * 1000)))) hidden++;
+        const timeMs = Math.round((frame / sourceFps) * 1000);
+        const result = layer.process(video, timeMs);
+        if (hidesSomething(result)) hidden++;
+        if (result && gate.helps(result, timeMs)) zoomFrames++;
         // The picture as it is when the frame could not be read, like in front of the pose model.
         ctx.drawImage(layer.render(video), 0, 0, width, height);
       },
     });
-    return { blob, frames: plan.frames, hidden };
+    return { blob, frames: plan.frames, hidden, zoomShare: zoomFrames / Math.max(1, plan.frames) };
   } finally {
     layer.dispose();
     disposeVideo(video);

@@ -99,6 +99,30 @@ describe('the person who jumps, chosen by the travel of their hips', () => {
     expect(choices.size).toBe(1);
   });
 
+  it('is not fooled by a spotter who bobs at every landing and bends down fast now and then', () => {
+    // The spotter of the competition clip: hips that bob a little in time with the jumps, and every few jumps a deep, fast
+    // bend (about 0.5 picture heights a second — the travel and the speed of half a jump). What tells them apart is that it
+    // all happens at the spotter's own height, never above their station. The jumper is hidden behind them around every
+    // landing, so her tracks are fragments.
+    const bending = (t: number) => {
+      const bob = 0.03 * Math.abs(Math.sin((Math.PI * t) / 1.6));
+      const phase = t % 4.8;
+      const dip = phase < 0.5 ? 0.14 * Math.sin((Math.PI * phase) / 0.5) : 0;
+      return person(0.62, 0.78 + bob + dip, 0.2);
+    };
+    const fragmented = (t: number) => {
+      const sinceLanding = t % 1.6;
+      const hidden = sinceLanding < 0.25 || sinceLanding > 1.35;
+      return hidden ? [bending(t)] : [bending(t), jumper(t)];
+    };
+    const rows = run(new JumperSelector(), fragmented, 10);
+    for (const xs of after(rows, 4)) {
+      expect(xs === null || xs.every((x) => Math.abs(x - 0.5) < 0.01)).toBe(true);
+    }
+    const found = after(rows, 4).filter((xs) => xs !== null && xs.length === 1);
+    expect(found.length).toBeGreaterThan(3 * FPS);
+  });
+
   it('is not fooled by somebody who walks fast across the picture: sideways travel is not jumping', () => {
     const walker = (t: number) => person((0.1 + 0.1 * t) % 1, 0.7, 0.12);
     const rows = run(new JumperSelector(), (t) => [walker(t), jumper(t)], 8);
