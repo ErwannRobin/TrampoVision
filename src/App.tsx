@@ -8,7 +8,7 @@ import {
 } from './analysis/calibration';
 import { computeAnalysis } from './analysis/computeAnalysis';
 import { download, toCsv, toJumpsCsv } from './analysis/export';
-import { keepAthletes } from './analysis/athletes';
+import { keepAthletes, mergeTracks } from './analysis/athletes';
 import { extractPoseTracks } from './analysis/extractPoseTrack';
 import { analysisStride } from './analysis/stride';
 import { stabilizePose } from './analysis/stabilize';
@@ -1464,6 +1464,11 @@ function AppView({ playhead }: { playhead: Playhead }) {
                           },
                           compare: comparing,
                           onCompare: () => setCompare(true),
+                          onMerge: () => {
+                            setCompare(false);
+                            setAthleteIdx(0);
+                            setTracks([mergeTracks(tracks)]);
+                          },
                         }
                       : undefined
                   }

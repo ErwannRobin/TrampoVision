@@ -57,6 +57,8 @@ export interface StageProps {
     onChange: (index: number) => void;
     compare: boolean;
     onCompare: () => void;
+    /** The athletes were one person found more than once: make them one. */
+    onMerge: () => void;
   };
   /** The other athletes, drawn on the video next to the main one (side by side view). */
   others?: OtherAthlete[];
@@ -97,6 +99,8 @@ const NO_OTHERS: OtherAthlete[] = [];
 const PICK_RADIUS_PX = 16;
 /** Space between the video and the pane in the split view. */
 const SPLIT_GAP_PX = 12;
+/** Space between the switchers along the top and the label chips below them. */
+const TOP_BAR_GAP_PX = 6;
 const NO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
 /** How long the hint about swiping stays up when the full screen opens. */
 const HINT_MS = 5000;
@@ -323,11 +327,33 @@ export function Stage({
     return { video: split.video, pane: split.pane, hidden: false, stacked: split.direction === 'column' };
   }, [view, pane, ratio, size, isFull]);
 
+  // The switchers along the top lie over the video: the label chips drawn on it start below them.
+  const [topBar, setTopBar] = useState(0);
+  const topBarRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) {
+      setTopBar(0);
+      return;
+    }
+    const measure = () => setTopBar(el.offsetTop + el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      setTopBar(0);
+    };
+  }, []);
+  const labelTop = topBar > 0 ? Math.max(0, topBar + TOP_BAR_GAP_PX - layout.video.y) : 0;
+  const drawnOverlay = useMemo(
+    () => (labelTop > 0 ? { ...shownOverlay, labelTop } : shownOverlay),
+    [shownOverlay, labelTop],
+  );
+
   // The latest inputs for the animation loop, which must not restart on every change.
   const live = useRef({
     result,
     skills,
-    overlay: shownOverlay,
+    overlay: drawnOverlay,
     fps,
     calibration,
     box: layout.video,
@@ -338,7 +364,7 @@ export function Stage({
   live.current = {
     result,
     skills,
-    overlay: shownOverlay,
+    overlay: drawnOverlay,
     fps,
     calibration,
     box: layout.video,
@@ -348,7 +374,7 @@ export function Stage({
   };
   useEffect(() => {
     dirty.current = true;
-  }, [result, skills, shownOverlay, calibration, layout.video, layout.hidden, others, zoom.view.zoom]);
+  }, [result, skills, drawnOverlay, calibration, layout.video, layout.hidden, others, zoom.view.zoom]);
 
   // The player bus: everything else in the interface drives the video through these.
   useEffect(() => {
@@ -703,36 +729,50 @@ export function Stage({
         </div>
       )}
 
-      {athletes && !isFull && (
-        <div className="stage__views stage__athletes">
-          <Segmented<string>
-            ariaLabel={t('stage.athletes')}
-            size="sm"
-            value={athletes.compare ? COMPARE : String(athletes.value)}
-            onChange={(v) => (v === COMPARE ? athletes.onCompare() : athletes.onChange(Number(v)))}
-            options={[
-              ...Array.from({ length: athletes.count }, (_, i) => ({
-                value: String(i),
-                label: t('stage.athlete', { n: i + 1 }),
-                title: t('stage.athleteTitle', { n: i + 1 }),
-              })),
-              { value: COMPARE, label: t('stage.compare'), title: t('stage.compareTitle') },
-            ]}
-          />
-        </div>
-      )}
+      {((athletes && !isFull) || (onView && !isFull)) && (
+        <div className="stage__top" ref={topBarRef}>
+          {athletes && !isFull && (
+            <div className="stage__views stage__athletes">
+              <Segmented<string>
+                ariaLabel={t('stage.athletes')}
+                size="sm"
+                value={athletes.compare ? COMPARE : String(athletes.value)}
+                onChange={(v) => (v === COMPARE ? athletes.onCompare() : athletes.onChange(Number(v)))}
+                options={[
+                  ...Array.from({ length: athletes.count }, (_, i) => ({
+                    value: String(i),
+                    label: t('stage.athlete', { n: i + 1 }),
+                    title: t('stage.athleteTitle', { n: i + 1 }),
+                  })),
+                  { value: COMPARE, label: t('stage.compare'), title: t('stage.compareTitle') },
+                ]}
+              />
+              <IconButton
+                className="stage__merge"
+                icon="merge"
+                label={t('stage.merge')}
+                variant="solid"
+                size="sm"
+                onClick={() => {
+                  if (window.confirm(t('stage.mergeConfirm'))) athletes.onMerge();
+                }}
+              />
+            </div>
+          )}
 
-      {onView && !isFull && (
-        <div className="stage__views">
-          <Segmented<StageView>
-            ariaLabel={t('stage.views')}
-            size="sm"
-            value={view}
-            onChange={onView}
-            options={viewOptions().map((o) =>
-              url || o.value === '3d' ? { ...o } : { ...o, disabled: true, title: t('stage.noVideo') },
-            )}
-          />
+          {onView && !isFull && (
+            <div className="stage__views stage__views--mode">
+              <Segmented<StageView>
+                ariaLabel={t('stage.views')}
+                size="sm"
+                value={view}
+                onChange={onView}
+                options={viewOptions().map((o) =>
+                  url || o.value === '3d' ? { ...o } : { ...o, disabled: true, title: t('stage.noVideo') },
+                )}
+              />
+            </div>
+          )}
         </div>
       )}
 

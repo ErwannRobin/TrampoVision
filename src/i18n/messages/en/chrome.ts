@@ -210,6 +210,8 @@ export const chrome = {
   'stage.athleteTitle': 'Show the analysis of athlete {n}',
   'stage.compare': 'Side by side',
   'stage.compareTitle': 'All athletes next to each other',
+  'stage.merge': 'Merge athletes',
+  'stage.mergeConfirm': 'These athletes are the same person, found twice: make them one athlete?',
   'compare.title': 'Athletes side by side',
   'compare.jumps': 'Jumps',
   'compare.maxHeight': 'Highest point',
