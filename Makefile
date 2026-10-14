@@ -114,6 +114,10 @@ eval-jev: node_modules ## Compare Jev with the classifier (needs TYPESAFE_API_KE
 	$(call require,FILE,TYPESAFE_API_KEY=... make eval-jev FILE=eval/export.ndjson [DEBUG=1] [ALL=1])
 	npx vite-node scripts/jev-eval.ts $(FILE) $(if $(DEBUG),--debug) $(if $(ALL),--all)
 
+motion-eval: node_modules ## Run the motion detector over a real clip (needs ffmpeg): FILE= [SHEET=boxes.png] [EVERY=3] [CONFIG=json]
+	$(call require,FILE,make motion-eval FILE=clip.mp4 [SHEET=boxes.png] [EVERY=3] [CONFIG=json])
+	npx vite-node scripts/motion-eval.ts $(FILE) $(if $(SHEET),--sheet $(SHEET)) $(if $(EVERY),--every $(EVERY)) $(if $(CONFIG),--config '$(CONFIG)')
+
 ##@ Review Worker
 
 worker-check: node_modules ## Typecheck the Worker (worker/)

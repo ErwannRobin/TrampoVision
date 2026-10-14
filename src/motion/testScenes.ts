@@ -45,6 +45,23 @@ export interface WaverSpec {
   hz: number;
 }
 
+/**
+ * A trampoline that moves like a real one: a band of bed with a woven texture, pads below it, which the jumper pushes down at every landing
+ * and which keeps shaking for a moment after takeoff; and the jumper's shadow on it, which goes sideways as they rise (a light at an angle).
+ * The made-up scenes had a bed that never moved, and the real ones do, in time with the jumps.
+ */
+export interface BedSpec {
+  /** From x `from` to x `to`, picture pixels; its top at the jumpers' `bedY`, `thickness` rows of bed and three rows of pads below. */
+  from: number;
+  to: number;
+  thickness: number;
+  /** How far the bed goes down at a landing, picture pixels; it keeps shaking by `ring` of that (default 0.3), dying out, after takeoff. */
+  deflection: number;
+  ring?: number;
+  /** Draws the jumper's shadow on the bed. */
+  shadow?: boolean;
+}
+
 export interface StanderSpec {
   x: number;
   /** The y of the feet. */
@@ -54,8 +71,8 @@ export interface StanderSpec {
 
 /** What the camera does. The scene is bigger than the picture, and the picture is a window that moves over it. */
 export type CameraSpec =
-  /** Pans at a constant speed, picture pixels a second (right and down are positive). */
-  | { kind: 'pan'; vx: number; vy?: number }
+  /** Pans at a constant speed, picture pixels a second (right and down are positive), from `fromS` (default 0: from the start). */
+  | { kind: 'pan'; vx: number; vy?: number; fromS?: number }
   /** Pans back and forth, a sine of this amplitude (picture pixels) and period, so the athlete stays in the picture. */
   | { kind: 'sway'; ax: number; ay?: number; periodS: number }
   /**
@@ -73,6 +90,8 @@ export interface SceneSpec {
   walkers?: WalkerSpec[];
   wavers?: WaverSpec[];
   standers?: StanderSpec[];
+  /** A bed that moves with the jumps (missing: the bed is part of the wall and never moves). */
+  bed?: BedSpec;
   /** Standard deviation of the noise added to every pixel of every frame, intensity 0..1. */
   noise?: number;
   /** Amplitude of the brightness change of the whole picture from frame to frame (a light that flickers). */
@@ -211,6 +230,47 @@ function flightAt(j: JumperSpec, t: number): { lift: number; jump: number; share
   return { lift: 4 * j.apex * ramp * share * (1 - share), jump, share };
 }
 
+/** How far down the bed is at time `t`: pushed down while the jumper lands and takes off (the last and first tenth of a jump), shaking after. */
+function bedDropAt(bed: BedSpec, j: JumperSpec | undefined, t: number): number {
+  if (!j) return 0;
+  const { jump, share } = flightAt(j, t);
+  if (jump < 0) return 0;
+  const contact = share >= 0.9 ? (share - 0.9) / 0.2 : share < 0.1 ? (share + 0.1) / 0.2 : -1;
+  if (contact >= 0) return bed.deflection * Math.sin(Math.PI * contact);
+  const since = (share - 0.1) * j.periodS;
+  return bed.deflection * (bed.ring ?? 0.3) * Math.exp(-4 * since) * Math.sin(2 * Math.PI * 9 * since);
+}
+
+/** The bed, its pads and the jumper's shadow at time `t`, as shapes: the bed sits `drop` pixels lower than at rest. */
+function bedShapes(bed: BedSpec, j: JumperSpec | undefined, drop: number, t: number): Shape[] {
+  const top = (j?.bedY ?? 0) + 1 + drop;
+  const middle = top + bed.thickness / 2;
+  const band = (y: number, r: number, value: number): Capsule => ({
+    kind: 'capsule',
+    x0: bed.from,
+    y0: y,
+    x1: bed.to,
+    y1: y,
+    r,
+    value,
+  });
+  const shapes: Shape[] = [
+    band(middle, bed.thickness / 2, 0.3),
+    band(top + bed.thickness / 4, 0.6, 0.5),
+    band(top + (3 * bed.thickness) / 4, 0.6, 0.5),
+    // The pads move half as far as the bed.
+    band(top + bed.thickness + 1.5 + drop / 2 - drop, 1.5, 0.75),
+  ];
+  if (bed.shadow && j) {
+    const { lift, jump } = flightAt(j, t);
+    if (jump >= 0) {
+      const size = 0.18 * j.size * Math.max(0.25, 1 - lift / (2 * j.apex));
+      shapes.push({ kind: 'disc', x: j.x + 0.5 * lift, y: middle, r: size, value: 0.12 });
+    }
+  }
+  return shapes;
+}
+
 /** The wall, the bed and a few lines that are made up, `pad` pixels bigger than the picture on every side. */
 function madeUpWall(spec: SceneSpec, rand: () => number, pad: number): Float32Array {
   const { width: w, height: h } = spec;
@@ -293,8 +353,10 @@ function cameraPath(spec: SceneSpec): { x: number; y: number }[] {
   for (let f = 0; f < count; f++) {
     const t = f / spec.fps;
     if (!camera) path.push({ x: 0, y: 0 });
-    else if (camera.kind === 'pan') path.push({ x: camera.vx * t, y: (camera.vy ?? 0) * t });
-    else if (camera.kind === 'sway') {
+    else if (camera.kind === 'pan') {
+      const since = Math.max(0, t - (camera.fromS ?? 0));
+      path.push({ x: camera.vx * since, y: (camera.vy ?? 0) * since });
+    } else if (camera.kind === 'sway') {
       const phase = Math.sin((2 * Math.PI * t) / camera.periodS);
       path.push({ x: camera.ax * phase, y: (camera.ay ?? 0) * phase });
     } else {
@@ -365,6 +427,10 @@ export function* sceneFrames(spec: SceneSpec): Generator<SceneFrame> {
       }
     };
 
+    if (spec.bed) {
+      const jumper = spec.jumpers.find((j) => j.x >= spec.bed!.from && j.x <= spec.bed!.to);
+      draw(bedShapes(spec.bed, jumper, bedDropAt(spec.bed, jumper, t), t), false);
+    }
     for (const s of spec.standers ?? [])
       draw(person(s.size, { hipX: s.x, hipY: s.y - 0.5 * s.size, angle: 0, swing: 0, phase: 0 }), false);
     for (const k of spec.walkers ?? []) {
