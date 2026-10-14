@@ -16,8 +16,8 @@ import { focusOnAthletes } from '../focus';
 import { APP_WITH_RESULT, putHandoff } from '../handoff';
 import { CanvasMaskLayer } from '../layer';
 import { hidesSomething } from '../maskedEstimator';
-import { maskedName, renderMaskedVideo, ZOOM_WINS_SHARE } from '../resultVideo';
-import type { MotionResult } from '../types';
+import { maskedName, renderMaskedVideo, resultPlan, scoutAthlete, ZOOM_WINS_SHARE } from '../resultVideo';
+import type { Box, MotionResult } from '../types';
 import { Panels } from './panels';
 
 /**
@@ -57,6 +57,37 @@ const panels = new Panels({
   given: $<HTMLCanvasElement>('c-given'),
   skeleton: $<HTMLCanvasElement>('c-skeleton'),
 });
+/**
+ * The position bars: the one under the buttons and one under each panel, so that the position can be moved (and read) next to the picture
+ * that is looked at, without scrolling back up, which matters on a phone where the panels are stacked. They all show the same position.
+ */
+const seekBars: HTMLInputElement[] = [seek];
+const clocks: HTMLOutputElement[] = [clock];
+for (const panel of document.querySelectorAll<HTMLElement>('.md-panel')) {
+  const row = document.createElement('div');
+  row.className = 'md-panel__seek';
+  const bar = document.createElement('input');
+  bar.type = 'range';
+  bar.min = bar.max = bar.value = '0';
+  bar.step = '1';
+  bar.disabled = true;
+  bar.setAttribute('aria-label', `Position in the video (${panel.querySelector('strong')?.textContent ?? 'panel'})`);
+  const time = document.createElement('output');
+  time.className = 'num';
+  time.textContent = '0.00 s';
+  row.append(bar, time);
+  panel.querySelector('canvas')!.after(row);
+  seekBars.push(bar);
+  clocks.push(time);
+}
+for (const bar of seekBars) bar.addEventListener('input', () => moveTo(Number(bar.value)));
+
+/** Shows the position on every bar and clock: frame `index` of the analyzed ones, at `timeS` seconds. */
+function showPosition(index: number, timeS: number): void {
+  for (const bar of seekBars) bar.value = String(index);
+  for (const out of clocks) out.textContent = `${timeS.toFixed(2)} s`;
+}
+
 const layer = new CanvasMaskLayer();
 /** What is done to the picture before the pose model, once the athlete is found; null when neither box is ticked. Made again when a box changes. */
 let viewer: AthleteView | null = null;
@@ -76,6 +107,8 @@ interface Session {
   total: number;
   /** The frame (of the analyzed ones) shown next. */
   index: number;
+  /** Where the athlete jumps, from a look at the start of the clip (null until it is done, or when nobody is found): the mask is drawn from it right after a seek. */
+  hint: Box | null;
   /** Set when another video is opened: what is still going on for this one is dropped. */
   closed: boolean;
 }
@@ -282,7 +315,7 @@ function updateControls(): void {
   playButton.disabled = !ready || working;
   stepButton.disabled = !ready || working || playing || (session !== null && session.index >= session.total);
   restartButton.disabled = !ready || working;
-  seek.disabled = !ready || working;
+  for (const bar of seekBars) bar.disabled = !ready || working;
   playButton.textContent = playing ? 'Pause' : session && session.index >= session.total ? 'Play again' : 'Play';
   fileInput.disabled = working;
   sampleSelect.disabled = working;
@@ -313,16 +346,18 @@ async function openVideo(file: File): Promise<void> {
     }
     const stride = analysisStride(fps);
     const total = Math.max(1, Math.floor((video.duration * fps) / stride));
-    session = { url, file, video, fps, stride, total, index: 0, closed: false };
+    session = { url, file, video, fps, stride, total, index: 0, hint: null, closed: false };
     panels.resize(video.videoWidth, video.videoHeight);
     layer.detector.reset();
-    seek.max = String(total - 1);
-    seek.value = '0';
+    layer.detector.hint(null);
+    for (const bar of seekBars) bar.max = String(total - 1);
+    showPosition(0, 0);
     setLoadStatus('');
     setStatus(
       `${file.name}: ${video.videoWidth} × ${video.videoHeight}, ${fps} frames a second, every ${stride === 1 ? 'frame' : `${stride}th frame`} is analyzed. Press Play.`,
     );
     updateControls();
+    void scoutSession(session);
     await run('show');
   } catch (error) {
     URL.revokeObjectURL(url);
@@ -432,8 +467,7 @@ async function processFrame(s: Session): Promise<void> {
   });
   showStats(s, result, people, athlete, prepared, [t1 - t0, t2 - t1]);
   announce(s, result, people);
-  seek.value = String(s.index);
-  clock.textContent = `${(frame / s.fps).toFixed(2)} s`;
+  showPosition(s.index, frame / s.fps);
 }
 
 const nextPaint = () =>
@@ -493,6 +527,46 @@ fileInput.addEventListener('change', () => {
   fileInput.value = '';
 });
 
+// --- Drag and drop -----------------------------------------------------------------------------------------------
+
+/** A video file: the type the system gives, or the extension when it gives none (some systems do not know .mkv or .mov). */
+function isVideo(file: File): boolean {
+  return file.type.startsWith('video/') || /\.(mp4|m4v|mov|webm|mkv|avi|ogv|3gp)$/i.test(file.name);
+}
+const carriesFiles = (event: DragEvent) => event.dataTransfer?.types.includes('Files') ?? false;
+/** dragenter and dragleave fire for every element the drag crosses: the page is left when as many have left as were entered. */
+let dragDepth = 0;
+const setDragging = (on: boolean) => document.body.classList.toggle('is-dragging', on);
+
+document.addEventListener('dragenter', (event) => {
+  if (!carriesFiles(event)) return;
+  event.preventDefault();
+  dragDepth++;
+  setDragging(rendering === null);
+});
+document.addEventListener('dragover', (event) => {
+  if (!carriesFiles(event)) return;
+  // Without this the browser opens the file in the tab instead of giving it to the page.
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = rendering ? 'none' : 'copy';
+});
+document.addEventListener('dragleave', (event) => {
+  if (!carriesFiles(event)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) setDragging(false);
+});
+document.addEventListener('drop', (event) => {
+  if (!carriesFiles(event)) return;
+  event.preventDefault();
+  dragDepth = 0;
+  setDragging(false);
+  if (rendering) return;
+  const files = Array.from(event.dataTransfer?.files ?? []);
+  const file = files.find(isVideo);
+  if (file) void openVideo(file);
+  else if (files.length > 0) setStatus(`${files[0].name} is not a video.`, 'error');
+});
+
 playButton.addEventListener('click', () => {
   if (!session) return;
   if (playing) {
@@ -510,12 +584,46 @@ stepButton.addEventListener('click', () => {
   if (session && !playing) void run('step');
 });
 
+/** Starts the detector again (the video was cut: a seek, a restart), with the place of the athlete when it is known, so that the mask is there at once. */
+function resetDetector(s: Session): void {
+  layer.detector.reset();
+  layer.detector.hint(s.hint);
+  viewer?.reset();
+}
+
 function restart(): void {
   if (!session) return;
   session.index = 0;
-  layer.detector.reset();
-  viewer?.reset();
+  resetDetector(session);
   updateControls();
+}
+
+/**
+ * The look at the start of the clip (the same one that makes the video for the app), on a video of its own, in the background: it says where the
+ * athlete jumps. Until it is done a seek shows the picture as it is until the detector is sure; after, the mask is there from the first frame.
+ */
+async function scoutSession(s: Session): Promise<void> {
+  let video: HTMLVideoElement | null = null;
+  try {
+    video = await loadVideo(s.url);
+    const plan = resultPlan(video.duration, s.fps, s.stride);
+    const box = await scoutAthlete(
+      video,
+      { sourceFps: s.fps, stride: s.stride, config: { ...layer.detector.config } },
+      plan,
+    );
+    if (s.closed) return;
+    s.hint = box;
+    // The video may be at its first frame, with nothing learned yet: the athlete is shown there too.
+    if (!playing && s.index === 0 && box) {
+      resetDetector(s);
+      void run('show');
+    }
+  } catch {
+    // The look is a help for the mask, not a need: the detector goes on without it.
+  } finally {
+    if (video) disposeVideo(video);
+  }
 }
 
 restartButton.addEventListener('click', () => {
@@ -524,13 +632,13 @@ restartButton.addEventListener('click', () => {
 });
 
 // Seeking cuts the video: the detector starts again from that frame (a gap in time resets it by itself).
-seek.addEventListener('input', () => {
+function moveTo(index: number): void {
   if (!session) return;
-  session.index = Number(seek.value);
-  layer.detector.reset();
-  viewer?.reset();
+  session.index = index;
+  resetDetector(session);
+  showPosition(index, (index * session.stride) / session.fps);
   void run('show');
-});
+}
 
 for (const box of [zoomBox, turnBox]) {
   box.addEventListener('change', () => {
