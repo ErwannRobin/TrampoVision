@@ -30,13 +30,14 @@ function frame(coverage: number): MotionResult {
   };
 }
 
-/** The same, for a picture of 100 × 100 pixels in which the athlete is in `athletes`. */
+/** The same, for a picture of 100 × 100 pixels in which the athlete is in `athletes`: small enough on a steady shot for the zoom view. */
 const frameWith = (coverage: number, athletes: Box[]): MotionResult => ({
   ...frame(coverage),
   width: 100,
   height: 100,
   found: athletes.length > 0,
   athletes,
+  camera: { type: 'fixed', dx: 0, dy: 0, known: true, speed: 0, athleteShare: 0.2 },
 });
 
 /** A person whose hips are at (x, y) of the picture, 0 to 1. */
@@ -49,7 +50,7 @@ function person(x: number, y: number): PoseDetection {
 /** A pose estimator that records what it was given, and a layer that says what it is told to. */
 function setup(
   says: (MotionResult | null | Error)[],
-  people: PoseDetection[] | Promise<PoseDetection[]> = detections,
+  people: PoseDetection[] | Promise<PoseDetection[]> | (() => PoseDetection[]) = detections,
   extra = {},
 ) {
   const given: unknown[] = [];
@@ -59,7 +60,7 @@ function setup(
     detect: (source, timestampMs) => {
       given.push(source);
       times.push(timestampMs);
-      return people;
+      return typeof people === 'function' ? people() : people;
     },
     dispose: vi.fn(),
   };
@@ -158,6 +159,27 @@ describe('the motion mask in front of a pose estimator', () => {
       const estimator = await factory(options);
       await expect(estimator.detect(video, 1000)).resolves.toEqual([athlete]);
     });
+
+    it('is the person whose hips travel like a jumper, even when the motion box sits on a spotter', async () => {
+      // A person with real shoulders and hips, so the travel of the hips can be followed from frame to frame.
+      const body = (x: number, y: number, torso: number): PoseDetection => {
+        const landmarks = Array.from({ length: LANDMARK_COUNT }, () => ({ x, y: y - torso / 2, visibility: 1 }));
+        landmarks[LM.L_HIP] = landmarks[LM.R_HIP] = { x, y, visibility: 1 };
+        landmarks[LM.L_SHOULDER] = landmarks[LM.R_SHOULDER] = { x, y: y - torso, visibility: 1 };
+        return { landmarks };
+      };
+      const jumper = (t: number) => body(0.3, 0.55 - 0.3 * Math.abs(Math.sin((Math.PI * t) / 1.6)), 0.08);
+      const spotter = body(0.52, 0.8, 0.2);
+      // The detector's box joined the spotter and a post: the box alone would follow the spotter.
+      const boxOnSpotter = [{ x0: 42, y0: 70, x1: 62, y1: 95 }];
+      let now = 0;
+      const { factory } = setup([frameWith(0.2, boxOnSpotter)], () => [spotter, jumper(now / 1000)]);
+      const estimator = await factory(options);
+      let last: PoseDetection[] = [];
+      for (now = 0; now < 8000; now += 33) last = estimator.detect(video, now) as PoseDetection[];
+      expect(last).toHaveLength(1);
+      expect(last[0].landmarks[LM.L_HIP].x).toBeCloseTo(0.3);
+    });
   });
 
   describe('the view of the athlete', () => {
@@ -165,12 +187,14 @@ describe('the motion mask in front of a pose estimator', () => {
     const zoomed = { name: 'a zoomed view' } as unknown as HTMLCanvasElement;
     const paint = vi.fn(() => zoomed as unknown as CanvasImageSource);
 
-    it('gives the pose model a zoomed view of the athlete, and the people it finds are put back in the frame', async () => {
+    it('gives the pose model a zoomed view of the athlete once the shot has been steady a while, and the people it finds are put back in the frame', async () => {
       // The athlete is in the middle of the view the pose model is given: they are where the box of the athlete is.
       const { factory, given } = setup([frameWith(0.2, where)], [person(0.5, 0.5)], { view: { zoom: true }, paint });
       const estimator = await factory(options);
-      const found = estimator.detect(video, 1000) as PoseDetection[];
-      expect(given).toEqual([zoomed]);
+      // The zoom view waits for the shot to have been steady, with a small athlete, for two seconds (`ZoomGate`).
+      estimator.detect(video, 0);
+      const found = estimator.detect(video, 2500) as PoseDetection[];
+      expect(given).toEqual([masked, zoomed]);
       expect(paint).toHaveBeenCalledTimes(1);
       // The middle of the box, which is 50.5 and 60.5 of a picture of 100.
       expect(found).toHaveLength(1);
@@ -198,7 +222,8 @@ describe('the motion mask in front of a pose estimator', () => {
         paint,
       });
       const estimator = await factory(options);
-      const found = await (estimator.detect(video, 1000) as Promise<PoseDetection[]>);
+      await estimator.detect(video, 0);
+      const found = await (estimator.detect(video, 2500) as Promise<PoseDetection[]>);
       expect(found[0].landmarks[LM.L_HIP].x).toBeCloseTo(0.505, 6);
     });
   });

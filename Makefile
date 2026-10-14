@@ -118,6 +118,11 @@ motion-eval: node_modules ## Run the motion detector over a real clip (needs ffm
 	$(call require,FILE,make motion-eval FILE=clip.mp4 [SHEET=boxes.png] [EVERY=3] [CONFIG=json])
 	npx vite-node scripts/motion-eval.ts $(FILE) $(if $(SHEET),--sheet $(SHEET)) $(if $(EVERY),--every $(EVERY)) $(if $(CONFIG),--config '$(CONFIG)')
 
+pose-eval: node_modules ## Check the choice of the jumper on a real clip (needs Chrome, ffmpeg): FILE= [MASKED=1] [ZOOM=1] [SHEET=chosen.png] [EVERY=3] [RATE=15] [POSES=5] [ATHLETES=1] [CACHE=f.json] [MAX=s]
+	$(call require,FILE,make pose-eval FILE=clip.mp4 [MASKED=1] [ZOOM=1] [SHEET=chosen.png] [EVERY=3] [RATE=15] [POSES=5] [ATHLETES=1] [CACHE=f.json] [MAX=s])
+	@test -d node_modules/playwright-core || npm i --no-save playwright-core
+	npx vite-node scripts/pose-eval.ts $(FILE) $(if $(MASKED),--masked) $(if $(ZOOM),--zoom) $(if $(SHEET),--sheet $(SHEET)) $(if $(EVERY),--every $(EVERY)) $(if $(RATE),--rate $(RATE)) $(if $(POSES),--poses $(POSES)) $(if $(ATHLETES),--athletes $(ATHLETES)) $(if $(CACHE),--cache $(CACHE)) $(if $(MAX),--max $(MAX))
+
 ##@ Review Worker
 
 worker-check: node_modules ## Typecheck the Worker (worker/)

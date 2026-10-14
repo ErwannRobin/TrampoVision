@@ -12,6 +12,7 @@ import { TrampolineMotionDetector } from '../src/motion/detector';
 import type { MotionConfig } from '../src/motion/config';
 import { formatSeconds, formatSummary, summarize, type FrameRow } from '../src/motion/report';
 import { workSize } from '../src/motion/pixels';
+import { probe } from './clip';
 
 const args = process.argv.slice(2);
 const valued = new Set(['--sheet', '--every', '--config']);
@@ -26,32 +27,6 @@ if (!file) {
 }
 const config: Partial<MotionConfig> = flag('--config') ? JSON.parse(flag('--config')!) : {};
 const workWidth = config.workWidth ?? new TrampolineMotionDetector().config.workWidth;
-
-/** The size and frame rate of the clip as it is shown, from ffprobe: a phone clip stored sideways with a rotation tag is turned, as ffmpeg and the browser turn it. */
-function probe(path: string): { width: number; height: number; fps: number } {
-  const out = execFileSync('ffprobe', [
-    '-v',
-    'error',
-    '-select_streams',
-    'v:0',
-    '-show_entries',
-    'stream=width,height,r_frame_rate:stream_side_data=rotation',
-    '-of',
-    'default=nw=1:nk=1',
-    path,
-  ])
-    .toString()
-    .trim()
-    .split('\n');
-  const [num, den] = out[2].split('/').map(Number);
-  const rotation = Math.abs(Number(out[3] ?? 0)) % 180;
-  const sideways = rotation === 90;
-  return {
-    width: Number(sideways ? out[1] : out[0]),
-    height: Number(sideways ? out[0] : out[1]),
-    fps: num / (den || 1),
-  };
-}
 
 /** Every frame of the clip as a gray picture `width` × `height`, 8 bits a pixel, decoded the way the page reads a video: supersampled and averaged down. */
 function decode(path: string, width: number, height: number): Uint8Array {

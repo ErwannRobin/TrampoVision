@@ -2,11 +2,46 @@ import type { PoseDetection, PoseEstimatorFactory } from '../pose/types';
 import type { MotionConfig } from './config';
 import { AthleteView, type AthleteViewOptions, type Painter, type Prepared } from './athleteView';
 import { focusOnAthletes } from './focus';
+import { JumperSelector } from './jumperSelect';
 import { CanvasMaskLayer, type MaskLayer } from './layer';
 import type { MotionResult } from './types';
 
 /** A mask that keeps this much of the picture or more hides nothing worth the trouble: the picture goes to the pose model as it is. */
 const NOTHING_HIDDEN = 0.999;
+
+/**
+ * The zoom view is used only while the athlete is smaller than this share of the picture's shorter side, on a steady shot. Measured at 30
+ * frames a second on real footage (share of frames in which the chosen athlete is seen, plain → zoomed): it lifts a small athlete — a wide
+ * tripod shot (share 0.21) 7% → 55%, a synchro one (0.31) 28% → 61%, a competition clip filmed from behind the end deck (0.26) 0% → 54% —
+ * and it hurts a big one (a phone close-up, 0.60: 87% → 58%) and a broadcast with cuts and tilts (55% → 36%), whose box is often wrong.
+ */
+const ZOOM_MAX_SHARE = 0.35;
+/** ... and stays in use until the athlete grows past this: the smoothed share wobbles around a threshold. */
+const ZOOM_OFF_SHARE = 0.45;
+/** The shot must have been steady, with a small athlete, this long before the zoom view cuts in: the phone close-up passes below `ZOOM_MAX_SHARE` for stray moments. */
+const ZOOM_WARMUP_S = 2;
+
+/**
+ * Says, frame by frame, whether the zoomed view of the athlete would help the pose model: yes once the shot has been steady with a small
+ * athlete for `ZOOM_WARMUP_S`, and until the athlete grows or the camera moves (see `ZOOM_MAX_SHARE`).
+ */
+export class ZoomGate {
+  private smallSinceMs: number | null = null;
+  private on = false;
+
+  helps(result: MotionResult, timestampMs: number): boolean {
+    const share = result.camera.athleteShare;
+    const small = result.camera.type === 'fixed' && share > 0 && share < (this.on ? ZOOM_OFF_SHARE : ZOOM_MAX_SHARE);
+    if (!small) {
+      this.smallSinceMs = null;
+      this.on = false;
+      return false;
+    }
+    this.smallSinceMs ??= timestampMs;
+    this.on = this.on || timestampMs - this.smallSinceMs >= ZOOM_WARMUP_S * 1000;
+    return this.on;
+  }
+}
 
 /** Whether a frame is worth painting over: the detector found a region and the mask hides something. When not, the pose model gets the video. */
 export function hidesSomething(result: MotionResult | null): boolean {
@@ -20,8 +55,10 @@ export interface MotionMaskOptions {
   /** Told what the detector found in every frame (null when the frame could not be read), for a debug view. */
   onFrame?: (result: MotionResult | null) => void;
   /**
-   * Give back only the person who jumps (the one in the box the detector reports) and not the people who stand near the bed and are still
-   * seen through the margin of the mask. Default true. Nobody is dropped while the detector does not know where the athlete is.
+   * Give back only the person who jumps, and not the people who stand near the bed and are still seen through the margin of the mask.
+   * The person whose hips travel up and down like a jumper's is the athlete (`JumperSelector`); while no one has travelled yet (the
+   * first jump, or a camera that follows the athlete and keeps them still in the picture), the person in the box the detector reports
+   * is. Default true. Nobody is dropped while neither knows where the athlete is.
    */
   focus?: boolean;
   /**
@@ -59,6 +96,8 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
     const estimator = await inner(estimatorOptions);
     const layer = options.layer?.() ?? new CanvasMaskLayer(options.config, options.fill);
     const focus = options.focus ?? true;
+    const selector = new JumperSelector(Math.max(1, Math.floor(options.config?.maxAthletes ?? 1)));
+    const zoomGate = new ZoomGate();
     const viewer =
       options.view?.zoom || options.view?.rotate
         ? new AthleteView({ zoom: options.view.zoom ?? false, rotate: options.view.rotate ?? false }, options.paint)
@@ -79,7 +118,7 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
             options.onFrame?.(result);
             if (hidesSomething(result)) source = layer.render(video) as unknown as HTMLVideoElement;
             athletes = result;
-            if (viewer && result) {
+            if (viewer && result && zoomGate.helps(result, timestampMs)) {
               prepared = viewer.prepare(
                 source as unknown as CanvasImageSource,
                 frame,
@@ -99,7 +138,11 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
             viewer && prepared && athletes
               ? viewer.finish(people, prepared, frame, athletes.athletes, athletes)
               : people;
-          return focus && athletes ? focusOnAthletes(inFrame, athletes.athletes, athletes) : inFrame;
+          if (!focus) return inFrame;
+          // The person whose hips travel like a jumper's; until a track has travelled, the person in the motion box.
+          const byTravel = selector.push(inFrame, timestampMs / 1000);
+          if (byTravel !== null) return byTravel;
+          return athletes ? focusOnAthletes(inFrame, athletes.athletes, athletes) : inFrame;
         };
         return found instanceof Promise ? found.then(narrow) : narrow(found);
       },
