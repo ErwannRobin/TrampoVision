@@ -59,8 +59,9 @@ function overlapShare(a: Box, b: Box): number {
  * 4. The athlete and the mask: the evidence is kept as regions with hysteresis (it enters high and leaves low) and small pieces are
  *    dropped. Of the rest only the strongest is the athlete (`maxAthletes`: the video is of one person who jumps, and the others, the
  *    coach, the people who wait, are not): the region that was followed keeps its place unless another is clearly stronger. The region is the
- *    place the athlete jumps through; the athlete is the box of what moves in it right now. That box, with a margin and soft edges, is what the
- *    mask keeps, so a person who stands still in the place the athlete jumps through, or next to them, is hidden too.
+ *    place the athlete jumps through; the athlete is the box of what moves in it right now, less the bed, which moves with the jumps too but
+ *    is a flat bar and not a body (`boxIn`). That box, with a margin and soft edges, is what the mask keeps, so a person who stands still in
+ *    the place the athlete jumps through, or next to them, is hidden too.
  *
  * It never hides the picture when it is not sure: with no athlete the mask is all 1, which is the picture as it was, and the background
  * fades in and out (`fadeInS`, `fadeOutS`) instead of cutting.
@@ -71,10 +72,13 @@ function overlapShare(a: Box, b: Box): number {
  *   background; the vertical shake the columns agree on when that cannot be told).
  * - `lowAngle`, a still camera at the bed looking up, the athlete big in the picture: the same, with the athlete excluded from the fit
  *   by where the detector found them, and a bigger piece of motion needed to count as an athlete.
- * - `tracking`, a camera that follows the athlete or pans: the move is taken out, and everything the detector remembers (what went up and
- *   down through a pixel, the rhythm of the columns, the mask) moves with the picture, so it stays on the same place of the scene. What
- *   is left to see is the athlete against a background that stands still, as in a fixed shot. When the move cannot be told (a plain
- *   wall) nothing is said about the frame, and the mask opens by itself as what was remembered fades.
+ * - `tracking`, a camera that follows the athlete or pans: the move is taken out, and a move has to be faster than the camera's own
+ *   error to count. What is left to see is the athlete against a background that stands still, as in a fixed shot. When the move cannot
+ *   be told (a plain wall) nothing is said about the frame, and the mask opens by itself as what was remembered fades.
+ *
+ * In every kind of shot, everything the detector remembers (what went up and down through a pixel, the rhythm of the columns, the mask)
+ * moves with the picture by the move that was measured, so it stays on the same place of the scene; with a camera that stands still that
+ * move adds up to nothing. So a change of the kind of shot drops nothing.
  */
 export class TrampolineMotionDetector {
   /** What the person set, and what is in use: the same plus what the kind of shot changes (`CAMERA_PROFILES`). The parts of the detector share the second. */
@@ -252,9 +256,9 @@ export class TrampolineMotionDetector {
   private applyType(): CameraType {
     const type = this.wantedType();
     if (type !== this.cameraType) {
-      // What was learned before the camera was known to follow was learned from a background that moved, and is dropped. Leaving
-      // `tracking` keeps it: the memory is in the place of the picture as it is now, which is where a still camera looks.
-      if (type === 'tracking') this.forget();
+      // Nothing is forgotten at the change: what the detector remembers has moved with the picture all along, whatever the kind of shot,
+      // so it is in the right place of the scene either way. (It used to be dropped on entering `tracking`, and a camera in a hand, whose
+      // speed sits around the threshold, lost the athlete for seconds at every change.)
       this.cameraType = type;
       this.useProfile();
     }
@@ -284,7 +288,8 @@ export class TrampolineMotionDetector {
     const type = this.applyType();
     if (!estimate) return { kind: 'shake' };
     if (!estimate.ok) return type === 'tracking' ? { kind: 'unknown' } : { kind: 'shake' };
-    if (type === 'tracking') this.moveMemory(estimate.dx, estimate.dy);
+    // Whatever the kind of shot: with a camera that stands still the move adds up to nothing, and the memory stays where it is.
+    this.moveMemory(estimate.dx, estimate.dy);
     return { kind: 'move', dx: estimate.dx, dy: estimate.dy };
   }
 
@@ -434,7 +439,10 @@ export class TrampolineMotionDetector {
     const pad = Math.max(1, Math.round(cfg.marginShare * short));
     const chosen = this.found ? this.chooseAthletes(pieces, big) : [];
     this.windows = chosen.map((label) => growBox(pieces.box[label], pad, w, h));
-    this.athletes = this.windows.map((window) => this.boxIn(window));
+    const before = this.athletes;
+    this.athletes = this.windows.map((window) =>
+      this.boxIn(window, before.find((b) => overlapShare(b, window) > 0) ?? null),
+    );
     // Against the shorter side, like every size of the detector: the same athlete is as big in a portrait video as in a landscape one.
     this.athleteWidth = this.athletes.length ? Math.max(...this.athletes.map((b) => b.x1 - b.x0 + 1)) / short : null;
 
@@ -485,18 +493,23 @@ export class TrampolineMotionDetector {
   }
 
   /**
-   * The box of what moves inside `window` now: the biggest group of pixels that moved lately, with the groups that are big enough to be
-   * a part of the same body (a leg, a hand), and no speck of noise. When nothing moves in the window (the athlete stands on the bed) the
-   * window itself is the athlete: it is where they jump.
+   * The box of what moves inside `window` now: the group of pixels that moved lately that is most like a body (the biggest, but a flat bar
+   * is not a body), with the groups that are big enough to be a part of the same body (a leg, a hand) and close enough to it, and no speck
+   * of noise. A real bed goes down at every landing, shakes after, and carries the athlete's shadow, all in time with the jumps, and a line
+   * of the wall flickers when the camera's move is taken out: they are bars, rows of moving pixels far wider than the body's rows, and are
+   * taken out before the groups are made, so they neither are the athlete nor join them. When nothing like a body moves in the window
+   * (the athlete stands on the bed) the athlete is where they were a frame ago, or the window itself: it is where they jump.
    */
-  private boxIn(window: Box): Box {
+  private boxIn(window: Box, before: Box | null): Box {
     const { width: w, height: h, cfg, held, moving } = this;
+    const join = Math.max(1, Math.round(cfg.joinShare * Math.min(w, h)));
     moving.fill(0);
     for (let y = window.y0; y <= window.y1; y++) {
       for (let x = window.x0; x <= window.x1; x++) moving[y * w + x] = held[y * w + x] > 0 ? 1 : 0;
     }
+    this.dropBars(window, join);
     // Grown a little so the edges of one body are one group.
-    dilate(moving, this.joined, w, h, Math.max(1, Math.round(cfg.joinShare * Math.min(w, h))), this.tmpBytes);
+    dilate(moving, this.joined, w, h, join, this.tmpBytes);
     const count = labelPieces(this.joined, this.labels, w, h, this.stack).length;
     const pixels = new Array<number>(count).fill(0);
     const groups: Box[] = Array.from({ length: count }, () => ({ x0: w, y0: h, x1: -1, y1: -1 }));
@@ -513,18 +526,78 @@ export class TrampolineMotionDetector {
         g.y1 = Math.max(g.y1, y);
       }
     }
+    const width = (b: Box) => b.x1 - b.x0 + 1;
+    const height = (b: Box) => b.y1 - b.y0 + 1;
+    // How much like a body a group is: its pixels, divided by how many times wider than `flatShape` heights it is.
+    const bodyLike = (label: number) =>
+      pixels[label] / Math.max(1, width(groups[label]) / (cfg.flatShape * height(groups[label])));
     let best = 0;
-    for (let label = 1; label < count; label++) if (pixels[label] > pixels[best]) best = label;
-    if (best === 0 || pixels[best] < cfg.minActivePixels) return { ...window };
-    const box = { ...groups[best] };
+    for (let label = 1; label < count; label++) if (bodyLike(label) > bodyLike(best)) best = label;
+    if (best === 0 || pixels[best] < cfg.minActivePixels) return before ?? { ...window };
+    const body = groups[best];
+    const box = { ...body };
+    const reach = cfg.partReachShare * Math.max(height(body), width(body));
     for (let label = 1; label < count; label++) {
       if (label === best || pixels[label] < Math.max(cfg.minActivePixels, cfg.partShare * pixels[best])) continue;
-      box.x0 = Math.min(box.x0, groups[label].x0);
-      box.x1 = Math.max(box.x1, groups[label].x1);
-      box.y0 = Math.min(box.y0, groups[label].y0);
-      box.y1 = Math.max(box.y1, groups[label].y1);
+      const g = groups[label];
+      const gapY = Math.max(0, g.y0 - body.y1, body.y0 - g.y1);
+      const gapX = Math.max(0, g.x0 - body.x1, body.x0 - g.x1);
+      // A part of the same body is within a body length of it and no wider than it.
+      if (gapY > reach || gapX > reach || width(g) > cfg.partWidthShare * width(body)) continue;
+      box.x0 = Math.min(box.x0, g.x0);
+      box.x1 = Math.max(box.x1, g.x1);
+      box.y0 = Math.min(box.y0, g.y0);
+      box.y1 = Math.max(box.y1, g.y1);
     }
     return box;
+  }
+
+  /**
+   * Takes the bars out of `moving` inside `window`: the bed, its pads, a line of the wall. A bar is a row whose moving pixels (in runs of two
+   * or more; gaps of up to `join` bridged) spread over more than `bedRowShare` times the typical row, as one run that wide or as pieces with
+   * at least half a typical row of pixels outside the biggest of them (a body with a speck of noise far from it is not a bar). The typical
+   * row is the 35th percentile of the rows' spreads: the body has more rows than the bed, and a tiny athlete over a thick bed still has
+   * more narrow rows than that.
+   */
+  private dropBars(window: Box, join: number): void {
+    const { width: w, cfg, moving } = this;
+    const rows: { y: number; x0: number; x1: number; spread: number; biggest: number; outside: number }[] = [];
+    for (let y = window.y0; y <= window.y1; y++) {
+      let first = -1;
+      let last = -1;
+      let biggest = 0;
+      let count = 0;
+      let runStart = -1;
+      let runLast = -1;
+      const endRun = () => {
+        const length = runLast - runStart + 1;
+        if (length < 2) return;
+        if (first < 0) first = runStart;
+        last = runLast;
+        biggest = Math.max(biggest, length);
+      };
+      for (let x = window.x0; x <= window.x1 + 1; x++) {
+        const on = x <= window.x1 && moving[y * w + x] === 1;
+        if (on) count++;
+        if (on && runStart < 0) runStart = x;
+        if (on) runLast = x;
+        if (runStart >= 0 && !on && x - runLast > join) {
+          endRun();
+          runStart = -1;
+        }
+      }
+      if (runStart >= 0) endRun();
+      if (first < 0) continue;
+      rows.push({ y, x0: first, x1: last, spread: last - first + 1, biggest, outside: count - biggest });
+    }
+    if (rows.length < 3) return;
+    const spreads = rows.map((r) => r.spread).sort((a, b) => a - b);
+    const typical = spreads[Math.floor(0.35 * spreads.length)];
+    const bar = Math.max(typical * cfg.bedRowShare, typical + 4);
+    for (const r of rows) {
+      if (r.spread <= bar || (r.biggest <= bar && r.outside < Math.max(2, typical / 2))) continue;
+      for (let x = window.x0; x <= window.x1; x++) moving[r.y * w + x] = 0;
+    }
   }
 
   /** Keeps the picture in `box` and `margin` pixels around it, the edge soft over `featherShare`: added to `target` as the larger of the two. */

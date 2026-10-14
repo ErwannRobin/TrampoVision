@@ -26,6 +26,9 @@ interface Run {
   athletes: number[];
   /** The middle of the box of the first athlete, per frame; NaN where there is none. */
   centerX: number[];
+  /** The width of that box, per frame, and the width of the athlete's pixels in the truth of the scene; NaN where there is none. */
+  boxWidth: number[];
+  truthWidth: number[];
   period: (number | null)[];
   /** The kind of shot the detector was working with, per frame. */
   shot: string[];
@@ -54,6 +57,8 @@ function run(name: string, spec: SceneSpec, config?: Partial<MotionConfig>): Run
     standerKept: (spec.standers ?? []).map(() => []),
     athletes: [],
     centerX: [],
+    boxWidth: [],
+    truthWidth: [],
     period: [],
     shot: [],
     lastResult: undefined as unknown as MotionResult,
@@ -70,10 +75,14 @@ function run(name: string, spec: SceneSpec, config?: Partial<MotionConfig>): Run
     const truth = scene.jumperPixels[f];
     let athlete = 0;
     let kept = 0;
+    let left = w;
+    let right = -1;
     for (let i = 0; i < truth.length; i++) {
       if (!truth[i]) continue;
       athlete++;
       if (result.mask[i] >= 0.5) kept++;
+      left = Math.min(left, i % w);
+      right = Math.max(right, i % w);
     }
     let farKept = 0;
     for (let y = 0; y < h; y++) {
@@ -115,6 +124,8 @@ function run(name: string, spec: SceneSpec, config?: Partial<MotionConfig>): Run
     out.blinks.push(blinks);
     out.athletes.push(result.athletes.length);
     out.centerX.push(result.athletes.length ? (result.athletes[0].x0 + result.athletes[0].x1) / 2 : NaN);
+    out.boxWidth.push(result.athletes.length ? result.athletes[0].x1 - result.athletes[0].x0 + 1 : NaN);
+    out.truthWidth.push(right >= 0 ? right - left + 1 : NaN);
     out.period.push(result.periodS);
     out.shot.push(result.camera.type);
     beforeThat = before;
@@ -126,6 +137,11 @@ function run(name: string, spec: SceneSpec, config?: Partial<MotionConfig>): Run
 }
 
 const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
+/** The value `share` of the way up the sorted values (0.5 is the median). */
+const quantile = (values: number[], share: number) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.floor(share * sorted.length))];
+};
 /** The values of a series from second `from` to second `to` (the end of the run when missing). */
 const between = (r: Run, series: number[], from: number, to = Infinity) =>
   series.filter((_, f) => f / r.fps >= from && f / r.fps < to && !Number.isNaN(series[f]));
@@ -433,6 +449,36 @@ describe('what the athlete does', () => {
   });
 });
 
+describe('a real trampoline', () => {
+  // A bed that goes down 2 pixels at every landing and shakes after, with the jumper's shadow on it: all of it moves in time with the jumps.
+  const bed = { from: 26, to: 102, thickness: 4, deflection: 2, shadow: true };
+
+  it('keeps the box about the athlete, and not the bed that moves with every landing', () => {
+    const r = run('bed', clip({ bed }));
+    const ratio = between(
+      r,
+      r.boxWidth.map((width, f) => width / r.truthWidth[f]),
+      6,
+    );
+    // The box is about a body wide (the arms swing, and a moving edge adds a pixel or two each side), as it is with a bed that does not
+    // move: 1.45 in the middle frame and 2.4 in the 90th, 20 pixels at the widest. The bed is 76 pixels, seven bodies.
+    expect(quantile(ratio, 0.5)).toBeLessThan(1.8);
+    expect(quantile(ratio, 0.9)).toBeLessThan(3);
+    expect(Math.max(...between(r, r.boxWidth, 6))).toBeLessThan(30);
+    expect(mean(between(r, r.athleteKept, 6))).toBeGreaterThan(0.97);
+  });
+
+  it('keeps the athlete while a still camera starts to drift and the shot becomes a camera that moves', () => {
+    // A tripod shot until 5 s, then the camera drifts at 6 pixels a second (a hand): fast enough to read as a camera that moves.
+    const r = run('drift', clip({ seconds: 13, camera: { kind: 'pan', vx: 6, fromS: 5 } }));
+    expect(r.shot[r.shot.length - 1]).toBe('tracking');
+    const lost = r.found
+      .map((found, f) => (f / r.fps >= 5 && !found ? f / r.fps : NaN))
+      .filter((t) => !Number.isNaN(t));
+    expect(lost).toEqual([]);
+  });
+});
+
 describe('the video', () => {
   it('copes with a camera that shakes', () => {
     const r = run('shake', clip({ jitter: 0.8, noise: 0.01 }));
@@ -478,10 +524,13 @@ describe('a camera that moves', () => {
     }
   });
 
-  it('would take the wall for the athlete without knowing the camera moves', () => {
-    // The same close-up, with the kind of shot forced to a still camera: the wall that goes up and down with the jumps is evidence too.
+  it('keeps the athlete in the same close-up with the kind of shot forced to a still camera', () => {
+    // The move of the picture is measured and what the detector remembers moves with it in every kind of shot, so the wall that goes up and
+    // down with the jumps is not evidence even then; the kind of shot only changes thresholds. (It used to leave a quarter of the far
+    // picture open: the memory moved with the picture in a following shot only.)
     const blind = run('follow-blind', clip({ camera: { kind: 'follow', gain: 0.9 } }), { cameraType: 'fixed' });
-    expect(mean(between(blind, blind.farKept, 8))).toBeGreaterThan(0.2);
+    expect(mean(between(blind, blind.athleteKept, 8))).toBeGreaterThan(0.97);
+    expect(mean(between(blind, blind.farKept, 8))).toBeLessThan(0.06);
   });
 
   it('does not take the move of the camera for an athlete', () => {

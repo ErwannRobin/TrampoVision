@@ -47,6 +47,8 @@ import type { ModelVariant, Point, PoseEngineId } from './pose/types';
 import { canDecode, decodeProblem, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
 import { fitTrackToClip } from './motion/fitTrack';
 import { receiveHandoff } from './motion/handoff';
+import { withMotionMask } from './motion/maskedEstimator';
+import { estimatorFactory } from './pose/engines';
 import { loadSample, loadSampleSeries, loadSamples, type Sample } from './video/sample';
 import { dragHasFiles, pickDroppedSeries, pickDroppedVideo } from './video/drop';
 import { matchClip, type ClipIdentity } from './analysis/seriesMatch';
@@ -152,6 +154,8 @@ interface MaskedCopy {
   fps: number;
   /** The size of the clip that is shown. */
   clip: { width: number; height: number };
+  /** True when the motion page said to analyze the clip itself, live through the detector with the zoomed view of the athlete, instead of this copy (see `Handoff.zoom`). */
+  zoom: boolean;
 }
 
 /**
@@ -161,6 +165,7 @@ interface MaskedCopy {
 async function openMasked(
   file: File,
   clip: MaskedCopy['clip'],
+  zoom: boolean,
   signal: AbortSignal,
   onProgress: (fraction: number) => void,
 ): Promise<MaskedCopy> {
@@ -185,7 +190,7 @@ async function openMasked(
     }
     const measured = await estimateFps(probe);
     disposeVideo(probe);
-    return { url, fps: measured ?? 30, clip };
+    return { url, fps: measured ?? 30, clip, zoom };
   } catch (err) {
     URL.revokeObjectURL(url);
     throw err;
@@ -409,7 +414,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
     let live = true;
     receiveHandoff().then(
       (video) => {
-        if (live && video) void onFile(video.original, undefined, video.masked);
+        if (live && video) void onFile(video.original, undefined, video);
       },
       (err) => live && setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) }),
     );
@@ -520,9 +525,10 @@ function AppView({ playhead }: { playhead: Playhead }) {
 
   /**
    * `series`: the saved analysis of this very video (a sample's): opened in place of running the pose model.
-   * `masked`: the same clip with the background hidden: it is shown as `next` is, and the pose model reads it.
+   * `handoff`: what the motion page left — the same clip with the background hidden, which the pose model reads in place of
+   * `next`, or (`zoom`) the word that the clip itself is to be analyzed live through the detector with the zoomed view.
    */
-  async function onFile(next: File, series?: string, masked?: File) {
+  async function onFile(next: File, series?: string, handoff?: { masked: File; zoom: boolean }) {
     abort.current?.abort();
     if (url) URL.revokeObjectURL(url);
     dropMasked();
@@ -594,9 +600,9 @@ function AppView({ playhead }: { playhead: Playhead }) {
       disposeVideo(probe);
       if (!isCurrent()) return;
       setFps(measured ?? 30);
-      if (masked) {
+      if (handoff) {
         try {
-          const copy = await openMasked(masked, shown, ctl.signal, (progress) => {
+          const copy = await openMasked(handoff.masked, shown, handoff.zoom, ctl.signal, (progress) => {
             if (isCurrent()) setStatus({ kind: 'loading', stage: 'converting', progress });
           });
           if (!isCurrent()) {
@@ -656,19 +662,36 @@ function AppView({ playhead }: { playhead: Playhead }) {
     const strideNow = advanced ? stride : analysisStride(fps);
     if (strideNow !== stride) setStride(strideNow);
     try {
+      const engineNow = advanced ? engine : 'mediapipe';
+      // The motion page said the athlete is small on a steady shot: the clip itself is analyzed, live through the detector,
+      // with the zoomed view of the athlete — the view is what lets the pose model see a small athlete at all — and the
+      // person who jumps is chosen among the people found (`JumperSelector`). Only MediaPipe reads the painted frames.
+      const live = (maskedRef.current?.zoom ?? false) && engineNow === 'mediapipe';
       // With a masked copy, the pose model reads it at its own rate (it holds only the frames that are analyzed): every frame of it.
-      const masked = maskedRef.current;
+      const masked = live ? null : maskedRef.current;
       const read = await extractPoseTracks(masked?.url ?? url, {
-        engine: advanced ? engine : 'mediapipe',
+        engine: engineNow,
         model,
         numPoses,
-        preferGpu,
+        // The live zoomed path runs on the CPU delegate: it is the one the choice of the jumper was measured on, and on the
+        // GPU delegate of a headless Chrome the model found the jumper half as often, with ghosts. The analysis is offline.
+        preferGpu: live ? false : preferGpu,
         sourceFps: masked ? masked.fps : fps,
         stride: masked ? 1 : strideNow,
         signal: ctl.signal,
         onBackend: setBackend,
         onLoad: (progress) => setStatus({ kind: 'loading', stage: 'model', progress }),
         onProgress: (done, total) => setStatus({ kind: 'analyzing', done, total }),
+        createEstimator: live
+          ? withMotionMask(estimatorFactory('mediapipe'), {
+              // The detector keeps its one box (the zoom view and the mask were measured with it); the choice of the jumper
+              // keeps as many people as asked, or two (synchro) when the count is left to the app. The travel alone decides
+              // ('travel'): the tracker locks on the first person it is given, and the motion box would hand it the spotter.
+              athletes: numPoses > 0 ? Math.floor(numPoses) : 2,
+              focus: 'travel',
+              view: { zoom: true },
+            })
+          : undefined,
       });
       const ts = masked
         ? read.map((tr) => fitTrackToClip(tr, { ...masked.clip, sourceFps: fps, stride: strideNow }))

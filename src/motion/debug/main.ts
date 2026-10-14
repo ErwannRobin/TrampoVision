@@ -16,7 +16,7 @@ import { focusOnAthletes } from '../focus';
 import { APP_WITH_RESULT, putHandoff } from '../handoff';
 import { CanvasMaskLayer } from '../layer';
 import { hidesSomething } from '../maskedEstimator';
-import { maskedName, renderMaskedVideo } from '../resultVideo';
+import { maskedName, renderMaskedVideo, ZOOM_WINS_SHARE } from '../resultVideo';
 import type { MotionResult } from '../types';
 import { Panels } from './panels';
 
@@ -601,6 +601,8 @@ async function loadInApp(): Promise<void> {
     await putHandoff({
       original: s.file,
       masked: new File([made.blob], maskedName(s.file.name), { type: made.blob.type }),
+      // The athlete is small on a steady shot: the app analyzes the clip live and zoomed, and the rendered video is the fallback.
+      zoom: made.zoomShare >= ZOOM_WINS_SHARE,
     });
     location.assign(APP_WITH_RESULT);
   } catch (error) {
