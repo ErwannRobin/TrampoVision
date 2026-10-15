@@ -9,7 +9,7 @@ import { DemoSkeleton } from './DemoSkeleton';
 import { DatasetBar, EvaluationReport } from './EvaluationView';
 import type { Sample } from '../video/sample';
 import { useMediaQuery } from './hooks';
-import { Icon, Menu, type IconName } from './kit';
+import { Icon, Menu, Switch, type IconName } from './kit';
 
 export interface LandingProps {
   onFile: (file: File) => void;
@@ -25,6 +25,9 @@ export interface LandingProps {
   busy: boolean;
   /** The advanced tools are on: saved analyses, the reviewer page and the saved dataset. */
   advanced: boolean;
+  /** The motion detector runs in front of the pose model (the same choice as in the settings), and turning it on or off. */
+  motion: boolean;
+  onMotion: (on: boolean) => void;
 }
 
 /** A link to a tool that has a page of its own (the advanced tools): its icon, its name and a line about it. */
@@ -97,7 +100,18 @@ function VideoButton({
 }
 
 /** The first screen: what the app does and how to start. The advanced tools add the saved analyses and the dataset kept in this browser. */
-export function Landing({ onFile, samples, onSample, onOpenSeries, dataset, recent, busy, advanced }: LandingProps) {
+export function Landing({
+  onFile,
+  samples,
+  onSample,
+  onOpenSeries,
+  dataset,
+  recent,
+  busy,
+  advanced,
+  motion,
+  onMotion,
+}: LandingProps) {
   const hasDataset = advanced && dataset.records.length > 0;
   // A phone or a tablet can film right away; a computer picks a file.
   const touch = useMediaQuery('(pointer: coarse)');
@@ -137,6 +151,11 @@ export function Landing({ onFile, samples, onSample, onOpenSeries, dataset, rece
             )}
           </div>
           <p className="landing__hint">{t('landing.drop')}</p>
+          {/* Chosen before the clip: the analysis starts as soon as one is picked. */}
+          <div className="landing__option">
+            <Switch checked={motion} onChange={onMotion} disabled={busy} label={t('setup.motionSwitch')} />
+            <small>{t('landing.followHint')}</small>
+          </div>
           {advanced && (
             <label className="landing__link">
               {t('landing.openSaved')}

@@ -1439,6 +1439,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
               }}
               busy={loading}
               advanced={advanced}
+              motion={motion}
+              onMotion={(on) => setMotionFlag(on ? 'on' : 'off')}
             />
           </>
         ) : (
