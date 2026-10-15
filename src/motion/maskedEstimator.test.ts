@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PoseDetection, PoseEstimator, PoseEstimatorFactory } from '../pose/types';
 import type { MaskLayer } from './layer';
-import { withMotionMask } from './maskedEstimator';
+import { FollowWatch, withMotionMask } from './maskedEstimator';
 import { LM, LANDMARK_COUNT } from '../pose/landmarks';
 import type { Box, MotionResult } from './types';
 import { toView, type View } from './view';
@@ -22,6 +22,7 @@ function frame(coverage: number): MotionResult {
     mask: new Float32Array(n).fill(coverage),
     found: coverage < 1,
     athletes: [],
+    bodies: [],
     periodS: null,
     rhythmFit: 0,
     coverage,
@@ -73,6 +74,7 @@ function setup(
       return next;
     }),
     render: vi.fn(() => masked),
+    seeBodies: vi.fn(),
     dispose: vi.fn(),
   };
   const inner: PoseEstimatorFactory = async () => estimator;
@@ -141,6 +143,21 @@ describe('the motion mask in front of a pose estimator', () => {
       const { factory } = setup([frameWith(0.2, where)], [coach, athlete]);
       const estimator = await factory(options);
       expect(estimator.detect(video, 1000)).toEqual([athlete]);
+    });
+
+    it('is kept in the next mask where the pose model found them, and the coach is not, when asked', async () => {
+      const { factory, layer } = setup([frameWith(0.2, where)], [coach, athlete], { keepBodies: true });
+      const estimator = await factory(options);
+      estimator.detect(video, 1000);
+      // The box around the skeleton, in the 100 × 100 picture of the detector: here every point is at the hips.
+      expect(layer.seeBodies).toHaveBeenCalledWith([{ x0: 50, y0: 60, x1: 50, y1: 60 }]);
+    });
+
+    it('is not told to the mask by default', async () => {
+      const { factory, layer } = setup([frameWith(0.2, where)], [coach, athlete]);
+      const estimator = await factory(options);
+      estimator.detect(video, 1000);
+      expect(layer.seeBodies).not.toHaveBeenCalled();
     });
 
     it('is not told apart from the others while the detector does not know where they are', async () => {
@@ -417,5 +434,25 @@ describe('the motion mask in front of a pose estimator', () => {
     expect(estimator.detect(canvas, 1000)).toBe(detections);
     expect(given).toEqual([canvas]);
     expect(layer.process).not.toHaveBeenCalled();
+  });
+});
+
+describe('the follow clip', () => {
+  const fast = { ...frameWith(0.2, [{ x0: 40, y0: 45, x1: 60, y1: 75 }], { type: 'tracking', speed: 0.4 }) };
+  const still = frameWith(0.2, [{ x0: 40, y0: 45, x1: 60, y1: 75 }]);
+
+  it('is known once the camera has moved fast for a second without a pause, and for good', () => {
+    const watch = new FollowWatch();
+    let known = false;
+    for (let t = 0; t <= 1000; t += 40) known = watch.push(fast, t);
+    expect(known).toBe(true);
+    expect(watch.push(still, 1040)).toBe(true);
+  });
+
+  it('is not known from two fast stretches of the clip with a seek between them', () => {
+    const watch = new FollowWatch();
+    for (let t = 0; t <= 600; t += 40) watch.push(fast, t);
+    expect(watch.push(fast, 60_000)).toBe(false);
+    expect(watch.push(fast, 60_040)).toBe(false);
   });
 });

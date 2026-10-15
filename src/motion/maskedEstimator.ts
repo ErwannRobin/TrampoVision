@@ -2,7 +2,7 @@ import { bodySignature, createPixelReader, type Pixels } from '../pose/appearanc
 import type { Keypoint, PoseDetection, PoseEstimatorFactory, PoseSource } from '../pose/types';
 import type { MotionConfig } from './config';
 import { AthleteView, type AthleteViewOptions, type Painter, type Prepared } from './athleteView';
-import { focusOnAthletes } from './focus';
+import { bodyBox, focusOnAthletes } from './focus';
 import { JumperSelector } from './jumperSelect';
 import { CanvasMaskLayer, type MaskLayer } from './layer';
 import type { MotionResult } from './types';
@@ -44,6 +44,8 @@ const FOLLOW_SPEED = 0.18;
  * 246 with three somersaults (1.72, 1.97, 2.76 turns) — the plain analysis on the same delegate reads 247 and the same three.
  */
 const FOLLOW_KNOWN_S = 1;
+/** Frames further apart than this are not one run of the camera (the detector's own `maxGapS`). */
+const FOLLOW_GAP_MS = 500;
 
 /**
  * Says, frame by frame, whether the zoomed view of the athlete would help the pose model: yes once the shot has been steady (slow) with a
@@ -67,6 +69,45 @@ export class ZoomGate {
     this.smallSinceMs ??= timestampMs;
     this.on = this.on || timestampMs - this.smallSinceMs >= ZOOM_WARMUP_S * 1000;
     return this.on;
+  }
+}
+
+/**
+ * Says, frame by frame, whether the clip is a follow clip: once the camera has moved at `FOLLOW_SPEED` or faster for `FOLLOW_KNOWN_S`
+ * without a pause, it is, for good, and the detector steps aside.
+ */
+export class FollowWatch {
+  private fastSinceMs: number | null = null;
+  private lastMs: number | null = null;
+  private known = false;
+
+  /**
+   * Takes what the detector found in a frame (null when it could not read it) and says whether the clip is a follow clip. A jump in time
+   * (a seek: back, or more than `FOLLOW_GAP_MS` on) breaks the run of fast frames: two fast stretches of the clip are not one.
+   */
+  push(result: MotionResult | null, timestampMs: number): boolean {
+    const cut = this.lastMs !== null && (timestampMs <= this.lastMs || timestampMs - this.lastMs > FOLLOW_GAP_MS);
+    this.lastMs = timestampMs;
+    if (cut) this.fastSinceMs = null;
+    if (result && result.camera.speed >= FOLLOW_SPEED) {
+      this.fastSinceMs ??= timestampMs;
+      this.known = this.known || timestampMs - this.fastSinceMs >= FOLLOW_KNOWN_S * 1000;
+    } else {
+      this.fastSinceMs = null;
+    }
+    return this.known;
+  }
+
+  /** Whether the clip was found to be a follow clip. */
+  get followClip(): boolean {
+    return this.known;
+  }
+
+  /** Forgets it: another clip, or the same one from the start. */
+  reset(): void {
+    this.fastSinceMs = null;
+    this.lastMs = null;
+    this.known = false;
   }
 }
 
@@ -106,6 +147,14 @@ export interface MotionMaskOptions {
    * follows (its person finder reads the body's rotation), so a turned picture only adds the resampling and a turn that can be wrong.
    */
   view?: Partial<AthleteViewOptions>;
+  /**
+   * Tell the mask where the pose model found the person it gives back, so that the next mask keeps their skeleton too
+   * (`TrampolineMotionDetector.seeBodies`). Off by default. Offline it all but stopped the mask from cutting the athlete, and through the
+   * whole app (MediaPipe, CPU) it gave the wide tripod sample 706 → 749 frames with the athlete (in flight 537 → 693), but on the synchro
+   * sample the athlete's track broke in 4 runs of 4 (frames with the athlete 542 to 598 without it, 11 to 337 with it), though frame by
+   * frame the pose model found the jumper as often: the app's tracking downstream is what changed, and that is not understood yet.
+   */
+  keepBodies?: boolean;
   /** Where the views are painted. Default: a canvas. Tests give a fake one. */
   paint?: Painter;
   /** Where the frames are read and painted. Default: canvases. Tests give a fake one. */
@@ -142,9 +191,8 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
     // back in the frame first): they let the choice of the jumper tell apart people who are equally near, and know the
     // athlete again across a gap. Null where a canvas cannot be read (tests, workers): the choice then goes without looks.
     let readPixels: (() => Pixels | null) | null | undefined;
-    // When the camera started moving at a follow camera's speed (null while it does not), and whether it ever kept it up
-    // long enough to call the clip a follow clip (`FOLLOW_KNOWN_S`) — that verdict is never taken back.
-    let fastSinceMs: number | null = null;
+    // Whether the camera ever moved fast long enough to call the clip a follow clip — that verdict is never taken back.
+    const follow = new FollowWatch();
     let followClip = false;
     let broken = false;
     return {
@@ -162,12 +210,7 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
             const result = layer.process(video, timestampMs);
             options.onFrame?.(result);
             athletes = result;
-            if (result && result.camera.speed >= FOLLOW_SPEED) {
-              fastSinceMs ??= timestampMs;
-              followClip = followClip || timestampMs - fastSinceMs >= FOLLOW_KNOWN_S * 1000;
-            } else {
-              fastSinceMs = null;
-            }
+            followClip = follow.push(result, timestampMs);
             // A follow clip is read as it is (`FOLLOW_KNOWN_S`).
             if (hidesSomething(result) && !followClip) source = layer.render(video);
             if (viewer && result && !followClip) {
@@ -190,13 +233,21 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
           readPixels = createPixelReader(video, video.videoWidth);
         }
         const found = estimator.detect(source, timestampMs);
+        // The mask keeps the bodies of the athletes the pose model found next frame, where they do not move enough to be seen moving.
+        const keepInMask = (bodies: PoseDetection[]) => {
+          if (!options.keepBodies || !athletes || !layer.seeBodies) return;
+          const picture = athletes;
+          layer.seeBodies(bodies.map((p) => bodyBox(p, picture)).filter((b) => b !== null));
+        };
         const narrow = (people: PoseDetection[]): PoseDetection[] => {
           const inFrame = viewer && prepared ? viewer.toFrame(people, prepared, frame) : people;
           if (followClip) return inFrame;
           const inBox = () =>
             athletes?.athletes.length ? (focusOnAthletes(inFrame, athletes.athletes, athletes)[0] ?? null) : null;
           if (!focus) {
-            viewer?.learn(inBox(), frame);
+            const athlete = inBox();
+            keepInMask(athlete ? [athlete] : []);
+            viewer?.learn(athlete, frame);
             return inFrame;
           }
           const pixels = frame.width > 0 ? (readPixels?.() ?? null) : null;
@@ -215,13 +266,15 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
           // The person whose hips travel like a jumper's; until a track has travelled, the person in the motion box — or,
           // trusting the travel alone, nobody.
           const byTravel = selector.push(inFrame, timestampMs / 1000, looks);
+          const byBox = () => (athletes ? focusOnAthletes(inFrame, athletes.athletes, athletes) : inFrame);
+          keepInMask(byTravel ?? byBox());
           // The turn is learnt from the person who jumps: once the travel knows them, from them alone (a frame they are not in
           // carries the turn on), and before, from the person in the motion box. Two people who jump (synchro) cannot both be
           // put upright by one turn: the picture is then left as it is.
           viewer?.learn(byTravel === null ? inBox() : byTravel.length === 1 ? byTravel[0] : null, frame);
           if (byTravel !== null) return byTravel;
           if (focus === 'travel') return [];
-          return athletes ? focusOnAthletes(inFrame, athletes.athletes, athletes) : inFrame;
+          return byBox();
         };
         return found instanceof Promise ? found.then(narrow) : narrow(found);
       },
