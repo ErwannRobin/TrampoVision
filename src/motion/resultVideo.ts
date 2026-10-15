@@ -73,7 +73,11 @@ export interface RenderedVideo {
  * jump. The detector of the clip itself needs two and a half jumps to be sure, and the frames before that would be given to the pose model
  * with the people who stand around the bed; this run is what lets them be masked too. Null when the athlete is not found.
  */
-async function scoutAthlete(video: HTMLVideoElement, options: RenderOptions, plan: ResultPlan): Promise<Box | null> {
+export async function scoutAthlete(
+  video: HTMLVideoElement,
+  options: Pick<RenderOptions, 'sourceFps' | 'stride' | 'config' | 'fill' | 'signal' | 'onScout'>,
+  plan: ResultPlan,
+): Promise<Box | null> {
   const { sourceFps, stride, signal } = options;
   const layer = new CanvasMaskLayer(options.config, options.fill);
   const scout = new AthleteScout();

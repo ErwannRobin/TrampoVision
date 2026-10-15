@@ -183,3 +183,39 @@
 .md-load progress {
   width: min(260px, 100%);
 }
+
+/* A position bar under each panel, for a phone where the one under the buttons is far above: a tall touch target, the time beside it. */
+.md-panel__seek {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+.md-panel__seek input {
+  width: 100%;
+  min-height: 32px;
+  margin: 0;
+}
+.md-panel__seek output {
+  min-width: 6ch;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  text-align: right;
+}
+
+/* A file is being dragged over the page. */
+.is-dragging::after {
+  content: 'Drop the video to open it';
+  position: fixed;
+  inset: var(--sp-3);
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  border: 3px dashed var(--line-2);
+  border-radius: var(--r-input);
+  background: color-mix(in srgb, var(--bg, #000) 80%, transparent);
+  color: var(--text);
+  font-size: var(--fs-lg);
+  pointer-events: none;
+}
