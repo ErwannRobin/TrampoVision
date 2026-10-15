@@ -81,8 +81,8 @@ const panels = new Panels({
   given: $<HTMLCanvasElement>('c-given'),
 });
 
-// The page looks for the athlete above the place they jump in as well (`searchAbove`; off in the app, see config.ts).
-const layer = new CanvasMaskLayer({ searchAbove: true });
+// Off when the page opens, as in the app (`searchAbove`, see config.ts): a box in the settings turns it on, and the app is sent that choice.
+const layer = new CanvasMaskLayer();
 /** Whether the camera follows the athlete: the detector then steps aside, as it does in the app (`FollowWatch`). */
 const follow = new FollowWatch();
 /** The frames in which the zoom helps (a small athlete on a steady shot): the only ones zoomed, as in the app (`ZoomGate`). */

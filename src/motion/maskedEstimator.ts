@@ -19,7 +19,12 @@ const NOTHING_HIDDEN = 0.999;
 const ZOOM_MAX_SHARE = 0.4;
 /** ... and stays in use until the athlete grows past this: the smoothed share wobbles around a threshold (it reaches 0.45 on the competition clip when the boxes of the jumper and the spotter join). */
 const ZOOM_OFF_SHARE = 0.5;
-/** The camera must be slower than this, shorter sides of the picture a second: tripod shots measure 0 to 0.10 (the subject's own motion), a broadcast that follows the athlete 0.2 to 0.8. The kind of shot is not used — a tripod synchro clip is called "tracking" from the jumpers' own motion. */
+/**
+ * The camera must be slower than this, shorter sides of the picture a second: the wide tripod shot measures 0, cameras in a hand that tilt
+ * with the jumps or pan a little 0.05 to 0.15 (the synchro clip, the competition clip, the phone close-up), a broadcast that follows the
+ * athlete 0.2 to 0.8. The kind of shot is not used: those hand-held clips are "tracking" in much of their length, and rightly (the synchro
+ * camera tilts up at every jump, about 5% of the picture), while the zoom still helps on two of them.
+ */
 const ZOOM_MAX_SPEED = 0.12;
 /** ... and the zoom view lets go above this: the speed wobbles too. */
 const ZOOM_OFF_SPEED = 0.18;
@@ -27,8 +32,8 @@ const ZOOM_OFF_SPEED = 0.18;
 const ZOOM_WARMUP_S = 2;
 /**
  * A camera moving faster than this follows the athlete: their hips stay near one spot of the picture and the travel never
- * speaks. The same measurement as `ZOOM_MAX_SPEED`: tripod shots measure 0 to 0.10 shorter sides of the picture a second (the
- * subject's own motion), a broadcast that follows the athlete 0.2 to 0.8.
+ * speaks. The same measurement as `ZOOM_MAX_SPEED`: the wide tripod shot measures 0 shorter sides of the picture a second, cameras in a
+ * hand that tilt with the jumps or pan a little 0.05 to 0.15, a broadcast that follows the athlete 0.2 to 0.8.
  */
 const FOLLOW_SPEED = 0.18;
 /**
