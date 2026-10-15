@@ -4,7 +4,7 @@ import { alphaFromMask } from '../pixels';
 import type { MotionResult } from '../types';
 
 /*
- * The five panels of the debug view. They draw on footage of any brightness, so the colors are fixed, the same as the ones the skeleton
+ * The panels of the debug view. They draw on footage of any brightness, so the colors are fixed, the same as the ones the skeleton
  * overlay of the app uses: blue for what rises (and the left of the body), orange for what falls (and the right), gold for the one mark
  * that is about the detector itself.
  */
@@ -54,9 +54,8 @@ export interface PanelCanvases {
   motion: HTMLCanvasElement;
   mask: HTMLCanvasElement;
   masked: HTMLCanvasElement;
-  /** What the pose model was given: the frame, or the view of the athlete when it is zoomed or turned. */
+  /** What the pose models were given: the frame, or the view of the athlete when it is zoomed or turned. */
   given: HTMLCanvasElement;
-  skeleton: HTMLCanvasElement;
 }
 
 export interface PanelFrame {
@@ -65,34 +64,48 @@ export interface PanelFrame {
   result: MotionResult | null;
   /** The frame with the background painted over. */
   masked: HTMLCanvasElement;
-  /** The picture the pose model was given: the masked frame, or the video as it is when the background is not hidden. */
+  /** The picture the pose models were given: the masked frame, or the video as it is when the background is not hidden. */
   given: CanvasImageSource;
-  /** What the pose model found in that picture; null when it did not run. */
-  people: PoseDetection[] | null;
-  /** Of those, the person who jumps (the one in the box of the athlete): drawn in colour, and the others dimmed. Null when the pose model did not run. */
-  athlete: PoseDetection[] | null;
-  /** The view of the athlete the pose model was given (zoomed, turned), or null when it was given the picture `given` as it is. */
+  /** The view of the athlete the pose models were given (zoomed, turned), or null when they were given the picture `given` as it is. */
   view: CanvasImageSource | null;
 }
 
-/** Draws the original frame, the motion map, the athlete mask, the masked frame, what the pose model was given and the skeleton. */
+/** Draws the original frame, the motion map, the athlete mask, the masked frame, what the pose models were given, and each model's skeletons. */
 export class Panels {
   private readonly motionScratch = new Scratch();
   private readonly maskScratch = new Scratch();
+  private width = PANEL_WIDTH;
+  private height = Math.round((PANEL_WIDTH * 9) / 16);
 
-  constructor(private readonly canvases: PanelCanvases) {}
+  constructor(private readonly canvases: PanelCanvases) {
+    this.clear();
+  }
 
-  /** Gives every panel the shape of the video. */
-  resize(videoWidth: number, videoHeight: number): void {
-    const height = Math.max(1, Math.round((PANEL_WIDTH * videoHeight) / Math.max(1, videoWidth)));
-    for (const canvas of Object.values(this.canvases)) {
-      canvas.width = PANEL_WIDTH;
-      canvas.height = height;
+  /** Gives every panel the shape of the video; `skeletons` are the panels of the pose models. */
+  resize(videoWidth: number, videoHeight: number, skeletons: HTMLCanvasElement[] = []): void {
+    this.height = Math.max(1, Math.round((PANEL_WIDTH * videoHeight) / Math.max(1, videoWidth)));
+    for (const canvas of [...Object.values(this.canvases), ...skeletons]) this.shape(canvas);
+  }
+
+  /** Gives a panel the shape of the video (a pose model's, added while a video is open). */
+  shape(canvas: HTMLCanvasElement): void {
+    canvas.width = this.width;
+    canvas.height = this.height;
+  }
+
+  /** Black panels, the shape of a wide video: there is no video. */
+  clear(skeletons: HTMLCanvasElement[] = []): void {
+    this.height = Math.round((PANEL_WIDTH * 9) / 16);
+    for (const canvas of [...Object.values(this.canvases), ...skeletons]) {
+      this.shape(canvas);
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
   }
 
-  draw({ video, result, masked, given, people, athlete, view }: PanelFrame): void {
-    const { original, motion, mask, masked: maskedPanel, given: givenPanel, skeleton } = this.canvases;
+  draw({ video, result, masked, given, view }: PanelFrame): void {
+    const { original, motion, mask, masked: maskedPanel, given: givenPanel } = this.canvases;
     const w = original.width;
     const h = original.height;
 
@@ -102,12 +115,25 @@ export class Panels {
     this.drawMask(mask, result);
     maskedPanel.getContext('2d')!.drawImage(masked, 0, 0, w, h);
     this.drawGiven(givenPanel, view ?? given);
+  }
 
-    const ctx = skeleton.getContext('2d')!;
+  /**
+   * A pose model's panel: the picture it was given, dimmed, and the people it found on it. `athlete` are the people who jump, drawn in
+   * colour; the others are faint. Null `people` writes `idle` instead (the model is loading, or did not load).
+   */
+  drawSkeletons(
+    canvas: HTMLCanvasElement,
+    given: CanvasImageSource,
+    people: PoseDetection[] | null,
+    athlete: PoseDetection[] | null,
+    idle = 'The model is not loaded',
+  ): void {
+    const ctx = canvas.getContext('2d')!;
+    const { width: w, height: h } = canvas;
     ctx.drawImage(given, 0, 0, w, h);
     ctx.fillStyle = SCRIM;
     ctx.fillRect(0, 0, w, h);
-    if (people === null) note(ctx, 'The pose model is off', w, h);
+    if (people === null) note(ctx, idle, w, h);
     else if (people.length === 0) note(ctx, 'No person found', w, h);
     else for (const person of people) drawPerson(ctx, person, w, h, athlete === null || athlete.includes(person));
   }
@@ -128,11 +154,19 @@ export class Panels {
     // The box of the athlete: what the mask keeps, before its margin.
     ctx.strokeStyle = `rgb(${GOLD})`;
     ctx.lineWidth = Math.max(1.5, w / 320);
+    const sx = w / result.width;
+    const sy = h / result.height;
     for (const box of result.athletes) {
-      const sx = w / result.width;
-      const sy = h / result.height;
       ctx.strokeRect(box.x0 * sx, box.y0 * sy, (box.x1 - box.x0 + 1) * sx, (box.y1 - box.y0 + 1) * sy);
     }
+    // The skeletons the pose model saw in the frame before, which the mask keeps as well (`seeBodies`).
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.setLineDash([6, 4]);
+    for (const box of result.bodies) {
+      ctx.strokeRect(box.x0 * sx, box.y0 * sy, (box.x1 - box.x0 + 1) * sx, (box.y1 - box.y0 + 1) * sy);
+    }
+    ctx.restore();
     const column = w / result.width;
     const strip = Math.max(6, h * 0.025);
     for (let x = 0; x < result.width; x++) {

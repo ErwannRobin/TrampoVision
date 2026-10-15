@@ -417,6 +417,52 @@ describe('a look ahead at the start of the clip', () => {
   });
 });
 
+describe('the bodies the pose model saw', () => {
+  // Run until the athlete is found and the background is hidden; then the pose model says where the body is, past the box of what moves.
+  const spec = clip({});
+  const scene = renderScene(spec);
+  const detector = new TrampolineMotionDetector();
+  const last = scene.frames.length - 1;
+  let result = detector.push(scene.frames[0], scene.timesMs[0]);
+  for (let f = 1; f < last; f++) result = detector.push(scene.frames[f], scene.timesMs[f]);
+  const box = { ...result.athletes[0] };
+  const kept = (r: MotionResult, x: number, y: number) => r.mask[Math.round(y) * spec.width + Math.round(x)] >= 0.5;
+  // Wider than the box and its margin: an arm the motion did not show, held out to the side.
+  const arm = { ...box, x1: Math.min(spec.width - 1, box.x1 + 16) };
+  // A body nowhere near where the athlete jumps: somebody else the pose model found.
+  const stranger = { x0: 2, y0: 2, x1: 12, y1: 30 };
+  // Above the place they jump in, in its columns: the top of a jump higher than the ones the place was learnt from.
+  const high = { x0: box.x0, y0: 0, x1: box.x1, y1: 3 };
+
+  it('keeps a body the motion did not show, where the athlete jumps, and nobody else', () => {
+    const probe = new TrampolineMotionDetector({ searchAbove: true });
+    let r = probe.push(scene.frames[0], scene.timesMs[0]);
+    for (let f = 1; f < last; f++) r = probe.push(scene.frames[f], scene.timesMs[f]);
+    probe.seeBodies([arm, stranger, high]);
+    r = probe.push(scene.frames[last], scene.timesMs[last]);
+    expect(r.found).toBe(true);
+    expect(r.bodies).toEqual([arm, high]);
+    expect(kept(r, arm.x1 - 1, (arm.y0 + arm.y1) / 2)).toBe(true);
+    expect(kept(r, (high.x0 + high.x1) / 2, 1)).toBe(true);
+    expect(kept(r, 7, 16)).toBe(false);
+  });
+
+  it('keeps one above the place they jump in only when told to look there', () => {
+    const probe = new TrampolineMotionDetector();
+    let r = probe.push(scene.frames[0], scene.timesMs[0]);
+    for (let f = 1; f < last; f++) r = probe.push(scene.frames[f], scene.timesMs[f]);
+    probe.seeBodies([arm, high]);
+    r = probe.push(scene.frames[last], scene.timesMs[last]);
+    expect(r.bodies).toEqual([arm]);
+  });
+
+  it('keeps it for one frame only, and without it the mask is the box of what moves', () => {
+    const plain = detector.push(scene.frames[last], scene.timesMs[last]);
+    expect(plain.bodies).toEqual([]);
+    expect(kept(plain, arm.x1 - 1, (arm.y0 + arm.y1) / 2)).toBe(false);
+  });
+});
+
 describe('what the athlete does', () => {
   it('keeps an athlete who turns somersaults, whose arms and legs sweep around', () => {
     const r = run(

@@ -43,6 +43,8 @@ export interface MotionResult {
    * jump's columns; empty while none is found. When nothing moves at the moment (the athlete stands on the bed) it is the place they jump in.
    */
   athletes: Box[];
+  /** The bodies the pose model saw in the frame before (`seeBodies`) that this mask keeps as well, picture pixels; empty when none. */
+  bodies: Box[];
   /** The jump period read from the moving columns, seconds; null while nothing repeats. */
   periodS: number | null;
   /** How well that period fits, 0 to 1 (the autocorrelation at the period). */

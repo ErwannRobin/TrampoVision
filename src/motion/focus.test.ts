@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LM, LANDMARK_COUNT } from '../pose/landmarks';
 import type { PoseDetection } from '../pose/types';
-import { bodyCenter, focusOnAthletes } from './focus';
+import { bodyBox, bodyCenter, focusOnAthletes } from './focus';
 
 const picture = { width: 128, height: 72 };
 
@@ -75,5 +75,32 @@ describe('the person who jumps, among the people the pose model found', () => {
     expect(focusOnAthletes([high], [boxAt(0.5, 0.6, 6, 8)], picture)).toEqual([high]);
     // A person much farther away than that is somebody else.
     expect(focusOnAthletes([person(0.5, 0.2)], [boxAt(0.5, 0.6, 6, 8)], picture)).toEqual([]);
+  });
+});
+
+describe('the box around a body', () => {
+  it('reaches every point the model placed, faint ones too, in the pixels of the detector', () => {
+    const p = person(0.5, 0.5);
+    p.landmarks[LM.L_ANKLE] = { x: 0.55, y: 0.9, visibility: 0.1 };
+    p.landmarks[LM.R_WRIST] = { x: 0.3, y: 0.2, visibility: 0.6 };
+    const box = bodyBox(p, picture)!;
+    expect(box.x0).toBeCloseTo(0.3 * picture.width);
+    expect(box.x1).toBeCloseTo(0.55 * picture.width);
+    expect(box.y0).toBeCloseTo(0.2 * picture.height);
+    expect(box.y1).toBeCloseTo(0.9 * picture.height);
+  });
+
+  it('leaves out the points a model does not have, and stays in the picture', () => {
+    const p = person(0.5, 0.5);
+    p.landmarks[LM.L_FOOT] = { x: 0, y: 0, visibility: 0 };
+    p.landmarks[LM.R_FOOT] = { x: 0.5, y: 1.3, visibility: 0.5 };
+    const box = bodyBox(p, picture)!;
+    expect(box.x0).toBeGreaterThan(0);
+    expect(box.y1).toBe(picture.height);
+  });
+
+  it('is not there when the model placed hardly any point', () => {
+    const p = person(0.5, 0.5, 0);
+    expect(bodyBox(p, picture)).toBeNull();
   });
 });
