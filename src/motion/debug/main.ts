@@ -106,6 +106,8 @@ interface Session {
   shown: number;
   /** Where the athlete jumps, from a look at the start of the clip (null until it is done, or when nobody is found): the mask is drawn from it right after a seek. */
   hint: Box | null;
+  /** Bumped at every cut (a seek, a restart): a frame that was being processed when it happened leaves the position and the mask alone. */
+  cuts: number;
   /** Set when another video is opened: what is still going on for this one is dropped. */
   closed: boolean;
 }
@@ -583,7 +585,7 @@ async function openVideo(file: File): Promise<void> {
     }
     const stride = analysisStride(fps);
     const total = Math.max(1, Math.floor((video.duration * fps) / stride));
-    session = { url, file, video, fps, stride, total, index: 0, shown: 0, hint: null, closed: false };
+    session = { url, file, video, fps, stride, total, index: 0, shown: 0, hint: null, cuts: 0, closed: false };
     panels.resize(
       video.videoWidth,
       video.videoHeight,
@@ -660,16 +662,19 @@ function announce(
   );
 }
 
-/** Shows the frame on the panels again, with a setting that changed (when playing, the next frames have it anyway). */
+/**
+ * Shows the effect of a setting that changed, on the next frame (when playing, the next frames have it anyway). Not the same frame again:
+ * the detector reads the frames in order, and the same frame twice is a cut to it, which forgets the athlete.
+ */
 function reshow(): void {
   if (!session || playing) return;
-  session.index = session.shown;
   void run('show');
 }
 
 /** Runs the frame at `s.index` through the detector and every pose model that is ticked, and draws it. */
 async function processFrame(s: Session): Promise<void> {
   const index = s.index;
+  const cut = s.cuts;
   const frame = index * s.stride;
   await seekTo(s.video, Math.min(frameSeekTime(frame, s.fps), s.video.duration - 1e-3));
   if (s.closed) return;
@@ -696,23 +701,27 @@ async function processFrame(s: Session): Promise<void> {
   let firstPeople: PoseDetection[] | null = null;
   let firstAthletes: PoseDetection[] | null = null;
   const found: { id: string; people: number; athlete: boolean; ms: number }[] = [];
+  // A model unticked, or made again (the GPU box), while the frame was processed is left alone.
+  const current = (view: ModelView, slot: ModelSlot) => ticked.get(view.model.id) === view && view.slot === slot;
   for (const [k, view] of views.entries()) {
+    const slot = view.slot;
     const loaded = await loadModel(view);
     if (s.closed) return;
+    if (!current(view, slot)) continue;
     if (!loaded) {
       panels.drawSkeletons(view.canvas, given, null, null, view.slot.error ? 'The model did not load' : 'Loading…');
       view.now.textContent = view.slot.error ? 'Did not load.' : 'Loading…';
       continue;
     }
-    const answer = await view.slot.detect(source, (1000 * s.stride) / s.fps);
+    const answer = await slot.detect(source, (1000 * s.stride) / s.fps);
     if (s.closed) return;
-    if (!answer) continue;
+    if (!answer || !current(view, slot)) continue;
     const people = viewer && prepared ? viewer.toFrame(answer.people, prepared, size) : answer.people;
     // The person who jumps is the one in the box of what moves; on a camera that follows, everybody (the app's tracker chooses there).
     const athletes = result && !following ? focusOnAthletes(people, result.athletes, result) : people;
     const judged = Boolean(result?.athletes.length) || following;
     const athlete = judged ? (athletes[0] ?? null) : null;
-    addFrame(view.slot.tally, judged, athlete, answer.ms);
+    addFrame(slot.tally, judged, athlete, answer.ms);
     panels.drawSkeletons(view.canvas, given, people, athletes);
     view.now.textContent = `${answer.ms.toFixed(0)} ms · ${people.length === 1 ? '1 person' : `${people.length} people`}${
       athlete ? ` · the athlete, ${Math.round(pointsSeen(athlete) * 13)} of 13 points seen` : ''
@@ -723,15 +732,17 @@ async function processFrame(s: Session): Promise<void> {
       firstAthletes = athletes;
     }
   }
+  updateCompare();
+  showStats(s, result, following, prepared, detectorMs);
+  announce(s, result, firstPeople, found);
+  // A seek or a restart while the models ran: the detector starts again elsewhere, and the position shows where it goes.
+  if (s.cuts !== cut) return;
   // The mask keeps the first model's athletes next frame, where they do not move enough to be seen moving; the turn learns from them.
   if (result && !following) {
     const bodies = keepBodyBox.checked && firstAthletes && result.athletes.length ? firstAthletes : [];
     layer.seeBodies(bodies.map((p) => bodyBox(p, result)).filter((b) => b !== null));
   }
   if (firstAthletes) viewer?.learn(result?.athletes.length ? (firstAthletes[0] ?? null) : null, size);
-  updateCompare();
-  showStats(s, result, following, prepared, detectorMs);
-  announce(s, result, firstPeople, found);
   showPosition(index, frame / s.fps);
 }
 
@@ -754,6 +765,8 @@ async function run(request: 'step' | 'show' | null): Promise<void> {
   if (busy) return;
   busy = true;
   let current: Session | null = null;
+  // A frame of a video that was closed failed (its video let go of in the middle of a seek): the next video's frame is still to show.
+  let again = false;
   try {
     for (;;) {
       const s = session;
@@ -765,10 +778,11 @@ async function run(request: 'step' | 'show' | null): Promise<void> {
       // A frame asked for at the end of the clip is the last one.
       s.index = Math.min(s.index, s.total - 1);
       const index = s.index;
+      const cut = s.cuts;
       await processFrame(s);
       if (s.closed) continue;
-      // The next frame is the one after it, unless a seek while the frame was processed has moved the position already.
-      if (s.index === index) s.index = Math.min(index + 1, s.total);
+      // The next frame is the one after it, unless a seek or a restart while the frame was processed has moved the position already.
+      if (s.cuts === cut) s.index = Math.min(index + 1, s.total);
       if (mode === 'play') {
         setStatus('Playing…');
         await nextPaint();
@@ -791,11 +805,14 @@ async function run(request: 'step' | 'show' | null): Promise<void> {
     if (!current?.closed) {
       playing = false;
       setStatus(error instanceof Error ? error.message : String(error), 'error');
+    } else {
+      again = session !== null;
     }
   } finally {
     busy = false;
     updateControls();
   }
+  if (again) void run(null);
 }
 
 fileInput.addEventListener('change', () => {
@@ -877,6 +894,7 @@ document.addEventListener('keydown', (event) => {
 
 /** Starts the detector again (the video was cut: a seek, a restart), with the place of the athlete when it is known, so that the mask is there at once. */
 function resetDetector(s: Session): void {
+  s.cuts++;
   layer.detector.reset();
   layer.detector.hint(s.hint);
   viewer?.reset();

@@ -50,7 +50,8 @@ export function attachGestures(element: HTMLElement, handlers: GestureHandlers):
   } | null = null;
 
   element.addEventListener('pointerdown', (event) => {
-    if (press || !event.isPrimary || event.button !== 0) return;
+    // A new press ends one whose end was not seen (a mouse let go outside the video).
+    if (!event.isPrimary || event.button !== 0) return;
     const position = handlers.position();
     if (!position) return;
     const onButton = event.target instanceof Element && event.target.closest('button') !== null;

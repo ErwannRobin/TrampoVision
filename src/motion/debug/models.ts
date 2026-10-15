@@ -83,6 +83,8 @@ export class ModelSlot {
   private time = 0;
   /** Let go of (unticked, or the GPU box changed): a model still loading is dropped when it arrives. */
   private disposed = false;
+  /** The frame the model is answering now, if any: it is not let go of in the middle of one. */
+  private running: Promise<PoseDetection[]> | null = null;
   /** Why the model did not load; it is not asked again until the GPU box changes. */
   error: string | null = null;
   tally = emptyTally();
@@ -105,7 +107,7 @@ export class ModelSlot {
   /** The model, loaded the first time it is asked for; null when it did not load (`error` says why). */
   load(preferGpu: boolean, onLoad: (fraction: number | undefined) => void): Promise<PoseEstimator | null> {
     if (this.estimator) return Promise.resolve(this.estimator);
-    if (this.error) return Promise.resolve(null);
+    if (this.error || this.disposed) return Promise.resolve(null);
     this.loading ??= estimatorFactory(this.model.engine)({
       engine: this.model.engine,
       model: this.model.variant,
@@ -136,13 +138,22 @@ export class ModelSlot {
     if (!this.estimator) return null;
     this.time += Math.max(1, Math.round(stepMs));
     const t0 = performance.now();
-    const people = await this.estimator.detect(source, this.time);
-    return { people, ms: performance.now() - t0 };
+    const running = Promise.resolve(this.estimator.detect(source, this.time));
+    this.running = running;
+    try {
+      return { people: await running, ms: performance.now() - t0 };
+    } finally {
+      if (this.running === running) this.running = null;
+    }
   }
 
+  /** Lets go of the model; one that is still answering a frame is let go of once it has. */
   dispose(): void {
     this.disposed = true;
-    this.estimator?.dispose();
+    const estimator = this.estimator;
     this.estimator = null;
+    if (!estimator) return;
+    if (this.running) void this.running.finally(() => estimator.dispose()).catch(() => undefined);
+    else estimator.dispose();
   }
 }
