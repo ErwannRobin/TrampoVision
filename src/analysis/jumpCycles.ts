@@ -1,4 +1,4 @@
-import { argExtreme, findPeaks, solveLinearSystem } from './signal';
+import { argExtreme, findPeaks, median, solveLinearSystem } from './signal';
 
 /** Per-frame phase of the trampoline cycle. */
 export const JUMP_PHASES = ['unknown', 'ground', 'takeoff', 'ascent', 'apex', 'descent', 'landing'] as const;
@@ -35,9 +35,20 @@ export interface JumpOptions {
   minRiseM: number;
   /** Two apexes closer than this (seconds) are the same jump. */
   minApexSeparationS: number;
+  /**
+   * The longest flight a person can make, seconds. In a longer one, the takeoff or the landing furthest from the apex is looked for
+   * again within half of it (then the other, if needed); if none is there, or the flight still comes out longer, it is dropped. Not
+   * applied to a clip whose flights are mostly longer: that is slow motion played at normal speed, and its times are not real ones.
+   */
+  maxFlightS: number;
 }
 
-export const DEFAULT_JUMP_OPTIONS: JumpOptions = { minRiseM: 0.3, minApexSeparationS: 0.3 };
+/**
+ * The longest flight: elite routines stay about 2 s in the air on their highest skills; 2.5 s would be a rise of 7.7 m (g T² / 8), more
+ * than anyone jumps. Longer "flights" come from a lost apex: with the athlete missed high in the air, the search ran over a bed contact
+ * into the jump before or after.
+ */
+export const DEFAULT_JUMP_OPTIONS: JumpOptions = { minRiseM: 0.3, minApexSeparationS: 0.3, maxFlightS: 2.5 };
 
 export interface JumpCycle {
   /** 0-based order in the clip. */
@@ -232,6 +243,7 @@ const nearestIndex = (time: Float64Array, t: number) =>
  *  - Takeoff / landing: first found roughly as the largest upward / downward velocity around the apex,
  *    then refined to the instant where free fall (a = -g) starts / ends (see `refineBoundary`).
  *  - Ascent / descent are the stretches between those events; every other frame is on the bed.
+ *  - No flight is longer than `maxFlightS`: a longer one is looked for again near its apex, else dropped.
  *
  * A clip that starts or ends in the air still reports the jump, with takeoff or landing left null.
  */
@@ -243,6 +255,8 @@ export function detectJumps(input: JumpInput, options: Partial<JumpOptions> = {}
 
   const apexes = findPeaks(height, o.minRiseM, Math.max(1, Math.round(o.minApexSeparationS * fps)));
   const firstFinite = height.findIndex(Number.isFinite);
+  // Half of the longest flight, in samples: a takeoff or a landing is never further than that from the apex.
+  const reach = Math.round(0.5 * o.maxFlightS * fps);
 
   // Pass 1: coarse events from the velocity extremes.
   interface Coarse {
@@ -250,9 +264,7 @@ export function detectJumps(input: JumpInput, options: Partial<JumpOptions> = {}
     takeoff: number | null;
     landing: number | null;
   }
-  const coarse: Coarse[] = apexes.map((a, k) => {
-    const from = k === 0 ? Math.max(0, firstFinite) : apexes[k - 1];
-    const to = k === apexes.length - 1 ? n - 1 : apexes[k + 1];
+  const between = (a: number, from: number, to: number): Coarse => {
     const valleyBefore = argExtreme(height, from, a, 'min');
     const valleyAfter = argExtreme(height, a, to, 'min');
     const tk = argExtreme(vy, valleyBefore, a, 'max');
@@ -262,10 +274,37 @@ export function detectJumps(input: JumpInput, options: Partial<JumpOptions> = {}
       takeoff: tk >= 0 && tk !== valleyBefore ? tk : null,
       landing: ld >= 0 && ld !== valleyAfter ? ld : null,
     };
+  };
+  const span = (k: number) => [
+    k === 0 ? Math.max(0, firstFinite) : apexes[k - 1],
+    k === apexes.length - 1 ? n - 1 : apexes[k + 1],
+  ];
+  const wide = apexes.map((a, k) => between(a, ...(span(k) as [number, number])));
+  const flightOf = (c: Coarse) => (c.takeoff === null || c.landing === null ? null : time[c.landing] - time[c.takeoff]);
+  const flights = wide.map(flightOf).filter((f) => f !== null);
+  const capped = !flights.length || median(flights) <= o.maxFlightS;
+  const coarse: Coarse[] = wide.flatMap((c, k) => {
+    const flightS = flightOf(c);
+    if (!capped || flightS === null || flightS <= o.maxFlightS) return [c];
+    // Too long to be one flight: an apex was missed (the athlete lost high in the air) and the search ran over a bed contact into
+    // the jump before or after. The side that went further is looked for again near this apex, and the other one only if the
+    // flight is still too long: the apex of a badly read flight is often off its middle, and the near side is right. No bed
+    // contact near the apex: not a flight.
+    const a = c.apex;
+    const [from, to] = span(k);
+    const near = between(a, Math.max(from, a - reach), Math.min(to, a + reach));
+    const takeoffFirst = a - c.takeoff! >= c.landing! - a;
+    let takeoff = takeoffFirst ? near.takeoff : c.takeoff;
+    let landing = takeoffFirst ? c.landing : near.landing;
+    if (takeoff !== null && landing !== null && time[landing] - time[takeoff] > o.maxFlightS) {
+      takeoff = near.takeoff;
+      landing = near.landing;
+    }
+    return takeoff === null || landing === null ? [] : [{ apex: a, takeoff, landing }];
   });
 
   // Pass 2: free-fall fit, refined events and metrics.
-  const cycles: JumpCycle[] = coarse.map((c, k) => {
+  const measured: JumpCycle[] = coarse.map((c, k) => {
     const a = c.apex;
     const tA0 = time[a];
     const toTakeoff = c.takeoff === null ? a * dt : tA0 - time[c.takeoff];
@@ -362,6 +401,10 @@ export function detectJumps(input: JumpInput, options: Partial<JumpOptions> = {}
       complete: both,
     };
   });
+  // A flight longer than a person can make, even searched near its apex, is not one.
+  const cycles = measured
+    .filter((c) => !capped || c.flightTimeS === null || c.flightTimeS <= o.maxFlightS)
+    .map((c, index) => ({ ...c, index }));
 
   // Per-sample labels.
   const phase = new Uint8Array(n);

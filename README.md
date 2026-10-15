@@ -241,6 +241,12 @@ From the COM height and vertical velocity only:
 - **Takeoff / landing:** found roughly as the largest upward / downward COM speed around the apex, then refined to the instant where
   free fall (a = −g) starts / ends, using a two-piece parabola fit (bed contact has a free acceleration, flight is forced to −g).
   This avoids the lag you get from reading the event off a smoothed velocity curve.
+- **Longest flight (2.5 s):** elite skills stay about 2 s in the air; 2.5 s would be a rise of 7.7 m. A longer "flight" means an
+  apex was missed (the athlete lost high in the air, often on a broadcast camera) and the search ran over a bed contact into the
+  next jump. The event furthest from the apex is then looked for again within 1.25 s of it (then the other one, if needed); with no
+  bed contact there, the flight is dropped. On the broadcast sample this turned four impossible flights (2.9, 3.7, 4.8 and 6.1 s)
+  into real ones of 1.5–1.8 s, checked on the video, and changed no other jump. The limit is not applied to a clip whose flights
+  are mostly longer: that is slow motion played at normal speed.
 - **Phases per frame:** `ground`, `takeoff`, `ascent`, `apex`, `descent`, `landing`. A clip that starts or ends in the air reports
   the jump with takeoff or landing left empty.
 - **Metrics per jump:** flight time, time to apex, apex height, height gained, vertical velocity at takeoff/landing (and the
