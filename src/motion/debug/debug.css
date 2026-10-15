@@ -29,12 +29,129 @@
   font-size: var(--fs-sm);
   font-weight: 500;
 }
+.md-tag--small {
+  padding: 0 8px;
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
 
-.md-bar {
+/* --- Where the video comes from: the pickers while there is none, its name and a way back once there is one. --- */
+
+.md-bar,
+.md-source,
+.md-loaded {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-3);
+}
+.md-bar [hidden] {
+  display: none;
+}
+.md-loaded {
+  min-width: 0;
+}
+.md-loaded__name {
+  min-width: 0;
+  max-width: min(48ch, 100%);
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The sample picker sits in the bar like a button: the kit's select is a full-width field. */
+.md-bar .select {
+  width: auto;
+  max-width: 100%;
+}
+/* While the result video is made, the controls that would change the video are locked. */
+.md-bar .is-busy {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* --- The playback bar of a desktop. --- */
+
+.md-transport {
+  display: grid;
+  grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+.md-transport input {
+  width: 100%;
+}
+.md-transport output {
+  min-width: 6ch;
+  color: var(--text-2);
+  text-align: right;
+}
+
+.md-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+.md-icon--line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Play or pause, whichever the click does. */
+.md-icon--pause,
+.is-playing .md-icon--play {
+  display: none;
+}
+.is-playing .md-icon--pause {
+  display: block;
+}
+
+/* --- The options: the models to compare, and what is done to the picture. --- */
+
+.md-options {
+  display: grid;
+  gap: var(--sp-3);
+}
+.md-models {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.md-models legend {
+  margin-bottom: var(--sp-2);
+  padding: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.md-models__list,
+.md-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+}
+.md-models__list {
+  gap: var(--sp-2);
+}
+.md-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 34px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.md-chip:has(input:checked) {
+  border-color: var(--text-2);
+  background: var(--panel-2);
+  color: var(--text);
 }
 .md-check {
   display: inline-flex;
@@ -44,20 +161,6 @@
   font-size: var(--fs-sm);
 }
 
-.md-seek {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: var(--sp-3);
-}
-.md-seek input {
-  width: 100%;
-}
-.md-seek output {
-  min-width: 6ch;
-  color: var(--text-2);
-  text-align: right;
-}
 .md-status {
   min-height: 1.5em;
   color: var(--text-2);
@@ -67,17 +170,31 @@
   color: var(--danger);
 }
 
+/* --- The panels. --- */
+
 .md-panels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: var(--sp-4) var(--sp-3);
+}
+.md-panel {
+  margin: 0;
+}
+.md-panel__view {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-input);
+  /* Up and down scrolls the page; the rest is the page's own (a tap plays, a slide sideways moves the position). */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .md-panel canvas {
   display: block;
   width: 100%;
   height: auto;
   background: #000;
-  border-radius: var(--r-input);
 }
 .md-panel figcaption {
   margin-top: var(--sp-2);
@@ -86,6 +203,124 @@
 }
 .md-panel strong {
   display: block;
+  color: var(--text);
+  font-weight: 600;
+}
+.md-panel__now {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/*
+ * The controls on every video, for a touch screen: play and pause, the time, and a line that says how far into the clip. They sit on
+ * footage of any brightness, so their colours are fixed, like the marks of the panels.
+ */
+.md-hud {
+  display: none;
+}
+@media (pointer: coarse) {
+  .md-transport {
+    display: none;
+  }
+  .has-video .md-hud {
+    position: absolute;
+    inset: 0;
+    display: block;
+    pointer-events: none;
+  }
+  .md-hud__play {
+    position: absolute;
+    bottom: 12px;
+    left: 8px;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    pointer-events: auto;
+  }
+  .is-playing .md-hud__play {
+    opacity: 0.6;
+  }
+  .md-hud__time {
+    position: absolute;
+    right: 8px;
+    bottom: 14px;
+    padding: 2px 8px;
+    border-radius: var(--r-pill);
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: var(--fs-xs);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  .md-hud__bar {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.25);
+    transition: height var(--t-fast);
+  }
+  .md-hud__fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: #fff;
+  }
+  /* A finger slides on the video: the line it moves grows, so that it is seen under the finger. */
+  .is-scrubbing .md-hud__bar {
+    height: 10px;
+  }
+}
+
+/* --- The comparison of the models. --- */
+
+.md-compare {
+  display: grid;
+  gap: var(--sp-3);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.md-compare h2,
+.md-load h2 {
+  font-size: var(--fs-lg);
+}
+.md-compare p,
+.md-load p {
+  max-width: 78ch;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.md-compare__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.md-compare__table {
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.md-compare__table th,
+.md-compare__table td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+.md-compare__table thead th {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.md-compare__table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.md-compare__table tbody th {
   color: var(--text);
   font-weight: 600;
 }
@@ -120,7 +355,7 @@
 }
 .md-sliders {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: var(--sp-4);
   margin-top: var(--sp-3);
 }
@@ -145,31 +380,12 @@
   color: var(--text);
 }
 
-/* The sample picker sits in the bar like a button: the kit's select is a full-width field. */
-.md-bar .select {
-  width: auto;
-  max-width: 100%;
-}
-/* While the result video is made, the controls that would change the video are locked. */
-.md-bar .is-busy {
-  opacity: 0.4;
-  pointer-events: none;
-}
-
 .md-load {
   display: grid;
   gap: var(--sp-3);
   justify-items: start;
   padding-top: var(--sp-4);
   border-top: 1px solid var(--line);
-}
-.md-load h2 {
-  font-size: var(--fs-lg);
-}
-.md-load p {
-  max-width: 78ch;
-  color: var(--text-2);
-  font-size: var(--fs-sm);
 }
 .md-load .md-status {
   min-height: 1.5em;
@@ -182,26 +398,6 @@
 }
 .md-load progress {
   width: min(260px, 100%);
-}
-
-/* A position bar under each panel, for a phone where the one under the buttons is far above: a tall touch target, the time beside it. */
-.md-panel__seek {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: var(--sp-3);
-  margin-top: var(--sp-2);
-}
-.md-panel__seek input {
-  width: 100%;
-  min-height: 32px;
-  margin: 0;
-}
-.md-panel__seek output {
-  min-width: 6ch;
-  color: var(--text-2);
-  font-size: var(--fs-sm);
-  text-align: right;
 }
 
 /* A file is being dragged over the page. */

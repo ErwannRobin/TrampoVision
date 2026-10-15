@@ -6,48 +6,72 @@ import '../../styles/kit.css';
 import './debug.css';
 import { analysisStride } from '../../analysis/stride';
 import { AthleteView, type Prepared } from '../athleteView';
-import { createMediaPipeEstimator } from '../../pose/MediaPipePoseEstimator';
 import { LM } from '../../pose/landmarks';
-import type { PoseDetection, PoseEstimator } from '../../pose/types';
+import type { PoseDetection, PoseSource } from '../../pose/types';
 import { disposeVideo, estimateFps, frameSeekTime, loadVideo, seekTo } from '../../video/frames';
 import { loadSample, loadSamples, type Sample } from '../../video/sample';
 import { DEFAULT_MOTION_CONFIG, type CameraSetting, type CameraType, type MotionConfig } from '../config';
-import { focusOnAthletes } from '../focus';
+import { bodyBox, focusOnAthletes } from '../focus';
 import { APP_WITH_RESULT, putHandoff } from '../handoff';
 import { CanvasMaskLayer } from '../layer';
-import { hidesSomething } from '../maskedEstimator';
+import { FollowWatch, hidesSomething } from '../maskedEstimator';
 import { maskedName, renderMaskedVideo, resultPlan, scoutAthlete, ZOOM_WINS_SHARE } from '../resultVideo';
 import type { Box, MotionResult } from '../types';
+import { attachGestures } from './gestures';
+import {
+  addFrame,
+  DEFAULT_MODEL,
+  describeTally,
+  emptyTally,
+  ModelSlot,
+  POSE_MODELS,
+  pointsSeen,
+  type PoseModel,
+} from './models';
 import { Panels } from './panels';
 
 /**
- * The debug page of the motion detector (motion.html): a video goes through the detector and the pose model frame by frame, and the stages
- * are shown side by side. It reads the video like the analysis does (seeking to every frame, on a hidden video element), so what is seen
- * does not depend on the speed of the machine. The video is one the person chooses, or one of the app's samples; and the result, the video
- * with the background hidden, can be sent to the app (`handoff.ts`). English only: it is a tool for the people who work on the detector.
+ * The debug page of the motion detector (motion.html): a video goes through the detector and the pose models frame by frame, and the
+ * stages are shown side by side, with one panel for each pose model that is ticked so that they can be compared on the same picture. It
+ * reads the video like the analysis does (seeking to every frame, on a hidden video element), so what is seen does not depend on the
+ * speed of the machine. The video is one the person chooses, or one of the app's samples; and the result, the video with the background
+ * hidden, can be sent to the app (`handoff.ts`). English only: it is a tool for the people who work on the detector.
+ *
+ * A desktop has the playback controls in a bar above the panels. On a touch screen every panel is its own control: a tap plays or
+ * pauses, a finger moved sideways moves the position, and up and down still scrolls the page (`gestures.ts`).
  */
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
+const sourceBox = $('source');
 const pickLabel = $('pick');
 const fileInput = $<HTMLInputElement>('file');
 const sampleSelect = $<HTMLSelectElement>('sample');
+const loadedBox = $('loaded');
+const videoName = $('video-name');
+const resetButton = $<HTMLButtonElement>('reset');
 const playButton = $<HTMLButtonElement>('play');
 const stepButton = $<HTMLButtonElement>('step');
 const restartButton = $<HTMLButtonElement>('restart');
-const poseBox = $<HTMLInputElement>('pose');
+const modelList = $('models');
 const gpuBox = $<HTMLInputElement>('gpu');
 const hideBox = $<HTMLInputElement>('hide');
+const keepBodyBox = $<HTMLInputElement>('keep-body');
 const zoomBox = $<HTMLInputElement>('zoom');
 const turnBox = $<HTMLInputElement>('turn');
 const seek = $<HTMLInputElement>('seek');
 const clock = $<HTMLOutputElement>('clock');
 const status = $('status');
+const panelSection = $('panels');
+const compareRows = $('compare-rows');
 const stats = $('stats');
 const loadButton = $<HTMLButtonElement>('load');
 const loadCancel = $<HTMLButtonElement>('load-cancel');
 const loadProgress = $<HTMLProgressElement>('load-progress');
 const loadStatus = $('load-status');
+
+/** A touch screen: the panels are the controls (the CSS reads the same query). */
+const touch = window.matchMedia('(pointer: coarse)');
 
 const panels = new Panels({
   original: $<HTMLCanvasElement>('c-original'),
@@ -55,41 +79,12 @@ const panels = new Panels({
   mask: $<HTMLCanvasElement>('c-mask'),
   masked: $<HTMLCanvasElement>('c-masked'),
   given: $<HTMLCanvasElement>('c-given'),
-  skeleton: $<HTMLCanvasElement>('c-skeleton'),
 });
-/**
- * The position bars: the one under the buttons and one under each panel, so that the position can be moved (and read) next to the picture
- * that is looked at, without scrolling back up, which matters on a phone where the panels are stacked. They all show the same position.
- */
-const seekBars: HTMLInputElement[] = [seek];
-const clocks: HTMLOutputElement[] = [clock];
-for (const panel of document.querySelectorAll<HTMLElement>('.md-panel')) {
-  const row = document.createElement('div');
-  row.className = 'md-panel__seek';
-  const bar = document.createElement('input');
-  bar.type = 'range';
-  bar.min = bar.max = bar.value = '0';
-  bar.step = '1';
-  bar.disabled = true;
-  bar.setAttribute('aria-label', `Position in the video (${panel.querySelector('strong')?.textContent ?? 'panel'})`);
-  const time = document.createElement('output');
-  time.className = 'num';
-  time.textContent = '0.00 s';
-  row.append(bar, time);
-  panel.querySelector('canvas')!.after(row);
-  seekBars.push(bar);
-  clocks.push(time);
-}
-for (const bar of seekBars) bar.addEventListener('input', () => moveTo(Number(bar.value)));
-
-/** Shows the position on every bar and clock: frame `index` of the analyzed ones, at `timeS` seconds. */
-function showPosition(index: number, timeS: number): void {
-  for (const bar of seekBars) bar.value = String(index);
-  for (const out of clocks) out.textContent = `${timeS.toFixed(2)} s`;
-}
 
 const layer = new CanvasMaskLayer();
-/** What is done to the picture before the pose model, once the athlete is found; null when neither box is ticked. Made again when a box changes. */
+/** Whether the camera follows the athlete: the detector then steps aside, as it does in the app (`FollowWatch`). */
+const follow = new FollowWatch();
+/** What is done to the picture before the pose models, once the athlete is found; null when neither box is ticked. Made again when a box changes. */
 let viewer: AthleteView | null = null;
 function updateViewer(): void {
   viewer =
@@ -105,8 +100,10 @@ interface Session {
   /** Every how many frames of the video are analyzed, so that the analysis runs at about 30 a second as the app does. */
   stride: number;
   total: number;
-  /** The frame (of the analyzed ones) shown next. */
+  /** The frame (of the analyzed ones) shown next: the one after the frame on the panels, or the one a seek asked for. */
   index: number;
+  /** The frame on the panels now. */
+  shown: number;
   /** Where the athlete jumps, from a look at the start of the clip (null until it is done, or when nobody is found): the mask is drawn from it right after a seek. */
   hint: Box | null;
   /** Set when another video is opened: what is still going on for this one is dropped. */
@@ -114,9 +111,6 @@ interface Session {
 }
 
 let session: Session | null = null;
-let estimator: PoseEstimator | null = null;
-/** MediaPipe wants a time that always increases, even when the video is played again from the start. */
-let poseTime = 0;
 let playing = false;
 let busy = false;
 /** What was asked while a frame was being processed. It is done next, so that no click is lost. */
@@ -136,6 +130,211 @@ function setLoadStatus(text: string, kind: 'info' | 'error' = 'info'): void {
   loadStatus.dataset.kind = kind;
 }
 
+// --- The controls on the panels ----------------------------------------------------------------------------------
+
+/** What every panel shows on top of its picture on a touch screen: play and pause, the time, and how far into the clip. */
+interface Hud {
+  play: HTMLButtonElement;
+  time: HTMLElement;
+  fill: HTMLElement;
+}
+const huds = new Set<Hud>();
+
+const PLAY_ICONS = `
+  <svg class="md-icon md-icon--play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="7 4.5 19.5 12 7 19.5" /></svg>
+  <svg class="md-icon md-icon--pause" viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="6" y="4.5" width="4" height="15" rx="1.2" /><rect x="14" y="4.5" width="4" height="15" rx="1.2" />
+  </svg>`;
+
+/** Puts the controls on a panel: its picture becomes a control (tap, slide), with a play button, the time and a progress line on it. */
+function addHud(figure: HTMLElement): Hud {
+  const canvas = figure.querySelector('canvas')!;
+  const view = document.createElement('div');
+  view.className = 'md-panel__view';
+  canvas.before(view);
+  view.append(canvas);
+  const overlay = document.createElement('div');
+  overlay.className = 'md-hud';
+  const play = document.createElement('button');
+  play.type = 'button';
+  play.className = 'md-hud__play';
+  play.setAttribute('aria-label', 'Play');
+  play.innerHTML = PLAY_ICONS;
+  play.addEventListener('click', togglePlay);
+  const time = document.createElement('span');
+  time.className = 'md-hud__time num';
+  time.textContent = '0.00 s';
+  const bar = document.createElement('span');
+  bar.className = 'md-hud__bar';
+  const fill = document.createElement('span');
+  fill.className = 'md-hud__fill';
+  bar.append(fill);
+  overlay.append(play, time, bar);
+  view.append(overlay);
+  attachGestures(view, {
+    scrubs: () => touch.matches,
+    position: () => (session && !rendering ? { index: session.shown, total: session.total } : null),
+    tap: togglePlay,
+    scrubStart: () => {
+      playing = false;
+      updateControls();
+    },
+    scrub: (index) => {
+      if (session && index !== session.shown) moveTo(index);
+    },
+    scrubEnd: () => undefined,
+  });
+  const hud = { play, time, fill };
+  huds.add(hud);
+  return hud;
+}
+
+for (const figure of panelSection.querySelectorAll<HTMLElement>('.md-panel')) addHud(figure);
+
+/** Shows the position on the bar, the clock and every panel: frame `index` of the analyzed ones, at `timeS` seconds. */
+function showPosition(index: number, timeS: number): void {
+  seek.value = String(index);
+  const text = `${timeS.toFixed(2)} s`;
+  clock.textContent = text;
+  const share = session && session.total > 1 ? index / (session.total - 1) : 0;
+  for (const hud of huds) {
+    hud.time.textContent = text;
+    hud.fill.style.width = `${(share * 100).toFixed(2)}%`;
+  }
+}
+
+// --- The pose models ---------------------------------------------------------------------------------------------
+
+/** A pose model that is ticked: its runtime, its panel, and its row of the comparison. */
+interface ModelView {
+  model: PoseModel;
+  slot: ModelSlot;
+  figure: HTMLElement;
+  canvas: HTMLCanvasElement;
+  /** What it found in the frame on the panels, under its name. */
+  now: HTMLElement;
+  hud: Hud;
+  row: HTMLTableRowElement;
+}
+const ticked = new Map<string, ModelView>();
+
+/** The models that are ticked, in the order of the list: the first one's skeleton is kept in the mask. */
+const tickedModels = (): ModelView[] => POSE_MODELS.flatMap((m) => ticked.get(m.id) ?? []);
+
+function addModel(model: PoseModel): void {
+  const figure = document.createElement('figure');
+  figure.className = 'md-panel';
+  figure.dataset.panel = model.id;
+  const canvas = document.createElement('canvas');
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', `The skeletons found by ${model.label}`);
+  const caption = document.createElement('figcaption');
+  const name = document.createElement('strong');
+  name.textContent = `${model.label} skeleton`;
+  const now = document.createElement('span');
+  now.className = 'md-panel__now';
+  now.textContent = 'Not run yet.';
+  caption.append(name, now);
+  figure.append(canvas, caption);
+  const row = document.createElement('tr');
+  for (let k = 0; k < 6; k++) row.append(document.createElement(k === 0 ? 'th' : 'td'));
+  row.cells[0].setAttribute('scope', 'row');
+  for (let k = 2; k < 6; k++) row.cells[k].className = 'num';
+  // In the order of the list, after the fixed panels and the models before it.
+  const next = tickedModels().find((m) => POSE_MODELS.indexOf(m.model) > POSE_MODELS.indexOf(model));
+  panelSection.insertBefore(figure, next?.figure ?? null);
+  compareRows.insertBefore(row, next?.row ?? null);
+  const hud = addHud(figure);
+  ticked.set(model.id, { model, slot: new ModelSlot(model), figure, canvas, now, hud, row });
+  if (session) panels.shape(canvas);
+  else panels.clear([canvas]);
+  updateCompare();
+}
+
+function removeModel(id: string): void {
+  const view = ticked.get(id);
+  if (!view) return;
+  view.slot.dispose();
+  view.figure.remove();
+  view.row.remove();
+  huds.delete(view.hud);
+  ticked.delete(id);
+  updateCompare();
+}
+
+/** The comparison table, and the tag of the model whose skeleton the mask keeps. */
+function updateCompare(): void {
+  tickedModels().forEach((view, k) => {
+    const cells = describeTally(view.slot.tally);
+    const [name, backend, frames, found, points, ms] = Array.from(view.row.cells);
+    name.textContent = view.model.label;
+    if (k === 0 && keepBodyBox.checked) {
+      const tag = document.createElement('span');
+      tag.className = 'md-tag md-tag--small';
+      tag.textContent = 'kept in the mask';
+      name.append(' ', tag);
+    }
+    backend.textContent = view.slot.backend;
+    frames.textContent = cells.frames;
+    found.textContent = cells.found;
+    points.textContent = cells.points;
+    ms.textContent = cells.ms;
+  });
+}
+
+function resetTallies(): void {
+  for (const view of ticked.values()) view.slot.tally = emptyTally();
+  updateCompare();
+}
+
+for (const model of POSE_MODELS) {
+  const label = document.createElement('label');
+  label.className = 'md-chip';
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.value = model.id;
+  box.checked = model.id === DEFAULT_MODEL;
+  box.addEventListener('change', () => {
+    if (box.checked) addModel(model);
+    else removeModel(model.id);
+    reshow();
+  });
+  label.append(box, ` ${model.label}`);
+  modelList.append(label);
+  if (box.checked) addModel(model);
+}
+
+/** Loads a model the first time it is needed, and says so: a big model takes a while to download. */
+async function loadModel(view: ModelView): Promise<boolean> {
+  if (view.slot.ready) return true;
+  const { label } = view.model;
+  setStatus(`Loading ${label}…`);
+  updateCompare();
+  const estimator = await view.slot.load(gpuBox.checked, (fraction) =>
+    setStatus(fraction === undefined ? `Loading ${label}…` : `Loading ${label}… ${Math.round(fraction * 100)} %`),
+  );
+  updateCompare();
+  if (!estimator && view.slot.error) {
+    setStatus(`${label} did not load (${view.slot.error}). Run "npm run fetch-assets".`, 'error');
+  }
+  return estimator !== null;
+}
+
+// The models are made again, with the other delegate, at the next frame.
+gpuBox.addEventListener('change', () => {
+  for (const view of ticked.values()) {
+    view.slot.dispose();
+    view.slot = new ModelSlot(view.model);
+  }
+  updateCompare();
+  reshow();
+});
+
+keepBodyBox.addEventListener('change', () => {
+  updateCompare();
+  reshow();
+});
+
 // --- Measurements ------------------------------------------------------------------------------------------------
 
 const STAT_LABELS = [
@@ -144,15 +343,14 @@ const STAT_LABELS = [
   ['period', 'Jump period'],
   ['fit', 'Rhythm fit'],
   ['kept', 'Picture kept'],
+  ['mask', 'Mask in use'],
   ['shot', 'Kind of shot'],
   ['readings', 'What the shot is read from'],
   ['camera', 'Camera move'],
   ['shake', 'Camera shake'],
   ['noise', 'Noise level'],
-  ['view', 'Given to the pose model'],
-  ['people', 'People found'],
+  ['view', 'Given to the pose models'],
   ['detector', 'Detector'],
-  ['pose', 'Pose model'],
 ] as const;
 type StatKey = (typeof STAT_LABELS)[number][0];
 
@@ -193,7 +391,7 @@ function shotReadings(result: MotionResult): string {
   return `${fast}; ${big}`;
 }
 
-/** What was done to the picture before the pose model: how it was cut and turned, or that nothing was. */
+/** What was done to the picture before the pose models: how it was cut and turned, or that nothing was. */
 function viewText(prepared: Prepared | null, frame: { width: number; height: number }): string {
   if (!viewer) return 'The frame as it is';
   if (!prepared?.view) return 'The frame as it is (no athlete yet, or nothing to do)';
@@ -206,35 +404,38 @@ function viewText(prepared: Prepared | null, frame: { width: number; height: num
   return `${zoom}${turn}`;
 }
 
+/** Whether the pose models were given the masked picture, and why not. */
+function maskText(result: MotionResult | null, following: boolean): string {
+  if (following) return 'No: the camera follows the athlete (the app reads such a clip as it is)';
+  if (!hideBox.checked) return 'No: switched off';
+  if (!hidesSomething(result)) return 'No: nothing hidden yet';
+  return result!.bodies.length ? 'Yes, with the skeleton of the frame before' : 'Yes';
+}
+
 function showStats(
   s: Session,
   result: MotionResult | null,
-  people: PoseDetection[] | null,
-  athlete: PoseDetection[] | null,
+  following: boolean,
   prepared: Prepared | null,
-  timing: [number, number],
+  detectorMs: number,
 ): void {
-  stat('frame', `${s.index + 1} of ${s.total}`);
+  stat('frame', `${s.shown + 1} of ${s.total}`);
   stat('athlete', result ? (result.found ? `Found (${result.athletes.length})` : 'Not yet') : '–');
   stat('period', result?.periodS ? `${result.periodS.toFixed(2)} s` : '–');
   stat('fit', result?.rhythmFit ? `${Math.round(result.rhythmFit * 100)} %` : '–');
   stat('kept', result ? `${Math.round(result.coverage * 100)} %` : '–');
+  stat('mask', maskText(result, following));
   stat('shot', result ? SHOT_NAMES[result.camera.type] : '–');
   stat('readings', result ? shotReadings(result) : '–');
   stat('camera', result ? cameraMove(result) : '–');
   stat('shake', result ? `${result.shift.toFixed(2)} px` : '–');
   stat('noise', result ? `${(result.noise * 100).toFixed(2)} %` : '–');
   stat('view', viewText(prepared, { width: s.video.videoWidth, height: s.video.videoHeight }));
-  stat(
-    'people',
-    people
-      ? athlete && athlete.length < people.length
-        ? `${people.length} (${athlete.length} jumps)`
-        : String(people.length)
-      : '–',
-  );
-  stat('detector', ms(timing[0]));
-  stat('pose', people ? ms(timing[1]) : '–');
+  stat('detector', ms(detectorMs));
+}
+
+function clearStats(): void {
+  for (const [key] of STAT_LABELS) stat(key, '–');
 }
 
 // --- The settings ------------------------------------------------------------------------------------------------
@@ -254,7 +455,7 @@ function bindSlider(
     const value = Number(input.value);
     out.textContent = show(value);
     layer.detector.configure(apply(value));
-    if (session && !playing) void run('show');
+    reshow();
   });
 }
 const D = DEFAULT_MOTION_CONFIG;
@@ -285,15 +486,15 @@ bindSlider(
 );
 $<HTMLSelectElement>('camera').addEventListener('change', (event) => {
   layer.detector.configure({ cameraType: (event.target as HTMLSelectElement).value as CameraSetting });
-  if (session && !playing) void run('show');
+  reshow();
 });
 $<HTMLSelectElement>('athletes').addEventListener('change', (event) => {
   layer.detector.configure({ maxAthletes: Number((event.target as HTMLSelectElement).value) });
-  if (session && !playing) void run('show');
+  reshow();
 });
 $<HTMLSelectElement>('fill').addEventListener('change', (event) => {
   layer.fill = (event.target as HTMLSelectElement).value;
-  if (session && !playing) void run('show');
+  reshow();
 });
 
 // --- The video ---------------------------------------------------------------------------------------------------
@@ -312,11 +513,25 @@ function updateControls(): void {
   const ready = session !== null;
   // While the masked video is made, the clip and the settings stay as they are: the video is being read, with these settings.
   const working = rendering !== null;
+  // Where the video comes from while there is none; its name, and the way back, once there is one.
+  sourceBox.hidden = ready;
+  loadedBox.hidden = !ready;
+  videoName.textContent = session?.file.name ?? '';
+  resetButton.disabled = working;
   playButton.disabled = !ready || working;
   stepButton.disabled = !ready || working || playing || (session !== null && session.index >= session.total);
   restartButton.disabled = !ready || working;
-  for (const bar of seekBars) bar.disabled = !ready || working;
-  playButton.textContent = playing ? 'Pause' : session && session.index >= session.total ? 'Play again' : 'Play';
+  seek.disabled = !ready || working;
+  const atEnd = session !== null && session.index >= session.total;
+  const label = playing ? 'Pause' : atEnd ? 'Play again' : 'Play';
+  playButton.setAttribute('aria-label', label);
+  playButton.title = label;
+  document.body.classList.toggle('is-playing', playing);
+  document.body.classList.toggle('has-video', ready);
+  for (const hud of huds) {
+    hud.play.setAttribute('aria-label', label);
+    hud.play.disabled = !ready || working;
+  }
   fileInput.disabled = working;
   sampleSelect.disabled = working;
   pickLabel.classList.toggle('is-busy', working);
@@ -328,6 +543,28 @@ function updateControls(): void {
   loadCancel.hidden = !working;
   loadProgress.hidden = !working;
 }
+
+/** Back to no video: the panels are cleared and the ways to open one come back. */
+function resetVideo(): void {
+  if (rendering) return;
+  ++opening;
+  closeSession();
+  layer.detector.reset();
+  layer.detector.hint(null);
+  follow.reset();
+  viewer?.reset();
+  panels.clear(tickedModels().map((m) => m.canvas));
+  for (const view of ticked.values()) view.now.textContent = 'Not run yet.';
+  seek.max = '0';
+  showPosition(0, 0);
+  clearStats();
+  resetTallies();
+  setLoadStatus('');
+  setStatus('Choose a video to start.');
+  updateControls();
+}
+
+resetButton.addEventListener('click', resetVideo);
 
 async function openVideo(file: File): Promise<void> {
   const mine = ++opening;
@@ -346,15 +583,21 @@ async function openVideo(file: File): Promise<void> {
     }
     const stride = analysisStride(fps);
     const total = Math.max(1, Math.floor((video.duration * fps) / stride));
-    session = { url, file, video, fps, stride, total, index: 0, hint: null, closed: false };
-    panels.resize(video.videoWidth, video.videoHeight);
+    session = { url, file, video, fps, stride, total, index: 0, shown: 0, hint: null, closed: false };
+    panels.resize(
+      video.videoWidth,
+      video.videoHeight,
+      tickedModels().map((m) => m.canvas),
+    );
     layer.detector.reset();
     layer.detector.hint(null);
-    for (const bar of seekBars) bar.max = String(total - 1);
+    follow.reset();
+    resetTallies();
+    seek.max = String(total - 1);
     showPosition(0, 0);
     setLoadStatus('');
     setStatus(
-      `${file.name}: ${video.videoWidth} × ${video.videoHeight}, ${fps} frames a second, every ${stride === 1 ? 'frame' : `${stride}th frame`} is analyzed. Press Play.`,
+      `${file.name}: ${video.videoWidth} × ${video.videoHeight}, ${fps} frames a second, every ${stride === 1 ? 'frame' : `${stride}th frame`} is analyzed. ${touch.matches ? 'Tap a video to play it, slide sideways on it to move.' : 'Press Play.'}`,
     );
     updateControls();
     void scoutSession(session);
@@ -394,33 +637,17 @@ void loadSamples().then((samples) => {
   });
 });
 
-/** The pose model's turn: it gets `given`, and its people are returned (null when the pose model is off or did not load). */
-async function detectPose(s: Session, given: CanvasImageSource): Promise<PoseDetection[] | null> {
-  if (!poseBox.checked) return null;
-  if (!estimator) {
-    setStatus('Loading the pose model…');
-    try {
-      estimator = await createMediaPipeEstimator({ model: 'full', numPoses: 4, preferGpu: gpuBox.checked });
-    } catch (error) {
-      poseBox.checked = false;
-      setStatus(
-        `The pose model did not load (${error instanceof Error ? error.message : String(error)}). Run "npm run fetch-assets".`,
-        'error',
-      );
-      return null;
-    }
-  }
-  poseTime += Math.max(1, Math.round((1000 * s.stride) / s.fps));
-  // MediaPipe reads a canvas as well as a video; the types of the pose code say video, and that code is not changed (see withMotionMask).
-  return await estimator.detect(given as unknown as HTMLVideoElement, poseTime);
-}
-
 /**
  * Tells whoever listens (a test that drives the page) what a frame came to: `motion-frame` on the document, with the index of the frame,
- * whether the athlete was found, the share of the picture that was kept and where the pose model found people (the middle of their hips,
- * 0 to 1 of the picture; null when the pose model did not run).
+ * whether the athlete was found, the share of the picture that was kept, where the first pose model found people (the middle of their
+ * hips, 0 to 1 of the picture; null when no model ran) and what every model found.
  */
-function announce(s: Session, result: MotionResult | null, people: PoseDetection[] | null): void {
+function announce(
+  s: Session,
+  result: MotionResult | null,
+  people: PoseDetection[] | null,
+  models: { id: string; people: number; athlete: boolean; ms: number }[],
+): void {
   const centers =
     people?.map((p) => ({
       x: (p.landmarks[LM.L_HIP].x + p.landmarks[LM.R_HIP].x) / 2,
@@ -428,46 +655,84 @@ function announce(s: Session, result: MotionResult | null, people: PoseDetection
     })) ?? null;
   document.dispatchEvent(
     new CustomEvent('motion-frame', {
-      detail: { index: s.index, found: result?.found ?? false, kept: result?.coverage ?? 1, people: centers },
+      detail: { index: s.shown, found: result?.found ?? false, kept: result?.coverage ?? 1, people: centers, models },
     }),
   );
 }
 
-/** Runs the frame at `s.index` through the detector and the pose model, and draws it. */
+/** Shows the frame on the panels again, with a setting that changed (when playing, the next frames have it anyway). */
+function reshow(): void {
+  if (!session || playing) return;
+  session.index = session.shown;
+  void run('show');
+}
+
+/** Runs the frame at `s.index` through the detector and every pose model that is ticked, and draws it. */
 async function processFrame(s: Session): Promise<void> {
-  const frame = s.index * s.stride;
+  const index = s.index;
+  const frame = index * s.stride;
   await seekTo(s.video, Math.min(frameSeekTime(frame, s.fps), s.video.duration - 1e-3));
   if (s.closed) return;
+  s.shown = index;
 
   const t0 = performance.now();
-  const result = layer.process(s.video, Math.round((frame / s.fps) * 1000));
+  const timeMs = Math.round((frame / s.fps) * 1000);
+  const result = layer.process(s.video, timeMs);
+  // On a camera that follows the athlete the detector steps aside, as in the app: its box sits off the athlete there.
+  const following = follow.push(result, timeMs);
   const masked = layer.render(s.video);
-  const t1 = performance.now();
-  // What the pose model is given: the frame with the background painted over (once the detector hides something), or the video.
-  const given = hideBox.checked && hidesSomething(result) ? masked : s.video;
-  // Once the athlete is found the picture can be cut around them and turned upright (the boxes under the video), and what the pose model finds is put back in the frame.
+  const detectorMs = performance.now() - t0;
+  // What the pose models are given: the frame with the background painted over (once the detector hides something), or the video.
+  const given: PoseSource = hideBox.checked && hidesSomething(result) && !following ? masked : s.video;
+  // Once the athlete is found the picture can be cut around them and turned upright (the boxes above), and what the models find is put back in the frame.
   const size = { width: s.video.videoWidth, height: s.video.videoHeight };
-  const prepared = viewer && result ? viewer.prepare(given, size, result.athletes[0] ?? null, result) : null;
-  const found = await detectPose(s, prepared?.source ?? given);
-  if (s.closed) return;
-  const t2 = performance.now();
-  const people =
-    found && viewer && prepared && result ? viewer.finish(found, prepared, size, result.athletes, result) : found;
-  // Of the people the pose model found, the one who jumps: the others are people who stand near the bed.
-  const athlete = people && result ? focusOnAthletes(people, result.athletes, result) : people;
+  const prepared =
+    viewer && result && !following ? viewer.prepare(given, size, result.athletes[0] ?? null, result) : null;
+  const source = (prepared?.source ?? given) as PoseSource;
+  panels.draw({ video: s.video, result, masked, given, view: prepared?.view ? prepared.source : null });
 
-  panels.draw({
-    video: s.video,
-    result,
-    masked,
-    given,
-    people,
-    athlete,
-    view: prepared?.view ? prepared.source : null,
-  });
-  showStats(s, result, people, athlete, prepared, [t1 - t0, t2 - t1]);
-  announce(s, result, people);
-  showPosition(s.index, frame / s.fps);
+  // The models one after the other, on the same picture, so that each one's time is its own.
+  const views = tickedModels();
+  let firstPeople: PoseDetection[] | null = null;
+  let firstAthletes: PoseDetection[] | null = null;
+  const found: { id: string; people: number; athlete: boolean; ms: number }[] = [];
+  for (const [k, view] of views.entries()) {
+    const loaded = await loadModel(view);
+    if (s.closed) return;
+    if (!loaded) {
+      panels.drawSkeletons(view.canvas, given, null, null, view.slot.error ? 'The model did not load' : 'Loading…');
+      view.now.textContent = view.slot.error ? 'Did not load.' : 'Loading…';
+      continue;
+    }
+    const answer = await view.slot.detect(source, (1000 * s.stride) / s.fps);
+    if (s.closed) return;
+    if (!answer) continue;
+    const people = viewer && prepared ? viewer.toFrame(answer.people, prepared, size) : answer.people;
+    // The person who jumps is the one in the box of what moves; on a camera that follows, everybody (the app's tracker chooses there).
+    const athletes = result && !following ? focusOnAthletes(people, result.athletes, result) : people;
+    const judged = Boolean(result?.athletes.length) || following;
+    const athlete = judged ? (athletes[0] ?? null) : null;
+    addFrame(view.slot.tally, judged, athlete, answer.ms);
+    panels.drawSkeletons(view.canvas, given, people, athletes);
+    view.now.textContent = `${answer.ms.toFixed(0)} ms · ${people.length === 1 ? '1 person' : `${people.length} people`}${
+      athlete ? ` · the athlete, ${Math.round(pointsSeen(athlete) * 13)} of 13 points seen` : ''
+    }`;
+    found.push({ id: view.model.id, people: people.length, athlete: athlete !== null, ms: answer.ms });
+    if (k === 0) {
+      firstPeople = people;
+      firstAthletes = athletes;
+    }
+  }
+  // The mask keeps the first model's athletes next frame, where they do not move enough to be seen moving; the turn learns from them.
+  if (result && !following) {
+    const bodies = keepBodyBox.checked && firstAthletes && result.athletes.length ? firstAthletes : [];
+    layer.seeBodies(bodies.map((p) => bodyBox(p, result)).filter((b) => b !== null));
+  }
+  if (firstAthletes) viewer?.learn(result?.athletes.length ? (firstAthletes[0] ?? null) : null, size);
+  updateCompare();
+  showStats(s, result, following, prepared, detectorMs);
+  announce(s, result, firstPeople, found);
+  showPosition(index, frame / s.fps);
 }
 
 const nextPaint = () =>
@@ -484,7 +749,7 @@ const nextPaint = () =>
  * setting), then the next ones while playing. One loop, so that what is asked while a frame is in progress is picked up after it.
  */
 async function run(request: 'step' | 'show' | null): Promise<void> {
-  // A step moves on; showing the frame again is already what a step does first.
+  // Both show the frame at `index` and move on; a step asked while another frame is processed is not lost to a show.
   if (request && pending !== 'step') pending = request;
   if (busy) return;
   busy = true;
@@ -497,9 +762,13 @@ async function run(request: 'step' | 'show' | null): Promise<void> {
       const mode = pending ?? (playing && s.index < s.total ? 'play' : null);
       if (!mode) break;
       pending = null;
+      // A frame asked for at the end of the clip is the last one.
+      s.index = Math.min(s.index, s.total - 1);
+      const index = s.index;
       await processFrame(s);
       if (s.closed) continue;
-      if (mode !== 'show') s.index = Math.min(s.index + 1, s.total);
+      // The next frame is the one after it, unless a seek while the frame was processed has moved the position already.
+      if (s.index === index) s.index = Math.min(index + 1, s.total);
       if (mode === 'play') {
         setStatus('Playing…');
         await nextPaint();
@@ -508,7 +777,15 @@ async function run(request: 'step' | 'show' | null): Promise<void> {
     if (session) {
       const atEnd = session.index >= session.total;
       if (atEnd) playing = false;
-      setStatus(atEnd ? 'The end of the video. Play again, or move the position.' : 'Paused.');
+      setStatus(
+        atEnd
+          ? 'The end of the video. Play again, or move the position.'
+          : playing
+            ? 'Playing…'
+            : touch.matches
+              ? 'Paused. Tap a video to play it, slide sideways on it to move.'
+              : 'Paused.',
+      );
     }
   } catch (error) {
     if (!current?.closed) {
@@ -567,8 +844,10 @@ document.addEventListener('drop', (event) => {
   else if (files.length > 0) setStatus(`${files[0].name} is not a video.`, 'error');
 });
 
-playButton.addEventListener('click', () => {
-  if (!session) return;
+// --- Playing -----------------------------------------------------------------------------------------------------
+
+function togglePlay(): void {
+  if (!session || rendering) return;
   if (playing) {
     playing = false;
     updateControls();
@@ -578,10 +857,22 @@ playButton.addEventListener('click', () => {
   playing = true;
   updateControls();
   void run(null);
-});
+}
+
+playButton.addEventListener('click', togglePlay);
 
 stepButton.addEventListener('click', () => {
   if (session && !playing) void run('step');
+});
+
+// Space plays and pauses, unless a control that takes it has the focus.
+document.addEventListener('keydown', (event) => {
+  if (event.key !== ' ' || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest('input, select, textarea, button, summary, label, [contenteditable]')) return;
+  if (!session) return;
+  event.preventDefault();
+  togglePlay();
 });
 
 /** Starts the detector again (the video was cut: a seek, a restart), with the place of the athlete when it is known, so that the mask is there at once. */
@@ -595,6 +886,9 @@ function restart(): void {
   if (!session) return;
   session.index = 0;
   resetDetector(session);
+  // From the start, as the app reads it: the camera has not been seen to follow yet, and the comparison starts again.
+  follow.reset();
+  resetTallies();
   updateControls();
 }
 
@@ -615,8 +909,9 @@ async function scoutSession(s: Session): Promise<void> {
     if (s.closed) return;
     s.hint = box;
     // The video may be at its first frame, with nothing learned yet: the athlete is shown there too.
-    if (!playing && s.index === 0 && box) {
+    if (!playing && s.shown === 0 && s.index <= 1 && box) {
       resetDetector(s);
+      s.index = 0;
       void run('show');
     }
   } catch {
@@ -640,17 +935,17 @@ function moveTo(index: number): void {
   void run('show');
 }
 
+seek.addEventListener('input', () => moveTo(Number(seek.value)));
+
 for (const box of [zoomBox, turnBox]) {
   box.addEventListener('change', () => {
     updateViewer();
-    if (session && !playing) void run('show');
+    reshow();
   });
 }
 
-// The pose model is made again, with the other delegate, at the next frame.
-gpuBox.addEventListener('change', () => {
-  estimator?.dispose();
-  estimator = null;
+hideBox.addEventListener('change', () => {
+  reshow();
 });
 
 // --- The result, in the app --------------------------------------------------------------------------------------
@@ -728,10 +1023,12 @@ loadCancel.addEventListener('click', () => rendering?.abort());
 window.addEventListener('pagehide', () => {
   rendering?.abort();
   closeSession();
-  estimator?.dispose();
+  for (const view of ticked.values()) view.slot.dispose();
 });
 
 // Back from the app can bring this page back from the browser's cache, after `pagehide` has closed its video: it starts again instead.
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) location.reload();
 });
+
+updateControls();

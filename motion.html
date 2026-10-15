@@ -13,80 +13,151 @@
         <h1>Motion detector <span class="md-tag">experimental</span></h1>
         <p>
           Finds the athlete from the way they move, before the pose model runs: the motion between frames, the columns
-          where things go up and down again and again like jumps, and a mask around them. Nothing is trained and the
-          pose model is not used to make the mask. Best with a camera that does not move. Your video stays on this
-          device.
+          where things go up and down again and again like jumps, and a mask around them. Then the pose models you pick
+          look at the same picture, side by side. Nothing is trained and the pose model is not used to find the athlete.
+          Best with a camera that does not move. Your video stays on this device.
         </p>
       </header>
 
       <section class="md-bar" aria-label="Video">
-        <label id="pick" class="btn btn--primary">
-          Choose a video, or drop it on the page
-          <input id="file" type="file" accept="video/*" hidden />
-        </label>
-        <!-- The sample clips of the app (the asset host). Hidden when the build has no asset host, like the app's own sample menu. -->
-        <select id="sample" class="select select--pill" aria-label="Open a sample video" hidden>
-          <option value="">Try a sample</option>
-        </select>
-        <button id="play" class="btn btn--secondary" type="button" disabled>Play</button>
-        <button id="step" class="btn btn--secondary" type="button" disabled>Step</button>
-        <button id="restart" class="btn btn--ghost" type="button" disabled>Restart</button>
-        <label class="md-check"><input id="pose" type="checkbox" checked /> Run the pose model</label>
-        <label class="md-check"><input id="gpu" type="checkbox" checked /> Use the GPU for it</label>
-        <label class="md-check"
-          ><input id="hide" type="checkbox" checked /> Hide the background before the pose model</label
-        >
-        <label class="md-check"
-          ><input id="zoom" type="checkbox" /> Zoom on the athlete (a crop around them, made big)</label
-        >
-        <label class="md-check"><input id="turn" type="checkbox" /> Turn the athlete upright (a somersault)</label>
+        <!-- No video yet: where one comes from. Replaced by the name of the video and a way back once one is open. -->
+        <div id="source" class="md-source">
+          <label id="pick" class="btn btn--primary">
+            Choose a video, or drop it on the page
+            <input id="file" type="file" accept="video/*" hidden />
+          </label>
+          <!-- The sample clips of the app (the asset host). Hidden when the build has no asset host, like the app's own sample menu. -->
+          <select id="sample" class="select select--pill" aria-label="Open a sample video" hidden>
+            <option value="">Try a sample</option>
+          </select>
+        </div>
+        <div id="loaded" class="md-loaded" hidden>
+          <span id="video-name" class="md-loaded__name"></span>
+          <button id="reset" class="btn btn--secondary" type="button">Reset video</button>
+        </div>
       </section>
 
-      <div class="md-seek">
+      <!-- The playback controls of a desktop. On a touch screen every video is its own control (see the panels). -->
+      <section class="md-transport" aria-label="Playback">
+        <button id="play" class="icon-btn icon-btn--primary icon-btn--lg" type="button" aria-label="Play" disabled>
+          <svg class="md-icon md-icon--play" viewBox="0 0 24 24" aria-hidden="true">
+            <polygon points="7 4.5 19.5 12 7 19.5" />
+          </svg>
+          <svg class="md-icon md-icon--pause" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="6" y="4.5" width="4" height="15" rx="1.2" />
+            <rect x="14" y="4.5" width="4" height="15" rx="1.2" />
+          </svg>
+        </button>
+        <button
+          id="step"
+          class="icon-btn icon-btn--solid"
+          type="button"
+          aria-label="Next frame"
+          title="Next frame"
+          disabled
+        >
+          <svg class="md-icon md-icon--line" viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="18" y1="5" x2="18" y2="19" />
+            <polyline points="6 5 14 12 6 19" />
+          </svg>
+        </button>
+        <button
+          id="restart"
+          class="icon-btn icon-btn--solid"
+          type="button"
+          aria-label="Back to the start"
+          title="Back to the start"
+          disabled
+        >
+          <svg class="md-icon md-icon--line" viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="4.5" y1="5" x2="4.5" y2="19" />
+            <polyline points="12.5 5 6.5 12 12.5 19" />
+            <polyline points="19.5 5 13.5 12 19.5 19" />
+          </svg>
+        </button>
         <input id="seek" type="range" min="0" max="0" value="0" step="1" disabled aria-label="Position in the video" />
         <output id="clock" class="num">0.00 s</output>
-      </div>
-      <p id="status" class="md-status" role="status">
-        Choose a video to start. Seeking starts the detector again from that frame.
-      </p>
+      </section>
 
-      <section class="md-panels" aria-label="Stages">
-        <figure class="md-panel">
+      <section class="md-options" aria-label="Options">
+        <fieldset class="md-models">
+          <legend>Pose models to compare</legend>
+          <div id="models" class="md-models__list"></div>
+        </fieldset>
+        <div class="md-checks">
+          <label class="md-check"><input id="gpu" type="checkbox" checked /> Use the GPU for them</label>
+          <label class="md-check"
+            ><input id="hide" type="checkbox" checked /> Hide the background before the pose models</label
+          >
+          <label class="md-check"
+            ><input id="keep-body" type="checkbox" checked /> Keep the skeleton of the first model in the mask</label
+          >
+          <label class="md-check"
+            ><input id="zoom" type="checkbox" /> Zoom on the athlete (a crop around them, made big)</label
+          >
+          <label class="md-check"><input id="turn" type="checkbox" /> Turn the athlete upright (a somersault)</label>
+        </div>
+      </section>
+
+      <p id="status" class="md-status" role="status">Choose a video to start.</p>
+
+      <section id="panels" class="md-panels" aria-label="Stages">
+        <figure class="md-panel" data-panel="original">
           <canvas id="c-original" role="img" aria-label="The original frame"></canvas>
           <figcaption><strong>Original frame</strong> The video as it is.</figcaption>
         </figure>
-        <figure class="md-panel">
+        <figure class="md-panel" data-panel="motion">
           <canvas id="c-motion" role="img" aria-label="The motion map"></canvas>
           <figcaption>
             <strong>Motion map</strong> Blue moves up, orange moves down. The gold strip shows how well each column
-            repeats like a jump, and the gold box is the athlete.
+            repeats like a jump, the gold box is what moves of the athlete, and the dashed white box is the skeleton the
+            mask keeps too.
           </figcaption>
         </figure>
-        <figure class="md-panel">
+        <figure class="md-panel" data-panel="mask">
           <canvas id="c-mask" role="img" aria-label="The athlete mask"></canvas>
           <figcaption>
             <strong>Athlete mask</strong> White stays, black is hidden. Only the one person who jumps stays, and the
             picture is left as it is until the detector is sure.
           </figcaption>
         </figure>
-        <figure class="md-panel">
+        <figure class="md-panel" data-panel="masked">
           <canvas id="c-masked" role="img" aria-label="The masked frame"></canvas>
           <figcaption><strong>Masked frame</strong> The frame with the background painted over.</figcaption>
         </figure>
-        <figure class="md-panel">
-          <canvas id="c-given" role="img" aria-label="The picture the pose model was given"></canvas>
+        <figure class="md-panel" data-panel="given">
+          <canvas id="c-given" role="img" aria-label="The picture the pose models were given"></canvas>
           <figcaption>
-            <strong>Given to the pose model</strong> The masked frame, or the athlete zoomed and turned upright when
-            those are on.
+            <strong>Given to the pose models</strong> The masked frame, or the athlete zoomed and turned upright when
+            those are on. The frame as it is on a camera that follows the athlete: the app does not mask those.
           </figcaption>
         </figure>
-        <figure class="md-panel">
-          <canvas id="c-skeleton" role="img" aria-label="The skeleton found by MediaPipe"></canvas>
-          <figcaption>
-            <strong>MediaPipe skeleton</strong> What the pose model finds in the picture it is given. The person who
-            jumps is in colour, anybody else it still finds is faint.
-          </figcaption>
-        </figure>
+      </section>
+
+      <section class="md-compare" aria-labelledby="compare-title">
+        <h2 id="compare-title">Pose models side by side</h2>
+        <p>
+          Every frame shown since the video was opened (or played again from the start). Athlete found: in the frames
+          where the detector knows where the athlete is, how often the model found a person there (anybody, on a camera
+          that follows the athlete). Points seen: the share of the 13 body points (nose, shoulders, elbows, wrists,
+          hips, knees, ankles) the model rates 0.5 or more, when it found the athlete; each model rates its points its
+          own way.
+        </p>
+        <div class="md-compare__scroll">
+          <table class="md-compare__table">
+            <thead>
+              <tr>
+                <th scope="col">Model</th>
+                <th scope="col">Runs on</th>
+                <th scope="col" class="num">Frames</th>
+                <th scope="col" class="num">Athlete found</th>
+                <th scope="col" class="num">Points seen</th>
+                <th scope="col" class="num">Time a frame</th>
+              </tr>
+            </thead>
+            <tbody id="compare-rows"></tbody>
+          </table>
+        </div>
       </section>
 
       <dl id="stats" class="md-stats" aria-label="Measurements"></dl>
