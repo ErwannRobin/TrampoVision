@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LANDMARK_COUNT, LM } from '../landmarks';
 import { decodeHeatmaps, decodeSimcc } from './decode';
-import { cropAround, cropToImage, iou, nms, type Box } from './geometry';
+import { cropAround, cropToImage, iou, nms, sourceSize, type Box } from './geometry';
 import { COCO17, HALPE26, toLandmarks } from './keypointMaps';
 import { decodeYolox, yoloxRows } from './yolox';
 
@@ -27,6 +27,13 @@ describe('crop', () => {
     expect(cropToImage(c, 192, 256, 96, 128)).toEqual({ x: c.cx, y: c.cy });
     expect(cropToImage(c, 192, 256, 0, 0)).toEqual({ x: c.cx - c.w / 2, y: c.cy - c.h / 2 });
     expect(cropToImage(c, 192, 256, 192, 256)).toEqual({ x: c.cx + c.w / 2, y: c.cy + c.h / 2 });
+  });
+});
+
+describe('the size of a source', () => {
+  it('reads the frames of a video, and the canvas itself: the motion mask hands the engines its painted canvases', () => {
+    expect(sourceSize({ videoWidth: 640, videoHeight: 360, width: 0, height: 0 })).toEqual({ width: 640, height: 360 });
+    expect(sourceSize({ width: 384, height: 384 })).toEqual({ width: 384, height: 384 });
   });
 });
 

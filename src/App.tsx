@@ -93,6 +93,7 @@ const webgpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
 const AUDIENCES = ['athlete', 'coach'] as const;
 const ADVANCED = ['on', 'off'] as const;
 const APPEARANCES = ['system', 'light', 'dark'] as const;
+const MOTION = ['on', 'off'] as const;
 
 interface SavedCalibration {
   corners: Point[];
@@ -244,6 +245,10 @@ function AppView({ playhead }: { playhead: Playhead }) {
   const [advancedFlag, setAdvancedFlag] = useLocalStorage<'on' | 'off'>('trampovision.advanced', 'off', ADVANCED);
   const advanced = advancedFlag === 'on';
   const [appearance, setAppearance] = useLocalStorage<Appearance>('trampovision.appearance', 'system', APPEARANCES);
+  // The motion detector in front of the pose model (the default): it hides the background, zooms on a small athlete where
+  // that helps, and keeps the analysis on the person who jumps. The checkbox in the settings skips it: it is slower.
+  const [motionFlag, setMotionFlag] = useLocalStorage<'on' | 'off'>('trampovision.motion', 'on', MOTION);
+  const motion = motionFlag === 'on';
   // The settings are a popup over the app: from the first screen as well as from an open clip.
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useAbout();
@@ -663,19 +668,21 @@ function AppView({ playhead }: { playhead: Playhead }) {
     if (strideNow !== stride) setStride(strideNow);
     try {
       const engineNow = advanced ? engine : 'mediapipe';
-      // The motion page said the athlete is small on a steady shot: the clip itself is analyzed, live through the detector,
-      // with the zoomed view of the athlete — the view is what lets the pose model see a small athlete at all — and the
-      // person who jumps is chosen among the people found (`JumperSelector`). Only MediaPipe reads the painted frames.
-      const live = (maskedRef.current?.zoom ?? false) && engineNow === 'mediapipe';
+      // The motion detector runs in front of the pose model on the clip itself: it hides the background, zooms on a small
+      // athlete on a steady shot (`ZoomGate` — what lets the pose model see her at all), and the person who jumps is chosen
+      // among the people found (`JumperSelector`). The checkbox in the settings skips it (it is slower); a masked copy from
+      // the motion page stands in for the clip instead, unless the page said to analyze the clip live (`Handoff.zoom`).
+      const live = motion && (maskedRef.current?.zoom ?? !maskedRef.current);
       // With a masked copy, the pose model reads it at its own rate (it holds only the frames that are analyzed): every frame of it.
       const masked = live ? null : maskedRef.current;
       const read = await extractPoseTracks(masked?.url ?? url, {
         engine: engineNow,
         model,
         numPoses,
-        // The live zoomed path runs on the CPU delegate: it is the one the choice of the jumper was measured on, and on the
-        // GPU delegate of a headless Chrome the model found the jumper half as often, with ghosts. The analysis is offline.
-        preferGpu: live ? false : preferGpu,
+        // The live path runs MediaPipe on the CPU delegate: it is the one the choice of the jumper was measured on, and on
+        // the GPU delegate of a headless Chrome the model found the jumper half as often, with ghosts. The analysis is
+        // offline. The ONNX engines keep their own backend choice.
+        preferGpu: live && engineNow === 'mediapipe' ? false : preferGpu,
         sourceFps: masked ? masked.fps : fps,
         stride: masked ? 1 : strideNow,
         signal: ctl.signal,
@@ -683,10 +690,11 @@ function AppView({ playhead }: { playhead: Playhead }) {
         onLoad: (progress) => setStatus({ kind: 'loading', stage: 'model', progress }),
         onProgress: (done, total) => setStatus({ kind: 'analyzing', done, total }),
         createEstimator: live
-          ? withMotionMask(estimatorFactory('mediapipe'), {
+          ? withMotionMask(estimatorFactory(engineNow), {
               // The detector keeps its one box (the zoom view and the mask were measured with it); the choice of the jumper
               // keeps as many people as asked, or two (synchro) when the count is left to the app. The travel alone decides
               // ('travel'): the tracker locks on the first person it is given, and the motion box would hand it the spotter.
+              // On a camera that follows the athlete, whose hips never travel in the picture, the box decides after all.
               athletes: numPoses > 0 ? Math.floor(numPoses) : 2,
               focus: 'travel',
               view: { zoom: true },
@@ -1271,6 +1279,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
       onStride={setStride}
       preferGpu={preferGpu}
       onPreferGpu={setPreferGpu}
+      motion={motion}
+      onMotion={(on) => setMotionFlag(on ? 'on' : 'off')}
       fps={fps}
       onFps={(next) => {
         if (next === fps) return;
@@ -1429,6 +1439,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
               }}
               busy={loading}
               advanced={advanced}
+              motion={motion}
+              onMotion={(on) => setMotionFlag(on ? 'on' : 'off')}
             />
           </>
         ) : (

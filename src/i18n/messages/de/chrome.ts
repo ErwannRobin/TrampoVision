@@ -56,6 +56,8 @@ export const chrome: Translation<typeof en> = {
   'landing.reviewWaiting': '{n} warten auf Prüfung',
   'landing.motion': 'Bewegungsdetektor',
   'landing.motionHint': 'Experimentell: den Athleten vor dem Pose-Modell freistellen',
+  'landing.followHint':
+    'Langsamer, hält die Analyse aber auf dem Springer statt auf einer Hilfestellung oder einem Trainer.',
   'landing.noteCamera':
     'Die besten Ergebnisse liefert eine feststehende, waagerechte Kamera an der Seite, mit dem ganzen Trampolin im Bild und dem Athleten im Blick – vom Absprung des ersten bis zur Landung des letzten Elements.',
   'landing.notePrivacy': 'Läuft in Ihrem Browser. Das Video verlässt Ihr Gerät nie.',
@@ -93,6 +95,10 @@ export const chrome: Translation<typeof en> = {
   'setup.athlete': 'Athlet',
   'setup.height': 'Körpergröße',
   'setup.heightHint': 'Skaliert die Messungen in Metern, wenn das Trampolin nicht markiert ist.',
+  'setup.motion': 'Bewegungserkennung',
+  'setup.motionSwitch': 'Der springenden Person folgen',
+  'setup.motionText':
+    'Die Bewegungserkennung läuft vor dem Pose-Modell: Sie verdeckt den Hintergrund, zoomt auf eine im Bild kleine Athletin und hält die Analyse auf dem Springer statt auf einer Hilfestellung. Die Analyse wird langsamer.',
   'setup.review': 'Prüfung',
   'setup.reviewSwitch': 'Analysierte Sprünge zur Prüfung senden',
   'setup.reviewText':

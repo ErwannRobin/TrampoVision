@@ -50,6 +50,9 @@ export interface SettingsDialogProps {
   onStride: (n: number) => void;
   preferGpu: boolean;
   onPreferGpu: (value: boolean) => void;
+  /** The motion detector runs in front of the pose model (the default). Off, the pose model reads the clip as it is: faster, but the analysis can follow a spotter. */
+  motion: boolean;
+  onMotion: (on: boolean) => void;
   fps: number;
   onFps: (fps: number) => void;
   /** Runtime of the pose model once analysis ran ('' before). */
@@ -371,6 +374,18 @@ export function SettingsDialog(props: SettingsDialogProps) {
                   hint={t('setup.heightHint')}
                 />
               </Block>
+
+              {!short && (
+                <Block title={t('setup.motion')}>
+                  <Switch
+                    checked={props.motion}
+                    onChange={props.onMotion}
+                    disabled={state.engineLocked}
+                    label={t('setup.motionSwitch')}
+                  />
+                  <p className="settings__status">{t('setup.motionText')}</p>
+                </Block>
+              )}
 
               {props.advanced && (
                 <Block title={t('setup.analysis')}>

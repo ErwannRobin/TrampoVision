@@ -63,6 +63,7 @@ export const chrome = {
   'landing.reviewWaiting': '{n} waiting for a check',
   'landing.motion': 'Motion detector',
   'landing.motionHint': 'Experimental: isolate the athlete before the pose model',
+  'landing.followHint': 'Slower, but keeps the analysis on the jumper, not on a spotter or a coach.',
   'landing.noteCamera':
     'Best results come from a fixed, level camera at the side, with the whole trampoline in frame and the athlete in view from the takeoff of the first skill to the landing of the last.',
   'landing.notePrivacy': 'Runs in your browser. The video never leaves your device.',
@@ -101,6 +102,10 @@ export const chrome = {
   'setup.athlete': 'Athlete',
   'setup.height': 'Height',
   'setup.heightHint': 'Scales the measurements in meters when the trampoline is not marked.',
+  'setup.motion': 'Motion detector',
+  'setup.motionSwitch': 'Follow the person who jumps',
+  'setup.motionText':
+    'The motion detector runs in front of the pose model: it hides the background, zooms on an athlete who is small in the picture, and keeps the analysis on the jumper rather than on a spotter. It makes the analysis slower.',
   'setup.review': 'Review',
   'setup.reviewSwitch': 'Send analyzed jumps for review',
   'setup.reviewText':

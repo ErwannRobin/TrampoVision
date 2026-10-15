@@ -56,6 +56,7 @@ export const chrome: Translation<typeof en> = {
   'landing.reviewWaiting': '{n} en attente de vérification',
   'landing.motion': 'Détecteur de mouvement',
   'landing.motionHint': 'Expérimental : isoler l’athlète avant le modèle de pose',
+  'landing.followHint': 'Plus lent, mais garde l’analyse sur le sauteur, pas sur une parade ou un entraîneur.',
   'landing.noteCamera':
     'Les meilleurs résultats s’obtiennent avec une caméra fixe et bien horizontale, placée sur le côté, avec tout le trampoline dans le cadre et l’athlète visible de l’impulsion de la première figure jusqu’à la réception de la dernière.',
   'landing.notePrivacy': 'Fonctionne dans votre navigateur. La vidéo ne quitte jamais votre appareil.',
@@ -93,6 +94,10 @@ export const chrome: Translation<typeof en> = {
   'setup.athlete': 'Athlète',
   'setup.height': 'Taille',
   'setup.heightHint': 'Sert à mettre les mesures à l’échelle (en mètres) quand le trampoline n’est pas marqué.',
+  'setup.motion': 'Détecteur de mouvement',
+  'setup.motionSwitch': 'Suivre la personne qui saute',
+  'setup.motionText':
+    'Le détecteur de mouvement passe avant le modèle de pose : il masque l’arrière-plan, zoome sur un athlète petit dans l’image et garde l’analyse sur le sauteur plutôt que sur une parade. L’analyse est plus lente.',
   'setup.review': 'Vérification',
   'setup.reviewSwitch': 'Envoyer les sauts analysés pour vérification',
   'setup.reviewText':

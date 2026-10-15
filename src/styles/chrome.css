@@ -183,7 +183,8 @@
     position: absolute;
     inset: -4px 0;
   }
-  .settings .switch {
+  .settings .switch,
+  .landing__option .switch {
     min-height: 44px;
   }
   .landing__link {
@@ -308,6 +309,18 @@
 }
 .landing__hint {
   margin-top: 14px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.landing__option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 18px;
+}
+.landing__option small {
+  /* Under the label, past the track (34px) and the gap (10px). */
+  padding-left: 44px;
   color: var(--text-2);
   font-size: var(--fs-sm);
 }

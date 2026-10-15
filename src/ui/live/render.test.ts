@@ -210,7 +210,7 @@ describe('the first screen', () => {
     clear: async () => {},
     importText: async () => ({ added: 0, updated: 0, kept: 0 }),
   } as never;
-  const landing = (advanced: boolean) =>
+  const landing = (advanced: boolean, motion = true) =>
     renderToStaticMarkup(
       createElement(Landing, {
         onFile: () => {},
@@ -223,6 +223,8 @@ describe('the first screen', () => {
         dataset,
         busy: false,
         advanced,
+        motion,
+        onMotion: () => {},
       }),
     );
 
@@ -238,6 +240,13 @@ describe('the first screen', () => {
 
   it('brings back the saved analyses with the advanced tools', () => {
     expect(landing(true)).toContain('Open a saved analysis');
+  });
+
+  it('offers the motion detector before the clip is chosen, in the live view too, as it is set', () => {
+    const on = landing(false, true);
+    expect(on).toContain('Follow the person who jumps');
+    expect(on).toMatch(/role="switch"[^>]*checked=""/);
+    expect(landing(false, false)).not.toMatch(/role="switch"[^>]*checked=""/);
   });
 
   it('links the motion detector only with the advanced tools', () => {
@@ -269,6 +278,8 @@ describe('the settings', () => {
     onStride: () => {},
     preferGpu: true,
     onPreferGpu: () => {},
+    motion: true,
+    onMotion: () => {},
     fps: 30,
     onFps: () => {},
     backend: '',

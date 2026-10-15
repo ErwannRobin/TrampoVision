@@ -1,3 +1,4 @@
+import { blendSignature, signatureDistance, type Signature } from '../pose/appearance';
 import { LM } from '../pose/landmarks';
 import type { PoseDetection } from '../pose/types';
 import { bodyCenter } from './focus';
@@ -66,6 +67,17 @@ const RISE_ABOVE = 0.12;
 const SAME_COLUMNS = 0.15;
 /** A landmark with less visibility than this says nothing about where the body is. */
 const SEEN = 0.3;
+/** Cost of looking different, per unit of `signatureDistance`: what the athlete tracker uses (`selectAthlete.ts`), where clothes decide between two people who are equally near. */
+const APPEARANCE_WEIGHT = 6;
+/** How much of the newest look enters a track's running look: what the athlete tracker uses. */
+const LOOK_SMOOTHING = 0.1;
+/**
+ * Somebody who looks this close to the athlete is them (`signatureDistance`, 0 the same colors, 1 opposite). Measured at 30 Hz
+ * on three clips, the athlete's own detections lie 0.01 to 0.08 from her running look (10th to 90th part), everybody else 0.03
+ * to 0.37: the distributions overlap, so the threshold is tight. Swept on a 2× crop of the competition clip: 0.05 takes the
+ * athlete back in 19 more frames with the spotter chosen no more often than without looks; 0.08 starts handing her frames.
+ */
+const LOOK_SAME = 0.05;
 
 interface Sample {
   t: number;
@@ -171,6 +183,8 @@ interface Track {
   jumps: boolean;
   /** True while this track holds the title of the athlete. */
   chosen: boolean;
+  /** The colors of the person's clothes (smoothed), when the caller samples them. */
+  look: Signature | null;
 }
 
 export class JumperSelector {
@@ -181,6 +195,8 @@ export class JumperSelector {
   private band: { low: number; high: number } | null = null;
   /** The athlete's torso length (smoothed): somebody much bigger who walks through the picture is not them. */
   private athleteTorso: number | null = null;
+  /** What the athlete's clothes look like (smoothed): how they are known again when every track of theirs has died. */
+  private athleteLook: Signature | null = null;
   /** The spots people keep coming back to: where the standers stand (`Station`). */
   private stations: Station[] = [];
 
@@ -191,13 +207,17 @@ export class JumperSelector {
    * Takes the people of one frame (`timeS` seconds into the clip, landmarks normalized 0..1) and returns the athletes among
    * them: null while no track has travelled like a jumper yet (fall back on the motion box), an empty array when the athlete
    * is known but not seen in this frame (leave the frame empty rather than follow somebody else).
+   *
+   * `looks`: the colors of each person's clothes (`bodySignature`), when the caller can sample them. They settle the
+   * association between two people equally near, and they let the athlete be known again across a gap longer than a track
+   * survives: the model loses the jumper for whole jumps, and her clothes do not change while she is unseen.
    */
-  push(people: PoseDetection[], timeS: number): PoseDetection[] | null {
+  push(people: PoseDetection[], timeS: number, looks: (Signature | null)[] = []): PoseDetection[] | null {
     this.tracks = this.tracks.filter((track) => timeS - track.lastSeenT <= MAX_GAP_S);
 
     const observations = dropDuplicates(
       people
-        .map((person) => ({ person, hip: bodyCenter(person), torso: torsoLength(person) }))
+        .map((person, i) => ({ person, hip: bodyCenter(person), torso: torsoLength(person), look: looks[i] ?? null }))
         // The odd nonsense detection (hips outside the picture, a torso of half the picture) would poison a track's travel.
         .filter((o) => o.hip.x > -0.05 && o.hip.x < 1.05 && o.hip.y > -0.05 && o.hip.y < 1.05 && o.torso < 0.35),
     );
@@ -243,10 +263,15 @@ export class JumperSelector {
         );
         const ratio = o.torso / track.torso;
         if (distance > gate || ratio > MAX_SIZE_RATIO || ratio < 1 / MAX_SIZE_RATIO) return;
+        // Clothes settle the association between two people equally near; they never open the gate.
+        const different = o.look && track.look ? signatureDistance(o.look, track.look) : null;
         pairs.push({
           track,
           index,
-          cost: distance / Math.max(GATE_FLOOR, track.torso) + 2 * Math.abs(Math.log(ratio)),
+          cost:
+            distance / Math.max(GATE_FLOOR, track.torso) +
+            2 * Math.abs(Math.log(ratio)) +
+            APPEARANCE_WEIGHT * (different ?? 0),
         });
       });
     }
@@ -262,6 +287,7 @@ export class JumperSelector {
       if (gap > 0) track.velocity = { x: (o.hip.x - track.hip.x) / gap, y: (o.hip.y - track.hip.y) / gap };
       track.hip = o.hip;
       track.torso += SIZE_SMOOTHING * (o.torso - track.torso);
+      if (o.look) track.look = track.look ? blendSignature(track.look, o.look, LOOK_SMOOTHING) : o.look;
       track.lastSeenT = timeS;
       track.samples.push({ t: timeS, y: o.hip.y });
       if (track.samples[0].t < timeS - 2 * WINDOW_S) {
@@ -308,6 +334,7 @@ export class JumperSelector {
         travel: 0,
         jumps: false,
         chosen: false,
+        look: o.look,
       };
       this.tracks.push(track);
       trackOf.set(index, track);
@@ -327,9 +354,12 @@ export class JumperSelector {
       return standers.every((s) => Math.abs(track.hip.x - s.x) > SAME_COLUMNS || top < s.y - RISE_ABOVE);
     });
     // While nobody has ever travelled like a jumper, the caller's motion box knows better (null). Once somebody has, it does
-    // not: when every jumping track is lost (the model loses the jumper for whole jumps), a frame left empty is better than
-    // the motion box handing the frames to the spotter.
-    if (jumping.length === 0) return this.everChose ? [] : null;
+    // not: when every jumping track is lost (the model loses the jumper for whole jumps), somebody who wears the athlete's
+    // clothes in the athlete's heights is the athlete (`reacquire`); anybody else leaves the frame empty, which is better
+    // than the motion box handing the frames to the spotter.
+    if (jumping.length === 0) {
+      return this.everChose ? this.reacquire(observations, standers, people) : null;
+    }
     jumping.sort(
       (a, b) => b.travel * (b.chosen ? CHALLENGER_TRAVEL : 1) - a.travel * (a.chosen ? CHALLENGER_TRAVEL : 1),
     );
@@ -349,6 +379,9 @@ export class JumperSelector {
       this.athleteTorso = this.athleteTorso
         ? this.athleteTorso + BAND_SMOOTHING * (track.torso - this.athleteTorso)
         : track.torso;
+      if (track.look) {
+        this.athleteLook = this.athleteLook ? blendSignature(this.athleteLook, track.look, LOOK_SMOOTHING) : track.look;
+      }
     }
 
     const kept: number[] = [];
@@ -361,12 +394,39 @@ export class JumperSelector {
     });
     return kept.sort((a, b) => a - b).map((i) => people[i]);
   }
+
+  /**
+   * The athlete among the people of a frame in which no track travels like a jumper: somebody who wears the athlete's clothes
+   * (`LOOK_SAME`), at the athlete's size, inside the heights the athlete flies through, and away from the standers' stations.
+   * The model loses the jumper for longer than a track survives (`MAX_GAP_S`), and her clothes are what is left to know her by.
+   */
+  private reacquire(observations: Observation[], standers: Station[], people: PoseDetection[]): PoseDetection[] {
+    if (!this.athleteLook || !this.band) return [];
+    const kept: number[] = [];
+    for (const o of observations) {
+      if (!o.look) continue;
+      const different = signatureDistance(o.look, this.athleteLook);
+      if (different === null || different > LOOK_SAME) continue;
+      if (o.hip.y < this.band.low - BAND_SLACK || o.hip.y > this.band.high + BAND_SLACK) continue;
+      if (this.athleteTorso !== null) {
+        const ratio = o.torso / this.athleteTorso;
+        if (ratio > MAX_SIZE_RATIO || ratio < 1 / MAX_SIZE_RATIO) continue;
+      }
+      if (standers.some((s) => Math.hypot(o.hip.x - s.x, o.hip.y - s.y) < STATION_VETO)) continue;
+      kept.push(people.indexOf(o.person));
+    }
+    return kept
+      .sort((a, b) => a - b)
+      .slice(0, Math.max(1, Math.floor(this.maxAthletes)))
+      .map((i) => people[i]);
+  }
 }
 
 interface Observation {
   person: PoseDetection;
   hip: { x: number; y: number };
   torso: number;
+  look: Signature | null;
 }
 
 /** A spot somebody keeps coming back to, and how long they once stayed at it without leaving (`longestRun`). */

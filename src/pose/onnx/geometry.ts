@@ -46,6 +46,14 @@ export function cropToImage(
   };
 }
 
+/** The pixel size of what a model reads: a video's frames (`videoWidth`), or a canvas's own size. */
+export function sourceSize(source: { videoWidth?: number; videoHeight?: number; width?: number; height?: number }): {
+  width: number;
+  height: number;
+} {
+  return { width: source.videoWidth ?? source.width ?? 0, height: source.videoHeight ?? source.height ?? 0 };
+}
+
 export function iou(a: Box, b: Box): number {
   const w = Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1);
   const h = Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1);

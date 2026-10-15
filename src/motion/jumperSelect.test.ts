@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Signature } from '../pose/appearance';
 import { LM, LANDMARK_COUNT } from '../pose/landmarks';
 import type { PoseDetection } from '../pose/types';
 import { JumperSelector, verticalTravel } from './jumperSelect';
@@ -151,5 +152,52 @@ describe('the person who jumps, chosen by the travel of their hips', () => {
     // Everybody nearly still in the picture: the camera follows the jumper, so their hips stay put.
     const rows = run(new JumperSelector(), () => [person(0.5, 0.5, 0.1), person(0.8, 0.7, 0.15)], 8);
     expect(rows.every((xs) => xs === null)).toBe(true);
+  });
+});
+
+describe('the clothes of the athlete', () => {
+  const colored = (rgb: [number, number, number]): Signature => ({ torso: rgb, legs: rgb });
+  const black = colored([0.05, 0.05, 0.05]);
+  const maroon = colored([0.45, 0.1, 0.12]);
+
+  /** Like `run`, with the colors of each person's clothes given along. */
+  function runWithLooks(
+    selector: JumperSelector,
+    scene: (t: number) => { people: PoseDetection[]; looks: (Signature | null)[] },
+    seconds: number,
+  ): (number[] | null)[] {
+    const out: (number[] | null)[] = [];
+    for (let k = 0; k < seconds * FPS; k++) {
+      const t = k / FPS;
+      const { people, looks } = scene(t);
+      const chosen = selector.push(people, t, looks);
+      out.push(chosen === null ? null : chosen.map((p) => (p.landmarks[LM.L_HIP].x + p.landmarks[LM.R_HIP].x) / 2));
+    }
+    return out;
+  }
+
+  /** The jumper in black jumps, is lost for longer than a track survives, and reappears without travelling yet. */
+  const scene =
+    (reappearsAs: Signature) =>
+    (t: number): { people: PoseDetection[]; looks: (Signature | null)[] } => {
+      const spotter = person(0.52, 0.8, 0.2);
+      if (t < 4) {
+        return { people: [spotter, person(0.5, jumpY(t, 0.55, 0.3, 1.6), 0.08)], looks: [maroon, black] };
+      }
+      if (t < 5.5) return { people: [spotter], looks: [maroon] };
+      // Back in the middle of her flight band, hips still (the model just found her again): no travel to speak yet.
+      return { people: [spotter, person(0.45, 0.4, 0.08)], looks: [maroon, reappearsAs] };
+    };
+
+  it('are how she is known again after a gap no track survives, before she has travelled anew', () => {
+    const rows = runWithLooks(new JumperSelector(), scene(black), 7);
+    const back = after(rows, 5.6).filter((xs) => xs !== null && xs.length === 1);
+    expect(back.length).toBeGreaterThan(FPS);
+    expect(back.every((xs) => Math.abs(xs![0] - 0.45) < 0.01)).toBe(true);
+  });
+
+  it('keep a stranger in other clothes out: the frame stays empty', () => {
+    const rows = runWithLooks(new JumperSelector(), scene(maroon), 7);
+    expect(after(rows, 5.6).every((xs) => xs !== null && xs.length === 0)).toBe(true);
   });
 });

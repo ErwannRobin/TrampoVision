@@ -1,8 +1,15 @@
 import type * as Ort from 'onnxruntime-web';
-import type { BackendInfo, EstimatorOptions, PoseDetection, PoseEstimator, PoseEstimatorFactory } from '../types';
+import type {
+  BackendInfo,
+  EstimatorOptions,
+  PoseDetection,
+  PoseEstimator,
+  PoseEstimatorFactory,
+  PoseSource,
+} from '../types';
 import { decodeHeatmaps, decodeSimcc, type Decoded } from './decode';
 import { createPersonDetector, DETECTOR_FILE } from './detector';
-import { cropAround, cropToImage, type Crop } from './geometry';
+import { cropAround, cropToImage, sourceSize, type Crop } from './geometry';
 import { COCO17, HALPE26, toLandmarks, type KeypointMap, type ScoredPoint } from './keypointMaps';
 import { createSession, fetchModel, loadOrt } from './runtime';
 
@@ -60,14 +67,15 @@ const SPECS = {
 
 export type OnnxEngine = keyof typeof SPECS;
 
-/** Fills `pixels` (RGB, planes, normalized) from the part of the video the crop covers; what lies outside the picture is black. */
-function drawCrop(ctx: CanvasRenderingContext2D, video: HTMLVideoElement, crop: Crop, pixels: Float32Array): void {
+/** Fills `pixels` (RGB, planes, normalized) from the part of the source the crop covers; what lies outside the picture is black. */
+function drawCrop(ctx: CanvasRenderingContext2D, video: PoseSource, crop: Crop, pixels: Float32Array): void {
+  const size = sourceSize(video);
   const left = crop.cx - crop.w / 2;
   const top = crop.cy - crop.h / 2;
   const x0 = Math.max(0, left);
   const y0 = Math.max(0, top);
-  const x1 = Math.min(video.videoWidth, left + crop.w);
-  const y1 = Math.min(video.videoHeight, top + crop.h);
+  const x1 = Math.min(size.width, left + crop.w);
+  const y1 = Math.min(size.height, top + crop.h);
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, INPUT_W, INPUT_H);
   if (x1 > x0 && y1 > y0) {
@@ -143,7 +151,7 @@ export function createOnnxEstimator(engine: OnnxEngine): PoseEstimatorFactory {
     const estimator: PoseEstimator = {
       backend,
       async detect(video): Promise<PoseDetection[]> {
-        const { videoWidth: width, videoHeight: height } = video;
+        const { width, height } = sourceSize(video);
         const people: PoseDetection[] = [];
         for (const box of await detector.detect(video, options.numPoses)) {
           const crop = cropAround(box, INPUT_W / INPUT_H);

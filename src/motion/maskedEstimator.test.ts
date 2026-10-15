@@ -4,6 +4,7 @@ import type { MaskLayer } from './layer';
 import { withMotionMask } from './maskedEstimator';
 import { LM, LANDMARK_COUNT } from '../pose/landmarks';
 import type { Box, MotionResult } from './types';
+import { toView, type View } from './view';
 
 const video = { videoWidth: 640, videoHeight: 360 } as HTMLVideoElement;
 const masked = { masked: true } as unknown as HTMLCanvasElement;
@@ -31,13 +32,13 @@ function frame(coverage: number): MotionResult {
 }
 
 /** The same, for a picture of 100 × 100 pixels in which the athlete is in `athletes`: small enough on a steady shot for the zoom view. */
-const frameWith = (coverage: number, athletes: Box[]): MotionResult => ({
+const frameWith = (coverage: number, athletes: Box[], camera: Partial<MotionResult['camera']> = {}): MotionResult => ({
   ...frame(coverage),
   width: 100,
   height: 100,
   found: athletes.length > 0,
   athletes,
-  camera: { type: 'fixed', dx: 0, dy: 0, known: true, speed: 0, athleteShare: 0.2 },
+  camera: { type: 'fixed', dx: 0, dy: 0, known: true, speed: 0, athleteShare: 0.2, ...camera },
 });
 
 /** A person whose hips are at (x, y) of the picture, 0 to 1. */
@@ -203,6 +204,51 @@ describe('the motion mask in front of a pose estimator', () => {
       expect(last).toHaveLength(1);
       expect(last[0].landmarks[LM.L_HIP].x).toBeCloseTo(0.3);
     });
+
+    it('lets everybody through on a camera that follows the athlete, even when asked for the travel alone', async () => {
+      // The camera keeps the athlete still in the picture: their hips never travel, and the travel would never answer.
+      // Once it has moved at a follow camera's speed for a second, the clip is a follow clip: the app's tracker chooses.
+      const still = person(0.5, 0.6);
+      const judge = person(0.9, 0.8);
+      const boxOnAthlete = [{ x0: 40, y0: 45, x1: 60, y1: 75 }];
+      const { factory } = setup([frameWith(0.2, boxOnAthlete, { type: 'tracking', speed: 0.4 })], [judge, still], {
+        focus: 'travel',
+      });
+      const estimator = await factory(options);
+      // Before the camera has followed for a second, the travel knows nothing and the frames stay empty.
+      expect(estimator.detect(video, 0)).toEqual([]);
+      let last: PoseDetection[] = [];
+      for (let now = 33; now < 4000; now += 33) last = estimator.detect(video, now) as PoseDetection[];
+      expect(last).toEqual([judge, still]);
+    });
+
+    it('steps aside on a camera that follows the athlete: the frame as it is, and everybody, even somebody the travel chose', async () => {
+      // A panning camera sweeps the people behind the bed through the picture: their hips "travel" and the travel can
+      // choose one of them, while the motion box (the camera's own move taken out imperfectly) sits off the athlete, so the
+      // mask would hide them. Measured on the broadcast clip: the mask kept 3 to 12% of the picture, the athlete outside it.
+      const body = (x: number, y: number, torso: number): PoseDetection => {
+        const landmarks = Array.from({ length: LANDMARK_COUNT }, () => ({ x, y: y - torso / 2, visibility: 1 }));
+        landmarks[LM.L_HIP] = landmarks[LM.R_HIP] = { x, y, visibility: 1 };
+        landmarks[LM.L_SHOULDER] = landmarks[LM.R_SHOULDER] = { x, y: y - torso, visibility: 1 };
+        return { landmarks };
+      };
+      const swept = (t: number) => body(0.3, 0.55 - 0.3 * Math.abs(Math.sin((Math.PI * t) / 1.6)), 0.08);
+      const athlete = body(0.5, 0.5, 0.1);
+      const offAthlete = [{ x0: 80, y0: 5, x1: 95, y1: 30 }];
+      let now = 0;
+      const { factory, given } = setup(
+        [frameWith(0.2, offAthlete, { type: 'tracking', speed: 0.4 })],
+        () => [swept(now / 1000), athlete],
+        { focus: 'travel' },
+      );
+      const estimator = await factory(options);
+      let last: PoseDetection[] = [];
+      for (now = 0; now < 8000; now += 33) last = estimator.detect(video, now) as PoseDetection[];
+      // Masked while the follow was not known yet, the frame itself once it is.
+      expect(given[0]).toBe(masked);
+      expect(given[given.length - 1]).toBe(video);
+      expect(last).toHaveLength(2);
+    });
   });
 
   describe('the view of the athlete', () => {
@@ -251,9 +297,125 @@ describe('the motion mask in front of a pose estimator', () => {
     });
   });
 
-  it('refuses the engines that cannot read a canvas', async () => {
+  describe('turning the picture upright', () => {
+    const turnedCanvas = { name: 'a turned view' } as unknown as HTMLCanvasElement;
+    /** A big athlete (the zoom view is not wanted for them) on a steady shot. */
+    const big = { athleteShare: 0.6 };
+
+    /**
+     * A person whose hips are at (x, y) of the frame (0 to 1) and whose trunk, `torso` of the frame's height long, leans `lean` degrees to
+     * the right, as a perfect pose model finds them in `view` (null: in the frame itself).
+     */
+    function leaning(x: number, y: number, lean: number, torso: number, view: View | null): PoseDetection {
+      const { videoWidth: w, videoHeight: h } = video;
+      const at = (u: number, v: number) => {
+        const p = view ? toView({ x: u * w, y: v * h }, view) : { x: u * w, y: v * h };
+        const size = view ?? { width: w, height: h };
+        return { x: p.x / size.width, y: p.y / size.height, visibility: 1 };
+      };
+      const rad = (lean * Math.PI) / 180;
+      const landmarks = Array.from({ length: LANDMARK_COUNT }, () => at(x, y));
+      landmarks[LM.L_SHOULDER] = landmarks[LM.R_SHOULDER] = at(
+        x + (Math.sin(rad) * torso * h) / w,
+        y - Math.cos(rad) * torso,
+      );
+      return { landmarks };
+    }
+
+    /** Runs the people of `scene` (given the time, s, and the view the model was given) through the mask, 30 frames a second, and gives the views painted for each frame. */
+    async function run(scene: (t: number, view: View | null) => PoseDetection[], says: MotionResult, extra: object) {
+      const views: (View | null)[] = [];
+      let painted: View | null = null;
+      const paint = vi.fn((_source: CanvasImageSource, view: View) => {
+        painted = view;
+        return turnedCanvas as unknown as CanvasImageSource;
+      });
+      let now = 0;
+      const { factory, given } = setup(
+        [says],
+        () => {
+          const view = given[given.length - 1] === turnedCanvas ? painted : null;
+          views.push(view);
+          return scene(now / 1000, view);
+        },
+        { paint, ...extra },
+      );
+      const estimator = await factory(options);
+      for (now = 0; now < 8000; now += 33) estimator.detect(video, now);
+      return views;
+    }
+
+    /** The share of the last two seconds' frames whose picture was turned. */
+    const turnedShare = (views: (View | null)[]) => views.slice(-60).filter((v) => v && v.angle !== 0).length / 60;
+
+    it('turns the whole frame for a somersault of a big athlete, where the zoom view is not used', async () => {
+      const where = [{ x0: 40, y0: 45, x1: 60, y1: 75 }];
+      const views = await run((t, view) => [leaning(0.5, 0.6, t * 450, 0.15, view)], frameWith(0.2, where, big), {
+        view: { zoom: true, rotate: true },
+        focus: false,
+      });
+      expect(turnedShare(views)).toBeGreaterThan(0.5);
+      for (const v of views) if (v) expect([v.width, v.height, v.scale]).toEqual([640, 360, 1]);
+    });
+
+    it('learns the turn from the person who jumps, not from the spotter in the motion box', async () => {
+      const jumper = (t: number, view: View | null) =>
+        leaning(0.3, 0.55 - 0.3 * Math.abs(Math.sin((Math.PI * t) / 1.6)), t * 450, 0.08, view);
+      const boxOnSpotter = [{ x0: 42, y0: 70, x1: 62, y1: 95 }];
+      const views = await run(
+        (t, view) => [leaning(0.52, 0.8, 0, 0.2, view), jumper(t, view)],
+        frameWith(0.2, boxOnSpotter, big),
+        { view: { zoom: true, rotate: true }, focus: 'travel', athletes: 2 },
+      );
+      expect(turnedShare(views)).toBeGreaterThan(0.5);
+      // Turned by about the jumper's own lean, frame by frame.
+      for (let i = views.length - 60; i < views.length; i++) {
+        const v = views[i];
+        if (!v || v.angle === 0) continue;
+        const truth = ((i * 33) / 1000) * 450;
+        expect(Math.abs(((((v.angle - truth) % 360) + 540) % 360) - 180)).toBeLessThan(25);
+      }
+    });
+
+    it('leaves the picture as it is once two people jump (synchro): one turn cannot put both upright', async () => {
+      const at = (x: number, phase: number) => (t: number, view: View | null) =>
+        leaning(x, 0.55 - 0.3 * Math.abs(Math.sin((Math.PI * (t + phase)) / 1.6)), t * 450, 0.08, view);
+      const a = at(0.25, 0);
+      const b = at(0.7, 0.4);
+      const views = await run(
+        (t, view) => [a(t, view), b(t, view)],
+        frameWith(0.2, [{ x0: 15, y0: 20, x1: 35, y1: 60 }], big),
+        {
+          view: { zoom: true, rotate: true },
+          focus: 'travel',
+          athletes: 2,
+        },
+      );
+      expect(turnedShare(views)).toBe(0);
+    });
+
+    it('does not turn anything unless asked', async () => {
+      const where = [{ x0: 40, y0: 45, x1: 60, y1: 75 }];
+      const views = await run((t, view) => [leaning(0.5, 0.6, t * 450, 0.15, view)], frameWith(0.2, where, big), {
+        view: { zoom: true },
+        focus: false,
+      });
+      expect(views.every((v) => v === null)).toBe(true);
+    });
+  });
+
+  it('accepts every engine: they all read the painted canvas (the ONNX ones measure what they are given)', async () => {
     const { factory } = setup([frame(1)]);
-    await expect(factory({ ...options, engine: 'rtmpose' })).rejects.toThrow(/MediaPipe/);
+    await expect(factory({ ...options, engine: 'rtmpose' })).resolves.toBeDefined();
     await expect(factory({ ...options, engine: 'mediapipe' })).resolves.toBeDefined();
+  });
+
+  it('steps aside for a source that is not a video: the pose model gets it as it is', async () => {
+    const { factory, given, layer } = setup([frame(0.4)]);
+    const estimator = await factory(options);
+    const canvas = { width: 100, height: 100 } as HTMLCanvasElement;
+    expect(estimator.detect(canvas, 1000)).toBe(detections);
+    expect(given).toEqual([canvas]);
+    expect(layer.process).not.toHaveBeenCalled();
   });
 });

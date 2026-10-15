@@ -172,6 +172,49 @@ describe('preparing a frame for the pose model', () => {
       expect(view.turn).toBeCloseTo(15, 0);
     });
 
+    it('turns the picture without zooming in a frame where the zoom is not wanted', () => {
+      const { paint, views } = painter();
+      const view = new AthleteView({ rotate: true, zoom: true }, paint);
+      const box = boxAt(64, 40);
+      for (let f = 0; f < 12; f++) {
+        const p = view.prepare(source, frame, box, picture, false);
+        view.finish([found(320, 200, f * 15, p.view)], p, frame, [box], picture);
+      }
+      expect(view.angle).not.toBe(0);
+      // The whole frame, turned: as big as it was, one pixel for one pixel.
+      expect(views.length).toBeGreaterThan(0);
+      for (const v of views) expect([v.width, v.height, v.scale]).toEqual([frame.width, frame.height, 1]);
+    });
+
+    it('turns the whole frame about the hips of the athlete, not about a box that strayed from them', () => {
+      const { paint, views } = painter();
+      const view = new AthleteView({ rotate: true, zoom: false }, paint);
+      // The detector's box sits on somebody else, far to the left; the athlete is the one it is told about.
+      const stray = boxAt(20, 40);
+      for (let f = 0; f < 12; f++) {
+        const p = view.prepare(source, frame, stray, picture);
+        const athlete = found(320, 200, f * 15, p.view);
+        view.learn(view.toFrame([athlete], p, frame)[0], frame);
+      }
+      const last = views[views.length - 1];
+      // Turned about the athlete's hips (320, 200): half a revolution about the box (102, 200) would put them out of the frame.
+      expect(last.cx).toBeCloseTo(320, 0);
+      expect(last.cy).toBeCloseTo(200, 0);
+    });
+
+    it('learns the turn from the athlete it is told about, and carries it on a frame without them', () => {
+      const { paint } = painter();
+      const view = new AthleteView({ rotate: true, zoom: false }, paint);
+      for (let f = 0; f < 12; f++) {
+        const p = view.prepare(source, frame, null, picture);
+        view.learn(view.toFrame([found(320, 200, f * 15, p.view)], p, frame)[0], frame);
+      }
+      expect(view.turn).toBeCloseTo(15, 0);
+      const before = view.turn;
+      view.learn(null, frame);
+      expect(view.turn).toBeGreaterThan(0.9 * before);
+    });
+
     it('forgets the turn when it is reset', () => {
       const { view } = somersault(15, 20);
       view.reset();
