@@ -106,6 +106,11 @@ eval-consistency: node_modules ## Label-free rotation quality of jumps or a pose
 	$(call require,FILE,make eval-consistency FILE=<dataset.json | export.ndjson | pose-series.json> [BASELINE=f.json | SAVE=f.json])
 	npx vite-node scripts/consistency.ts $(FILE) $(if $(BASELINE),--baseline $(BASELINE)) $(if $(SAVE),--save $(SAVE))
 
+eval-fusion: node_modules ## Replay the pose check and the merge of two saved analyses of one clip: FIRST= SECOND= [ALL=1]
+	$(call require,FIRST,make eval-fusion FIRST=mediapipe.json SECOND=rtmpose.json [ALL=1])
+	$(call require,SECOND,make eval-fusion FIRST=mediapipe.json SECOND=rtmpose.json [ALL=1])
+	npx vite-node scripts/fusion-eval.ts $(FIRST) $(SECOND) $(if $(ALL),--all)
+
 eval-label-sheet: node_modules ## Labeling sheet, blank labels, filmstrip commands: FILE= [VIDEO=clip] [STRIPS=1]
 	$(call require,FILE,make eval-label-sheet FILE=eval/x.dataset.json [VIDEO=clip.mp4] [STRIPS=1])
 	npx vite-node scripts/label-sheet.ts $(FILE) $(if $(VIDEO),--video $(VIDEO)) $(if $(STRIPS),--strips)

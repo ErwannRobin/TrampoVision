@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { LANDMARK_COUNT, LM } from '../landmarks';
-import { decodeHeatmaps, decodeSimcc } from './decode';
+import { decodeHeatmaps, decodeSimcc, mergeFlipSimcc } from './decode';
 import { cropAround, cropToImage, iou, nms, sourceSize, type Box } from './geometry';
-import { COCO17, HALPE26, toLandmarks } from './keypointMaps';
+import { COCO17, COCO17_FLIP, HALPE26, HALPE26_FLIP, toLandmarks } from './keypointMaps';
 import { decodeYolox, yoloxRows } from './yolox';
 
 const box = (x1: number, y1: number, x2: number, y2: number, score = 1): Box => ({ x1, y1, x2, y2, score });
@@ -156,5 +156,28 @@ describe('keypoint maps', () => {
     expect(lm[LM.R_HIP].x).toBe(12);
     expect(lm[LM.R_ANKLE].x).toBe(16);
     expect(lm[LM.L_HEEL].visibility).toBe(0);
+  });
+});
+
+describe('the flip test of RTMPose', () => {
+  it('averages the plain reading with the mirrored one, turned around and with its sides traded', () => {
+    // Two keypoints that trade sides in a mirror, 8 bins in x, 4 in y; batch of two (plain, mirrored).
+    const bx = 8;
+    const by = 4;
+    const x = new Float32Array(2 * 2 * bx);
+    const y = new Float32Array(2 * 2 * by);
+    x[2] = 1; // plain: keypoint 0 at bin 2
+    y[1] = 1;
+    x[(2 + 1) * bx + (bx - 1 - 2)] = 0.5; // mirrored: it is keypoint 1, at the mirrored bin
+    y[(2 + 1) * by + 1] = 0.5;
+    const merged = mergeFlipSimcc(x, y, 2, bx, by, [1, 0]);
+    expect(merged.x[2]).toBeCloseTo(0.75);
+    expect(merged.y[1]).toBeCloseTo(0.75);
+    expect(Array.from(decodeSimcc(merged.x, merged.y, 2, bx, by).xy.slice(0, 2))).toEqual([1, 0.5]);
+  });
+
+  it('mirrors Halpe 26 onto itself, each pair twice', () => {
+    for (const flip of [COCO17_FLIP, HALPE26_FLIP]) flip.forEach((k, i) => expect(flip[k]).toBe(i));
+    expect(HALPE26_FLIP).toHaveLength(26);
   });
 });

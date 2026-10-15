@@ -53,6 +53,9 @@ export interface SettingsDialogProps {
   /** The motion detector runs in front of the pose model (the default). Off, the pose model reads the clip as it is: faster, but the analysis can follow a spotter. */
   motion: boolean;
   onMotion: (on: boolean) => void;
+  /** The second look: where the pose model is unsure, RTMPose-x reads the frames again and the readings are merged. Off by default (slower, a 200 MB model). */
+  secondLook: boolean;
+  onSecondLook: (on: boolean) => void;
   fps: number;
   onFps: (fps: number) => void;
   /** Runtime of the pose model once analysis ran ('' before). */
@@ -384,6 +387,18 @@ export function SettingsDialog(props: SettingsDialogProps) {
                     label={t('setup.motionSwitch')}
                   />
                   <p className="settings__status">{t('setup.motionText')}</p>
+                </Block>
+              )}
+
+              {!short && (
+                <Block title={t('setup.second')}>
+                  <Switch
+                    checked={props.secondLook}
+                    onChange={props.onSecondLook}
+                    disabled={state.engineLocked}
+                    label={t('setup.secondSwitch')}
+                  />
+                  <p className="settings__status">{t('setup.secondText')}</p>
                 </Block>
               )}
 

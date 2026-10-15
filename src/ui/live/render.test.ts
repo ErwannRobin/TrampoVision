@@ -280,6 +280,8 @@ describe('the settings', () => {
     onPreferGpu: () => {},
     motion: true,
     onMotion: () => {},
+    secondLook: false,
+    onSecondLook: () => {},
     fps: 30,
     onFps: () => {},
     backend: '',

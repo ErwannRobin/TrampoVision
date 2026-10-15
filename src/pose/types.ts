@@ -20,7 +20,7 @@ export interface WorldPoint {
 export type ModelVariant = 'lite' | 'full' | 'heavy';
 
 /** The pose model that finds the body points: MediaPipe, or one of the experimental ones (see engines.ts). */
-export type PoseEngineId = 'mediapipe' | 'rtmpose' | 'vitpose';
+export type PoseEngineId = 'mediapipe' | 'rtmpose' | 'rtmpose-x' | 'vitpose';
 
 export interface EstimatorOptions {
   /** Default 'mediapipe'. */

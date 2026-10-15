@@ -10,6 +10,7 @@ import { computeAnalysis } from './analysis/computeAnalysis';
 import { download, toCsv, toJumpsCsv } from './analysis/export';
 import { keepAthletes, mergeTracks } from './analysis/athletes';
 import { extractPoseTracks } from './analysis/extractPoseTrack';
+import { refinePoseTracks } from './analysis/refinePose';
 import { analysisStride } from './analysis/stride';
 import { stabilizePose } from './analysis/stabilize';
 import { sampleIndexAt } from './analysis/lookup';
@@ -249,6 +250,10 @@ function AppView({ playhead }: { playhead: Playhead }) {
   // that helps, and keeps the analysis on the person who jumps. The checkbox in the settings skips it: it is slower.
   const [motionFlag, setMotionFlag] = useLocalStorage<'on' | 'off'>('trampovision.motion', 'on', MOTION);
   const motion = motionFlag === 'on';
+  // The second look (off by default): where the pose model read the athlete badly, RTMPose-x reads those frames again and the two
+  // readings are merged (analysis/refinePose.ts). Slower, and a 200 MB model the first time.
+  const [secondFlag, setSecondFlag] = useLocalStorage<'on' | 'off'>('trampovision.second', 'off', MOTION);
+  const secondLook = secondFlag === 'on';
   // The settings are a popup over the app: from the first screen as well as from an open clip.
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useAbout();
@@ -705,7 +710,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
         ? read.map((tr) => fitTrackToClip(tr, { ...masked.clip, sourceFps: fps, stride: strideNow }))
         : read;
       // Left to the app, the people who do not jump (a coach, a judge) are not athletes.
-      const athletes =
+      const kept =
         numPoses > 0
           ? ts
           : keepAthletes(
@@ -717,6 +722,39 @@ function AppView({ playhead }: { playhead: Playhead }) {
                   stabilizePose(tr),
                 ).summary.jumpCount,
             );
+      // The second look, on the athletes only: the frames where the pose model read them badly are read again by RTMPose-x.
+      let athletes = kept;
+      if (secondLook && kept.length) {
+        setStatus({ kind: 'loading', stage: 'model' });
+        const firstBackend = read[0]?.backend ?? '';
+        try {
+          const refined = await refinePoseTracks(url, kept, {
+            preferGpu,
+            athleteHeightM: height,
+            signal: ctl.signal,
+            onLoad: (progress) => setStatus({ kind: 'loading', stage: 'model', progress }),
+            onProgress: (done, total) => setStatus({ kind: 'analyzing', done, total, pass: 'second' }),
+            onBackend: (second) => setBackend(`${firstBackend} + ${second}`),
+          });
+          athletes = refined.tracks;
+          const merged = refined.report.merges.filter((m) => m !== null);
+          const sum = (key: 'both' | 'replaced' | 'second') => merged.reduce((s, m) => s + m[key], 0);
+          setNotice(
+            refined.report.frames
+              ? t('app.secondLook', {
+                  frames: refined.report.frames,
+                  both: sum('both'),
+                  replaced: sum('replaced'),
+                  added: sum('second') - sum('replaced'),
+                })
+              : t('app.secondLookNone'),
+          );
+        } catch (err) {
+          // The first reading stands: the second look only ever adds to it.
+          if (err instanceof DOMException && err.name === 'AbortError') throw err;
+          setNotice(t('app.secondLookFailed', { reason: err instanceof Error ? err.message : String(err) }));
+        }
+      }
       setAthleteIdx(0);
       // Several athletes are shown together first: that is what they were filmed for.
       setCompare(athletes.length > 1);
@@ -1281,6 +1319,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
       onPreferGpu={setPreferGpu}
       motion={motion}
       onMotion={(on) => setMotionFlag(on ? 'on' : 'off')}
+      secondLook={secondLook}
+      onSecondLook={(on) => setSecondFlag(on ? 'on' : 'off')}
       fps={fps}
       onFps={(next) => {
         if (next === fps) return;
