@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { APP_WITH_RESULT, handoffWaiting, withoutHandoff } from './handoff';
+import { APP_WITH_RESULT, handoffWaiting, readSettings, withoutHandoff, type PageSettings } from './handoff';
 
 describe('the address the motion page sends the person to', () => {
   it('says that a video is waiting', () => {
@@ -35,5 +35,37 @@ describe('the address once the video was taken', () => {
     expect(withoutHandoff('')).toBe('');
     expect(withoutHandoff('?from=review')).toBe('?from=review');
     expect(withoutHandoff('?a=%20b')).toBe('?a=%20b');
+  });
+});
+
+describe('the settings of the motion page, read back from the record', () => {
+  const settings: PageSettings = {
+    config: { marginShare: 0.08, cameraType: 'fixed', searchAbove: true },
+    fill: 'rgb(0, 0, 0)',
+    hide: true,
+    keepBodies: true,
+    zoom: true,
+    rotate: false,
+    engine: 'rtmpose',
+    model: 'full',
+    preferGpu: false,
+  };
+
+  it('are what the page left', () => {
+    expect(readSettings(structuredClone(settings))).toEqual(settings);
+  });
+
+  it('are none in a record an earlier page left', () => {
+    expect(readSettings(undefined)).toBeUndefined();
+    expect(readSettings(null)).toBeUndefined();
+  });
+
+  it('are none when they are not what this app understands: the app then does what it did before', () => {
+    expect(readSettings({ ...settings, engine: 'openpose' })).toBeUndefined();
+    expect(readSettings({ ...settings, model: 'huge' })).toBeUndefined();
+    expect(readSettings({ ...settings, zoom: 'yes' })).toBeUndefined();
+    expect(readSettings({ ...settings, config: null })).toBeUndefined();
+    const { fill: _fill, ...noFill } = settings;
+    expect(readSettings(noFill)).toBeUndefined();
   });
 });

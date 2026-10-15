@@ -120,6 +120,11 @@ export interface MotionMaskOptions {
   config?: Partial<MotionConfig>;
   /** What shows where the picture is hidden (a CSS color). Default: a flat gray. */
   fill?: string;
+  /**
+   * Whether the pose model is given the picture with the background hidden. Default true. Without it the detector still finds the
+   * athlete, for the zoom, the turn and the choice of the jumper (the motion page's box "Hide the background").
+   */
+  hide?: boolean;
   /** Told what the detector found in every frame (null when the frame could not be read), for a debug view. */
   onFrame?: (result: MotionResult | null) => void;
   /**
@@ -212,7 +217,7 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
             athletes = result;
             followClip = follow.push(result, timestampMs);
             // A follow clip is read as it is (`FOLLOW_KNOWN_S`).
-            if (hidesSomething(result) && !followClip) source = layer.render(video);
+            if (hidesSomething(result) && !followClip && options.hide !== false) source = layer.render(video);
             if (viewer && result && !followClip) {
               // The zoom view only where it helps; the turn wherever the athlete is turned, zoomed or not.
               prepared = viewer.prepare(

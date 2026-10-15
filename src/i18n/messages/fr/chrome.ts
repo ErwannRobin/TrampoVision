@@ -274,6 +274,8 @@ export const chrome: Translation<typeof en> = {
     'Ce navigateur ne peut pas décoder le fichier d’origine : il a donc été converti en H.264 (720p max) dans le navigateur.',
   'app.maskedFallback':
     'La vidéo masquée n’a pas pu être ouverte : le modèle de pose lit donc la vidéo d’origine (l’arrière-plan n’est pas masqué).',
+  'app.motionPageSettings':
+    'Analyse faite avec les réglages de la page du détecteur de mouvement (ses seuils, son masque, son zoom et son modèle de pose), pas ceux de l’app.',
   'app.fpsAssumed': 'Impossible de mesurer la cadence : 30 im/s sont supposées.',
   'app.secondLook':
     'Second regard : {frames} images relues par RTMPose-x. {both} lectures confirmées, {replaced} corrigées, {added} ajoutées là où l’athlète manquait.',

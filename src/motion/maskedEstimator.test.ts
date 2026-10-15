@@ -103,6 +103,15 @@ describe('the motion mask in front of a pose estimator', () => {
     expect(layer.render).not.toHaveBeenCalled();
   });
 
+  it('gives it the video itself when asked not to hide the background, though the detector still runs', async () => {
+    const { factory, given, layer, seen } = setup([frame(0.4)], detections, { hide: false });
+    const estimator = await factory(options);
+    estimator.detect(video, 1000);
+    expect(given).toEqual([video]);
+    expect(layer.render).not.toHaveBeenCalled();
+    expect(seen).toHaveLength(1);
+  });
+
   it('passes the time of the frame on, and tells the debug view what was found', async () => {
     const found = frame(0.5);
     const { factory, times, seen } = setup([found]);

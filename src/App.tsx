@@ -47,7 +47,7 @@ import type { PoseTrack, ScaleSource } from './analysis/types';
 import type { ModelVariant, Point, PoseEngineId } from './pose/types';
 import { canDecode, decodeProblem, disposeVideo, estimateFps, loadVideo, SeekTimeoutError } from './video/frames';
 import { fitTrackToClip } from './motion/fitTrack';
-import { receiveHandoff } from './motion/handoff';
+import { receiveHandoff, type Handoff, type PageSettings } from './motion/handoff';
 import { withMotionMask } from './motion/maskedEstimator';
 import { estimatorFactory } from './pose/engines';
 import { loadSample, loadSampleSeries, loadSamples, type Sample } from './video/sample';
@@ -292,6 +292,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
   /** The masked copy could not be opened: the analysis reads the original, and says so (it starts by clearing the notice). */
   // The notice about a masked copy that could not be opened ('' when it was).
   const maskedFailed = useRef('');
+  // The motion page's settings, when the clip came from it (`PageSettings`): kept even when the masked copy could not be opened.
+  const pageSettings = useRef<PageSettings | undefined>(undefined);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -535,10 +537,10 @@ function AppView({ playhead }: { playhead: Playhead }) {
 
   /**
    * `series`: the saved analysis of this very video (a sample's): opened in place of running the pose model.
-   * `handoff`: what the motion page left — the same clip with the background hidden, which the pose model reads in place of
-   * `next`, or (`zoom`) the word that the clip itself is to be analyzed live through the detector with the zoomed view.
+   * `handoff`: what the motion page left — its settings, with which the clip is analyzed live through the detector as the page showed
+   * it, and the same clip with the background hidden, which the pose model reads in place of `next` when the detector is switched off.
    */
-  async function onFile(next: File, series?: string, handoff?: { masked: File; zoom: boolean }) {
+  async function onFile(next: File, series?: string, handoff?: Omit<Handoff, 'original'>) {
     abort.current?.abort();
     if (url) URL.revokeObjectURL(url);
     dropMasked();
@@ -611,6 +613,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
       if (!isCurrent()) return;
       setFps(measured ?? 30);
       if (handoff) {
+        pageSettings.current = handoff.settings;
         try {
           const copy = await openMasked(handoff.masked, shown, handoff.zoom, ctl.signal, (progress) => {
             if (isCurrent()) setStatus({ kind: 'loading', stage: 'converting', progress });
@@ -652,11 +655,12 @@ function AppView({ playhead }: { playhead: Playhead }) {
     }
   }
 
-  /** Lets go of the masked copy of the clip, when there is one. */
+  /** Lets go of the masked copy of the clip, when there is one, and of the motion page's settings. */
   function dropMasked() {
     if (maskedRef.current) URL.revokeObjectURL(maskedRef.current.url);
     maskedRef.current = null;
     maskedFailed.current = '';
+    pageSettings.current = undefined;
   }
 
   async function analyze() {
@@ -672,22 +676,28 @@ function AppView({ playhead }: { playhead: Playhead }) {
     const strideNow = advanced ? stride : analysisStride(fps);
     if (strideNow !== stride) setStride(strideNow);
     try {
-      const engineNow = advanced ? engine : 'mediapipe';
+      // The motion page's settings, when the clip came from it: the analysis then sees what the page showed — its detector
+      // thresholds, mask, zoom, turn and pose model. What comes after the pose model (the jumper over the clip, the tracks, the
+      // jumps) stays the app's.
+      const page = motion ? pageSettings.current : undefined;
+      const engineNow = page?.engine ?? (advanced ? engine : 'mediapipe');
       // The motion detector runs in front of the pose model on the clip itself: it hides the background, zooms on a small
       // athlete on a steady shot (`ZoomGate` — what lets the pose model see her at all), and the person who jumps is chosen
       // among the people found (`JumperSelector`). The checkbox in the settings skips it (it is slower); a masked copy from
-      // the motion page stands in for the clip instead, unless the page said to analyze the clip live (`Handoff.zoom`).
-      const live = motion && (maskedRef.current?.zoom ?? !maskedRef.current);
+      // the motion page stands in for the clip instead, unless the page sent its settings or said to analyze the clip live
+      // (`Handoff.zoom`, from an earlier page).
+      const live = motion && (page !== undefined || (maskedRef.current?.zoom ?? !maskedRef.current));
+      if (page) setNotice(t('app.motionPageSettings'));
       // With a masked copy, the pose model reads it at its own rate (it holds only the frames that are analyzed): every frame of it.
       const masked = live ? null : maskedRef.current;
       const read = await extractPoseTracks(masked?.url ?? url, {
         engine: engineNow,
-        model,
+        model: page?.model ?? model,
         numPoses,
         // The live path runs MediaPipe on the CPU delegate: it is the one the choice of the jumper was measured on, and on
         // the GPU delegate of a headless Chrome the model found the jumper half as often, with ghosts. The analysis is
-        // offline. The ONNX engines keep their own backend choice.
-        preferGpu: live && engineNow === 'mediapipe' ? false : preferGpu,
+        // offline. The ONNX engines keep their own backend choice. The motion page's choice wins: it is what it showed.
+        preferGpu: page ? page.preferGpu : live && engineNow === 'mediapipe' ? false : preferGpu,
         sourceFps: masked ? masked.fps : fps,
         stride: masked ? 1 : strideNow,
         signal: ctl.signal,
@@ -702,7 +712,15 @@ function AppView({ playhead }: { playhead: Playhead }) {
               // On a camera that follows the athlete, whose hips never travel in the picture, the box decides after all.
               athletes: numPoses > 0 ? Math.floor(numPoses) : 2,
               focus: 'travel',
-              view: { zoom: true },
+              ...(page
+                ? {
+                    config: page.config,
+                    fill: page.fill,
+                    hide: page.hide,
+                    keepBodies: page.keepBodies,
+                    view: { zoom: page.zoom, rotate: page.rotate },
+                  }
+                : { view: { zoom: true } }),
             })
           : undefined,
       });
