@@ -147,6 +147,14 @@ export interface MotionMaskOptions {
    * follows (its person finder reads the body's rotation), so a turned picture only adds the resampling and a turn that can be wrong.
    */
   view?: Partial<AthleteViewOptions>;
+  /**
+   * Tell the mask where the pose model found the person it gives back, so that the next mask keeps their skeleton too
+   * (`TrampolineMotionDetector.seeBodies`). Off by default. Offline it all but stopped the mask from cutting the athlete, and through the
+   * whole app (MediaPipe, CPU) it gave the wide tripod sample 706 → 749 frames with the athlete (in flight 537 → 693), but on the synchro
+   * sample the athlete's track broke in 4 runs of 4 (frames with the athlete 542 to 598 without it, 11 to 337 with it), though frame by
+   * frame the pose model found the jumper as often: the app's tracking downstream is what changed, and that is not understood yet.
+   */
+  keepBodies?: boolean;
   /** Where the views are painted. Default: a canvas. Tests give a fake one. */
   paint?: Painter;
   /** Where the frames are read and painted. Default: canvases. Tests give a fake one. */
@@ -227,7 +235,7 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
         const found = estimator.detect(source, timestampMs);
         // The mask keeps the bodies of the athletes the pose model found next frame, where they do not move enough to be seen moving.
         const keepInMask = (bodies: PoseDetection[]) => {
-          if (!athletes || !layer.seeBodies) return;
+          if (!options.keepBodies || !athletes || !layer.seeBodies) return;
           const picture = athletes;
           layer.seeBodies(bodies.map((p) => bodyBox(p, picture)).filter((b) => b !== null));
         };

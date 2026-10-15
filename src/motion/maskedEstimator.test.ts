@@ -145,12 +145,19 @@ describe('the motion mask in front of a pose estimator', () => {
       expect(estimator.detect(video, 1000)).toEqual([athlete]);
     });
 
-    it('is kept in the next mask where the pose model found them, and the coach is not', async () => {
-      const { factory, layer } = setup([frameWith(0.2, where)], [coach, athlete]);
+    it('is kept in the next mask where the pose model found them, and the coach is not, when asked', async () => {
+      const { factory, layer } = setup([frameWith(0.2, where)], [coach, athlete], { keepBodies: true });
       const estimator = await factory(options);
       estimator.detect(video, 1000);
       // The box around the skeleton, in the 100 × 100 picture of the detector: here every point is at the hips.
       expect(layer.seeBodies).toHaveBeenCalledWith([{ x0: 50, y0: 60, x1: 50, y1: 60 }]);
+    });
+
+    it('is not told to the mask by default', async () => {
+      const { factory, layer } = setup([frameWith(0.2, where)], [coach, athlete]);
+      const estimator = await factory(options);
+      estimator.detect(video, 1000);
+      expect(layer.seeBodies).not.toHaveBeenCalled();
     });
 
     it('is not told apart from the others while the detector does not know where they are', async () => {
