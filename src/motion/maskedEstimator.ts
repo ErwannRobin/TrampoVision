@@ -32,11 +32,16 @@ const ZOOM_WARMUP_S = 2;
  */
 const FOLLOW_SPEED = 0.18;
 /**
- * Once the camera has moved that fast for this long without a pause, the clip is a follow clip, for good: the strict `'travel'`
- * focus steps aside and every person goes through (the app's tracker chooses, as it did before the motion mask — a shot that
- * follows the athlete has no stander under their path). Measured at 30 Hz: the broadcast clip is over `FOLLOW_SPEED` in 1301 of
- * its 1493 frames, in one unbroken run after a still first 6.4 s, while no tripod clip ever crosses it (landscape peaks at
- * 0.001), so one second tells them apart with a wide margin.
+ * Once the camera has moved that fast for this long without a pause, the clip is a follow clip, for good, and the detector steps
+ * aside: the pose model reads the frame as it is, and every person it finds goes through (the app's tracker chooses, as it does
+ * without the motion detector — a shot that follows the athlete has no stander under their path). Measured at 30 Hz: the broadcast
+ * clip is over `FOLLOW_SPEED` in 1301 of its 1493 frames, in one unbroken run after a still first 6.4 s, while no other clip ever
+ * crosses it (peaks: wide tripod 0.001, synchro 0.112, phone close-up 0.153), so one second tells them apart with a wide margin. Why the whole detector and not only
+ * the choice: with the camera's own move taken out imperfectly, the motion box sits off the athlete (on the stands, on a logo) and
+ * the mask, keeping 3 to 12% of the picture, hid them; and the panning camera sweeps the people behind the bed through the picture,
+ * so their hips "travel" and the travel chose them. Through the whole app on the broadcast clip (25 fps, CPU), frames of the routine
+ * (20 to 45.5 s) with the athlete: mask and choice kept 122 of 638 and no somersault was measured; the mask off 151; stepping aside
+ * 246 with three somersaults (1.72, 1.97, 2.76 turns) — the plain analysis on the same delegate reads 247 and the same three.
  */
 const FOLLOW_KNOWN_S = 1;
 
@@ -81,9 +86,9 @@ export interface MotionMaskOptions {
    * The person whose hips travel up and down like a jumper's is the athlete (`JumperSelector`); while no one has travelled yet (the
    * first jump, or a camera that follows the athlete and keeps them still in the picture), the person in the box the detector reports
    * is. Default true. Nobody is dropped while neither knows where the athlete is. `'travel'` trusts the travel alone: until it knows,
-   * every frame is left empty — for the app's tracker, which locks on the first person it is given and must not be given the spotter —
-   * except on a camera that follows the athlete (`FOLLOW_KNOWN_S`), whose steady hips the travel never sees: everybody goes
-   * through there, and the tracker chooses as it did before the motion mask.
+   * every frame is left empty — for the app's tracker, which locks on the first person it is given and must not be given the spotter.
+   * On a camera that follows the athlete (`FOLLOW_KNOWN_S`) neither is trusted: everybody goes through, and the tracker chooses as it
+   * does without the motion detector.
    */
   focus?: boolean | 'travel';
   /**
@@ -93,8 +98,12 @@ export interface MotionMaskOptions {
   athletes?: number;
   /**
    * What is done to the picture after the background is hidden and before the pose model looks at it, once the athlete is found (`AthleteView`):
-   * `zoom` gives it a square around the athlete, made big, and `rotate` turns the picture so that an athlete in a somersault stands upright. What
-   * the model finds is taken back to the frame. Both are off by default: neither has been tried on real footage.
+   * `zoom` gives it a square around the athlete, made big (in the frames where `ZoomGate` says it helps), and `rotate` turns the picture,
+   * zoomed or not, so that an athlete in a somersault stands upright. What the model finds is taken back to the frame. Both are off by
+   * default; the app asks for the zoom. The turn made things worse on real somersaults, through the whole app with MediaPipe (frames
+   * with the athlete, and somersaults measured, without → with): wide tripod 728 → 635 and 525 in two runs, somersaults 4 → 4 and 1;
+   * phone close-up 360 → 333, 5 → 3; synchro 402 → 76. Likely why: MediaPipe already turns its own crop to the axis of the body it
+   * follows (its person finder reads the body's rotation), so a turned picture only adds the resampling and a turn that can be wrong.
    */
   view?: Partial<AthleteViewOptions>;
   /** Where the views are painted. Default: a canvas. Tests give a fake one. */
@@ -152,7 +161,6 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
           try {
             const result = layer.process(video, timestampMs);
             options.onFrame?.(result);
-            if (hidesSomething(result)) source = layer.render(video);
             athletes = result;
             if (result && result.camera.speed >= FOLLOW_SPEED) {
               fastSinceMs ??= timestampMs;
@@ -160,8 +168,17 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
             } else {
               fastSinceMs = null;
             }
-            if (viewer && result && zoomGate.helps(result, timestampMs)) {
-              prepared = viewer.prepare(source, frame, result.athletes[0] ?? null, result);
+            // A follow clip is read as it is (`FOLLOW_KNOWN_S`).
+            if (hidesSomething(result) && !followClip) source = layer.render(video);
+            if (viewer && result && !followClip) {
+              // The zoom view only where it helps; the turn wherever the athlete is turned, zoomed or not.
+              prepared = viewer.prepare(
+                source,
+                frame,
+                result.athletes[0] ?? null,
+                result,
+                zoomGate.helps(result, timestampMs),
+              );
               source = prepared.source as PoseSource;
             }
           } catch (error) {
@@ -174,11 +191,14 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
         }
         const found = estimator.detect(source, timestampMs);
         const narrow = (people: PoseDetection[]): PoseDetection[] => {
-          const inFrame =
-            viewer && prepared && athletes
-              ? viewer.finish(people, prepared, frame, athletes.athletes, athletes)
-              : people;
-          if (!focus) return inFrame;
+          const inFrame = viewer && prepared ? viewer.toFrame(people, prepared, frame) : people;
+          if (followClip) return inFrame;
+          const inBox = () =>
+            athletes?.athletes.length ? (focusOnAthletes(inFrame, athletes.athletes, athletes)[0] ?? null) : null;
+          if (!focus) {
+            viewer?.learn(inBox(), frame);
+            return inFrame;
+          }
           const pixels = frame.width > 0 ? (readPixels?.() ?? null) : null;
           const looks = pixels
             ? inFrame.map((p) =>
@@ -193,11 +213,12 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
               )
             : [];
           // The person whose hips travel like a jumper's; until a track has travelled, the person in the motion box — or,
-          // trusting the travel alone, nobody. On a follow clip the travel barely speaks (it may have qualified the athlete
-          // before the camera started to move, and never again after): whenever it has nobody, everybody goes through, and
-          // the app's tracker chooses as it did before the motion mask.
+          // trusting the travel alone, nobody.
           const byTravel = selector.push(inFrame, timestampMs / 1000, looks);
-          if (followClip && focus === 'travel') return byTravel?.length ? byTravel : inFrame;
+          // The turn is learnt from the person who jumps: once the travel knows them, from them alone (a frame they are not in
+          // carries the turn on), and before, from the person in the motion box. Two people who jump (synchro) cannot both be
+          // put upright by one turn: the picture is then left as it is.
+          viewer?.learn(byTravel === null ? inBox() : byTravel.length === 1 ? byTravel[0] : null, frame);
           if (byTravel !== null) return byTravel;
           if (focus === 'travel') return [];
           return athletes ? focusOnAthletes(inFrame, athletes.athletes, athletes) : inFrame;

@@ -92,14 +92,15 @@ export class AthleteView {
 
   /**
    * The picture to give the pose model for a frame. `athlete` is the box of the athlete in the detector's picture (`picture` is its size), or null
-   * when none is found: the frame is then given as it is.
+   * when none is found: the frame is then given as it is, unless it is to be turned. `zoom` false keeps the zoom view out of this frame (it does
+   * not help every shot, `ZoomGate`): the frame is then only turned, when the athlete is.
    */
-  prepare(source: CanvasImageSource, frame: Size, athlete: Box | null, picture: Size): Prepared {
+  prepare(source: CanvasImageSource, frame: Size, athlete: Box | null, picture: Size, zoom = true): Prepared {
     const sx = frame.width / picture.width;
     const sy = frame.height / picture.height;
-    const center = athlete
+    const box = athlete
       ? { x: ((athlete.x0 + athlete.x1 + 1) / 2) * sx, y: ((athlete.y0 + athlete.y1 + 1) / 2) * sy }
-      : this.pivot;
+      : null;
 
     this.angle = 0;
     if (this.options.rotate) {
@@ -109,7 +110,8 @@ export class AthleteView {
     }
 
     let view: View | null = null;
-    if (this.options.zoom && athlete && center) {
+    const center = box ?? this.pivot;
+    if (this.options.zoom && zoom && athlete && center) {
       const short = Math.min(frame.width, frame.height);
       const side = Math.max(
         MIN_SIDE_SHARE * short,
@@ -118,23 +120,38 @@ export class AthleteView {
       // An athlete who already fills the frame gains nothing from a crop of it.
       if (side < MAX_SIDE_SHARE * short) view = squareView(center, side, this.angle, VIEW_SIDE);
     }
-    if (!view && this.angle !== 0 && center) view = turnedView(frame, center, this.angle);
+    // The whole frame is turned about the athlete's own hips, as last seen: turned half a revolution about a box that sits on somebody else,
+    // the athlete would leave the picture.
+    const pivot = this.pivot ?? box;
+    if (!view && this.angle !== 0 && pivot) view = turnedView(frame, pivot, this.angle);
     return view ? { source: this.paint(source, view), view } : { source, view: null };
   }
 
+  /** Takes what the pose model found in the prepared picture back to the frame. */
+  toFrame(people: PoseDetection[], prepared: Prepared, frame: Size): PoseDetection[] {
+    return prepared.view ? detectionsInFrame(people, prepared.view, frame) : people;
+  }
+
   /**
-   * Takes what the pose model found in the prepared picture back to the frame, and learns from it: the person in the box of the athlete is the
-   * athlete, and the angle of their trunk is what the next frame is turned by.
+   * Learns from the athlete, as found in the frame (`toFrame`), or null in a frame where they were not: the angle of their trunk is what the next
+   * frame is turned by, and their hips what it is turned about. Without them, the turn is carried on for a few frames (`UprightTracker`).
    */
-  finish(people: PoseDetection[], prepared: Prepared, frame: Size, athletes: Box[], picture: Size): PoseDetection[] {
-    const inFrame = prepared.view ? detectionsInFrame(people, prepared.view, frame) : people;
-    const athlete = athletes.length ? focusOnAthletes(inFrame, athletes, picture)[0] : undefined;
+  learn(athlete: PoseDetection | null, frame: Size): void {
     this.tracker.update(athlete ? trunkAngle(athlete.landmarks, frame.width, frame.height) : null);
     if (athlete) {
       const left = athlete.landmarks[LM.L_HIP];
       const right = athlete.landmarks[LM.R_HIP];
       this.pivot = { x: ((left.x + right.x) / 2) * frame.width, y: ((left.y + right.y) / 2) * frame.height };
     }
+  }
+
+  /**
+   * Takes what the pose model found back to the frame, and learns from the person in the box of the athlete (for a caller that has no better
+   * idea of who the athlete is).
+   */
+  finish(people: PoseDetection[], prepared: Prepared, frame: Size, athletes: Box[], picture: Size): PoseDetection[] {
+    const inFrame = this.toFrame(people, prepared, frame);
+    this.learn(athletes.length ? (focusOnAthletes(inFrame, athletes, picture)[0] ?? null) : null, frame);
     return inFrame;
   }
 }
