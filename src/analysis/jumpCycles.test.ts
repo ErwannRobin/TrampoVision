@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { detectJumps, GRAVITY, JUMP_PHASES, PHASE, riseFromFlightTime, type JumpInput } from './jumpCycles';
+import {
+  DEFAULT_JUMP_OPTIONS,
+  detectJumps,
+  GRAVITY,
+  JUMP_PHASES,
+  PHASE,
+  riseFromFlightTime,
+  type JumpInput,
+} from './jumpCycles';
 import { localPolyFit, oddWindow } from './signal';
 import { makeRng, syntheticRoutine, type RoutineOptions } from './testTracks';
 
@@ -188,6 +196,53 @@ describe('detectJumps', () => {
     expect(Math.abs(r.turnsSinceTakeoff[b.takeoff!])).toBeLessThan(0.05); // reset
     expect(r.completedRotations[b.landing!]).toBe(2);
     expect(Number.isNaN(r.turnsSinceTakeoff[0])).toBe(true); // before any takeoff
+  });
+});
+
+describe('the longest flight', () => {
+  it('does not make one flight of two jumps when the athlete is lost high in the first', () => {
+    // Three high jumps. The first one's top half is lost (a broadcast camera, a pose model that drops the athlete upside down), and
+    // so is the bottom of the bed contact after it: the lowest point before the second apex is then the push-off of the first jump.
+    const { input, truth, fps } = inputFrom({ jumps: [{ v0: 7.5 }, { v0: 7 }, { v0: 6.5 }] });
+    const lose = (from: number, to: number) => {
+      for (const s of [input.height, input.vy]) s.fill(NaN, Math.round(from * fps), Math.round(to * fps));
+    };
+    lose(truth.takeoff[0] + 0.3, truth.landing[0] - 0.3);
+    lose(truth.landing[0] + 0.05, truth.takeoff[1] - 0.03);
+    // Without a limit, the second jump's takeoff is looked for back to the first one's: a flight of over 3 s.
+    const unlimited = detectJumps(input, { maxFlightS: Infinity }).cycles;
+    expect(unlimited).toHaveLength(2);
+    expect(unlimited[0].flightTimeS!).toBeGreaterThan(3);
+    // With it, the second jump is found alone, and the first one, whose apex was never seen, is not made up.
+    const { cycles } = detectJumps(input);
+    expect(cycles).toHaveLength(2);
+    near(cycles[0].takeoffTimeS, truth.takeoff[1], 0.05);
+    near(cycles[0].landingTimeS, truth.landing[1], 0.05);
+    expect(cycles[1].flightTimeS).toBe(unlimited[1].flightTimeS);
+  });
+
+  it('drops a flight longer than the limit when no bed contact lies near its apex', () => {
+    // The limit set below the middle jump (1.12 s): its takeoff and landing are further from the apex than half of it.
+    const { input, truth } = inputFrom({ jumps: [{ v0: 4 }, { v0: 5.5 }, { v0: 4.5 }] });
+    const { cycles, cycleIndex } = detectJumps(input, { maxFlightS: 1 });
+    expect(cycles.map((c) => c.index)).toEqual([0, 1]);
+    near(cycles[1].apexTimeS, truth.apex[2], 0.02);
+    expect(Math.max(...cycleIndex)).toBe(1);
+  });
+
+  it('leaves a slow-motion clip played at normal speed alone: all its flights are long', () => {
+    // Filmed at 120 fps, played at 30: every flight lasts four times longer than it did.
+    const { input } = inputFrom({ jumps: [{ v0: 4 }, { v0: 5.5 }, { v0: 4.5 }], fps: 120 });
+    const slowed: JumpInput = {
+      ...input,
+      fps: 30,
+      time: input.time.map((t) => 4 * t),
+      vy: input.vy.map((v) => v / 4),
+    };
+    const { cycles } = detectJumps(slowed);
+    expect(cycles).toHaveLength(3);
+    expect(cycles.every((c) => c.flightTimeS! > DEFAULT_JUMP_OPTIONS.maxFlightS)).toBe(true);
+    expect(cycles).toEqual(detectJumps(slowed, { maxFlightS: Infinity }).cycles);
   });
 });
 
