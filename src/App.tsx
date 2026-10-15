@@ -1481,6 +1481,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
               advanced={advanced}
               motion={motion}
               onMotion={(on) => setMotionFlag(on ? 'on' : 'off')}
+              secondLook={secondLook}
+              onSecondLook={(on) => setSecondFlag(on ? 'on' : 'off')}
             />
           </>
         ) : (

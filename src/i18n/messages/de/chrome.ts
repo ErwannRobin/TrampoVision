@@ -58,6 +58,8 @@ export const chrome: Translation<typeof en> = {
   'landing.motionHint': 'Experimentell: den Athleten vor dem Pose-Modell freistellen',
   'landing.followHint':
     'Langsamer, hält die Analyse aber auf dem Springer statt auf einer Hilfestellung oder einem Trainer.',
+  'landing.secondHint':
+    'Langsamer: Wo das Posenmodell unsicher ist, liest ein stärkeres Modell diese Bilder erneut, und beide Lesungen werden zusammengeführt. Beim ersten Mal 200 MB Download.',
   'landing.noteCamera':
     'Die besten Ergebnisse liefert eine feststehende, waagerechte Kamera an der Seite, mit dem ganzen Trampolin im Bild und dem Athleten im Blick – vom Absprung des ersten bis zur Landung des letzten Elements.',
   'landing.notePrivacy': 'Läuft in Ihrem Browser. Das Video verlässt Ihr Gerät nie.',

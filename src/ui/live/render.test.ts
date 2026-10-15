@@ -210,7 +210,7 @@ describe('the first screen', () => {
     clear: async () => {},
     importText: async () => ({ added: 0, updated: 0, kept: 0 }),
   } as never;
-  const landing = (advanced: boolean, motion = true) =>
+  const landing = (advanced: boolean, motion = true, secondLook = false) =>
     renderToStaticMarkup(
       createElement(Landing, {
         onFile: () => {},
@@ -225,6 +225,8 @@ describe('the first screen', () => {
         advanced,
         motion,
         onMotion: () => {},
+        secondLook,
+        onSecondLook: () => {},
       }),
     );
 
@@ -247,6 +249,13 @@ describe('the first screen', () => {
     expect(on).toContain('Follow the person who jumps');
     expect(on).toMatch(/role="switch"[^>]*checked=""/);
     expect(landing(false, false)).not.toMatch(/role="switch"[^>]*checked=""/);
+  });
+
+  it('offers the second look before the clip is chosen, off unless it was turned on', () => {
+    const off = landing(false, false);
+    expect(off).toContain('Read the hard moments again with RTMPose-x');
+    expect(off).not.toMatch(/role="switch"[^>]*checked=""/);
+    expect(landing(false, false, true)).toMatch(/role="switch"[^>]*checked=""/);
   });
 
   it('links the motion detector only with the advanced tools', () => {

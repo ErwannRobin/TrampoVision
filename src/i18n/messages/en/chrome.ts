@@ -64,6 +64,8 @@ export const chrome = {
   'landing.motion': 'Motion detector',
   'landing.motionHint': 'Experimental: isolate the athlete before the pose model',
   'landing.followHint': 'Slower, but keeps the analysis on the jumper, not on a spotter or a coach.',
+  'landing.secondHint':
+    'Slower: where the pose model is unsure, a stronger one reads those frames again and the two readings are merged. 200 MB to download the first time.',
   'landing.noteCamera':
     'Best results come from a fixed, level camera at the side, with the whole trampoline in frame and the athlete in view from the takeoff of the first skill to the landing of the last.',
   'landing.notePrivacy': 'Runs in your browser. The video never leaves your device.',

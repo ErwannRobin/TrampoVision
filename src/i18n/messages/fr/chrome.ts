@@ -57,6 +57,8 @@ export const chrome: Translation<typeof en> = {
   'landing.motion': 'Détecteur de mouvement',
   'landing.motionHint': 'Expérimental : isoler l’athlète avant le modèle de pose',
   'landing.followHint': 'Plus lent, mais garde l’analyse sur le sauteur, pas sur une parade ou un entraîneur.',
+  'landing.secondHint':
+    'Plus lent : là où le modèle de pose hésite, un modèle plus fort relit ces images et les deux lectures sont fusionnées. 200 Mo à télécharger la première fois.',
   'landing.noteCamera':
     'Les meilleurs résultats s’obtiennent avec une caméra fixe et bien horizontale, placée sur le côté, avec tout le trampoline dans le cadre et l’athlète visible de l’impulsion de la première figure jusqu’à la réception de la dernière.',
   'landing.notePrivacy': 'Fonctionne dans votre navigateur. La vidéo ne quitte jamais votre appareil.',

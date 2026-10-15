@@ -28,6 +28,9 @@ export interface LandingProps {
   /** The motion detector runs in front of the pose model (the same choice as in the settings), and turning it on or off. */
   motion: boolean;
   onMotion: (on: boolean) => void;
+  /** The second look: the frames the pose model read badly are read again by a stronger model (the same choice as in the settings). */
+  secondLook: boolean;
+  onSecondLook: (on: boolean) => void;
 }
 
 /** A link to a tool that has a page of its own (the advanced tools): its icon, its name and a line about it. */
@@ -111,6 +114,8 @@ export function Landing({
   advanced,
   motion,
   onMotion,
+  secondLook,
+  onSecondLook,
 }: LandingProps) {
   const hasDataset = advanced && dataset.records.length > 0;
   // A phone or a tablet can film right away; a computer picks a file.
@@ -155,6 +160,10 @@ export function Landing({
           <div className="landing__option">
             <Switch checked={motion} onChange={onMotion} disabled={busy} label={t('setup.motionSwitch')} />
             <small>{t('landing.followHint')}</small>
+          </div>
+          <div className="landing__option">
+            <Switch checked={secondLook} onChange={onSecondLook} disabled={busy} label={t('setup.secondSwitch')} />
+            <small>{t('landing.secondHint')}</small>
           </div>
           {advanced && (
             <label className="landing__link">
