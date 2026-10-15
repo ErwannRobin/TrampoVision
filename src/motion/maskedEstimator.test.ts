@@ -22,6 +22,7 @@ function frame(coverage: number): MotionResult {
     mask: new Float32Array(n).fill(coverage),
     found: coverage < 1,
     athletes: [],
+    bodies: [],
     periodS: null,
     rhythmFit: 0,
     coverage,
@@ -73,6 +74,7 @@ function setup(
       return next;
     }),
     render: vi.fn(() => masked),
+    seeBodies: vi.fn(),
     dispose: vi.fn(),
   };
   const inner: PoseEstimatorFactory = async () => estimator;
@@ -141,6 +143,14 @@ describe('the motion mask in front of a pose estimator', () => {
       const { factory } = setup([frameWith(0.2, where)], [coach, athlete]);
       const estimator = await factory(options);
       expect(estimator.detect(video, 1000)).toEqual([athlete]);
+    });
+
+    it('is kept in the next mask where the pose model found them, and the coach is not', async () => {
+      const { factory, layer } = setup([frameWith(0.2, where)], [coach, athlete]);
+      const estimator = await factory(options);
+      estimator.detect(video, 1000);
+      // The box around the skeleton, in the 100 × 100 picture of the detector: here every point is at the hips.
+      expect(layer.seeBodies).toHaveBeenCalledWith([{ x0: 50, y0: 60, x1: 50, y1: 60 }]);
     });
 
     it('is not told apart from the others while the detector does not know where they are', async () => {

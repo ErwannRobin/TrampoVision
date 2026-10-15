@@ -37,6 +37,14 @@ const growBox = (b: Box, by: number, w: number, h: number): Box => ({
   y1: Math.min(h - 1, b.y1 + by),
 });
 
+/**
+ * Where the athlete of a region can be: its columns, from its bottom up to the top of the picture. The region is where things went up and
+ * down, so the top of a jump higher than the ones it was learnt from is not in it yet. On the wide tripod sample the detector found the
+ * athlete during low bounces (the region was rows 41 to 70 of 72), and the next jump went up to row 10: the box, looked for in the region
+ * only, stayed on the bed, and the mask hid the athlete for most of a second. Little else moves above the athlete in the jump's columns.
+ */
+const reachOf = (window: Box): Box => ({ ...window, y0: 0 });
+
 /** How much of the smaller of two boxes lies inside the other, 0 to 1. */
 function overlapShare(a: Box, b: Box): number {
   const w = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) + 1;
@@ -59,9 +67,10 @@ function overlapShare(a: Box, b: Box): number {
  * 4. The athlete and the mask: the evidence is kept as regions with hysteresis (it enters high and leaves low) and small pieces are
  *    dropped. Of the rest only the strongest is the athlete (`maxAthletes`: the video is of one person who jumps, and the others, the
  *    coach, the people who wait, are not): the region that was followed keeps its place unless another is clearly stronger. The region is the
- *    place the athlete jumps through; the athlete is the box of what moves in it right now, less the bed, which moves with the jumps too but
- *    is a flat bar and not a body (`boxIn`). That box, with a margin and soft edges, is what the mask keeps, so a person who stands still in
- *    the place the athlete jumps through, or next to them, is hidden too.
+ *    place the athlete jumps through; the athlete is the box of what moves in it, or above it in its columns (a jump higher than the ones it
+ *    was learnt from), right now, less the bed, which moves with the jumps too but is a flat bar and not a body (`boxIn`). That box, with a
+ *    margin and soft edges, is what the mask keeps, with the skeleton the pose model saw in the frame before when it is told it
+ *    (`seeBodies`), so a person who stands still in the place the athlete jumps through, or next to them, is hidden too.
  *
  * It never hides the picture when it is not sure: with no athlete the mask is all 1, which is the picture as it was, and the background
  * fades in and out (`fadeInS`, `fadeOutS`) instead of cutting.
@@ -111,6 +120,10 @@ export class TrampolineMotionDetector {
   private fade = 0;
   /** Where the athlete is known to jump from a first look at the clip (`hint`): kept in the picture until the detector finds them by itself. */
   private hinted: Box | null = null;
+  /** The athletes' bodies as the pose model saw them in the last frame (`seeBodies`): the next mask keeps them too, once. */
+  private bodies: Box[] = [];
+  /** The ones of those the last mask kept. */
+  private keptBodies: Box[] = [];
 
   private motion = new Float32Array(0);
   private up = new Float32Array(0);
@@ -162,6 +175,27 @@ export class TrampolineMotionDetector {
     this.hinted = box ? { ...box } : null;
   }
 
+  /**
+   * Tells the detector where the pose model found the athletes in the frame it was just given: the box around each one's skeleton, picture
+   * pixels. The next mask keeps those boxes too, with the same margin as the box of what moves, so that a body is not cut where it does not
+   * move enough to be seen moving: legs that hold still in a pike, or are as pale as the bed, a body at the top of a jump, where only the bed
+   * still moves. A box that is in none of the places the athletes can be (`reachOf`) is left out: it is somebody else. The boxes are used
+   * once: a frame in which the pose model finds nobody keeps only what moves.
+   *
+   * Measured on the samples, with the skeleton of the frame before standing in for the pose model's (and the box looked for above the region,
+   * `reachOf`): frames in which the mask hid part of the athlete's body, before → after — wide tripod 15.2 → 1.3% (the whole athlete 2.7 →
+   * 0.5%; checked against RTMPose run on the clip without a mask), phone close-up 22.1 → 3.6%, synchro 11.4 → 0.5%, the still start of the
+   * broadcast 57.9 → 0% — for a picture kept 0.2 to 3.5 points bigger.
+   */
+  seeBodies(boxes: readonly Box[]): void {
+    this.bodies = boxes.map((b) => ({
+      x0: Math.floor(b.x0),
+      y0: Math.floor(b.y0),
+      x1: Math.ceil(b.x1),
+      y1: Math.ceil(b.y1),
+    }));
+  }
+
   /** What the detector believes the shot is: the person's choice, or what the video says. */
   private wantedType(): CameraType {
     return this.user.cameraType === 'auto' ? this.typeEstimator.type : this.user.cameraType;
@@ -207,6 +241,8 @@ export class TrampolineMotionDetector {
     this.panX.value = this.panY.value = 0;
     this.windows = [];
     this.athletes = [];
+    this.bodies = [];
+    this.keptBodies = [];
     this.athleteWidth = null;
     this.found = false;
     this.periodS = null;
@@ -305,6 +341,7 @@ export class TrampolineMotionDetector {
     }
     const move = (b: Box): Box => ({ x0: b.x0 + sx, y0: b.y0 + sy, x1: b.x1 + sx, y1: b.y1 + sy });
     this.windows = this.windows.map(move);
+    this.bodies = this.bodies.map(move);
     shiftPicture(this.on, this.tmpBytes, w, h, sx, sy, 0);
     this.on.set(this.tmpBytes);
     this.rhythm!.shift(sx);
@@ -440,17 +477,22 @@ export class TrampolineMotionDetector {
     const chosen = this.found ? this.chooseAthletes(pieces, big) : [];
     this.windows = chosen.map((label) => growBox(pieces.box[label], pad, w, h));
     const before = this.athletes;
-    this.athletes = this.windows.map((window) =>
-      this.boxIn(window, before.find((b) => overlapShare(b, window) > 0) ?? null),
-    );
+    this.athletes = this.windows.map((window) => {
+      const reach = reachOf(window);
+      return this.boxIn(reach, before.find((b) => overlapShare(b, reach) > 0) ?? null);
+    });
     // Against the shorter side, like every size of the detector: the same athlete is as big in a portrait video as in a landscape one.
     this.athleteWidth = this.athletes.length ? Math.max(...this.athletes.map((b) => b.x1 - b.x0 + 1)) / short : null;
 
     // The picture the athletes keep, and how far the rest is hidden: the background goes away over `fadeInS` and comes back over `fadeOutS`.
+    this.keptBodies = this.found
+      ? this.bodies.filter((body) => this.windows.some((window) => overlapShare(reachOf(window), body) > 0))
+      : [];
+    this.bodies = [];
     if (this.found) {
       this.hinted = null;
       this.target.fill(0);
-      for (const box of this.athletes) this.paintBox(box, pad);
+      for (const box of [...this.athletes, ...this.keptBodies]) this.paintBox(box, pad);
     } else if (this.hinted) {
       this.applyHint();
     }
@@ -659,6 +701,7 @@ export class TrampolineMotionDetector {
       mask: this.mask,
       found: this.found,
       athletes: this.athletes,
+      bodies: this.keptBodies,
       periodS: this.periodS,
       rhythmFit: this.rhythmFit,
       coverage: this.mask.length > 0 ? sum / this.mask.length : 1,

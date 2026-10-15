@@ -1,7 +1,7 @@
 import type { MotionConfig } from './config';
 import { TrampolineMotionDetector } from './detector';
 import { alphaFromMask, grayFromRgba, workSize } from './pixels';
-import type { GrayFrame, MotionResult } from './types';
+import type { Box, GrayFrame, MotionResult } from './types';
 
 /** The picture is read this many times bigger than the gray picture and averaged down (see `grayFromRgba`). */
 const SUPERSAMPLE = 3;
@@ -17,6 +17,8 @@ export interface MaskLayer {
   process(video: HTMLVideoElement, timeMs: number): MotionResult | null;
   /** The video's current frame with what the last `process` found out to be background painted over: a canvas the size of the video. */
   render(video: HTMLVideoElement): HTMLCanvasElement;
+  /** Tells the detector where the pose model found the athletes in the frame (`TrampolineMotionDetector.seeBodies`). A test's fake can leave it out. */
+  seeBodies?(boxes: readonly Box[]): void;
   dispose(): void;
 }
 
@@ -110,6 +112,10 @@ export class CanvasMaskLayer implements MaskLayer {
     mctx.putImageData(image, 0, 0);
     paintMasked(ctx, video, mask, width, height, this.fill);
     return output;
+  }
+
+  seeBodies(boxes: readonly Box[]): void {
+    this.detector.seeBodies(boxes);
   }
 
   dispose(): void {

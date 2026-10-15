@@ -23,6 +23,35 @@ export function bodyCenter(person: PoseDetection): Point {
 }
 
 /**
+ * A landmark with this visibility or less is not a point of the body at all: the ONNX engines leave the points their model lacks at 0. A
+ * point with little visibility is kept: the pose model puts a leg it cannot see where the body says it is, and that is where the leg is.
+ */
+const PLACED = 0.05;
+
+/**
+ * The box around a person's skeleton, in the detector's picture (`picture` is its size): what the mask keeps of them next frame
+ * (`TrampolineMotionDetector.seeBodies`). Null when the model placed too few points to say where the body is.
+ */
+export function bodyBox(person: PoseDetection, picture: { width: number; height: number }): Box | null {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  let placed = 0;
+  for (const p of person.landmarks) {
+    if (!(p.visibility > PLACED)) continue;
+    const x = Math.min(1, Math.max(0, p.x)) * picture.width;
+    const y = Math.min(1, Math.max(0, p.y)) * picture.height;
+    x0 = Math.min(x0, x);
+    y0 = Math.min(y0, y);
+    x1 = Math.max(x1, x);
+    y1 = Math.max(y1, y);
+    placed++;
+  }
+  return placed >= 4 ? { x0, y0, x1, y1 } : null;
+}
+
+/**
  * Of the people the pose model found, the athletes: the person whose body is in the box of each athlete the motion detector reports, and nobody
  * else. A person who stands near the bed and is still seen by the model (the mask has a margin) is not the person who jumps. With no athlete
  * boxes (the detector is not sure yet) everybody is returned as found. When an athlete's box has nobody in it (the model lost them) nobody is
