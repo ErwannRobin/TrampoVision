@@ -93,6 +93,10 @@ export const chrome: Translation<typeof en> = {
   'setup.athlete': 'Athlète',
   'setup.height': 'Taille',
   'setup.heightHint': 'Sert à mettre les mesures à l’échelle (en mètres) quand le trampoline n’est pas marqué.',
+  'setup.motion': 'Détecteur de mouvement',
+  'setup.motionSwitch': 'Suivre la personne qui saute',
+  'setup.motionText':
+    'Le détecteur de mouvement passe avant le modèle de pose : il masque l’arrière-plan, zoome sur un athlète petit dans l’image et garde l’analyse sur le sauteur plutôt que sur une parade. L’analyse est plus lente.',
   'setup.review': 'Vérification',
   'setup.reviewSwitch': 'Envoyer les sauts analysés pour vérification',
   'setup.reviewText':

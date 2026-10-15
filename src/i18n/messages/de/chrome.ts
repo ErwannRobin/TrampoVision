@@ -93,6 +93,10 @@ export const chrome: Translation<typeof en> = {
   'setup.athlete': 'Athlet',
   'setup.height': 'Körpergröße',
   'setup.heightHint': 'Skaliert die Messungen in Metern, wenn das Trampolin nicht markiert ist.',
+  'setup.motion': 'Bewegungserkennung',
+  'setup.motionSwitch': 'Der springenden Person folgen',
+  'setup.motionText':
+    'Die Bewegungserkennung läuft vor dem Pose-Modell: Sie verdeckt den Hintergrund, zoomt auf eine im Bild kleine Athletin und hält die Analyse auf dem Springer statt auf einer Hilfestellung. Die Analyse wird langsamer.',
   'setup.review': 'Prüfung',
   'setup.reviewSwitch': 'Analysierte Sprünge zur Prüfung senden',
   'setup.reviewText':

@@ -1,5 +1,6 @@
 import type * as Ort from 'onnxruntime-web';
-import type { Box } from './geometry';
+import type { PoseSource } from '../types';
+import { sourceSize, type Box } from './geometry';
 import { createSession } from './runtime';
 import { decodeYolox } from './yolox';
 
@@ -10,8 +11,8 @@ const SIZE = 640;
 const PAD = 114;
 
 export interface PersonDetector {
-  /** People in the frame, best first, in video pixels. */
-  detect(source: HTMLVideoElement, maxBoxes: number): Promise<Box[]>;
+  /** People in the frame, best first, in source pixels. */
+  detect(source: PoseSource, maxBoxes: number): Promise<Box[]>;
   dispose(): void;
   provider: 'webgpu' | 'wasm';
   fallbackReason?: string;
@@ -35,7 +36,7 @@ export async function createPersonDetector(ort: typeof Ort, preferGpu: boolean):
     provider: opened.provider,
     fallbackReason: opened.fallbackReason,
     async detect(source, maxBoxes) {
-      const { videoWidth: w, videoHeight: h } = source;
+      const { width: w, height: h } = sourceSize(source);
       // The picture goes in the top left corner at the largest size that fits, the rest stays grey.
       const ratio = Math.min(SIZE / h, SIZE / w);
       const dw = Math.floor(w * ratio);

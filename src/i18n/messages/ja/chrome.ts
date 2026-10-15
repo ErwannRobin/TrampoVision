@@ -91,6 +91,10 @@ export const chrome: Translation<typeof en> = {
   'setup.athlete': '選手',
   'setup.height': '身長',
   'setup.heightHint': 'トランポリンをマークしていない場合に、メートル単位の測定値へ換算するために使います。',
+  'setup.motion': 'モーション検出',
+  'setup.motionSwitch': 'ジャンプする人を追う',
+  'setup.motionText':
+    'モーション検出がポーズモデルの前に入り、背景を隠し、画面の中で小さい選手にズームし、補助者ではなくジャンパーを分析し続けます。分析は遅くなります。',
   'setup.review': '確認',
   'setup.reviewSwitch': '解析したジャンプを確認用に送信',
   'setup.reviewText':

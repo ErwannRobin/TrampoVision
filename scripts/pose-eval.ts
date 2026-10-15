@@ -20,6 +20,7 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JumperSelector } from '../src/motion/jumperSelect';
 import type { EvalFrame, EvalPerson, PoseEvalCapture } from '../src/motion/debug/poseEvalRun';
+import type { Signature } from '../src/pose/appearance';
 import { LM, LANDMARK_COUNT } from '../src/pose/landmarks';
 import type { PoseDetection } from '../src/pose/types';
 import { probe } from './clip';
@@ -50,6 +51,8 @@ const zoom = args.includes('--zoom');
 const gpu = args.includes('--gpu');
 const focused = args.includes('--focused');
 const rotate = args.includes('--rotate');
+// Replay the choice without the clothes, to measure what they add on the same capture.
+const noLooks = args.includes('--no-looks');
 
 /** The model's output over the clip: from the cache when one is given and filled, else from a headless Chrome run (and into the cache). */
 async function captureOrCache(): Promise<PoseEvalCapture> {
@@ -162,12 +165,18 @@ interface Row {
   chosen: EvalPerson[] | null;
 }
 
+/** The clothes of a captured person, as the selector reads them. */
+function toSignature(p: EvalPerson): Signature | null {
+  return p.look ? { torso: p.look.t, legs: p.look.l } : null;
+}
+
 /** Replays the choice of the jumper over the captured frames. */
 function replay(capture: PoseEvalCapture): Row[] {
   const selector = new JumperSelector(maxAthletes);
   return capture.frames.map((frame) => {
     const people = frame.people.map(toDetection);
-    const chosen = selector.push(people, frame.t);
+    const looks = noLooks ? [] : frame.people.map(toSignature);
+    const chosen = selector.push(people, frame.t, looks);
     return { frame, chosen: chosen === null ? null : chosen.map((c) => frame.people[people.indexOf(c)]) };
   });
 }

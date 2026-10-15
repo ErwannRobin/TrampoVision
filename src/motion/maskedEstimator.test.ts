@@ -31,13 +31,13 @@ function frame(coverage: number): MotionResult {
 }
 
 /** The same, for a picture of 100 × 100 pixels in which the athlete is in `athletes`: small enough on a steady shot for the zoom view. */
-const frameWith = (coverage: number, athletes: Box[]): MotionResult => ({
+const frameWith = (coverage: number, athletes: Box[], camera: Partial<MotionResult['camera']> = {}): MotionResult => ({
   ...frame(coverage),
   width: 100,
   height: 100,
   found: athletes.length > 0,
   athletes,
-  camera: { type: 'fixed', dx: 0, dy: 0, known: true, speed: 0, athleteShare: 0.2 },
+  camera: { type: 'fixed', dx: 0, dy: 0, known: true, speed: 0, athleteShare: 0.2, ...camera },
 });
 
 /** A person whose hips are at (x, y) of the picture, 0 to 1. */
@@ -203,6 +203,23 @@ describe('the motion mask in front of a pose estimator', () => {
       expect(last).toHaveLength(1);
       expect(last[0].landmarks[LM.L_HIP].x).toBeCloseTo(0.3);
     });
+
+    it('lets everybody through on a camera that follows the athlete, even when asked for the travel alone', async () => {
+      // The camera keeps the athlete still in the picture: their hips never travel, and the travel would never answer.
+      // Once it has moved at a follow camera's speed for a second, the clip is a follow clip: the app's tracker chooses.
+      const still = person(0.5, 0.6);
+      const judge = person(0.9, 0.8);
+      const boxOnAthlete = [{ x0: 40, y0: 45, x1: 60, y1: 75 }];
+      const { factory } = setup([frameWith(0.2, boxOnAthlete, { type: 'tracking', speed: 0.4 })], [judge, still], {
+        focus: 'travel',
+      });
+      const estimator = await factory(options);
+      // Before the camera has followed for a second, the travel knows nothing and the frames stay empty.
+      expect(estimator.detect(video, 0)).toEqual([]);
+      let last: PoseDetection[] = [];
+      for (let now = 33; now < 4000; now += 33) last = estimator.detect(video, now) as PoseDetection[];
+      expect(last).toEqual([judge, still]);
+    });
   });
 
   describe('the view of the athlete', () => {
@@ -251,9 +268,18 @@ describe('the motion mask in front of a pose estimator', () => {
     });
   });
 
-  it('refuses the engines that cannot read a canvas', async () => {
+  it('accepts every engine: they all read the painted canvas (the ONNX ones measure what they are given)', async () => {
     const { factory } = setup([frame(1)]);
-    await expect(factory({ ...options, engine: 'rtmpose' })).rejects.toThrow(/MediaPipe/);
+    await expect(factory({ ...options, engine: 'rtmpose' })).resolves.toBeDefined();
     await expect(factory({ ...options, engine: 'mediapipe' })).resolves.toBeDefined();
+  });
+
+  it('steps aside for a source that is not a video: the pose model gets it as it is', async () => {
+    const { factory, given, layer } = setup([frame(0.4)]);
+    const estimator = await factory(options);
+    const canvas = { width: 100, height: 100 } as HTMLCanvasElement;
+    expect(estimator.detect(canvas, 1000)).toBe(detections);
+    expect(given).toEqual([canvas]);
+    expect(layer.process).not.toHaveBeenCalled();
   });
 });

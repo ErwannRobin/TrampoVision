@@ -101,6 +101,10 @@ export const chrome = {
   'setup.athlete': 'Athlete',
   'setup.height': 'Height',
   'setup.heightHint': 'Scales the measurements in meters when the trampoline is not marked.',
+  'setup.motion': 'Motion detector',
+  'setup.motionSwitch': 'Follow the person who jumps',
+  'setup.motionText':
+    'The motion detector runs in front of the pose model: it hides the background, zooms on an athlete who is small in the picture, and keeps the analysis on the jumper rather than on a spotter. It makes the analysis slower.',
   'setup.review': 'Review',
   'setup.reviewSwitch': 'Send analyzed jumps for review',
   'setup.reviewText':

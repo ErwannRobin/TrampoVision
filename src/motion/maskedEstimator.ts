@@ -1,4 +1,5 @@
-import type { PoseDetection, PoseEstimatorFactory } from '../pose/types';
+import { bodySignature, createPixelReader, type Pixels } from '../pose/appearance';
+import type { Keypoint, PoseDetection, PoseEstimatorFactory, PoseSource } from '../pose/types';
 import type { MotionConfig } from './config';
 import { AthleteView, type AthleteViewOptions, type Painter, type Prepared } from './athleteView';
 import { focusOnAthletes } from './focus';
@@ -24,6 +25,20 @@ const ZOOM_MAX_SPEED = 0.12;
 const ZOOM_OFF_SPEED = 0.18;
 /** The shot must have been steady, with a small athlete, this long before the zoom view cuts in: the phone close-up passes below `ZOOM_MAX_SHARE` for about a second while its share settles. */
 const ZOOM_WARMUP_S = 2;
+/**
+ * A camera moving faster than this follows the athlete: their hips stay near one spot of the picture and the travel never
+ * speaks. The same measurement as `ZOOM_MAX_SPEED`: tripod shots measure 0 to 0.10 shorter sides of the picture a second (the
+ * subject's own motion), a broadcast that follows the athlete 0.2 to 0.8.
+ */
+const FOLLOW_SPEED = 0.18;
+/**
+ * Once the camera has moved that fast for this long without a pause, the clip is a follow clip, for good: the strict `'travel'`
+ * focus steps aside and every person goes through (the app's tracker chooses, as it did before the motion mask — a shot that
+ * follows the athlete has no stander under their path). Measured at 30 Hz: the broadcast clip is over `FOLLOW_SPEED` in 1301 of
+ * its 1493 frames, in one unbroken run after a still first 6.4 s, while no tripod clip ever crosses it (landscape peaks at
+ * 0.001), so one second tells them apart with a wide margin.
+ */
+const FOLLOW_KNOWN_S = 1;
 
 /**
  * Says, frame by frame, whether the zoomed view of the athlete would help the pose model: yes once the shot has been steady (slow) with a
@@ -66,7 +81,9 @@ export interface MotionMaskOptions {
    * The person whose hips travel up and down like a jumper's is the athlete (`JumperSelector`); while no one has travelled yet (the
    * first jump, or a camera that follows the athlete and keeps them still in the picture), the person in the box the detector reports
    * is. Default true. Nobody is dropped while neither knows where the athlete is. `'travel'` trusts the travel alone: until it knows,
-   * every frame is left empty — for the app's tracker, which locks on the first person it is given and must not be given the spotter.
+   * every frame is left empty — for the app's tracker, which locks on the first person it is given and must not be given the spotter —
+   * except on a camera that follows the athlete (`FOLLOW_KNOWN_S`), whose steady hips the travel never sees: everybody goes
+   * through there, and the tracker chooses as it did before the motion mask.
    */
   focus?: boolean | 'travel';
   /**
@@ -97,15 +114,12 @@ export interface MotionMaskOptions {
  * itself; and if the layer fails once, it is switched off for the rest of the analysis. Once it knows who jumps, the people the pose model
  * finds are narrowed to that person (`focus`), and the picture can be zoomed on them and turned upright (`view`).
  *
- * Only for MediaPipe, which takes a canvas as well as a video. `PoseEstimator.detect` says "video" because the app has only ever given it
- * one, and the pose code is not to be touched yet: the canvas is passed through one cast, here. The experimental ONNX engines read
- * `videoWidth` and would not work with it, so they are refused.
+ * Every engine reads the painted canvas as well as the video (`PoseSource`): MediaPipe takes any image source, and the ONNX engines
+ * measure what they are given (`sourceSize`). The detector itself reads frames from a real video only: given anything else, the mask
+ * steps aside and the pose model gets the source as it is.
  */
 export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskOptions = {}): PoseEstimatorFactory {
   return async (estimatorOptions) => {
-    if (estimatorOptions.engine && estimatorOptions.engine !== 'mediapipe') {
-      throw new Error('The motion mask works with the MediaPipe engine only.');
-    }
     const estimator = await inner(estimatorOptions);
     const layer = options.layer?.() ?? new CanvasMaskLayer(options.config, options.fill);
     const focus = options.focus ?? true;
@@ -115,35 +129,48 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
       options.view?.zoom || options.view?.rotate
         ? new AthleteView({ zoom: options.view.zoom ?? false, rotate: options.view.rotate ?? false }, options.paint)
         : null;
+    // The colors of each person's clothes, read from the frame itself (not the masked or zoomed view, whose people are put
+    // back in the frame first): they let the choice of the jumper tell apart people who are equally near, and know the
+    // athlete again across a gap. Null where a canvas cannot be read (tests, workers): the choice then goes without looks.
+    let readPixels: (() => Pixels | null) | null | undefined;
+    // When the camera started moving at a follow camera's speed (null while it does not), and whether it ever kept it up
+    // long enough to call the clip a follow clip (`FOLLOW_KNOWN_S`) — that verdict is never taken back.
+    let fastSinceMs: number | null = null;
+    let followClip = false;
     let broken = false;
     return {
       get backend() {
         return estimator.backend;
       },
       detect(video, timestampMs) {
-        let source: HTMLVideoElement = video;
+        let source: PoseSource = video;
         let athletes: MotionResult | null = null;
         let prepared: Prepared | null = null;
-        const frame = { width: video.videoWidth, height: video.videoHeight };
-        if (!broken) {
+        let frame = { width: 0, height: 0 };
+        if (!broken && 'videoWidth' in video) {
+          frame = { width: video.videoWidth, height: video.videoHeight };
           try {
             const result = layer.process(video, timestampMs);
             options.onFrame?.(result);
-            if (hidesSomething(result)) source = layer.render(video) as unknown as HTMLVideoElement;
+            if (hidesSomething(result)) source = layer.render(video);
             athletes = result;
+            if (result && result.camera.speed >= FOLLOW_SPEED) {
+              fastSinceMs ??= timestampMs;
+              followClip = followClip || timestampMs - fastSinceMs >= FOLLOW_KNOWN_S * 1000;
+            } else {
+              fastSinceMs = null;
+            }
             if (viewer && result && zoomGate.helps(result, timestampMs)) {
-              prepared = viewer.prepare(
-                source as unknown as CanvasImageSource,
-                frame,
-                result.athletes[0] ?? null,
-                result,
-              );
-              source = prepared.source as unknown as HTMLVideoElement;
+              prepared = viewer.prepare(source, frame, result.athletes[0] ?? null, result);
+              source = prepared.source as PoseSource;
             }
           } catch (error) {
             broken = true;
             console.warn('[motion] the mask failed; the pose model gets the video as it is from now on:', error);
           }
+        }
+        if (focus && readPixels === undefined && 'videoWidth' in video) {
+          readPixels = createPixelReader(video, video.videoWidth);
         }
         const found = estimator.detect(source, timestampMs);
         const narrow = (people: PoseDetection[]): PoseDetection[] => {
@@ -152,9 +179,25 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
               ? viewer.finish(people, prepared, frame, athletes.athletes, athletes)
               : people;
           if (!focus) return inFrame;
+          const pixels = frame.width > 0 ? (readPixels?.() ?? null) : null;
+          const looks = pixels
+            ? inFrame.map((p) =>
+                bodySignature(
+                  pixels,
+                  p.landmarks.map((k): Keypoint => ({
+                    x: k.x * frame.width,
+                    y: k.y * frame.height,
+                    visibility: k.visibility,
+                  })),
+                ),
+              )
+            : [];
           // The person whose hips travel like a jumper's; until a track has travelled, the person in the motion box — or,
-          // trusting the travel alone, nobody.
-          const byTravel = selector.push(inFrame, timestampMs / 1000);
+          // trusting the travel alone, nobody. On a follow clip the travel barely speaks (it may have qualified the athlete
+          // before the camera started to move, and never again after): whenever it has nobody, everybody goes through, and
+          // the app's tracker chooses as it did before the motion mask.
+          const byTravel = selector.push(inFrame, timestampMs / 1000, looks);
+          if (followClip && focus === 'travel') return byTravel?.length ? byTravel : inFrame;
           if (byTravel !== null) return byTravel;
           if (focus === 'travel') return [];
           return athletes ? focusOnAthletes(inFrame, athletes.athletes, athletes) : inFrame;

@@ -51,6 +51,9 @@ export interface PoseDetection {
   world?: WorldPoint[];
 }
 
+/** What a pose model reads: the app's hidden <video>, or a canvas the motion detector painted (a masked or zoomed view of it). */
+export type PoseSource = HTMLVideoElement | HTMLCanvasElement;
+
 /**
  * Backend-agnostic pose estimator. MediaPipe is the default; the experimental engines (onnxruntime-web, see pose/onnx/) sit
  * behind the same interface and output the 33-point MediaPipe/BlazePose topology (see landmarks.ts), the points they lack unseen.
@@ -58,7 +61,7 @@ export interface PoseDetection {
 export interface PoseEstimator {
   readonly backend: BackendInfo;
   /** `timestampMs` must be strictly increasing between calls. */
-  detect(source: HTMLVideoElement, timestampMs: number): PoseDetection[] | Promise<PoseDetection[]>;
+  detect(source: PoseSource, timestampMs: number): PoseDetection[] | Promise<PoseDetection[]>;
   dispose(): void;
 }
 

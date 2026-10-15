@@ -269,6 +269,8 @@ describe('the settings', () => {
     onStride: () => {},
     preferGpu: true,
     onPreferGpu: () => {},
+    motion: true,
+    onMotion: () => {},
     fps: 30,
     onFps: () => {},
     backend: '',
