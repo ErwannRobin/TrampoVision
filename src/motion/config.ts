@@ -127,6 +127,14 @@ export interface MotionConfig {
   partWidthShare: number;
   partReachShare: number;
   bedRowShare: number;
+  /**
+   * Look for the athlete's box, and for the skeletons the mask is told about (`seeBodies`), in the region's columns up to the top of the
+   * picture, and not only in the region: the top of a jump higher than the ones the region was learnt from is not in it yet. Offline it cut
+   * the frames in which the mask hid the whole athlete on the wide tripod sample from 2.7 to 0.8%. Off by default, for the app: through the
+   * whole app the tripod sample gained nothing (706 and 715 frames with the athlete without it, 705 with it), and the synchro sample swings
+   * too much from run to run to tell (542 to 623 frames in five runs without it, 76 in a sixth; 384 and 76 with it). The debug page turns it on.
+   */
+  searchAbove: boolean;
   /** How far the mask reaches around the box of the athlete, share of the picture. The pose model needs the hands and the feet too. */
   marginShare: number;
   /** Softness of the mask edge, share of the picture. */
@@ -193,6 +201,7 @@ export const DEFAULT_MOTION_CONFIG: MotionConfig = {
   partWidthShare: 1.5,
   partReachShare: 1,
   bedRowShare: 2.5,
+  searchAbove: false,
   marginShare: 0.05,
   featherShare: 0.04,
   fadeInS: 0.6,

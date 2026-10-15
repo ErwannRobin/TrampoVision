@@ -81,7 +81,8 @@ const panels = new Panels({
   given: $<HTMLCanvasElement>('c-given'),
 });
 
-const layer = new CanvasMaskLayer();
+// The page looks for the athlete above the place they jump in as well (`searchAbove`; off in the app, see config.ts).
+const layer = new CanvasMaskLayer({ searchAbove: true });
 /** Whether the camera follows the athlete: the detector then steps aside, as it does in the app (`FollowWatch`). */
 const follow = new FollowWatch();
 /** What is done to the picture before the pose models, once the athlete is found; null when neither box is ticked. Made again when a box changes. */
@@ -492,6 +493,10 @@ $<HTMLSelectElement>('camera').addEventListener('change', (event) => {
 });
 $<HTMLSelectElement>('athletes').addEventListener('change', (event) => {
   layer.detector.configure({ maxAthletes: Number((event.target as HTMLSelectElement).value) });
+  reshow();
+});
+$<HTMLInputElement>('above').addEventListener('change', (event) => {
+  layer.detector.configure({ searchAbove: (event.target as HTMLInputElement).checked });
   reshow();
 });
 $<HTMLSelectElement>('fill').addEventListener('change', (event) => {

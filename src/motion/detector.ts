@@ -38,21 +38,21 @@ const growBox = (b: Box, by: number, w: number, h: number): Box => ({
 });
 
 /**
- * Where the athlete of a region can be: its columns, from its bottom up to the top of the picture. The region is where things went up and
- * down, so the top of a jump higher than the ones it was learnt from is not in it yet. On the wide tripod sample the detector found the
- * athlete during low bounces (the region was rows 41 to 70 of 72), and the next jump went up to row 10: the box, looked for in the region
- * only, stayed on the bed, and the mask hid the athlete for most of a second. Little else moves above the athlete in the jump's columns.
+ * Where the athlete of a region can be: the region, or with `above` (`MotionConfig.searchAbove`) its columns from its bottom up to the top of
+ * the picture. The region is where things went up and down, so the top of a jump higher than the ones it was learnt from is not in it yet.
+ * On the wide tripod sample the detector found the athlete during low bounces (the region was rows 41 to 70 of 72), and the next jump went
+ * up to row 10: the box, looked for in the region only, stayed on the bed, and the mask hid the athlete for most of a second.
  */
-const reachOf = (window: Box): Box => ({ ...window, y0: 0 });
+const reachOf = (window: Box, above: boolean): Box => (above ? { ...window, y0: 0 } : window);
 /**
- * Whether a skeleton the pose model saw is the athlete of a region: its middle is in the region's columns, at or above its bottom. Not any
+ * Whether a skeleton the pose model saw is the athlete of a region: its middle is where the athlete can be (`reachOf`). Not any
  * overlap (a stranger whose arm reaches the columns is not the athlete), nor most of the skeleton inside (arms held out wide are outside).
  */
-function inReach(body: Box, window: Box): boolean {
-  const reach = reachOf(window);
+function inReach(body: Box, window: Box, above: boolean): boolean {
+  const reach = reachOf(window, above);
   const cx = (body.x0 + body.x1) / 2;
   const cy = (body.y0 + body.y1) / 2;
-  return cx >= reach.x0 && cx <= reach.x1 + 1 && cy <= reach.y1 + 1;
+  return cx >= reach.x0 && cx <= reach.x1 + 1 && cy >= reach.y0 && cy <= reach.y1 + 1;
 }
 
 /** How much of the smaller of two boxes lies inside the other, 0 to 1. */
@@ -77,8 +77,8 @@ function overlapShare(a: Box, b: Box): number {
  * 4. The athlete and the mask: the evidence is kept as regions with hysteresis (it enters high and leaves low) and small pieces are
  *    dropped. Of the rest only the strongest is the athlete (`maxAthletes`: the video is of one person who jumps, and the others, the
  *    coach, the people who wait, are not): the region that was followed keeps its place unless another is clearly stronger. The region is the
- *    place the athlete jumps through; the athlete is the box of what moves in it, or above it in its columns (a jump higher than the ones it
- *    was learnt from), right now, less the bed, which moves with the jumps too but is a flat bar and not a body (`boxIn`). That box, with a
+ *    place the athlete jumps through; the athlete is the box of what moves in it (or above it in its columns, `searchAbove`: a jump higher
+ *    than the ones it was learnt from) right now, less the bed, which moves with the jumps too but is a flat bar and not a body (`boxIn`). That box, with a
  *    margin and soft edges, is what the mask keeps, with the skeleton the pose model saw in the frame before when it is told it
  *    (`seeBodies`), so a person who stands still in the place the athlete jumps through, or next to them, is hidden too.
  *
@@ -193,7 +193,7 @@ export class TrampolineMotionDetector {
    * once: a frame in which the pose model finds nobody keeps only what moves.
    *
    * Measured on the samples, with the skeleton of the frame before standing in for the pose model's (and the box looked for above the region,
-   * `reachOf`): frames in which the mask hid part of the athlete's body, before → after — wide tripod 15.2 → 1.6% (the whole athlete 2.7 →
+   * `searchAbove`): frames in which the mask hid part of the athlete's body, before → after — wide tripod 15.2 → 1.6% (the whole athlete 2.7 →
    * 0.5%; checked against RTMPose run on the clip without a mask), phone close-up 22.1 → 3.6%, synchro 11.4 → 0.5%, the still start of the
    * broadcast 57.9 → 0% — for a picture kept 0.2 to 3.5 points bigger.
    */
@@ -488,14 +488,14 @@ export class TrampolineMotionDetector {
     this.windows = chosen.map((label) => growBox(pieces.box[label], pad, w, h));
     const before = this.athletes;
     this.athletes = this.windows.map((window) =>
-      this.boxIn(window, before.find((b) => overlapShare(b, reachOf(window)) > 0) ?? null),
+      this.boxIn(window, before.find((b) => overlapShare(b, reachOf(window, cfg.searchAbove)) > 0) ?? null),
     );
     // Against the shorter side, like every size of the detector: the same athlete is as big in a portrait video as in a landscape one.
     this.athleteWidth = this.athletes.length ? Math.max(...this.athletes.map((b) => b.x1 - b.x0 + 1)) / short : null;
 
     // The picture the athletes keep, and how far the rest is hidden: the background goes away over `fadeInS` and comes back over `fadeOutS`.
     this.keptBodies = this.found
-      ? this.bodies.filter((body) => this.windows.some((window) => inReach(body, window)))
+      ? this.bodies.filter((body) => this.windows.some((window) => inReach(body, window, cfg.searchAbove)))
       : [];
     this.bodies = [];
     if (this.found) {
@@ -553,7 +553,7 @@ export class TrampolineMotionDetector {
    */
   private boxIn(window: Box, before: Box | null): Box {
     const { width: w, height: h, cfg, held, moving } = this;
-    const area = reachOf(window);
+    const area = reachOf(window, cfg.searchAbove);
     const join = Math.max(1, Math.round(cfg.joinShare * Math.min(w, h)));
     moving.fill(0);
     for (let y = area.y0; y <= area.y1; y++) {

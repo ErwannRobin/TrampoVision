@@ -435,7 +435,7 @@ describe('the bodies the pose model saw', () => {
   const high = { x0: box.x0, y0: 0, x1: box.x1, y1: 3 };
 
   it('keeps a body the motion did not show, where the athlete jumps, and nobody else', () => {
-    const probe = new TrampolineMotionDetector();
+    const probe = new TrampolineMotionDetector({ searchAbove: true });
     let r = probe.push(scene.frames[0], scene.timesMs[0]);
     for (let f = 1; f < last; f++) r = probe.push(scene.frames[f], scene.timesMs[f]);
     probe.seeBodies([arm, stranger, high]);
@@ -445,6 +445,15 @@ describe('the bodies the pose model saw', () => {
     expect(kept(r, arm.x1 - 1, (arm.y0 + arm.y1) / 2)).toBe(true);
     expect(kept(r, (high.x0 + high.x1) / 2, 1)).toBe(true);
     expect(kept(r, 7, 16)).toBe(false);
+  });
+
+  it('keeps one above the place they jump in only when told to look there', () => {
+    const probe = new TrampolineMotionDetector();
+    let r = probe.push(scene.frames[0], scene.timesMs[0]);
+    for (let f = 1; f < last; f++) r = probe.push(scene.frames[f], scene.timesMs[f]);
+    probe.seeBodies([arm, high]);
+    r = probe.push(scene.frames[last], scene.timesMs[last]);
+    expect(r.bodies).toEqual([arm]);
   });
 
   it('keeps it for one frame only, and without it the mask is the box of what moves', () => {
