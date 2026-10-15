@@ -87,7 +87,11 @@ export function toJumpsCsv(a: AnalysisResult): string {
 }
 
 export function download(filename: string, text: string, mime: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: mime }));
+  downloadBlob(filename, new Blob([text], { type: mime }));
+}
+
+export function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;

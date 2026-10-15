@@ -33,7 +33,7 @@ export const about: Translation<typeof en> = {
 
   'about.deviceTitle': 'Was auf Ihrem Gerät bleibt',
   'about.deviceText1':
-    'Das Video verlässt Ihren Browser nie. Die Seite lehnt jede Anfrage an eine andere Website ab, und die Produktionsversion fügt eine Content-Security-Policy hinzu, die der Browser selbst durchsetzt.',
+    'Das Video bleibt in Ihrem Browser, außer Sie fordern einen Link zum Teilen an: Dann werden dieser Clip und seine Analyse hochgeladen (Cloudflare, in der EU) und nach 90 Tagen gelöscht, oder sobald Sie das Teilen beenden. Davon abgesehen lehnt die Seite jede Anfrage an eine andere Website ab, und die Produktionsversion fügt eine Content-Security-Policy hinzu, die der Browser selbst durchsetzt.',
   'about.deviceText2':
     'Gespeichert werden nur Zahlen, in Ihrem Browser (IndexedDB): Messwerte, Vorhersagen und Ihre Labels, nie das Video. Ist die App mit einem Prüfdienst eingerichtet, können die analysierten Sprünge dorthin gesendet werden, damit eine Person sie prüft: nur Messwerte, weder Video noch Dateiname. Ein Schalter in den Einstellungen schaltet das ab.',
 

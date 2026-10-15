@@ -141,3 +141,7 @@ worker-schema: node_modules ## Apply worker/schema.sql to the remote D1 database
 
 worker-deploy: node_modules ## Deploy it (worker-schema first when schema.sql changed)
 	cd worker && npx wrangler deploy
+
+worker-r2: node_modules ## Create the R2 bucket of the shared clips (EU) with its 90-day expiry, once, before the first deploy
+	cd worker && npx wrangler r2 bucket create trampovision-shares --jurisdiction eu
+	cd worker && npx wrangler r2 bucket lifecycle add trampovision-shares expire-shares --expire-days 90 --jurisdiction eu --force

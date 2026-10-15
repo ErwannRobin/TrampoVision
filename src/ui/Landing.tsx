@@ -7,6 +7,7 @@ import { HeroArcs } from './chrome/HeroArcs';
 import { RecentSets, type RecentSetsProps } from './chrome/RecentSets';
 import { DemoSkeleton } from './DemoSkeleton';
 import { DatasetBar, EvaluationReport } from './EvaluationView';
+import { canShare } from '../sync/share';
 import type { Sample } from '../video/sample';
 import { useMediaQuery } from './hooks';
 import { Icon, Menu, Switch, type IconName } from './kit';
@@ -194,7 +195,7 @@ export function Landing({
             </li>
             <li>
               <Icon name="shield" size={17} />
-              {t('landing.notePrivacy')}
+              {t(canShare ? 'landing.notePrivacyShare' : 'landing.notePrivacy')}
             </li>
           </ul>
         </div>

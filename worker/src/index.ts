@@ -1,7 +1,8 @@
 import { FIG_ELEMENTS } from '../../src/skills/fig/elements';
 import { originAllowed, parseIngest, parseReview, tokenMatches, STATUSES, type JumpRow } from './logic';
+import { handleShares, type ShareEnv } from './shares';
 
-export interface Env {
+export interface Env extends ShareEnv {
   DB: D1Database;
   ALLOWED_ORIGIN: string;
   /** Regular expression of the preview deployments of the app that may call too (optional). */
@@ -77,6 +78,10 @@ export default {
       if (path === '/elements' && req.method === 'GET') {
         return reply({ elements: FIG_ELEMENTS.map((e) => ({ id: e.id, name: e.name })) });
       }
+
+      // Shared clips (shares.ts): uploading takes the app's token, reading takes the link, removing takes the uploader's key.
+      const shared = await handleShares(req, env, path, canWrite(req, env), h, reply);
+      if (shared) return shared;
 
       // The browser posts every jump right after the analysis. A re-post of the same jump replaces the automatic answer and keeps the review.
       if (path === '/jumps' && req.method === 'POST') {

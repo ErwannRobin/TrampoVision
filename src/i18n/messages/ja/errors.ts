@@ -18,6 +18,8 @@ export const errors: Translation<typeof en> = {
   'err.modelFile':
     'モデルファイル {file} が見つかりません。「npm run fetch-assets」を実行してください（またはアセットホストにアップロードしてください）。',
   'err.notJson': 'このファイルは有効な JSON ではありません。',
+  'err.bundleVideo':
+    'この動画には分析を埋め込めません。アプリが追記できる MP4 または QuickTime のファイルではありません。',
   'err.notSeries': 'これは TrampoVision の姿勢時系列ファイルではありません。',
   'err.seriesVersion':
     'サポートされていないファイルバージョンです（{found}）。このアプリはバージョン {expected} を読み込みます。',

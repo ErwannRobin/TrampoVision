@@ -22,6 +22,7 @@ export interface ProcessingOverlayProps {
 
 const loadingText = () => ({
   downloading: t('busy.downloading'),
+  shared: t('busy.shared'),
   reading: t('busy.reading'),
   measuring: t('busy.measuring'),
   converting: t('busy.converting'),
@@ -46,7 +47,9 @@ export function announcement(status: Status): string {
     const converting = status.stage === 'converting';
     const start = converting ? `${t('busy.converting')} ${t('busy.convertingText')}` : loadingText()[status.stage];
     const progress =
-      converting || status.stage === 'downloading' || status.stage === 'model' ? (status.progress ?? 0) : 0;
+      converting || status.stage === 'downloading' || status.stage === 'shared' || status.stage === 'model'
+        ? (status.progress ?? 0)
+        : 0;
     return milestoneText(progress, start);
   }
   if (status.kind === 'analyzing') {
@@ -95,7 +98,7 @@ export function ProcessingOverlay({
     const converting = status.stage === 'converting';
     // The pose model's progress is unknown (a ring that turns) until its files start to arrive and again once they are in.
     const progress =
-      converting || status.stage === 'downloading'
+      converting || status.stage === 'downloading' || status.stage === 'shared'
         ? (status.progress ?? 0)
         : status.stage === 'model'
           ? status.progress

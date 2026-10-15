@@ -159,6 +159,8 @@ export const coaching = {
   'live.shared': 'Shared',
   'live.copied': 'Copied',
   'live.copyFailed': 'Could not copy',
+  'live.shareLink': 'Share link',
+  'live.shareLinkTitle': 'Get a link that opens this video with its analysis',
   'live.repeatHint': 'A repeat counts once',
   'live.nothingJudged': 'Nothing judged',
   'live.estimate': 'Estimate, out of 10',

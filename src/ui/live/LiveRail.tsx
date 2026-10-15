@@ -38,6 +38,8 @@ export interface LiveRailProps {
   notes: string[];
   /** The name of the clip, for the text that is shared. */
   title: string;
+  /** Share the clip with its analysis as a link; absent when this build cannot (no review service) or there is no video. */
+  onShareLink?: () => void;
 }
 
 type Item = { kind: 'skill'; jump: LiveJump } | { kind: 'bounces'; jumps: LiveJump[] };
@@ -277,7 +279,7 @@ function LiveSet(props: LiveRailProps) {
       )}
     </div>
   );
-  const summary = <SetSummary session={session} title={props.title} />;
+  const summary = <SetSummary session={session} title={props.title} onShareLink={props.onShareLink} />;
 
   return (
     <div

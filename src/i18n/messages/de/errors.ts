@@ -18,6 +18,8 @@ export const errors: Translation<typeof en> = {
   'err.modelFile':
     'Die Modelldatei {file} wurde nicht gefunden. Führen Sie „npm run fetch-assets“ aus (oder laden Sie sie auf den Asset-Host hoch).',
   'err.notJson': 'Diese Datei ist kein gültiges JSON.',
+  'err.bundleVideo':
+    'Dieses Video kann seine Analyse nicht aufnehmen: Es ist keine MP4- oder QuickTime-Datei, die die App ergänzen kann.',
   'err.notSeries': 'Dies ist keine TrampoVision-Posenreihe.',
   'err.seriesVersion': 'Nicht unterstützte Dateiversion ({found}); diese App liest Version {expected}.',
   'err.noFrames': 'Die Datei enthält keine Bilddaten.',

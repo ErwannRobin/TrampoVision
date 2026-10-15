@@ -63,6 +63,7 @@ export const chrome: Translation<typeof en> = {
   'landing.noteCamera':
     'Die besten Ergebnisse liefert eine feststehende, waagerechte Kamera an der Seite, mit dem ganzen Trampolin im Bild und dem Athleten im Blick – vom Absprung des ersten bis zur Landung des letzten Elements.',
   'landing.notePrivacy': 'Läuft in Ihrem Browser. Das Video verlässt Ihr Gerät nie.',
+  'landing.notePrivacyShare': 'Läuft in Ihrem Browser. Das Video bleibt auf Ihrem Gerät, außer Sie teilen es als Link.',
   'landing.about': 'Über TrampoVision',
   'landing.savedDataset': 'Gespeicherter Datensatz',
   'landing.recent': 'Letzte Übungen',
@@ -175,6 +176,7 @@ export const chrome: Translation<typeof en> = {
   'setup.hintChoose': 'Wählen Sie ein Video zur Analyse.',
 
   'busy.downloading': 'Beispielvideo wird geladen…',
+  'busy.shared': 'Geteilter Clip wird geladen…',
   'busy.reading': 'Ihr Video wird geöffnet…',
   'busy.measuring': 'Ihr Video wird geprüft…',
   'busy.model': 'Pose-Modell wird geladen…',
@@ -313,6 +315,38 @@ export const chrome: Translation<typeof en> = {
   'export.framesHint': 'Eine Zeile pro Bild',
   'export.jumps': 'Sprünge (CSV)',
   'export.jumpsHint': 'Eine Zeile pro Sprung',
+  'export.bundle': 'Video mit Analyse (MP4)',
+  'export.bundleHint': 'Das Video mit seiner Analyse darin: Es läuft überall und öffnet sich hier bereits analysiert',
+  'export.share': 'Link zum Teilen…',
+  'export.shareHint':
+    'Das Video mit seiner Analyse hochladen und einen Link erhalten, der es analysiert in jedem Browser öffnet',
+  'share.title': 'Diesen Clip teilen',
+  'share.text':
+    'Wer den Link hat, sieht das Video mit seiner Analyse im eigenen Browser, ohne etwas zu installieren oder zu berechnen.',
+  'share.where':
+    'Das Video und seine Analyse werden in den Speicher von TrampoVision hochgeladen (Cloudflare, in der EU) und nach {days} Tagen gelöscht, oder sobald Sie das Teilen beenden. Jede Person mit dem Link kann es ansehen.',
+  'share.consent':
+    'Teilen Sie nur ein Video, das Sie teilen dürfen: Fragen Sie zuerst die Athletin oder den Athleten (oder die Eltern).',
+  'share.create': 'Link erstellen',
+  'share.preparing': 'Video wird vorbereitet…',
+  'share.uploading': 'Wird hochgeladen… {percent}',
+  'share.link': 'Link',
+  'share.copy': 'Link kopieren',
+  'share.send': 'Senden…',
+  'share.until': 'Verfügbar bis {date}.',
+  'share.stopText': 'Beenden löscht die hochgeladene Kopie: Der Link öffnet sie dann nicht mehr.',
+  'share.stop': 'Teilen beenden',
+  'share.stopped': 'Die geteilte Kopie ist gelöscht: Der Link öffnet sie nicht mehr.',
+  'share.noClip': 'Es gibt kein analysiertes Video zum Teilen.',
+  'share.unavailable': 'Teilen ist in dieser Version der App nicht verfügbar.',
+  'share.errTooLarge': 'Das Video ist zu groß zum Teilen (höchstens {mb} MB).',
+  'share.errTooMany': 'Zu viele Links in kurzer Zeit: Versuchen Sie es in einer Minute erneut.',
+  'share.errFull': 'Das Teilen ist für heute voll: Versuchen Sie es morgen erneut.',
+  'share.errType': 'Nur MP4- oder QuickTime-Videos können geteilt werden.',
+  'share.errNetwork':
+    'Der Dienst zum Teilen ist nicht erreichbar. Prüfen Sie die Verbindung und versuchen Sie es erneut.',
+  'share.errHttp': 'Das Teilen hat nicht funktioniert (HTTP {status}).',
+  'share.errGone': 'Dieser geteilte Clip ist nicht mehr verfügbar: Er wurde gelöscht oder ist abgelaufen.',
   'export.series': 'Analyse speichern (JSON)',
   'export.seriesHint':
     'Jedes Bild: alle Gelenke mit Bewertungen, Schwerpunkt, Ausrichtung, Phase sowie die Rohausgabe des Modells. Öffnen Sie die Datei später, um die Analyse zu überspringen.',

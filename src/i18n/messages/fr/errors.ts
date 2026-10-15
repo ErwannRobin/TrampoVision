@@ -18,6 +18,8 @@ export const errors: Translation<typeof en> = {
   'err.modelFile':
     'Le fichier de modèle {file} est introuvable. Lancez « npm run fetch-assets » (ou envoyez-le sur l’hôte des ressources).',
   'err.notJson': 'Ce fichier n’est pas un JSON valide.',
+  'err.bundleVideo':
+    'Cette vidéo ne peut pas contenir son analyse : ce n’est pas un fichier MP4 ou QuickTime que l’application sait compléter.',
   'err.notSeries': 'Ce n’est pas un fichier de série de poses TrampoVision.',
   'err.seriesVersion': 'Version de fichier non prise en charge ({found}) ; cette appli lit la version {expected}.',
   'err.noFrames': 'Le fichier ne contient aucune donnée d’image.',
