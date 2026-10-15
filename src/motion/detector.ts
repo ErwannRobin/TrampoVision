@@ -44,6 +44,16 @@ const growBox = (b: Box, by: number, w: number, h: number): Box => ({
  * only, stayed on the bed, and the mask hid the athlete for most of a second. Little else moves above the athlete in the jump's columns.
  */
 const reachOf = (window: Box): Box => ({ ...window, y0: 0 });
+/**
+ * Whether a skeleton the pose model saw is the athlete of a region: its middle is in the region's columns, at or above its bottom. Not any
+ * overlap (a stranger whose arm reaches the columns is not the athlete), nor most of the skeleton inside (arms held out wide are outside).
+ */
+function inReach(body: Box, window: Box): boolean {
+  const reach = reachOf(window);
+  const cx = (body.x0 + body.x1) / 2;
+  const cy = (body.y0 + body.y1) / 2;
+  return cx >= reach.x0 && cx <= reach.x1 + 1 && cy <= reach.y1 + 1;
+}
 
 /** How much of the smaller of two boxes lies inside the other, 0 to 1. */
 function overlapShare(a: Box, b: Box): number {
@@ -179,11 +189,11 @@ export class TrampolineMotionDetector {
    * Tells the detector where the pose model found the athletes in the frame it was just given: the box around each one's skeleton, picture
    * pixels. The next mask keeps those boxes too, with the same margin as the box of what moves, so that a body is not cut where it does not
    * move enough to be seen moving: legs that hold still in a pike, or are as pale as the bed, a body at the top of a jump, where only the bed
-   * still moves. A box that is in none of the places the athletes can be (`reachOf`) is left out: it is somebody else. The boxes are used
+   * still moves. A box whose middle is in none of the places the athletes can be (`inReach`) is left out: it is somebody else. The boxes are used
    * once: a frame in which the pose model finds nobody keeps only what moves.
    *
    * Measured on the samples, with the skeleton of the frame before standing in for the pose model's (and the box looked for above the region,
-   * `reachOf`): frames in which the mask hid part of the athlete's body, before → after — wide tripod 15.2 → 1.3% (the whole athlete 2.7 →
+   * `reachOf`): frames in which the mask hid part of the athlete's body, before → after — wide tripod 15.2 → 1.6% (the whole athlete 2.7 →
    * 0.5%; checked against RTMPose run on the clip without a mask), phone close-up 22.1 → 3.6%, synchro 11.4 → 0.5%, the still start of the
    * broadcast 57.9 → 0% — for a picture kept 0.2 to 3.5 points bigger.
    */
@@ -477,16 +487,15 @@ export class TrampolineMotionDetector {
     const chosen = this.found ? this.chooseAthletes(pieces, big) : [];
     this.windows = chosen.map((label) => growBox(pieces.box[label], pad, w, h));
     const before = this.athletes;
-    this.athletes = this.windows.map((window) => {
-      const reach = reachOf(window);
-      return this.boxIn(reach, before.find((b) => overlapShare(b, reach) > 0) ?? null);
-    });
+    this.athletes = this.windows.map((window) =>
+      this.boxIn(window, before.find((b) => overlapShare(b, reachOf(window)) > 0) ?? null),
+    );
     // Against the shorter side, like every size of the detector: the same athlete is as big in a portrait video as in a landscape one.
     this.athleteWidth = this.athletes.length ? Math.max(...this.athletes.map((b) => b.x1 - b.x0 + 1)) / short : null;
 
     // The picture the athletes keep, and how far the rest is hidden: the background goes away over `fadeInS` and comes back over `fadeOutS`.
     this.keptBodies = this.found
-      ? this.bodies.filter((body) => this.windows.some((window) => overlapShare(reachOf(window), body) > 0))
+      ? this.bodies.filter((body) => this.windows.some((window) => inReach(body, window)))
       : [];
     this.bodies = [];
     if (this.found) {
@@ -544,19 +553,20 @@ export class TrampolineMotionDetector {
    */
   private boxIn(window: Box, before: Box | null): Box {
     const { width: w, height: h, cfg, held, moving } = this;
+    const area = reachOf(window);
     const join = Math.max(1, Math.round(cfg.joinShare * Math.min(w, h)));
     moving.fill(0);
-    for (let y = window.y0; y <= window.y1; y++) {
-      for (let x = window.x0; x <= window.x1; x++) moving[y * w + x] = held[y * w + x] > 0 ? 1 : 0;
+    for (let y = area.y0; y <= area.y1; y++) {
+      for (let x = area.x0; x <= area.x1; x++) moving[y * w + x] = held[y * w + x] > 0 ? 1 : 0;
     }
-    this.dropBars(window, join);
+    this.dropBars(area, join);
     // Grown a little so the edges of one body are one group.
     dilate(moving, this.joined, w, h, join, this.tmpBytes);
     const count = labelPieces(this.joined, this.labels, w, h, this.stack).length;
     const pixels = new Array<number>(count).fill(0);
     const groups: Box[] = Array.from({ length: count }, () => ({ x0: w, y0: h, x1: -1, y1: -1 }));
-    for (let y = window.y0; y <= window.y1; y++) {
-      for (let x = window.x0; x <= window.x1; x++) {
+    for (let y = area.y0; y <= area.y1; y++) {
+      for (let x = area.x0; x <= area.x1; x++) {
         const i = y * w + x;
         if (!moving[i]) continue;
         const label = this.labels[i];

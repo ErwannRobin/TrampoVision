@@ -44,6 +44,8 @@ const FOLLOW_SPEED = 0.18;
  * 246 with three somersaults (1.72, 1.97, 2.76 turns) — the plain analysis on the same delegate reads 247 and the same three.
  */
 const FOLLOW_KNOWN_S = 1;
+/** Frames further apart than this are not one run of the camera (the detector's own `maxGapS`). */
+const FOLLOW_GAP_MS = 500;
 
 /**
  * Says, frame by frame, whether the zoomed view of the athlete would help the pose model: yes once the shot has been steady (slow) with a
@@ -76,10 +78,17 @@ export class ZoomGate {
  */
 export class FollowWatch {
   private fastSinceMs: number | null = null;
+  private lastMs: number | null = null;
   private known = false;
 
-  /** Takes what the detector found in a frame (null when it could not read it) and says whether the clip is a follow clip. */
+  /**
+   * Takes what the detector found in a frame (null when it could not read it) and says whether the clip is a follow clip. A jump in time
+   * (a seek: back, or more than `FOLLOW_GAP_MS` on) breaks the run of fast frames: two fast stretches of the clip are not one.
+   */
   push(result: MotionResult | null, timestampMs: number): boolean {
+    const cut = this.lastMs !== null && (timestampMs <= this.lastMs || timestampMs - this.lastMs > FOLLOW_GAP_MS);
+    this.lastMs = timestampMs;
+    if (cut) this.fastSinceMs = null;
     if (result && result.camera.speed >= FOLLOW_SPEED) {
       this.fastSinceMs ??= timestampMs;
       this.known = this.known || timestampMs - this.fastSinceMs >= FOLLOW_KNOWN_S * 1000;
@@ -97,6 +106,7 @@ export class FollowWatch {
   /** Forgets it: another clip, or the same one from the start. */
   reset(): void {
     this.fastSinceMs = null;
+    this.lastMs = null;
     this.known = false;
   }
 }

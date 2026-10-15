@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PoseDetection, PoseEstimator, PoseEstimatorFactory } from '../pose/types';
 import type { MaskLayer } from './layer';
-import { withMotionMask } from './maskedEstimator';
+import { FollowWatch, withMotionMask } from './maskedEstimator';
 import { LM, LANDMARK_COUNT } from '../pose/landmarks';
 import type { Box, MotionResult } from './types';
 import { toView, type View } from './view';
@@ -427,5 +427,25 @@ describe('the motion mask in front of a pose estimator', () => {
     expect(estimator.detect(canvas, 1000)).toBe(detections);
     expect(given).toEqual([canvas]);
     expect(layer.process).not.toHaveBeenCalled();
+  });
+});
+
+describe('the follow clip', () => {
+  const fast = { ...frameWith(0.2, [{ x0: 40, y0: 45, x1: 60, y1: 75 }], { type: 'tracking', speed: 0.4 }) };
+  const still = frameWith(0.2, [{ x0: 40, y0: 45, x1: 60, y1: 75 }]);
+
+  it('is known once the camera has moved fast for a second without a pause, and for good', () => {
+    const watch = new FollowWatch();
+    let known = false;
+    for (let t = 0; t <= 1000; t += 40) known = watch.push(fast, t);
+    expect(known).toBe(true);
+    expect(watch.push(still, 1040)).toBe(true);
+  });
+
+  it('is not known from two fast stretches of the clip with a seek between them', () => {
+    const watch = new FollowWatch();
+    for (let t = 0; t <= 600; t += 40) watch.push(fast, t);
+    expect(watch.push(fast, 60_000)).toBe(false);
+    expect(watch.push(fast, 60_040)).toBe(false);
   });
 });
