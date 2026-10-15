@@ -284,6 +284,8 @@ export const chrome = {
     'This browser cannot decode the original file, so it was converted to H.264 (max 720p) in the browser.',
   'app.maskedFallback':
     'The masked video could not be opened, so the pose model reads the original video (the background is not hidden).',
+  'app.motionPageSettings':
+    'Analyzed with the settings of the motion detector page (its thresholds, mask, zoom and pose model), not those of the app.',
   'app.fpsAssumed': 'Could not measure the frame rate, so 30 fps is assumed.',
   'app.secondLook':
     'Second look: {frames} frames read again by RTMPose-x. {both} readings confirmed, {replaced} corrected, {added} added where the athlete was missing.',

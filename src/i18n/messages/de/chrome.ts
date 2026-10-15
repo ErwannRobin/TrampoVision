@@ -275,6 +275,8 @@ export const chrome: Translation<typeof en> = {
     'Dieser Browser kann die Originaldatei nicht dekodieren; sie wurde deshalb im Browser in H.264 (max. 720p) umgewandelt.',
   'app.maskedFallback':
     'Das maskierte Video konnte nicht geöffnet werden; das Posenmodell liest deshalb das Originalvideo (der Hintergrund wird nicht ausgeblendet).',
+  'app.motionPageSettings':
+    'Analysiert mit den Einstellungen der Seite des Bewegungsdetektors (Schwellen, Maske, Zoom und Posenmodell), nicht mit denen der App.',
   'app.fpsAssumed': 'Die Bildrate konnte nicht gemessen werden; es werden 30 fps angenommen.',
   'app.secondLook':
     'Zweiter Blick: {frames} Bilder von RTMPose-x erneut gelesen. {both} Lesungen bestätigt, {replaced} korrigiert, {added} ergänzt, wo der Athlet fehlte.',

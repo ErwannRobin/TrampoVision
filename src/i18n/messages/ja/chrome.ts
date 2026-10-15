@@ -268,6 +268,8 @@ export const chrome: Translation<typeof en> = {
   'app.converted':
     'このブラウザーでは元のファイルをデコードできないため、ブラウザー内で H.264（最大720p）に変換しました。',
   'app.maskedFallback': 'マスク済みの動画を開けなかったため、姿勢モデルは元の動画を読み取ります（背景は隠れません）。',
+  'app.motionPageSettings':
+    'アプリの設定ではなく、動き検出ページの設定（しきい値、マスク、ズーム、姿勢モデル）で解析しました。',
   'app.fpsAssumed': 'フレームレートを測定できなかったため、30 fps と仮定します。',
   'app.secondLook':
     '再確認：RTMPose-x が {frames} フレームを読み直しました。{both} 件を確認、{replaced} 件を修正、選手が見えなかった所に {added} 件を追加。',

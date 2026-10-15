@@ -1,5 +1,8 @@
 import { done, wrap } from '../dataset/db';
 import { t } from '../i18n/core';
+import { POSE_ENGINES } from '../pose/engines';
+import type { ModelVariant, PoseEngineId } from '../pose/types';
+import type { MotionConfig } from './config';
 
 /**
  * How the result video of the motion page (/motion.html) gets to the app. They are two pages of one site, and a video does not survive the
@@ -8,6 +11,7 @@ import { t } from '../i18n/core';
  * own and not the app's (`dataset/db.ts`): nothing the app keeps is upgraded or touched.
  *
  * Two videos are left: the clip as it was, which the app shows, and the clip with the background hidden, which the pose model is given.
+ * And the page's settings, with which the app analyzes the clip the way the page showed it (`PageSettings`).
  */
 
 /** Where the motion page sends the person: the app, told that a video is waiting for it. */
@@ -29,20 +33,67 @@ interface Stored {
   masked: StoredFile;
   /** Absent in records left by an earlier version: read as false. */
   zoom?: boolean;
+  /** Absent in records left by an earlier version: the app then reads `masked`, or decides by `zoom`. */
+  settings?: unknown;
+}
+
+/**
+ * The motion page's settings when the person sent the result to the app. With them, the app analyzes the clip live through the detector
+ * (`withMotionMask`) the way the page showed it, instead of reading the rendered video: the zoom, the turn and the skeleton kept in the
+ * mask depend on what the pose model finds, which a video cannot carry, and the thresholds and the model are the ones the person looked at.
+ * What the app does after the pose model (who the jumper is over the whole clip, the tracks, the jumps) stays its own.
+ */
+export interface PageSettings {
+  /** The detector's thresholds as the page had them: its sliders, the kind of shot, the people kept, the look above the region. */
+  config: Partial<MotionConfig>;
+  /** What is painted over the background (a CSS color). */
+  fill: string;
+  /** Whether the background is hidden before the pose model. */
+  hide: boolean;
+  /** Whether the mask keeps the skeleton the pose model found in the frame before (`MotionMaskOptions.keepBodies`). */
+  keepBodies: boolean;
+  /** The zoom on a small athlete and the upright turn (`MotionMaskOptions.view`). */
+  zoom: boolean;
+  rotate: boolean;
+  /** The pose model: the first one ticked on the page, the one whose skeleton the mask keeps. */
+  engine: PoseEngineId;
+  model: ModelVariant;
+  preferGpu: boolean;
+}
+
+const VARIANTS: readonly ModelVariant[] = ['lite', 'full', 'heavy'];
+
+/**
+ * The settings in a stored record, or undefined when there are none or they are not what this version of the app understands (a record
+ * left by another version): the app then does what it did before the page sent its settings.
+ */
+export function readSettings(value: unknown): PageSettings | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const s = value as Record<string, unknown>;
+  const flags = ['hide', 'keepBodies', 'zoom', 'rotate', 'preferGpu'] as const;
+  if (flags.some((key) => typeof s[key] !== 'boolean')) return undefined;
+  if (typeof s.fill !== 'string' || typeof s.config !== 'object' || s.config === null) return undefined;
+  if (!POSE_ENGINES.includes(s.engine as PoseEngineId) || !VARIANTS.includes(s.model as ModelVariant)) return undefined;
+  return value as PageSettings;
 }
 
 /** What the motion page leaves for the app. */
 export interface Handoff {
   /** The clip as the person chose it: what the app shows. */
   original: File;
-  /** The clip with the background hidden: what the pose model is given. */
+  /**
+   * The clip with the background hidden: what the pose model is given when the app does not analyze the clip live (its motion detector
+   * is switched off, or the record came without `settings`).
+   */
   masked: File;
   /**
    * True when the app should analyze the clip live through the motion detector with the zoomed view of the athlete
    * (`withMotionMask`, `view.zoom`) instead of reading `masked`: the motion page saw that the athlete is small on a steady
-   * shot in most frames (`ZOOM_WINS_SHARE`), where only the zoomed view lets the pose model see them.
+   * shot in most frames (`ZOOM_WINS_SHARE`), where only the zoomed view lets the pose model see them. Read only without `settings`.
    */
   zoom: boolean;
+  /** The page's settings, which the app analyzes the clip live with (`PageSettings`); undefined from a record left by an earlier version. */
+  settings?: PageSettings;
 }
 
 const toStored = (file: File): StoredFile => ({ name: file.name, type: file.type, blob: file });
@@ -77,8 +128,8 @@ async function inStore<T>(use: (store: IDBObjectStore) => Promise<T> | T): Promi
 }
 
 /** Leaves the two videos for the app. */
-export function putHandoff({ original, masked, zoom }: Handoff): Promise<void> {
-  const stored: Stored = { original: toStored(original), masked: toStored(masked), zoom };
+export function putHandoff({ original, masked, zoom, settings }: Handoff): Promise<void> {
+  const stored: Stored = { original: toStored(original), masked: toStored(masked), zoom, settings };
   return inStore((store) => void store.put(stored, KEY));
 }
 
@@ -91,7 +142,12 @@ async function takeStored(): Promise<Handoff | null> {
   const stored = await inStore((store) => wrap(store.get(KEY)) as Promise<Partial<Stored> | undefined>);
   try {
     return stored?.original && stored.masked
-      ? { original: await toFile(stored.original), masked: await toFile(stored.masked), zoom: stored.zoom ?? false }
+      ? {
+          original: await toFile(stored.original),
+          masked: await toFile(stored.masked),
+          zoom: stored.zoom ?? false,
+          settings: readSettings(stored.settings),
+        }
       : null;
   } finally {
     // A video that could not be cleaned away is no reason to lose the one that was read.

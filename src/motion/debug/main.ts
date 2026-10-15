@@ -12,9 +12,9 @@ import { disposeVideo, estimateFps, frameSeekTime, loadVideo, seekTo } from '../
 import { loadSample, loadSamples, type Sample } from '../../video/sample';
 import { DEFAULT_MOTION_CONFIG, type CameraSetting, type CameraType, type MotionConfig } from '../config';
 import { bodyBox, focusOnAthletes } from '../focus';
-import { APP_WITH_RESULT, putHandoff } from '../handoff';
+import { APP_WITH_RESULT, putHandoff, type PageSettings } from '../handoff';
 import { CanvasMaskLayer } from '../layer';
-import { FollowWatch, hidesSomething } from '../maskedEstimator';
+import { FollowWatch, hidesSomething, ZoomGate } from '../maskedEstimator';
 import { maskedName, renderMaskedVideo, resultPlan, scoutAthlete, ZOOM_WINS_SHARE } from '../resultVideo';
 import type { Box, MotionResult } from '../types';
 import { attachGestures } from './gestures';
@@ -81,16 +81,19 @@ const panels = new Panels({
   given: $<HTMLCanvasElement>('c-given'),
 });
 
-// The page looks for the athlete above the place they jump in as well (`searchAbove`; off in the app, see config.ts).
-const layer = new CanvasMaskLayer({ searchAbove: true });
+// Off when the page opens, as in the app (`searchAbove`, see config.ts): a box in the settings turns it on, and the app is sent that choice.
+const layer = new CanvasMaskLayer();
 /** Whether the camera follows the athlete: the detector then steps aside, as it does in the app (`FollowWatch`). */
 const follow = new FollowWatch();
+/** The frames in which the zoom helps (a small athlete on a steady shot): the only ones zoomed, as in the app (`ZoomGate`). */
+let zoomGate = new ZoomGate();
 /** What is done to the picture before the pose models, once the athlete is found; null when neither box is ticked. Made again when a box changes. */
 let viewer: AthleteView | null = null;
 function updateViewer(): void {
   viewer =
     zoomBox.checked || turnBox.checked ? new AthleteView({ zoom: zoomBox.checked, rotate: turnBox.checked }) : null;
 }
+updateViewer();
 
 interface Session {
   url: string;
@@ -397,7 +400,8 @@ function shotReadings(result: MotionResult): string {
 /** What was done to the picture before the pose models: how it was cut and turned, or that nothing was. */
 function viewText(prepared: Prepared | null, frame: { width: number; height: number }): string {
   if (!viewer) return 'The frame as it is';
-  if (!prepared?.view) return 'The frame as it is (no athlete yet, or nothing to do)';
+  if (!prepared?.view)
+    return 'The frame as it is (no athlete yet, nothing to turn, or the athlete is not small on a steady shot)';
   const { view } = prepared;
   // The square of the frame that was cut, against the frame's shorter side: 2 is a square half as high as the frame.
   const side = view.width / view.scale;
@@ -560,6 +564,7 @@ function resetVideo(): void {
   layer.detector.hint(null);
   follow.reset();
   viewer?.reset();
+  zoomGate = new ZoomGate();
   panels.clear(tickedModels().map((m) => m.canvas));
   for (const view of ticked.values()) view.now.textContent = 'Not run yet.';
   seek.max = '0';
@@ -599,6 +604,8 @@ async function openVideo(file: File): Promise<void> {
     layer.detector.reset();
     layer.detector.hint(null);
     follow.reset();
+    viewer?.reset();
+    zoomGate = new ZoomGate();
     resetTallies();
     seek.max = String(total - 1);
     showPosition(0, 0);
@@ -697,7 +704,9 @@ async function processFrame(s: Session): Promise<void> {
   // Once the athlete is found the picture can be cut around them and turned upright (the boxes above), and what the models find is put back in the frame.
   const size = { width: s.video.videoWidth, height: s.video.videoHeight };
   const prepared =
-    viewer && result && !following ? viewer.prepare(given, size, result.athletes[0] ?? null, result) : null;
+    viewer && result && !following
+      ? viewer.prepare(given, size, result.athletes[0] ?? null, result, zoomGate.helps(result, timeMs))
+      : null;
   const source = (prepared?.source ?? given) as PoseSource;
   panels.draw({ video: s.video, result, masked, given, view: prepared?.view ? prepared.source : null });
 
@@ -903,6 +912,7 @@ function resetDetector(s: Session): void {
   layer.detector.reset();
   layer.detector.hint(s.hint);
   viewer?.reset();
+  zoomGate = new ZoomGate();
 }
 
 function restart(): void {
@@ -974,8 +984,29 @@ hideBox.addEventListener('change', () => {
 // --- The result, in the app --------------------------------------------------------------------------------------
 
 /**
- * Makes the masked video of the whole clip with the settings as they are now, leaves it with the clip itself for the app and goes there. The
- * app shows the clip and gives the masked video (named after the clip) to the pose model: its analysis is unchanged.
+ * The settings as they are now, for the app (`PageSettings`): it analyzes the clip with them, the way this page shows it. The pose model is
+ * the first one ticked, the one whose skeleton the mask keeps (the app's own when none is ticked: the mask then keeps no skeleton).
+ */
+function pageSettings(): PageSettings {
+  const first = tickedModels()[0]?.model;
+  const model = first ?? POSE_MODELS.find((m) => m.id === DEFAULT_MODEL)!;
+  return {
+    config: { ...layer.detector.config },
+    fill: layer.fill,
+    hide: hideBox.checked,
+    keepBodies: keepBodyBox.checked && first !== undefined,
+    zoom: zoomBox.checked,
+    rotate: turnBox.checked,
+    engine: model.engine,
+    model: model.variant,
+    preferGpu: gpuBox.checked,
+  };
+}
+
+/**
+ * Makes the masked video of the whole clip with the settings as they are now, leaves it with the clip itself and the settings for the app
+ * and goes there. The app shows the clip and analyzes it live through the detector with these settings; the masked video (named after
+ * the clip) is what its pose model reads instead when its motion detector is switched off.
  */
 async function loadInApp(): Promise<void> {
   const s = session;
@@ -1025,9 +1056,10 @@ async function loadInApp(): Promise<void> {
     }
     setLoadStatus(`The background is hidden in ${share} % of the frames. Opening TrampoVision…`);
     await putHandoff({
+      settings: pageSettings(),
       original: s.file,
       masked: new File([made.blob], maskedName(s.file.name), { type: made.blob.type }),
-      // The athlete is small on a steady shot: the app analyzes the clip live and zoomed, and the rendered video is the fallback.
+      // Whether the athlete is small on a steady shot. The app reads it only from a record without settings (one an earlier page left).
       zoom: made.zoomShare >= ZOOM_WINS_SHARE,
     });
     location.assign(APP_WITH_RESULT);
