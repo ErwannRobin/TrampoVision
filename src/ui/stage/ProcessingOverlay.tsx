@@ -50,7 +50,8 @@ export function announcement(status: Status): string {
     return milestoneText(progress, start);
   }
   if (status.kind === 'analyzing') {
-    return milestoneText(status.total > 0 ? status.done / status.total : 0, t('busy.analyzingLive'));
+    const start = status.pass === 'second' ? t('busy.secondLive') : t('busy.analyzingLive');
+    return milestoneText(status.total > 0 ? status.done / status.total : 0, start);
   }
   return '';
 }
@@ -125,11 +126,11 @@ export function ProcessingOverlay({
           </ProgressRing>
           <p className="busy__title">
             {advanced
-              ? tx('busy.analyzing', {
+              ? tx(status.pass === 'second' ? 'busy.second' : 'busy.analyzing', {
                   done: <span className="num">{status.done}</span>,
                   total: <span className="num">{status.total}</span>,
                 })
-              : t('busy.analyzingLive')}
+              : t(status.pass === 'second' ? 'busy.secondLive' : 'busy.analyzingLive')}
           </p>
           {/* The line keeps its place while there is nothing to say yet, so the panel does not jump when the estimate comes. */}
           <p className="busy__text" aria-hidden={left === null || undefined}>

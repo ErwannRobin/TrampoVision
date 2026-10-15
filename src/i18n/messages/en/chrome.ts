@@ -64,6 +64,8 @@ export const chrome = {
   'landing.motion': 'Motion detector',
   'landing.motionHint': 'Experimental: isolate the athlete before the pose model',
   'landing.followHint': 'Slower, but keeps the analysis on the jumper, not on a spotter or a coach.',
+  'landing.secondHint':
+    'Slower: where the pose model is unsure, a stronger one reads those frames again and the two readings are merged. 200 MB to download the first time.',
   'landing.noteCamera':
     'Best results come from a fixed, level camera at the side, with the whole trampoline in frame and the athlete in view from the takeoff of the first skill to the landing of the last.',
   'landing.notePrivacy': 'Runs in your browser. The video never leaves your device.',
@@ -106,6 +108,10 @@ export const chrome = {
   'setup.motionSwitch': 'Follow the person who jumps',
   'setup.motionText':
     'The motion detector runs in front of the pose model: it hides the background, zooms on an athlete who is small in the picture, and keeps the analysis on the jumper rather than on a spotter. It makes the analysis slower.',
+  'setup.second': 'Second look',
+  'setup.secondSwitch': 'Read the hard moments again with RTMPose-x',
+  'setup.secondText':
+    'The analysis checks how well the pose model read the athlete. Where it is unsure (upside down, tucked, lost for a moment), a slower, stronger model reads those frames again and the two readings are merged. It takes longer, and the first time it downloads a 200 MB model.',
   'setup.review': 'Review',
   'setup.reviewSwitch': 'Send analyzed jumps for review',
   'setup.reviewText':
@@ -140,6 +146,7 @@ export const chrome = {
   'setup.engine': 'Pose model',
   'setup.engine.mediapipe': 'MediaPipe (default)',
   'setup.engine.rtmpose': 'RTMPose-m (with feet)',
+  'setup.engine.rtmpose-x': 'RTMPose-x (high effort, slow)',
   'setup.engine.vitpose': 'ViTPose-B',
   'setup.engineHint':
     'MediaPipe is the tested one. The others try to follow the athlete where MediaPipe loses them. They give 2D points only: no 3D, so no twist estimate. They need their model files and are slower.',
@@ -183,6 +190,8 @@ export const chrome = {
   // Advanced counts frames and names the runtime; the live view says what is happening in plain words
   'busy.analyzing': 'Analyzing frame {done} of {total}',
   'busy.analyzingLive': 'Reading your set…',
+  'busy.second': 'Second look: frame {done} of {total}',
+  'busy.secondLive': 'Taking a second look at the hard moments…',
   'busy.half': 'Halfway there',
   'busy.runningOn': 'Running on {backend}',
   'busy.stays': 'Your video stays on this device.',
@@ -276,6 +285,10 @@ export const chrome = {
   'app.maskedFallback':
     'The masked video could not be opened, so the pose model reads the original video (the background is not hidden).',
   'app.fpsAssumed': 'Could not measure the frame rate, so 30 fps is assumed.',
+  'app.secondLook':
+    'Second look: {frames} frames read again by RTMPose-x. {both} readings confirmed, {replaced} corrected, {added} added where the athlete was missing.',
+  'app.secondLookNone': 'Second look: the pose model read every jump well, nothing to read again.',
+  'app.secondLookFailed': 'The second look could not run ({reason}). The analysis is the first pose model’s alone.',
   'app.fpsAssumedAdvanced':
     'Could not measure the frame rate, so 30 fps is assumed. Set the real value under Analysis in the settings.',
   'app.fetchAssets': ' — if the model failed to load, run "npm run fetch-assets".',

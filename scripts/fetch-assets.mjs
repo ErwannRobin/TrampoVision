@@ -63,6 +63,12 @@ const EXPERIMENTAL = [
     `${OPENMMLAB}/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.zip`,
     'end2end.onnx',
   ],
+  // RTMPose-x, Halpe 26 points, 384 x 288 (rtmlib's "performance" pose model, 200 MB): the second opinion on the hard frames.
+  [
+    'rtmpose_x_halpe26_384x288.onnx',
+    `${OPENMMLAB}/rtmpose-x_simcc-body7_pt-body7-halpe26_700e-384x288-7fb6e239_20230606.zip`,
+    'end2end.onnx',
+  ],
   // ViTPose-B, COCO 17 points (ONNX export from onnx-community, 344 MB).
   [
     'vitpose_base_simple.onnx',

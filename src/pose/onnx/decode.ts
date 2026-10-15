@@ -87,3 +87,28 @@ export function decodeHeatmaps(
   }
   return { xy, scores };
 }
+
+/**
+ * The flip test of RTMPose ("high effort"): the crop is read a second time mirrored, and the two readings are averaged before decoding,
+ * as MMPose does. The mirrored reading's x classification is turned around, and its left and right keypoints traded (`flip[k]` is the
+ * keypoint that k becomes in a mirror). `x`, `y`: the outputs of a batch of two, the plain crop first. Returns the averaged first item.
+ */
+export function mergeFlipSimcc(
+  x: Float32Array,
+  y: Float32Array,
+  keypoints: number,
+  binsX: number,
+  binsY: number,
+  flip: readonly number[],
+): { x: Float32Array; y: Float32Array } {
+  const mx = new Float32Array(keypoints * binsX);
+  const my = new Float32Array(keypoints * binsY);
+  const second = (k: number, bins: number) => (keypoints + flip[k]) * bins;
+  for (let k = 0; k < keypoints; k++) {
+    const sx = second(k, binsX);
+    for (let i = 0; i < binsX; i++) mx[k * binsX + i] = (x[k * binsX + i] + x[sx + binsX - 1 - i]) / 2;
+    const sy = second(k, binsY);
+    for (let i = 0; i < binsY; i++) my[k * binsY + i] = (y[k * binsY + i] + y[sy + i]) / 2;
+  }
+  return { x: mx, y: my };
+}

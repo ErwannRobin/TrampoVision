@@ -58,6 +58,8 @@ export const chrome: Translation<typeof en> = {
   'landing.motionHint': 'Experimentell: den Athleten vor dem Pose-Modell freistellen',
   'landing.followHint':
     'Langsamer, hält die Analyse aber auf dem Springer statt auf einer Hilfestellung oder einem Trainer.',
+  'landing.secondHint':
+    'Langsamer: Wo das Posenmodell unsicher ist, liest ein stärkeres Modell diese Bilder erneut, und beide Lesungen werden zusammengeführt. Beim ersten Mal 200 MB Download.',
   'landing.noteCamera':
     'Die besten Ergebnisse liefert eine feststehende, waagerechte Kamera an der Seite, mit dem ganzen Trampolin im Bild und dem Athleten im Blick – vom Absprung des ersten bis zur Landung des letzten Elements.',
   'landing.notePrivacy': 'Läuft in Ihrem Browser. Das Video verlässt Ihr Gerät nie.',
@@ -99,6 +101,10 @@ export const chrome: Translation<typeof en> = {
   'setup.motionSwitch': 'Der springenden Person folgen',
   'setup.motionText':
     'Die Bewegungserkennung läuft vor dem Pose-Modell: Sie verdeckt den Hintergrund, zoomt auf eine im Bild kleine Athletin und hält die Analyse auf dem Springer statt auf einer Hilfestellung. Die Analyse wird langsamer.',
+  'setup.second': 'Zweiter Blick',
+  'setup.secondSwitch': 'Schwierige Momente mit RTMPose-x erneut lesen',
+  'setup.secondText':
+    'Die Analyse prüft, wie gut das Posenmodell den Athleten gelesen hat. Wo es unsicher ist (kopfüber, gehockt, kurz verloren), liest ein langsameres, stärkeres Modell diese Bilder erneut, und beide Lesungen werden zusammengeführt. Das dauert länger, und beim ersten Mal wird ein Modell von 200 MB geladen.',
   'setup.review': 'Prüfung',
   'setup.reviewSwitch': 'Analysierte Sprünge zur Prüfung senden',
   'setup.reviewText':
@@ -134,6 +140,7 @@ export const chrome: Translation<typeof en> = {
   'setup.engine': 'Posenmodell',
   'setup.engine.mediapipe': 'MediaPipe (Standard)',
   'setup.engine.rtmpose': 'RTMPose-m (mit Füßen)',
+  'setup.engine.rtmpose-x': 'RTMPose-x (hoher Aufwand, langsam)',
   'setup.engine.vitpose': 'ViTPose-B',
   'setup.engineHint':
     'MediaPipe ist das getestete Modell. Die anderen versuchen, den Athleten dort zu verfolgen, wo MediaPipe ihn verliert. Sie liefern nur 2D-Punkte: kein 3D, also keine Schätzung der Schraube. Sie brauchen ihre Modelldateien und sind langsamer.',
@@ -177,6 +184,8 @@ export const chrome: Translation<typeof en> = {
   'busy.progress': 'Analysefortschritt',
   'busy.analyzing': 'Bild {done} von {total} wird analysiert',
   'busy.analyzingLive': 'Ihre Übung wird analysiert…',
+  'busy.second': 'Zweiter Blick: Bild {done} von {total}',
+  'busy.secondLive': 'Zweiter Blick auf die schwierigen Momente…',
   'busy.half': 'Zur Hälfte geschafft',
   'busy.runningOn': 'Läuft auf {backend}',
   'busy.stays': 'Ihr Video bleibt auf diesem Gerät.',
@@ -267,6 +276,11 @@ export const chrome: Translation<typeof en> = {
   'app.maskedFallback':
     'Das maskierte Video konnte nicht geöffnet werden; das Posenmodell liest deshalb das Originalvideo (der Hintergrund wird nicht ausgeblendet).',
   'app.fpsAssumed': 'Die Bildrate konnte nicht gemessen werden; es werden 30 fps angenommen.',
+  'app.secondLook':
+    'Zweiter Blick: {frames} Bilder von RTMPose-x erneut gelesen. {both} Lesungen bestätigt, {replaced} korrigiert, {added} ergänzt, wo der Athlet fehlte.',
+  'app.secondLookNone': 'Zweiter Blick: Das Posenmodell hat jeden Sprung gut gelesen, nichts erneut zu lesen.',
+  'app.secondLookFailed':
+    'Der zweite Blick konnte nicht laufen ({reason}). Die Analyse stammt nur vom ersten Posenmodell.',
   'app.fpsAssumedAdvanced':
     'Die Bildrate konnte nicht gemessen werden; es werden 30 fps angenommen. Stellen Sie den tatsächlichen Wert in den Einstellungen unter „Analyse“ ein.',
   'app.fetchAssets': ' – falls das Modell nicht geladen werden konnte, führen Sie „npm run fetch-assets“ aus.',

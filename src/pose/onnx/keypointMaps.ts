@@ -46,6 +46,12 @@ export const HALPE26: KeypointMap = [
   LM.R_HEEL,
 ];
 
+/** COCO 17 in a mirror: each point becomes its other side (the nose stays the nose). */
+export const COCO17_FLIP: readonly number[] = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15];
+
+/** Halpe 26 in a mirror: COCO 17, then the head top, neck and hip center stay, the toes and heels trade sides. */
+export const HALPE26_FLIP: readonly number[] = [...COCO17_FLIP, 17, 18, 19, 21, 20, 23, 22, 25, 24];
+
 /** A point of a model, in the units the caller wants, with its score in [0, 1]. */
 export interface ScoredPoint {
   x: number;

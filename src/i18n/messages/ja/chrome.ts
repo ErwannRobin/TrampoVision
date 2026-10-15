@@ -57,6 +57,8 @@ export const chrome: Translation<typeof en> = {
   'landing.motion': 'モーション検出',
   'landing.motionHint': '実験的：姿勢モデルの前に選手を切り出します',
   'landing.followHint': '時間はかかりますが、補助者やコーチではなくジャンパーを分析し続けます。',
+  'landing.secondHint':
+    '時間はかかります。姿勢モデルが不確かな場面を、より強力なモデルで読み直し、二つの結果を統合します。初回は 200 MB をダウンロードします。',
   'landing.noteCamera':
     '最良の結果を得るには、カメラを横から水平に固定し、トランポリン全体を画角に収め、最初の技の踏み切りから最後の技の着地まで選手が映るようにしてください。',
   'landing.notePrivacy': 'ブラウザー上で動作します。動画が端末の外に出ることはありません。',
@@ -96,6 +98,10 @@ export const chrome: Translation<typeof en> = {
   'setup.motionSwitch': 'ジャンプする人を追う',
   'setup.motionText':
     'モーション検出がポーズモデルの前に入り、背景を隠し、画面の中で小さい選手にズームし、補助者ではなくジャンパーを分析し続けます。分析は遅くなります。',
+  'setup.second': '再確認',
+  'setup.secondSwitch': '難しい場面を RTMPose-x で読み直す',
+  'setup.secondText':
+    '姿勢モデルが選手をどれだけ正しく読めたかを確認します。自信のない場面（逆さま、抱え込み、一瞬見失ったとき）は、より遅く強力なモデルがそのフレームを読み直し、二つの読み取りを統合します。時間がかかり、初回は 200 MB のモデルをダウンロードします。',
   'setup.review': '確認',
   'setup.reviewSwitch': '解析したジャンプを確認用に送信',
   'setup.reviewText':
@@ -130,6 +136,7 @@ export const chrome: Translation<typeof en> = {
   'setup.engine': '姿勢モデル',
   'setup.engine.mediapipe': 'MediaPipe（標準）',
   'setup.engine.rtmpose': 'RTMPose-m（足あり）',
+  'setup.engine.rtmpose-x': 'RTMPose-x（高精度・低速）',
   'setup.engine.vitpose': 'ViTPose-B',
   'setup.engineHint':
     'MediaPipe は検証済みのモデルです。ほかのモデルは、MediaPipe が選手を見失う場面で追跡できるか試すものです。2Dの点のみで3Dはなく、ひねりの推定は使えません。モデルファイルが必要で、処理も遅くなります。',
@@ -171,6 +178,8 @@ export const chrome: Translation<typeof en> = {
   'busy.progress': '解析の進行状況',
   'busy.analyzing': 'フレーム {done} / {total} を解析中',
   'busy.analyzingLive': '演技を解析しています…',
+  'busy.second': '再確認：フレーム {done} / {total}',
+  'busy.secondLive': '難しい場面をもう一度確認しています…',
   'busy.half': '半分まで進みました',
   'busy.runningOn': '{backend} で実行中',
   'busy.stays': '動画はこの端末の外に出ません。',
@@ -260,6 +269,10 @@ export const chrome: Translation<typeof en> = {
     'このブラウザーでは元のファイルをデコードできないため、ブラウザー内で H.264（最大720p）に変換しました。',
   'app.maskedFallback': 'マスク済みの動画を開けなかったため、姿勢モデルは元の動画を読み取ります（背景は隠れません）。',
   'app.fpsAssumed': 'フレームレートを測定できなかったため、30 fps と仮定します。',
+  'app.secondLook':
+    '再確認：RTMPose-x が {frames} フレームを読み直しました。{both} 件を確認、{replaced} 件を修正、選手が見えなかった所に {added} 件を追加。',
+  'app.secondLookNone': '再確認：姿勢モデルはすべてのジャンプを正しく読めました。読み直しは不要です。',
+  'app.secondLookFailed': '再確認を実行できませんでした（{reason}）。解析は最初の姿勢モデルのみの結果です。',
   'app.fpsAssumedAdvanced':
     'フレームレートを測定できなかったため、30 fps と仮定します。設定の「解析」で実際の値を指定してください。',
   'app.fetchAssets': ' — モデルの読み込みに失敗した場合は、「npm run fetch-assets」を実行してください。',

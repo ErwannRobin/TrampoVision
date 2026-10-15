@@ -10,7 +10,7 @@
 //   mediapipe/<tasks-vision version>/vision_wasm_internal.wasm, vision_wasm_nosimd_internal.wasm
 //   ffmpeg/<@ffmpeg/core version>/ffmpeg-core.wasm
 //   ort/<onnxruntime-web version>/ort-wasm-simd-threaded.jsep.wasm
-//   models/yolox_s.onnx, rtmpose_m_halpe26.onnx, vitpose_base_simple.onnx   (experimental pose engines; only the ones in public/models)
+//   models/yolox_s.onnx, rtmpose_m_halpe26.onnx, rtmpose_x_halpe26_384x288.onnx, vitpose_base_simple.onnx   (experimental pose engines; only the ones in public/models)
 //   samples/<name>.mp4|.MOV   any video of the sample folder (a .mp4 and a .MOV of the same name are one clip)
 //   samples/<name>.pose.json  the saved analysis of that clip (npm run precompute-samples): the app opens it instead of running the pose model
 //   samples/index.json        {"files": [...]}: the sample file names in the store, rewritten at each run; the app reads it to list the samples
@@ -53,7 +53,12 @@ files.push([
   `ort/${version('onnxruntime-web')}/ort-wasm-simd-threaded.jsep.wasm`,
   () => readFileSync(join(root, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm')),
 ]);
-for (const name of ['yolox_s.onnx', 'rtmpose_m_halpe26.onnx', 'vitpose_base_simple.onnx']) {
+for (const name of [
+  'yolox_s.onnx',
+  'rtmpose_m_halpe26.onnx',
+  'rtmpose_x_halpe26_384x288.onnx',
+  'vitpose_base_simple.onnx',
+]) {
   const local = join(root, 'public/models', name);
   if (existsSync(local)) files.push([`models/${name}`, () => readFileSync(local)]);
   else console.warn(`[upload] ${name} is not in public/models (run npm run fetch-assets): skipped`);

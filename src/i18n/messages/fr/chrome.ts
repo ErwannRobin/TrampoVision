@@ -57,6 +57,8 @@ export const chrome: Translation<typeof en> = {
   'landing.motion': 'Détecteur de mouvement',
   'landing.motionHint': 'Expérimental : isoler l’athlète avant le modèle de pose',
   'landing.followHint': 'Plus lent, mais garde l’analyse sur le sauteur, pas sur une parade ou un entraîneur.',
+  'landing.secondHint':
+    'Plus lent : là où le modèle de pose hésite, un modèle plus fort relit ces images et les deux lectures sont fusionnées. 200 Mo à télécharger la première fois.',
   'landing.noteCamera':
     'Les meilleurs résultats s’obtiennent avec une caméra fixe et bien horizontale, placée sur le côté, avec tout le trampoline dans le cadre et l’athlète visible de l’impulsion de la première figure jusqu’à la réception de la dernière.',
   'landing.notePrivacy': 'Fonctionne dans votre navigateur. La vidéo ne quitte jamais votre appareil.',
@@ -98,6 +100,10 @@ export const chrome: Translation<typeof en> = {
   'setup.motionSwitch': 'Suivre la personne qui saute',
   'setup.motionText':
     'Le détecteur de mouvement passe avant le modèle de pose : il masque l’arrière-plan, zoome sur un athlète petit dans l’image et garde l’analyse sur le sauteur plutôt que sur une parade. L’analyse est plus lente.',
+  'setup.second': 'Second regard',
+  'setup.secondSwitch': 'Relire les moments difficiles avec RTMPose-x',
+  'setup.secondText':
+    'L’analyse vérifie si le modèle de pose a bien lu l’athlète. Là où il hésite (tête en bas, groupé, perdu un instant), un modèle plus lent et plus fort relit ces images et les deux lectures sont fusionnées. C’est plus long, et la première fois un modèle de 200 Mo est téléchargé.',
   'setup.review': 'Vérification',
   'setup.reviewSwitch': 'Envoyer les sauts analysés pour vérification',
   'setup.reviewText':
@@ -133,6 +139,7 @@ export const chrome: Translation<typeof en> = {
   'setup.engine': 'Modèle de pose',
   'setup.engine.mediapipe': 'MediaPipe (par défaut)',
   'setup.engine.rtmpose': 'RTMPose-m (avec les pieds)',
+  'setup.engine.rtmpose-x': 'RTMPose-x (effort élevé, lent)',
   'setup.engine.vitpose': 'ViTPose-B',
   'setup.engineHint':
     'MediaPipe est le modèle testé. Les autres essaient de suivre l’athlète là où MediaPipe le perd. Ils donnent des points 2D seulement : pas de 3D, donc pas d’estimation de la vrille. Ils ont besoin de leurs fichiers de modèle et sont plus lents.',
@@ -175,6 +182,8 @@ export const chrome: Translation<typeof en> = {
   'busy.progress': 'Progression de l’analyse',
   'busy.analyzing': 'Analyse de l’image {done} sur {total}',
   'busy.analyzingLive': 'Analyse de votre enchaînement…',
+  'busy.second': 'Second regard : image {done} sur {total}',
+  'busy.secondLive': 'Second regard sur les moments difficiles…',
   'busy.half': 'À mi-parcours',
   'busy.runningOn': 'Exécution sur {backend}',
   'busy.stays': 'Votre vidéo reste sur cet appareil.',
@@ -266,6 +275,11 @@ export const chrome: Translation<typeof en> = {
   'app.maskedFallback':
     'La vidéo masquée n’a pas pu être ouverte : le modèle de pose lit donc la vidéo d’origine (l’arrière-plan n’est pas masqué).',
   'app.fpsAssumed': 'Impossible de mesurer la cadence : 30 im/s sont supposées.',
+  'app.secondLook':
+    'Second regard : {frames} images relues par RTMPose-x. {both} lectures confirmées, {replaced} corrigées, {added} ajoutées là où l’athlète manquait.',
+  'app.secondLookNone': 'Second regard : le modèle de pose a bien lu chaque saut, rien à relire.',
+  'app.secondLookFailed':
+    'Le second regard n’a pas pu se faire ({reason}). L’analyse est celle du premier modèle de pose seul.',
   'app.fpsAssumedAdvanced':
     'Impossible de mesurer la cadence : 30 im/s sont supposées. Indiquez la vraie valeur dans Analyse, dans les réglages.',
   'app.fetchAssets': ' — si le modèle n’a pas pu se charger, exécutez « npm run fetch-assets ».',

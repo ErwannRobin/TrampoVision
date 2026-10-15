@@ -14,6 +14,7 @@ export type Appearance = 'system' | 'light' | 'dark';
 export type Status =
   | { kind: 'idle' }
   | { kind: 'loading'; stage: 'downloading' | 'reading' | 'measuring' | 'converting' | 'model'; progress?: number }
-  | { kind: 'analyzing'; done: number; total: number }
+  /** `pass: 'second'`: the second look, where a stronger model reads the hard frames again (see analysis/refinePose.ts). */
+  | { kind: 'analyzing'; done: number; total: number; pass?: 'second' }
   /** `severity: 'warning'` = the app carried on with a fallback and the user may want to check it. */
   | { kind: 'error'; message: string; severity?: 'warning' };
