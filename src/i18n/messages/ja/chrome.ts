@@ -49,6 +49,7 @@ export const chrome: Translation<typeof en> = {
   'landing.film': '演技を撮影',
   'landing.choose': '動画を選択',
   'landing.sample': 'サンプルを試す',
+  'landing.examples': 'ユーザーが共有',
   'landing.drop': 'または、このページのどこかに動画をドロップ',
   'landing.openSaved': '保存した解析を開く',
   'landing.review': 'ジャンプを確認',
@@ -56,6 +57,8 @@ export const chrome: Translation<typeof en> = {
   'landing.reviewWaiting': '{n}件が確認待ち',
   'landing.motion': 'モーション検出',
   'landing.motionHint': '実験的：姿勢モデルの前に選手を切り出します',
+  'landing.moderation': '共有クリップを管理',
+  'landing.moderationHint': '管理者用ページ：共有されたクリップの掲載・名前変更・削除',
   'landing.followHint': '時間はかかりますが、補助者やコーチではなくジャンパーを分析し続けます。',
   'landing.secondHint':
     '時間はかかります。姿勢モデルが不確かな場面を、より強力なモデルで読み直し、二つの結果を統合します。初回は 200 MB をダウンロードします。',
@@ -323,6 +326,16 @@ export const chrome: Translation<typeof en> = {
   'share.stopText': '停止するとアップロードしたコピーが削除され、リンクでは開けなくなります。',
   'share.stop': '共有を停止',
   'share.stopped': '共有されたコピーを削除しました。リンクでは開けなくなりました。',
+  'share.listTitle': 'サンプルに追加しますか？',
+  'share.listText':
+    'スタート画面の「サンプルを試す」メニューに、アプリを開くすべての人向けに表示されます。通常のリンクと違い、掲載したクリップは{days}日後に削除されず、共有を停止するまで残ります。',
+  'share.listFine':
+    '誰でも視聴できます。選手（または保護者）が公開に同意したクリップだけを掲載し、タイトルに選手の名前を入れないでください。',
+  'share.listName': 'メニューに表示するタイトル',
+  'share.list': 'サンプルに追加',
+  'share.listing': '追加中…',
+  'share.listed': 'サンプルに掲載されました。共有を停止するまで残ります。',
+  'share.errExamplesFull': '現在、サンプルは満杯です。',
   'share.noClip': '共有できる分析済みの動画がありません。',
   'share.unavailable': 'このバージョンのアプリでは共有を利用できません。',
   'share.errTooLarge': '動画が大きすぎて共有できません（最大 {mb} MB）。',

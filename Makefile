@@ -144,4 +144,8 @@ worker-deploy: node_modules ## Deploy it (worker-schema first when schema.sql ch
 
 worker-r2: node_modules ## Create the R2 bucket of the shared clips (EU) with its 90-day expiry, once, before the first deploy
 	cd worker && npx wrangler r2 bucket create trampovision-shares --jurisdiction eu
-	cd worker && npx wrangler r2 bucket lifecycle add trampovision-shares expire-shares --expire-days 90 --jurisdiction eu --force
+	cd worker && npx wrangler r2 bucket lifecycle add trampovision-shares expire-shares shares/ --expire-days 90 --jurisdiction eu --force
+
+worker-r2-prefix: node_modules ## Once, before deploying listed examples, on a bucket made earlier: the 90-day expiry covers shares/ only, so examples/ stays
+	cd worker && npx wrangler r2 bucket lifecycle remove trampovision-shares --name expire-shares --jurisdiction eu
+	cd worker && npx wrangler r2 bucket lifecycle add trampovision-shares expire-shares shares/ --expire-days 90 --jurisdiction eu --force

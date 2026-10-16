@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { computeAnalysis } from '../../analysis/computeAnalysis';
 import { buildSession, type JumpLabel } from '../../coaching/session';
 import { figureOf } from '../../dataset/movementLabel';
@@ -210,15 +210,19 @@ describe('the first screen', () => {
     clear: async () => {},
     importText: async () => ({ added: 0, updated: 0, kept: 0 }),
   } as never;
-  const landing = (advanced: boolean, motion = true, secondLook = false) =>
+  const landing = (advanced: boolean, motion = true, secondLook = false, withSamples = true, listed = 0) =>
     renderToStaticMarkup(
       createElement(Landing, {
         onFile: () => {},
-        samples: [
-          { id: 'portrait', label: 'portrait', path: 'portrait.mp4' },
-          { id: 'landscape', label: 'landscape', path: 'landscape.mp4' },
-        ],
+        samples: withSamples
+          ? [
+              { id: 'portrait', label: 'portrait', path: 'portrait.mp4' },
+              { id: 'landscape', label: 'landscape', path: 'landscape.mp4' },
+            ]
+          : [],
         onSample: () => {},
+        examples: Array.from({ length: listed }, (_, i) => ({ id: `ex${i}`.padEnd(22, 'x'), label: `shared ${i}` })),
+        onExample: () => {},
         onOpenSeries: () => {},
         dataset,
         busy: false,
@@ -229,6 +233,12 @@ describe('the first screen', () => {
         onSecondLook: () => {},
       }),
     );
+
+  it('offers the listed clips in the sample menu, which is hidden when there is neither', () => {
+    expect(landing(false, true, false, false, 0)).not.toContain('Try a sample');
+    expect(landing(false, true, false, false, 2)).toContain('Try a sample');
+    expect(landing(false, true, false, true, 2)).toContain('Try a sample');
+  });
 
   it('asks for a video and nothing else in the live view', () => {
     const html = landing(false);
@@ -263,6 +273,40 @@ describe('the first screen', () => {
     expect(html).toContain('href="/motion.html"');
     expect(html).toContain('Motion detector');
     expect(landing(false)).not.toContain('/motion.html');
+  });
+
+  it('links the moderation page only with the advanced tools and a review service', async () => {
+    // Without a service (as in these tests) there is nothing to moderate.
+    expect(landing(true)).not.toContain('/moderation.html');
+    vi.stubEnv('VITE_REVIEW_API_URL', 'https://review.example');
+    vi.resetModules();
+    try {
+      const { Landing: WithService } = await import('../Landing');
+      const render = (advanced: boolean) =>
+        renderToStaticMarkup(
+          createElement(WithService, {
+            onFile: () => {},
+            samples: [],
+            onSample: () => {},
+            examples: [],
+            onExample: () => {},
+            onOpenSeries: () => {},
+            dataset,
+            busy: false,
+            advanced,
+            motion: true,
+            onMotion: () => {},
+            secondLook: false,
+            onSecondLook: () => {},
+          }),
+        );
+      expect(render(true)).toContain('href="/moderation.html"');
+      expect(render(true)).toContain('Moderate shared clips');
+      expect(render(false)).not.toContain('/moderation.html');
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
   });
 });
 
