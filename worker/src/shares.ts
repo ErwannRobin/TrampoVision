@@ -9,6 +9,9 @@ import { tokenMatches, type Parsed } from './logic';
  * The uploader can also list the clip among the examples of the app's first screen. A listed clip is the one exception to SHARE_DAYS: it
  * is moved to `examples/<id>` (the bucket's expiry rule only covers `shares/`), its row never expires, and `GET /examples` names it to
  * everyone. It stays until the uploader stops sharing it, or the owner (REVIEW_TOKEN) removes it.
+ *
+ * The owner moderates from /moderation.html (src/moderation/): `GET /admin/shares` lists every clip, `PUT /shares/<id>/example` lists
+ * or renames one with the owner's key, `DELETE /shares/<id>/example` takes one back out of the examples, `DELETE /shares/<id>` removes it.
  */
 
 export const SHARE_DAYS = 90;
@@ -29,6 +32,18 @@ export const NEVER_EXPIRES = '9999-12-31T23:59:59.999Z';
 /** The most clips listed at once, and the longest name of one: the list is public, it must stay a short, readable menu. */
 export const MAX_EXAMPLES = 40;
 export const MAX_LABEL = 60;
+
+export type AdminFilter = 'all' | 'listed' | 'unlisted';
+/** The `filter` and `limit` of a moderation listing: anything unknown falls back to everything, and at most 200 rows. */
+export function adminQuery(params: URLSearchParams): { filter: AdminFilter; limit: number } {
+  const filter = params.get('filter');
+  const raw = params.get('limit');
+  const limit = raw ? Math.floor(Number(raw)) : NaN;
+  return {
+    filter: filter === 'listed' || filter === 'unlisted' ? filter : 'all',
+    limit: Math.min(Math.max(Number.isFinite(limit) ? limit : 100, 1), 200),
+  };
+}
 
 /**
  * The name a person gave a listed clip, tidied: one line, no control or text-direction characters (the name is shown to everyone, and
@@ -132,12 +147,15 @@ export async function handleShares(
 ): Promise<Response | null> {
   if (path === '/shares' && req.method === 'POST') return upload(req, env, canUpload, reply);
   if (path === '/examples' && req.method === 'GET') return examples(env, reply);
+  if (path === '/admin/shares' && req.method === 'GET') return adminShares(req, env, reply);
   const one = /^\/shares\/([^/]+)$/.exec(path);
   const list = /^\/shares\/([^/]+)\/example$/.exec(path);
   if (!one && !list) return null;
   const id = (one ?? list)![1];
   if (!isShareId(id)) return reply({ error: 'not found' }, 404);
-  if (list) return req.method === 'PUT' ? listExample(req, env, id, reply) : reply({ error: 'not found' }, 404);
+  if (list && req.method === 'PUT') return listExample(req, env, id, reply);
+  if (list && req.method === 'DELETE') return unlistExample(req, env, id, reply);
+  if (list) return reply({ error: 'not found' }, 404);
   if (req.method === 'GET' || req.method === 'HEAD') return serve(req, env, id, cors, reply);
   if (req.method === 'DELETE') return remove(req, env, id, reply);
   return reply({ error: 'not found' }, 404);
@@ -263,7 +281,9 @@ async function examples(env: ShareEnv, reply: Reply): Promise<Response> {
  * `examples/<id>` before anything else changes, so a failure half way leaves the clip shared as it was.
  */
 async function listExample(req: Request, env: ShareEnv, id: string, reply: Reply): Promise<Response> {
-  const key = /^Bearer (.+)$/.exec(req.headers.get('authorization') ?? '')?.[1];
+  const header = req.headers.get('authorization');
+  const key = /^Bearer (.+)$/.exec(header ?? '')?.[1];
+  const owner = tokenMatches(header, env.REVIEW_TOKEN);
   const label = cleanLabel(((await req.json().catch(() => null)) as { label?: unknown } | null)?.label);
   if (!label) return reply({ error: `a name of 1 to ${MAX_LABEL} characters is required` }, 400);
   const row = await env.DB.prepare(
@@ -272,7 +292,7 @@ async function listExample(req: Request, env: ShareEnv, id: string, reply: Reply
     .bind(id)
     .first<{ delete_hash: string; expires_at: string; content_type: string; example: string | null }>();
   if (!row || row.expires_at <= new Date().toISOString()) return reply({ error: 'not found' }, 404);
-  if (!key || (await sha256Hex(key)) !== row.delete_hash) return reply({ error: 'unauthorized' }, 401);
+  if (!owner && (!key || (await sha256Hex(key)) !== row.delete_hash)) return reply({ error: 'unauthorized' }, 401);
   if (row.example) {
     // Listed already: only the name changes.
     await env.DB.prepare(`UPDATE examples SET label = ?2 WHERE id = ?1`).bind(id, label).run();
@@ -300,4 +320,61 @@ async function listExample(req: Request, env: ShareEnv, id: string, reply: Reply
   }
   await env.SHARES.delete(shareKey(id));
   return reply({ id, label }, 201);
+}
+
+/** Every clip not expired, newest first, for the owner's moderation page, with the totals. */
+async function adminShares(req: Request, env: ShareEnv, reply: Reply): Promise<Response> {
+  if (!tokenMatches(req.headers.get('authorization'), env.REVIEW_TOKEN)) return reply({ error: 'unauthorized' }, 401);
+  const { filter, limit } = adminQuery(new URL(req.url).searchParams);
+  const now = new Date().toISOString();
+  const where = filter === 'listed' ? 'WHERE e.id IS NOT NULL' : filter === 'unlisted' ? 'WHERE e.id IS NULL' : '';
+  const { results } = await env.DB.prepare(
+    `SELECT s.id, s.size, s.content_type AS contentType, s.created_at AS createdAt, s.expires_at AS expiresAt,
+       e.label, e.listed_at AS listedAt
+     FROM shares s LEFT JOIN examples e ON e.id = s.id
+     ${where ? `${where} AND` : 'WHERE'} s.expires_at > ?1
+     ORDER BY s.created_at DESC LIMIT ${limit}`,
+  )
+    .bind(now)
+    .all<Record<string, unknown> & { expiresAt: string; label: string | null }>();
+  const totals = await env.DB.prepare(
+    `SELECT COUNT(*) AS clips, COALESCE(SUM(s.size), 0) AS bytes, COUNT(e.id) AS listed
+     FROM shares s LEFT JOIN examples e ON e.id = s.id WHERE s.expires_at > ?1`,
+  )
+    .bind(now)
+    .first();
+  return reply({
+    clips: results.map(({ expiresAt, ...clip }) => ({
+      ...clip,
+      listed: clip.label !== null,
+      expiresAt: expiresAt === NEVER_EXPIRES ? null : expiresAt,
+    })),
+    totals,
+    maxExamples: MAX_EXAMPLES,
+  });
+}
+
+/** Takes a clip out of the examples: it goes back to a plain share, deleted after SHARE_DAYS from now. Owner only. */
+async function unlistExample(req: Request, env: ShareEnv, id: string, reply: Reply): Promise<Response> {
+  if (!tokenMatches(req.headers.get('authorization'), env.REVIEW_TOKEN)) return reply({ error: 'unauthorized' }, 401);
+  const row = await env.DB.prepare(`SELECT id FROM examples WHERE id = ?1`).bind(id).first();
+  if (!row) return reply({ error: 'not found' }, 404);
+  const source = await env.SHARES.get(exampleKey(id));
+  if (!source) return reply({ error: 'not found' }, 404);
+  const back = await env.SHARES.put(shareKey(id), source.body, {
+    httpMetadata: { contentType: source.httpMetadata?.contentType },
+  });
+  if (!back) return reply({ error: 'could not copy the clip' }, 500);
+  const expiresAt = new Date(Date.now() + SHARE_DAYS * 86_400_000).toISOString();
+  try {
+    await env.DB.batch([
+      env.DB.prepare(`DELETE FROM examples WHERE id = ?1`).bind(id),
+      env.DB.prepare(`UPDATE shares SET expires_at = ?2 WHERE id = ?1`).bind(id, expiresAt),
+    ]);
+  } catch (e) {
+    await env.SHARES.delete(shareKey(id));
+    throw e;
+  }
+  await env.SHARES.delete(exampleKey(id));
+  return reply({ id, expiresAt });
 }

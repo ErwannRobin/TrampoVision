@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  adminQuery,
   checkUpload,
   cleanLabel,
   contentRange,
@@ -75,5 +76,13 @@ describe('shared clips', () => {
   it('gives a listed clip an end date that is after every date a clock shows', () => {
     expect(NEVER_EXPIRES > new Date(8.64e15).toISOString().replace(/^\+/, '')).toBe(true);
     expect(NEVER_EXPIRES > '2100-01-01T00:00:00.000Z').toBe(true);
+  });
+
+  it('reads the filter and the limit of a moderation listing', () => {
+    expect(adminQuery(new URLSearchParams(''))).toEqual({ filter: 'all', limit: 100 });
+    expect(adminQuery(new URLSearchParams('filter=listed&limit=5'))).toEqual({ filter: 'listed', limit: 5 });
+    expect(adminQuery(new URLSearchParams('filter=unlisted&limit=99999'))).toEqual({ filter: 'unlisted', limit: 200 });
+    expect(adminQuery(new URLSearchParams('filter=drop table&limit=-3'))).toEqual({ filter: 'all', limit: 1 });
+    expect(adminQuery(new URLSearchParams('limit=abc'))).toEqual({ filter: 'all', limit: 100 });
   });
 });
