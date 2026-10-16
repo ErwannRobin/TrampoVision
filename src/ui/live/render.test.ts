@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { computeAnalysis } from '../../analysis/computeAnalysis';
 import { buildSession, type JumpLabel } from '../../coaching/session';
 import { figureOf } from '../../dataset/movementLabel';
@@ -273,6 +273,40 @@ describe('the first screen', () => {
     expect(html).toContain('href="/motion.html"');
     expect(html).toContain('Motion detector');
     expect(landing(false)).not.toContain('/motion.html');
+  });
+
+  it('links the moderation page only with the advanced tools and a review service', async () => {
+    // Without a service (as in these tests) there is nothing to moderate.
+    expect(landing(true)).not.toContain('/moderation.html');
+    vi.stubEnv('VITE_REVIEW_API_URL', 'https://review.example');
+    vi.resetModules();
+    try {
+      const { Landing: WithService } = await import('../Landing');
+      const render = (advanced: boolean) =>
+        renderToStaticMarkup(
+          createElement(WithService, {
+            onFile: () => {},
+            samples: [],
+            onSample: () => {},
+            examples: [],
+            onExample: () => {},
+            onOpenSeries: () => {},
+            dataset,
+            busy: false,
+            advanced,
+            motion: true,
+            onMotion: () => {},
+            secondLook: false,
+            onSecondLook: () => {},
+          }),
+        );
+      expect(render(true)).toContain('href="/moderation.html"');
+      expect(render(true)).toContain('Moderate shared clips');
+      expect(render(false)).not.toContain('/moderation.html');
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
   });
 });
 

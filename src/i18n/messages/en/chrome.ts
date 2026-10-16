@@ -64,6 +64,8 @@ export const chrome = {
   'landing.reviewWaiting': '{n} waiting for a check',
   'landing.motion': 'Motion detector',
   'landing.motionHint': 'Experimental: isolate the athlete before the pose model',
+  'landing.moderation': 'Moderate shared clips',
+  'landing.moderationHint': 'The owner’s page: list, rename or delete the clips people shared',
   'landing.followHint': 'Slower, but keeps the analysis on the jumper, not on a spotter or a coach.',
   'landing.secondHint':
     'Slower: where the pose model is unsure, a stronger one reads those frames again and the two readings are merged. 200 MB to download the first time.',

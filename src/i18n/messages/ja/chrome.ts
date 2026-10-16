@@ -57,6 +57,8 @@ export const chrome: Translation<typeof en> = {
   'landing.reviewWaiting': '{n}件が確認待ち',
   'landing.motion': 'モーション検出',
   'landing.motionHint': '実験的：姿勢モデルの前に選手を切り出します',
+  'landing.moderation': '共有クリップを管理',
+  'landing.moderationHint': '管理者用ページ：共有されたクリップの掲載・名前変更・削除',
   'landing.followHint': '時間はかかりますが、補助者やコーチではなくジャンパーを分析し続けます。',
   'landing.secondHint':
     '時間はかかります。姿勢モデルが不確かな場面を、より強力なモデルで読み直し、二つの結果を統合します。初回は 200 MB をダウンロードします。',

@@ -196,6 +196,14 @@ export function Landing({
             </label>
           )}
           {advanced && REVIEW_API_URL && <ReviewLink />}
+          {advanced && REVIEW_API_URL && (
+            <ToolLink
+              href="/moderation.html"
+              icon="shield"
+              title={t('landing.moderation')}
+              hint={t('landing.moderationHint')}
+            />
+          )}
           {advanced && (
             <ToolLink href="/motion.html" icon="target" title={t('landing.motion')} hint={t('landing.motionHint')} />
           )}

@@ -94,7 +94,7 @@ export default defineConfig(({ mode }) => ({
       },
     },
   ],
-  // The app, the reviewer page (/review.html), the owner's moderation page (/moderation.html, not linked: the owner types its address) and
+  // The app, the reviewer page (/review.html), the owner's moderation page (/moderation.html, linked in the advanced tools) and
   // the debug page of the motion detector (/motion.html, experimental, linked from the first screen in the advanced tools) share the build,
   // the CSP and the review service settings.
   build: {
