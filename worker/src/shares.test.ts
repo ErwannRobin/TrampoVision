@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkUpload,
+  cleanLabel,
   isShareId,
   looksLikeVideo,
   randomToken,
   sha256Hex,
   DAILY_SHARE_BYTES,
+  MAX_LABEL,
   MAX_LIVE_SHARE_BYTES,
   MAX_SHARE_BYTES,
+  NEVER_EXPIRES,
 } from './shares';
 import { contentRange } from './r2';
 
@@ -59,5 +62,18 @@ describe('shared clips', () => {
 
   it('hashes the delete key', async () => {
     expect(await sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  });
+
+  it('tidies the name of a listed clip', () => {
+    expect(cleanLabel('  Synchro \n  final  ')).toBe('Synchro final');
+    expect(cleanLabel('a\u0000b\u202ec')).toBe('a b c');
+    expect(cleanLabel('x'.repeat(MAX_LABEL + 10))).toBe('x'.repeat(MAX_LABEL));
+    expect(cleanLabel('日本'.repeat(40))).toHaveLength(MAX_LABEL);
+    for (const bad of ['', '   ', '\n\t', 12, null, undefined, {}]) expect(cleanLabel(bad)).toBe(null);
+  });
+
+  it('gives a listed clip an end date that is after every date a clock shows', () => {
+    expect(NEVER_EXPIRES > new Date(8.64e15).toISOString().replace(/^\+/, '')).toBe(true);
+    expect(NEVER_EXPIRES > '2100-01-01T00:00:00.000Z').toBe(true);
   });
 });

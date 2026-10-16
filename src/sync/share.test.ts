@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { forgetShare, rememberShare, rememberedShare, shareIdFrom, shareLink, withoutShare } from './share';
+import {
+  fetchExamples,
+  forgetShare,
+  rememberShare,
+  rememberedShare,
+  shareIdFrom,
+  shareLink,
+  withoutShare,
+} from './share';
 
 const ID = 'nUUB685eR6a0vTE-Iu5rIQ';
 
@@ -48,5 +56,29 @@ describe('links made on this device', () => {
     expect(Object.keys(JSON.parse(store.get('trampovision.shares')!))).toEqual(['new']);
     store.set('trampovision.shares', 'not json');
     expect(rememberedShare('new')).toBe(null);
+  });
+});
+
+describe('listed clips', () => {
+  const store = new Map<string, string>();
+  beforeEach(() => {
+    globalThis.localStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+      key: () => null,
+      length: 0,
+    };
+  });
+  afterEach(() => store.clear());
+
+  it('keeps the link of a listed clip, which has no end date', () => {
+    rememberShare('v-1', { id: ID, expiresAt: '', deleteKey: 'k', listed: true });
+    expect(rememberedShare('v-1', Date.parse('2099-01-01T00:00:00Z'))).toMatchObject({ id: ID, listed: true });
+  });
+
+  it('has no examples without a sharing service', async () => {
+    expect(await fetchExamples()).toEqual([]);
   });
 });

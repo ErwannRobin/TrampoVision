@@ -56,12 +56,15 @@ import {
   canShare,
   deleteShare,
   downloadShare,
+  fetchExamples,
   forgetShare,
+  listExample,
   rememberShare,
   rememberedShare,
   shareIdFrom,
   uploadShare,
   withoutShare,
+  type Example,
   type StoredShare,
 } from './sync/share';
 import { ShareDialog } from './ui/chrome/ShareDialog';
@@ -228,6 +231,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
   const locale = useLocale();
   const [url, setUrl] = useState<string | null>(null);
   const [samples, setSamples] = useState<Sample[]>([]);
+  // The clips other people shared and listed (see ShareDialog): offered next to the samples.
+  const [examples, setExamples] = useState<Example[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [fps, setFps] = useState(30);
   const [model, setModel] = useState<ModelVariant>('full');
@@ -445,6 +450,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
   useEffect(() => {
     let live = true;
     void loadSamples().then((found) => live && setSamples(found));
+    void fetchExamples().then((found) => live && setExamples(found));
     return () => {
       live = false;
     };
@@ -1049,6 +1055,17 @@ function AppView({ playhead }: { playhead: Playhead }) {
   async function stopShare(share: StoredShare) {
     if (share.deleteKey) await deleteShare(share.id, share.deleteKey);
     if (shareClipId) forgetShare(shareClipId);
+    setExamples((list) => list.filter((e) => e.id !== share.id));
+  }
+
+  async function listShare(share: StoredShare, label: string): Promise<StoredShare> {
+    if (!share.deleteKey) throw new Error(t('share.errGone'));
+    await listExample(share.id, share.deleteKey, label);
+    // A listed clip has no end date: the link is kept as it is, without one.
+    const listed = { ...share, expiresAt: '', listed: true };
+    if (shareClipId) rememberShare(shareClipId, listed);
+    setExamples((list) => [{ id: share.id, label }, ...list.filter((e) => e.id !== share.id)]);
+    return listed;
   }
   // The set on screen, as the recent sets keep it: stored when the analysis completes, and again whenever what the live view says about
   // it changes (a skill the coach confirms, changes or deletes). Only when the saved records are read, so a set that is reopened has its labels.
@@ -1588,6 +1605,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
           existing={knownShare}
           onCreate={createShare}
           onStop={stopShare}
+          onList={listShare}
         />
       )}
 
@@ -1632,6 +1650,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
               onFile={(f) => void onFile(f)}
               samples={samples}
               onSample={(sample) => void onSample(sample)}
+              examples={examples}
+              onExample={(example) => void openShared(example.id)}
               onOpenSeries={(f) => void openSeries(f)}
               dataset={dataset}
               recent={{

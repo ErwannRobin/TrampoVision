@@ -8,7 +8,9 @@ database_name = "trampovision-review"
 database_id = "2a8180dc-5ef3-4013-8764-dcb15c614282"
 
 # Shared clips (src/shares.ts): the video with its analysis inside, uploaded when a person shares one. EU jurisdiction: the files stay
-# in the EU. The bucket deletes them after 90 days (SHARE_DAYS): `make worker-r2` creates it with that rule, once, before the first deploy.
+# in the EU. The bucket deletes `shares/` after 90 days (SHARE_DAYS): `make worker-r2` creates it with that rule, once, before the first deploy.
+# The clips listed as examples are moved to `examples/`, which the rule does not touch: they stay. A bucket made before that needs
+# `make worker-r2-prefix` once (its rule covered the whole bucket).
 [[r2_buckets]]
 binding = "SHARES"
 bucket_name = "trampovision-shares"
