@@ -210,15 +210,19 @@ describe('the first screen', () => {
     clear: async () => {},
     importText: async () => ({ added: 0, updated: 0, kept: 0 }),
   } as never;
-  const landing = (advanced: boolean, motion = true, secondLook = false) =>
+  const landing = (advanced: boolean, motion = true, secondLook = false, withSamples = true, listed = 0) =>
     renderToStaticMarkup(
       createElement(Landing, {
         onFile: () => {},
-        samples: [
-          { id: 'portrait', label: 'portrait', path: 'portrait.mp4' },
-          { id: 'landscape', label: 'landscape', path: 'landscape.mp4' },
-        ],
+        samples: withSamples
+          ? [
+              { id: 'portrait', label: 'portrait', path: 'portrait.mp4' },
+              { id: 'landscape', label: 'landscape', path: 'landscape.mp4' },
+            ]
+          : [],
         onSample: () => {},
+        examples: Array.from({ length: listed }, (_, i) => ({ id: `ex${i}`.padEnd(22, 'x'), label: `shared ${i}` })),
+        onExample: () => {},
         onOpenSeries: () => {},
         dataset,
         busy: false,
@@ -229,6 +233,12 @@ describe('the first screen', () => {
         onSecondLook: () => {},
       }),
     );
+
+  it('offers the listed clips in the sample menu, which is hidden when there is neither', () => {
+    expect(landing(false, true, false, false, 0)).not.toContain('Try a sample');
+    expect(landing(false, true, false, false, 2)).toContain('Try a sample');
+    expect(landing(false, true, false, true, 2)).toContain('Try a sample');
+  });
 
   it('asks for a video and nothing else in the live view', () => {
     const html = landing(false);
