@@ -7,7 +7,7 @@ import {
   type TrampolineCalibration,
 } from './analysis/calibration';
 import { computeAnalysis } from './analysis/computeAnalysis';
-import { download, toCsv, toJumpsCsv } from './analysis/export';
+import { download, downloadBlob, toCsv, toJumpsCsv } from './analysis/export';
 import { keepAthletes, mergeTracks } from './analysis/athletes';
 import { extractPoseTracks } from './analysis/extractPoseTrack';
 import { refinePoseTracks } from './analysis/refinePose';
@@ -51,6 +51,20 @@ import { receiveHandoff, type Handoff, type PageSettings } from './motion/handof
 import { withMotionMask } from './motion/maskedEstimator';
 import { estimatorFactory } from './pose/engines';
 import { loadSample, loadSampleSeries, loadSamples, type Sample } from './video/sample';
+import { readBundle, writeBundle } from './video/bundle';
+import {
+  canShare,
+  deleteShare,
+  downloadShare,
+  forgetShare,
+  rememberShare,
+  rememberedShare,
+  shareIdFrom,
+  uploadShare,
+  withoutShare,
+  type StoredShare,
+} from './sync/share';
+import { ShareDialog } from './ui/chrome/ShareDialog';
 import { dragHasFiles, pickDroppedSeries, pickDroppedVideo } from './video/drop';
 import { matchClip, type ClipIdentity } from './analysis/seriesMatch';
 import { transcodeToH264 } from './video/transcode';
@@ -142,6 +156,16 @@ async function clipOfVideo(file: File): Promise<ClipIdentity> {
 
 function clipOfSeries({ source, track }: ParsedSeries): ClipIdentity {
   return { videoId: source.videoId, width: track.width, height: track.height, durationS: track.times.at(-1) ?? null };
+}
+
+/** The name of the clip a saved analysis was made from, or null. */
+function seriesFileName(text: string): string | null {
+  try {
+    const name = (JSON.parse(text) as { source?: { fileName?: unknown } }).source?.fileName;
+    return typeof name === 'string' && name.trim() ? name : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Each athlete of a clip is a video of their own for the labels: the first keeps the id of the clip. */
@@ -287,6 +311,12 @@ function AppView({ playhead }: { playhead: Playhead }) {
 
   const abort = useRef<AbortController | null>(null);
   const fileRef = useRef<File | null>(null); // latest selected file, to ignore stale async results
+  // Counts the files being opened: the newest wins while one is still being read.
+  const openSeq = useRef(0);
+  // The clip opened from a share link (?share=): the file as it was downloaded, and its link, which the share dialog then shows.
+  const sharedFile = useRef<File | null>(null);
+  const [openedShare, setOpenedShare] = useState<StoredShare | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   // The masked copy of the clip (from the motion detector) that the pose model reads while the clip is what is shown; null without one.
   const maskedRef = useRef<MaskedCopy | null>(null);
   /** The masked copy could not be opened: the analysis reads the original, and says so (it starts by clearing the notice). */
@@ -521,6 +551,34 @@ function AppView({ playhead }: { playhead: Playhead }) {
     [corners, editingCal, calibrationModel],
   );
 
+  // A share link (?share=<id>) opens that clip, with its analysis.
+  useEffect(() => {
+    const id = shareIdFrom(location.search);
+    if (id) void openShared(id);
+  }, []); // oxlint-disable-line react-hooks/exhaustive-deps
+
+  async function openShared(id: string) {
+    setStatus({ kind: 'loading', stage: 'shared', progress: 0 });
+    try {
+      const shared = await downloadShare(id, (progress) => setStatus({ kind: 'loading', stage: 'shared', progress }));
+      sharedFile.current = shared;
+      setOpenedShare({ id, expiresAt: '' });
+      await onFile(shared);
+    } catch (err) {
+      leaveShare();
+      setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  /** Leaves the clip opened from a link: the address and the share dialog forget it. */
+  function leaveShare() {
+    sharedFile.current = null;
+    setOpenedShare(null);
+    if (shareIdFrom(location.search)) {
+      window.history.replaceState(null, '', location.pathname + withoutShare(location.search) + location.hash);
+    }
+  }
+
   async function onSample(sample: Sample) {
     setStatus({ kind: 'loading', stage: 'downloading', progress: 0 });
     try {
@@ -541,6 +599,18 @@ function AppView({ playhead }: { playhead: Playhead }) {
    * it, and the same clip with the background hidden, which the pose model reads in place of `next` when the detector is switched off.
    */
   async function onFile(next: File, series?: string, handoff?: Omit<Handoff, 'original'>) {
+    // A video with its analysis inside (a shared clip, or "Video with analysis"): the video alone goes on, with that analysis in
+    // place of the pose model, under the name of the clip it was made from when it comes from a link.
+    const seq = ++openSeq.current;
+    const bundle = await readBundle(next);
+    if (seq !== openSeq.current) return;
+    const fromLink = next === sharedFile.current;
+    if (!fromLink) leaveShare();
+    if (bundle.series !== null) {
+      const name = (fromLink && seriesFileName(bundle.series)) || next.name;
+      next = new File([bundle.video], name, { type: next.type, lastModified: next.lastModified });
+      series ??= bundle.series;
+    }
     abort.current?.abort();
     if (url) URL.revokeObjectURL(url);
     dropMasked();
@@ -849,6 +919,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
     if (result && !(await autosave.flush()) && !window.confirm(t('app.closeAnalysis'))) return;
     autosave.reset();
     abort.current?.abort();
+    openSeq.current++;
+    leaveShare();
     if (url) URL.revokeObjectURL(url);
     dropMasked();
     fileRef.current = null;
@@ -934,6 +1006,49 @@ function AppView({ playhead }: { playhead: Playhead }) {
       videoId: athleteVideoId(id, i) ?? undefined,
     }));
     return toSeriesJson(buildPoseSeriesSet(athletes, { fileName: name, stride, minVisibility: 0.4, calibration: cal }));
+  }
+
+  /** The clip with its analysis inside, as it plays here: the H.264 copy when the original had to be converted. */
+  async function bundleOfClip(): Promise<Blob> {
+    if (!url || !track) throw new Error(t('share.noClip'));
+    const shown = await (await fetch(url)).blob();
+    const video = shown.type ? shown : new Blob([shown], { type: file?.type || 'video/mp4' });
+    return writeBundle(video, serializeSeries(fileName, videoId && clipVideoId(videoId), calibration));
+  }
+
+  async function saveBundle() {
+    try {
+      const bundle = await bundleOfClip();
+      // A clip opened from such a file does not get the suffix twice.
+      const name = clipBase.replace(/-trampovision$/, '');
+      downloadBlob(`${name}-trampovision.${bundle.type === 'video/quicktime' ? 'mov' : 'mp4'}`, bundle);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  // The links of this clip are kept by its id, so sharing it again shows its link instead of uploading it once more.
+  const shareClipId = fileVideoId && clipVideoId(fileVideoId);
+  const knownShare = useMemo(
+    () => (shareOpen ? (openedShare ?? (shareClipId ? rememberedShare(shareClipId) : null)) : null),
+    [shareOpen, openedShare, shareClipId],
+  );
+
+  async function createShare(opts: {
+    onProgress: (fraction: number | null) => void;
+    signal: AbortSignal;
+  }): Promise<StoredShare> {
+    opts.onProgress(null);
+    const bundle = await bundleOfClip();
+    if (opts.signal.aborted) throw new DOMException('Share cancelled', 'AbortError');
+    const receipt = await uploadShare(bundle, opts);
+    if (shareClipId) rememberShare(shareClipId, receipt);
+    return receipt;
+  }
+
+  async function stopShare(share: StoredShare) {
+    if (share.deleteKey) await deleteShare(share.id, share.deleteKey);
+    if (shareClipId) forgetShare(shareClipId);
   }
   // The set on screen, as the recent sets keep it: stored when the analysis completes, and again whenever what the live view says about
   // it changes (a skill the coach confirms, changes or deletes). Only when the saved records are read, so a set that is reopened has its labels.
@@ -1203,6 +1318,26 @@ function AppView({ playhead }: { playhead: Playhead }) {
             disabled: !url || !annotated.available || annotated.exporting,
             onSelect: () => void annotated.start(),
           },
+          {
+            id: 'bundle',
+            label: t('export.bundle'),
+            hint: t('export.bundleHint'),
+            icon: 'download',
+            disabled: !url || !track,
+            onSelect: () => void saveBundle(),
+          },
+          ...(canShare
+            ? [
+                {
+                  id: 'share',
+                  label: t('export.share'),
+                  hint: t('export.shareHint'),
+                  icon: 'upload' as const,
+                  disabled: !url || !track,
+                  onSelect: () => setShareOpen(true),
+                },
+              ]
+            : []),
         ],
       },
       {
@@ -1446,6 +1581,16 @@ function AppView({ playhead }: { playhead: Playhead }) {
 
       {settings}
 
+      {canShare && (
+        <ShareDialog
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          existing={knownShare}
+          onCreate={createShare}
+          onStop={stopShare}
+        />
+      )}
+
       <StatusBanners
         status={status}
         notice={notice}
@@ -1649,6 +1794,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
                     }}
                     notes={notes}
                     title={base}
+                    onShareLink={canShare && url && track ? () => setShareOpen(true) : undefined}
                   />
                 ) : audience === 'athlete' ? (
                   <AthleteInsights

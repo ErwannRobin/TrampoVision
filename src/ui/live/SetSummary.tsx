@@ -24,7 +24,16 @@ async function share(text: string): Promise<string> {
 }
 
 /** The set at a glance: how many skills, their difficulty, the execution the pose earns, the time in the air, and what to work on next. */
-export function SetSummary({ session, title }: { session: Session; title: string }) {
+export function SetSummary({
+  session,
+  title,
+  onShareLink,
+}: {
+  session: Session;
+  title: string;
+  /** Share the clip with its analysis as a link (absent: no button). */
+  onShareLink?: () => void;
+}) {
   const s = session.summary;
   const focusId = useId();
   const [note, setNote] = useState('');
@@ -58,6 +67,11 @@ export function SetSummary({ session, title }: { session: Session; title: string
             <Button size="sm" onClick={() => void onShare()} title={t('live.copyTitle')}>
               {t('live.copySummary')}
             </Button>
+            {onShareLink && (
+              <Button size="sm" icon="upload" onClick={onShareLink} title={t('live.shareLinkTitle')}>
+                {t('live.shareLink')}
+              </Button>
+            )}
           </span>
         </div>
 

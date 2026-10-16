@@ -33,7 +33,7 @@ export const about: Translation<typeof en> = {
 
   'about.deviceTitle': 'Ce qui reste sur votre appareil',
   'about.deviceText1':
-    'La vidéo ne quitte jamais votre navigateur. La page refuse toute requête vers un autre site, et la version de production ajoute une Content-Security-Policy que le navigateur applique lui-même.',
+    'La vidéo reste dans votre navigateur, sauf si vous demandez un lien de partage : ce clip et son analyse sont alors envoyés (Cloudflare, dans l’UE) et supprimés après 90 jours, ou dès que vous arrêtez le partage. En dehors de cela, la page refuse toute requête vers un autre site, et la version de production ajoute une Content-Security-Policy que le navigateur applique lui-même.',
   'about.deviceText2':
     'Seuls des nombres sont enregistrés, dans votre navigateur (IndexedDB) : mesures, prédictions et vos étiquettes, jamais la vidéo. Si l’application est reliée à un service de relecture, les sauts analysés peuvent lui être envoyés pour qu’une personne les vérifie : uniquement des mesures, ni vidéo ni nom de fichier. Un réglage dans les paramètres le désactive.',
 

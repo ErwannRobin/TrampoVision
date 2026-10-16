@@ -156,6 +156,8 @@ export const coaching: Translation<typeof en> = {
   'live.shared': 'Partagé',
   'live.copied': 'Copié',
   'live.copyFailed': 'Copie impossible',
+  'live.shareLink': 'Lien de partage',
+  'live.shareLinkTitle': 'Obtenir un lien qui ouvre cette vidéo avec son analyse',
   'live.repeatHint': 'Une répétition compte une fois',
   'live.nothingJudged': 'Rien de jugé',
   'live.estimate': 'Estimation, sur 10',

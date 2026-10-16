@@ -743,3 +743,76 @@ html:has(.settings[open]) {
   color: var(--text-2);
   line-height: 1.5;
 }
+
+/* Share link: the settings popup, smaller, its height that of what it says. ------------------------------------- */
+
+.share {
+  width: min(520px, calc(100vw - 32px));
+  /* A modal dialog is pinned to the top and the bottom: auto would stretch it. */
+  height: fit-content;
+  max-height: calc(100dvh - 48px);
+}
+.share__body {
+  gap: 14px;
+  line-height: 1.5;
+}
+.share__fine {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.share__progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.share__progress progress {
+  flex: 1 0 100%;
+  width: 100%;
+  height: 8px;
+  accent-color: var(--focus);
+}
+.share__progress p {
+  flex: 1 1 auto;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.share__label {
+  font-weight: 600;
+}
+.share__link {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-input);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.share__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.share__note {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.share__stop {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 640px) {
+  .share {
+    height: 100dvh;
+    max-height: none;
+  }
+}

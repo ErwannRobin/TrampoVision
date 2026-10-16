@@ -95,27 +95,37 @@ export async function loadSampleSeries(sample: Sample): Promise<string | null> {
   }
 }
 
+/** A download: its HTTP status and, when it succeeded, the file. */
+export interface Download {
+  ok: boolean;
+  status: number;
+  blob: Blob;
+}
+
+/** Downloads a file, telling how much of it has arrived (0..1) when the server says its size. */
+export async function fetchWithProgress(url: string, onProgress?: (fraction: number) => void): Promise<Download> {
+  const response = await fetch(url);
+  const done = (blob: Blob): Download => ({ ok: response.ok, status: response.status, blob });
+  if (!response.ok) return done(new Blob());
+  const size = Number(response.headers.get('content-length'));
+  if (!response.body || !(size > 0) || !onProgress) return done(await response.blob());
+  const reader = response.body.getReader();
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  let received = 0;
+  for (;;) {
+    const { done: end, value } = await reader.read();
+    if (end) break;
+    chunks.push(value as Uint8Array<ArrayBuffer>);
+    received += value.length;
+    onProgress(Math.min(received / size, 1));
+  }
+  return done(new Blob(chunks, { type: response.headers.get('content-type') ?? '' }));
+}
+
 /** Downloads the sample into a File, so it goes through the same path as a user-selected file. */
 export async function loadSample(path: string, onProgress?: (fraction: number) => void): Promise<File> {
-  const response = await fetch(path);
-  if (!response.ok) throw new Error(t('err.sampleHttp', { status: response.status }));
-  const size = Number(response.headers.get('content-length'));
-  let blob: Blob;
-  if (response.body && size > 0 && onProgress) {
-    const reader = response.body.getReader();
-    const chunks: Uint8Array<ArrayBuffer>[] = [];
-    let received = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value as Uint8Array<ArrayBuffer>);
-      received += value.length;
-      onProgress(Math.min(received / size, 1));
-    }
-    blob = new Blob(chunks);
-  } else {
-    blob = await response.blob();
-  }
+  const download = await fetchWithProgress(path, onProgress);
+  if (!download.ok) throw new Error(t('err.sampleHttp', { status: download.status }));
   const name = path.slice(path.lastIndexOf('/') + 1);
-  return new File([blob], name, { type: extensionOf(path) === 'mov' ? 'video/quicktime' : 'video/mp4' });
+  return new File([download.blob], name, { type: extensionOf(path) === 'mov' ? 'video/quicktime' : 'video/mp4' });
 }

@@ -181,6 +181,7 @@ const SAME_IN: Partial<Record<Locale, string[]>> = {
     'rv.somTriple',
   ],
   de: [
+    'share.link',
     'coach.jev.element',
     'about.inspirationTitle',
     'setup.appearanceSystem',

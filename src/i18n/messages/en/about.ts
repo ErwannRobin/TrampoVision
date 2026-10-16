@@ -31,7 +31,7 @@ export const about = {
 
   'about.deviceTitle': 'What stays on your device',
   'about.deviceText1':
-    'The video never leaves your browser. The page refuses every request to another site, and the production build adds a Content-Security-Policy that the browser enforces itself.',
+    'The video stays in your browser unless you ask for a share link: that clip and its analysis are then uploaded (Cloudflare, in the EU) and deleted after 90 days, or as soon as you stop sharing. Apart from that, the page refuses every request to another site, and the production build adds a Content-Security-Policy that the browser enforces itself.',
   'about.deviceText2':
     'Only numbers are saved, in your browser (IndexedDB): measurements, predictions and your labels, never the video. If the app is set up with a review service, the analyzed jumps can be sent so that a person can check them: measurements only, no video and no file name. A switch in the settings turns it off.',
 

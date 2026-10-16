@@ -15,6 +15,7 @@ export const errors = {
   'err.dimensions': 'Could not read the video dimensions/duration.',
   'err.modelFile': 'The model file {file} was not found. Run "npm run fetch-assets" (or upload it to the asset host).',
   'err.notJson': 'This file is not valid JSON.',
+  'err.bundleVideo': 'This video cannot carry its analysis: it is not an MP4 or QuickTime file the app can add to.',
   'err.notSeries': 'This is not a TrampoVision pose-series file.',
   'err.seriesVersion': 'Unsupported file version ({found}); this app reads version {expected}.',
   'err.noFrames': 'The file has no frame data.',

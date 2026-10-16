@@ -7,6 +7,19 @@ binding = "DB"
 database_name = "trampovision-review"
 database_id = "2a8180dc-5ef3-4013-8764-dcb15c614282"
 
+# Shared clips (src/shares.ts): the video with its analysis inside, uploaded when a person shares one. EU jurisdiction: the files stay
+# in the EU. The bucket deletes them after 90 days (SHARE_DAYS): `make worker-r2` creates it with that rule, once, before the first deploy.
+[[r2_buckets]]
+binding = "SHARES"
+bucket_name = "trampovision-shares"
+jurisdiction = "eu"
+
+# At most 5 shared clips a minute from one address.
+[[ratelimits]]
+name = "SHARE_LIMIT"
+namespace_id = "1001"
+simple = { limit = 5, period = 60 }
+
 [observability]
 enabled = true
 
