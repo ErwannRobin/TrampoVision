@@ -57,6 +57,8 @@ export const chrome: Translation<typeof en> = {
   'landing.reviewWaiting': '{n} warten auf Prüfung',
   'landing.motion': 'Bewegungsdetektor',
   'landing.motionHint': 'Experimentell: den Athleten vor dem Pose-Modell freistellen',
+  'landing.moderation': 'Geteilte Clips moderieren',
+  'landing.moderationHint': 'Die Seite des Eigentümers: geteilte Clips listen, umbenennen oder löschen',
   'landing.followHint':
     'Langsamer, hält die Analyse aber auf dem Springer statt auf einer Hilfestellung oder einem Trainer.',
   'landing.secondHint':

@@ -57,6 +57,8 @@ export const chrome: Translation<typeof en> = {
   'landing.reviewWaiting': '{n} en attente de vérification',
   'landing.motion': 'Détecteur de mouvement',
   'landing.motionHint': 'Expérimental : isoler l’athlète avant le modèle de pose',
+  'landing.moderation': 'Modérer les clips partagés',
+  'landing.moderationHint': 'La page du propriétaire : lister, renommer ou supprimer les clips partagés',
   'landing.followHint': 'Plus lent, mais garde l’analyse sur le sauteur, pas sur une parade ou un entraîneur.',
   'landing.secondHint':
     'Plus lent : là où le modèle de pose hésite, un modèle plus fort relit ces images et les deux lectures sont fusionnées. 200 Mo à télécharger la première fois.',
