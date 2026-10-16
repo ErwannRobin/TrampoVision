@@ -94,9 +94,14 @@ export default defineConfig(({ mode }) => ({
       },
     },
   ],
-  // The app, the reviewer page (/review.html) and the debug page of the motion detector (/motion.html, experimental, linked from the first
-  // screen in the advanced tools) share the build, the CSP and the review service settings.
-  build: { rollupOptions: { input: { main: 'index.html', review: 'review.html', motion: 'motion.html' } } },
+  // The app, the reviewer page (/review.html), the owner's moderation page (/moderation.html, not linked: the owner types its address) and
+  // the debug page of the motion detector (/motion.html, experimental, linked from the first screen in the advanced tools) share the build,
+  // the CSP and the review service settings.
+  build: {
+    rollupOptions: {
+      input: { main: 'index.html', review: 'review.html', motion: 'motion.html', moderation: 'moderation.html' },
+    },
+  },
   optimizeDeps: { exclude: ['@ffmpeg/ffmpeg'] },
   test: {
     environment: 'node',
