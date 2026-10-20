@@ -625,7 +625,10 @@ function AppView({ playhead }: { playhead: Playhead }) {
     settleBatch();
   }
 
-  /** Analyzes the clips of the library that have no analysis, one after the other; each result goes to the library as it is made. */
+  /**
+   * Analyzes the clips of the library that have no analysis, one after the other, with the best settings (see `analyze`); each result
+   * goes to the library as it is made.
+   */
   async function analyzeAll() {
     if (batching.current) return;
     const queue = inNeedOrder(library).filter((c) => !c.analysis);
@@ -844,14 +847,19 @@ function AppView({ playhead }: { playhead: Playhead }) {
     // The pose model loads first, which can take long (a download for the experimental ones).
     setStatus({ kind: 'loading', stage: 'model' });
     // The live view analyzes about 30 frames a second, so a phone film at 60 or 120 fps does not make the wait longer.
-    const strideNow = advanced ? stride : analysisStride(fps);
-    if (strideNow !== stride) setStride(strideNow);
+    // The library batch wants the best reading there is, whatever the settings: the heaviest MediaPipe model on every frame, behind the
+    // motion detector, then the second look (RTMPose-x) on the doubtful frames. It is a one-off job, so the time it takes does not matter.
+    const best = batching.current;
+    const strideNow = best ? 1 : advanced ? stride : analysisStride(fps);
+    if (!best && strideNow !== stride) setStride(strideNow);
+    const motion = best || motionFlag === 'on';
+    const secondLook = best || secondFlag === 'on';
     try {
       // The motion page's settings, when the clip came from it: the analysis then sees what the page showed — its detector
       // thresholds, mask, zoom, turn and pose model. What comes after the pose model (the jumper over the clip, the tracks, the
       // jumps) stays the app's.
       const page = motion ? pageSettings.current : undefined;
-      const engineNow = page?.engine ?? (advanced ? engine : 'mediapipe');
+      const engineNow = best ? 'mediapipe' : (page?.engine ?? (advanced ? engine : 'mediapipe'));
       // The motion detector runs in front of the pose model on the clip itself: it hides the background, zooms on a small
       // athlete on a steady shot (`ZoomGate` — what lets the pose model see her at all), and the person who jumps is chosen
       // among the people found (`JumperSelector`). The checkbox in the settings skips it (it is slower); a masked copy from
@@ -863,7 +871,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
       const masked = live ? null : maskedRef.current;
       const read = await extractPoseTracks(masked?.url ?? url, {
         engine: engineNow,
-        model: page?.model ?? model,
+        model: best ? 'heavy' : (page?.model ?? model),
         numPoses,
         // The live path runs MediaPipe on the CPU delegate: it is the one the choice of the jumper was measured on, and on
         // the GPU delegate of a headless Chrome the model found the jumper half as often, with ghosts. The analysis is
