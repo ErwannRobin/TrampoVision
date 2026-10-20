@@ -1,11 +1,11 @@
-// Uploads the big files to a public Vercel Blob store, so the deployment does not carry them (see src/assets.ts).
+// Uploads the big files to the R2 bucket the review Worker serves at /assets/, so the deployment does not carry them (see src/assets.ts).
 //
-//   npm run assets-upload                                      upload everything (token from BLOB_READ_WRITE_TOKEN, else .env.local, else .env)
-//   npm run assets-upload -- --force                           also re-upload what is already in the store (by default it is skipped)
+//   npm run assets-upload                                      upload everything (R2 token from the environment, else .env.local, else .env)
+//   npm run assets-upload -- --force                           also re-upload what is already in the bucket (by default it is skipped)
 //   npm run assets-upload -- --dry-run                         list what would be uploaded
 //   npm run assets-upload -- --samples path/to/videos          folder with IMG_8368.mp4, IMG_8368.MOV and dong-dong-2011-landscape.mp4 (default: video-sample/)
 //
-// Layout under the store (what the app reads):
+// Layout in the bucket (what the app reads):
 //   models/pose_landmarker_{lite,full,heavy}.task
 //   mediapipe/<tasks-vision version>/vision_wasm_internal.wasm, vision_wasm_nosimd_internal.wasm
 //   ffmpeg/<@ffmpeg/core version>/ffmpeg-core.wasm
@@ -13,13 +13,12 @@
 //   models/yolox_s.onnx, rtmpose_m_halpe26.onnx, rtmpose_x_halpe26_384x288.onnx, vitpose_base_simple.onnx   (experimental pose engines; only the ones in public/models)
 //   samples/<name>.mp4|.MOV   any video of the sample folder (a .mp4 and a .MOV of the same name are one clip)
 //   samples/<name>.pose.json  the saved analysis of that clip (npm run precompute-samples): the app opens it instead of running the pose model
-//   samples/index.json        {"files": [...]}: the sample file names in the store, rewritten at each run; the app reads it to list the samples
+//   samples/index.json        {"files": [...]}: the sample file names in the bucket, rewritten at each run; the app reads it to list the samples
 // Run it again after upgrading @mediapipe/tasks-vision, onnxruntime-web or @ffmpeg/core: the new version gets its own folder.
 // At the end it prints the value for VITE_ASSET_BASE_URL.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { put } from '@vercel/blob';
-import { hasToken, listStore, root, writeSampleIndex } from './blob-store.mjs';
+import { hasToken, listStore, publicBase, putObject, root, tokenHelp, writeSampleIndex } from './asset-store.mjs';
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -37,7 +36,7 @@ const contentTypes = {
 };
 const typeOf = (name) => contentTypes[name.slice(name.lastIndexOf('.')).toLowerCase()] ?? 'application/octet-stream';
 
-// [pathname in the store, () => bytes]
+// [pathname in the bucket, () => bytes]
 const files = [];
 
 const mediapipe = join(root, 'node_modules/@mediapipe/tasks-vision/wasm');
@@ -88,17 +87,15 @@ if (existsSync(samplesDir)) {
 }
 
 if (!dryRun && !hasToken) {
-  console.error('[upload] set BLOB_READ_WRITE_TOKEN (the read-write token of the Blob store)');
+  console.error(`[upload] ${tokenHelp}`);
   process.exit(1);
 }
 
-let base = '';
-// pathname -> size of what the store already holds (empty without a token or with --force: everything is then uploaded)
+// pathname -> size of what the bucket already holds (empty without a token or with --force: everything is then uploaded)
 const remote = new Map();
 if (hasToken && !force) {
-  const store = await listStore();
-  base = store.base;
-  for (const [pathname, { size }] of store.blobs) remote.set(pathname, size);
+  const { blobs } = await listStore();
+  for (const [pathname, { size }] of blobs) remote.set(pathname, size);
 }
 // Models and wasm have their version in the path, so a file that is there is the right one. A sample keeps its name when it is re-encoded: compare sizes.
 const upToDate = (pathname, size) =>
@@ -113,27 +110,19 @@ if (dryRun) {
 }
 
 for (const [pathname, read] of files) {
-  // Look before downloading a model: a file that is already in the store is not fetched again.
+  // Look before downloading a model: a file that is already in the bucket is not fetched again.
   if (!pathname.startsWith('samples/') && upToDate(pathname)) {
-    console.log(`[upload] ${pathname} already in the store, skipped`);
+    console.log(`[upload] ${pathname} already in the bucket, skipped`);
     continue;
   }
   const body = await read();
   if (upToDate(pathname, body.length)) {
-    console.log(`[upload] ${pathname} already in the store, skipped`);
+    console.log(`[upload] ${pathname} already in the bucket, skipped`);
     continue;
   }
-  const blob = await put(pathname, body, {
-    access: 'public',
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: typeOf(pathname),
-    // The version is in the path, so a file never changes. A saved analysis is rewritten when the video is analyzed again: an hour.
-    cacheControlMaxAge: pathname.endsWith('.pose.json') ? 60 * 60 : 60 * 60 * 24 * 365,
-    multipart: body.length > 20_000_000,
-  });
-  base = blob.url.slice(0, blob.url.length - pathname.length);
-  console.log(`[upload] ${pathname} (${(body.length / 1e6).toFixed(1)} MB) -> ${blob.url}`);
+  // The version is in the path, so a file never changes. A saved analysis is rewritten when the video is analyzed again: an hour.
+  await putObject(pathname, body, typeOf(pathname), pathname.endsWith('.pose.json') ? 60 * 60 : 60 * 60 * 24 * 365);
+  console.log(`[upload] ${pathname} (${(body.length / 1e6).toFixed(1)} MB) -> ${publicBase}/${pathname}`);
 }
 if (hasToken && !dryRun) await writeSampleIndex('upload');
-console.log(`\n[upload] done. Set VITE_ASSET_BASE_URL=${base.replace(/\/$/, '')} in the Vercel project.`);
+console.log(`\n[upload] done. Set VITE_ASSET_BASE_URL=${publicBase} in the Vercel project.`);

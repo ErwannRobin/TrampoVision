@@ -83,7 +83,8 @@ async function captureInBrowser(): Promise<PoseEvalCapture> {
   const port = 5191;
   const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], {
     cwd: root,
-    env: { ...process.env, VITE_REVIEW_API_URL: '', VITE_REVIEW_INGEST_TOKEN: '' },
+    // No asset host: the models come from public/, not downloaded again by each fresh headless browser.
+    env: { ...process.env, VITE_REVIEW_API_URL: '', VITE_REVIEW_INGEST_TOKEN: '', VITE_ASSET_BASE_URL: '' },
     stdio: 'ignore',
   });
   const stop = () => {

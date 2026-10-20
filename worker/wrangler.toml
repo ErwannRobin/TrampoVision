@@ -14,6 +14,12 @@ binding = "SHARES"
 bucket_name = "trampovision-shares"
 jurisdiction = "eu"
 
+# The app's models, wasm runtimes and sample videos (src/assets.ts), served at /assets/. Not in a jurisdiction: nothing personal in it,
+# kept in Western Europe. `make assets-bucket` creates it, once; scripts/assets-upload.mjs fills it.
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "trampovision-assets"
+
 # At most 5 shared clips a minute from one address.
 [[ratelimits]]
 name = "SHARE_LIMIT"
