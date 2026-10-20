@@ -345,6 +345,19 @@ export const chrome: Translation<typeof en> = {
   'share.errNetwork': '共有サービスに接続できません。接続を確認して、もう一度お試しください。',
   'share.errHttp': '共有できませんでした（HTTP {status}）。',
   'share.errGone': 'この共有クリップはもう利用できません。削除されたか、期限が切れました。',
+  'library.title': '解析ライブラリ',
+  'library.count': { one: '{n} クリップ、未解析 {todo}', other: '{n} クリップ、未解析 {todo}' },
+  'library.hint':
+    'データセット Trampoline-AQA の競技クリップです。まだ解析されていない(または精度の低い)クリップを選ぶと、ここで解析され、結果は自動でライブラリに送られます。ライブラリは各クリップの最良の結果を保持し、2つの結果が別々の部分をうまく読み取っている場合は結合します。',
+  'library.todo': '未解析',
+  'library.errGone': 'このクリップはライブラリにありません。',
+  'library.sentFirst': '解析をライブラリに送りました。クリップの {score} を読み取りました。',
+  'library.sentBetter': '解析をライブラリに送りました。より多く読み取れています(以前 {before}、今 {score})。',
+  'library.sentMerged':
+    '解析をライブラリに送り、保存済みの結果と結合しました。クリップの {score} を読み取っています(以前 {before})。',
+  'library.sentKept':
+    '解析をライブラリに送りました。保存済みの結果のほうが多く読み取れている({score}、あなたの結果は {mine})ため、そのまま残ります。',
+  'library.sendFailed': '解析をライブラリに送れませんでした: {reason}',
   'export.series': '解析を保存（JSON）',
   'export.seriesHint':
     'フレームごとに、スコア付きの全関節、重心、向き、フェーズ、モデルの生の出力を保存します。後で開けば解析をやり直す必要がありません。',

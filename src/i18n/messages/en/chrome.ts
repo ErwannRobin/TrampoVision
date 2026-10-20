@@ -363,6 +363,19 @@ export const chrome = {
   'share.errNetwork': 'The sharing service cannot be reached. Check the connection and try again.',
   'share.errHttp': 'Sharing did not work (HTTP {status}).',
   'share.errGone': 'This shared clip is no longer available: it was deleted or it expired.',
+  'library.title': 'Analysis library',
+  'library.count': { one: '{n} clip, {todo} to analyze', other: '{n} clips, {todo} to analyze' },
+  'library.hint':
+    'Competition clips from the Trampoline-AQA dataset. Pick one that has no analysis yet (or a low one): it is analyzed here, and the result is sent to the library automatically. The library keeps the best reading of each clip and joins two readings when each one reads a different part well.',
+  'library.todo': 'To analyze',
+  'library.errGone': 'This clip is no longer in the library.',
+  'library.sentFirst': 'Analysis sent to the library: {score} of the clip read.',
+  'library.sentBetter': 'Analysis sent to the library: it reads more of the clip ({before} before, {score} now).',
+  'library.sentMerged':
+    'Analysis sent to the library and joined with the one stored: {score} of the clip read now ({before} before).',
+  'library.sentKept':
+    'Analysis sent to the library: the one stored reads more of the clip ({score}, yours {mine}), so it stays.',
+  'library.sendFailed': 'The analysis could not be sent to the library: {reason}',
   'export.series': 'Save analysis (JSON)',
   'export.seriesHint':
     'Every frame: all joints with scores, center of mass, orientation, phase, plus the raw model output. Open it later to skip the analysis.',

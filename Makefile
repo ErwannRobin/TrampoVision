@@ -67,6 +67,9 @@ assets-bucket: node_modules ## Create the R2 bucket of the assets, once, before 
 assets-upload: node_modules ## Upload models, wasm, samples: [SAMPLES=dir] [FORCE=1] [DRY_RUN=1]
 	npm run assets-upload -- $(if $(SAMPLES),--samples $(SAMPLES)) $(if $(DRY_RUN),--dry-run) $(if $(FORCE),--force)
 
+library-upload: node_modules ## Put the Trampoline-AQA clips in the library (shares bucket): [DIR=video-sample/Trampoline-AQA] [FORCE=1] [DRY_RUN=1]
+	npm run library-upload -- $(if $(DIR),--dir $(DIR)) $(if $(DRY_RUN),--dry-run) $(if $(FORCE),--force)
+
 assets-precompute: node_modules ## Analyze sample videos so the app skips the pose model: [SAMPLES=dir] [FORCE=1]
 	@test -d node_modules/playwright-core || npm i --no-save playwright-core
 	npm run precompute-samples -- $(if $(SAMPLES),--samples $(SAMPLES)) $(if $(FORCE),--force)

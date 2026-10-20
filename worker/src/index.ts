@@ -1,9 +1,10 @@
 import { FIG_ELEMENTS } from '../../src/skills/fig/elements';
 import { handleAssets, type AssetEnv } from './assets';
 import { originAllowed, parseIngest, parseReview, tokenMatches, STATUSES, type JumpRow } from './logic';
+import { handleLibrary, type LibraryEnv } from './library';
 import { handleShares, type ShareEnv } from './shares';
 
-export interface Env extends ShareEnv, AssetEnv {
+export interface Env extends ShareEnv, AssetEnv, LibraryEnv {
   DB: D1Database;
   ALLOWED_ORIGIN: string;
   /** Regular expression of the preview deployments of the app that may call too (optional). */
@@ -84,6 +85,10 @@ export default {
       // The app's models, wasm and samples (assets.ts): public, read only.
       const asset = await handleAssets(req, env, path, h, reply);
       if (asset) return asset;
+
+      // The library of the dataset's videos and their best analysis (library.ts): reading is public, an analysis takes the app's token.
+      const library = await handleLibrary(req, env, path, canWrite(req, env), h, reply);
+      if (library) return library;
 
       // Shared clips (shares.ts): uploading takes the app's token, reading takes the link, removing takes the uploader's key.
       const shared = await handleShares(req, env, path, canWrite(req, env), h, reply);

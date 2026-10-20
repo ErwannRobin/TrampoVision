@@ -358,6 +358,20 @@ export const chrome: Translation<typeof en> = {
   'share.errNetwork': 'Le service de partage est injoignable. Vérifiez la connexion et réessayez.',
   'share.errHttp': 'Le partage n’a pas fonctionné (HTTP {status}).',
   'share.errGone': 'Ce clip partagé n’est plus disponible : il a été supprimé ou il a expiré.',
+  'library.title': 'Bibliothèque d’analyses',
+  'library.count': { one: '{n} clip, {todo} à analyser', other: '{n} clips, {todo} à analyser' },
+  'library.hint':
+    'Des clips de compétition du jeu de données Trampoline-AQA. Choisissez-en un sans analyse (ou avec une faible) : il est analysé ici et le résultat est envoyé automatiquement à la bibliothèque. Elle garde la meilleure lecture de chaque clip et réunit deux lectures quand chacune lit bien une partie différente.',
+  'library.todo': 'À analyser',
+  'library.errGone': 'Ce clip n’est plus dans la bibliothèque.',
+  'library.sentFirst': 'Analyse envoyée à la bibliothèque : {score} du clip lu.',
+  'library.sentBetter':
+    'Analyse envoyée à la bibliothèque : elle lit plus du clip ({before} avant, {score} maintenant).',
+  'library.sentMerged':
+    'Analyse envoyée à la bibliothèque et réunie avec celle qui y était : {score} du clip lu maintenant ({before} avant).',
+  'library.sentKept':
+    'Analyse envoyée à la bibliothèque : celle qui y est lit plus du clip ({score}, la vôtre {mine}), elle reste.',
+  'library.sendFailed': 'L’analyse n’a pas pu être envoyée à la bibliothèque : {reason}',
   'export.series': 'Enregistrer l’analyse (JSON)',
   'export.seriesHint':
     'Chaque image : toutes les articulations avec leurs scores, le centre de masse, l’orientation, la phase, ainsi que la sortie brute du modèle. Ouvrez-la plus tard pour éviter de refaire l’analyse.',

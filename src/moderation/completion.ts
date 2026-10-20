@@ -22,7 +22,8 @@ export const MAX_CONTACT_S = 1.5;
 /** A single jump alone is as likely a misreading as a bounce: a run has at least this many. */
 export const MIN_RUN = 2;
 
-export function completion(result: AnalysisResult): Completion {
+/** 1 for each frame inside a run of bounces, 0 elsewhere. */
+export function runMask(result: AnalysisResult): Uint8Array {
   const n = result.time.length;
   const complete = result.jumps.cycles.filter((c) => c.takeoff !== null && c.landing !== null);
   const inRun = new Uint8Array(n);
@@ -42,7 +43,13 @@ export function completion(result: AnalysisResult): Completion {
     }
   }
   close();
+  return inRun;
+}
 
+export function completion(result: AnalysisResult): Completion {
+  const n = result.time.length;
+  const complete = result.jumps.cycles.filter((c) => c.takeoff !== null && c.landing !== null);
+  const inRun = runMask(result);
   let found = 0;
   let read = 0;
   for (let i = 0; i < n; i++) {
