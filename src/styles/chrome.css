@@ -377,6 +377,26 @@
   font-size: var(--fs-sm);
   line-height: 1.5;
 }
+.library-batch {
+  position: fixed;
+  inset: auto 16px 16px 16px;
+  z-index: 40;
+  display: flex;
+  max-width: 28em;
+  margin-inline: auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.25);
+}
+.library__all {
+  margin-bottom: 10px;
+}
 .library__list {
   display: grid;
   max-height: 20em;

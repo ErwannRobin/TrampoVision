@@ -49,6 +49,8 @@ export interface MotionResult {
   periodS: number | null;
   /** How well that period fits, 0 to 1 (the autocorrelation at the period). */
   rhythmFit: number;
+  /** True for the first frame of a new shot (a cut of the broadcast, or a seek): what was learned of the scene before it is forgotten. */
+  cut: boolean;
   /** Mean of the mask: the share of the picture that stays visible. */
   coverage: number;
   /** Noise level of the frame difference this frame, intensity 0..1. */

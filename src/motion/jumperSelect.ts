@@ -200,6 +200,18 @@ export class JumperSelector {
   /** The spots people keep coming back to: where the standers stand (`Station`). */
   private stations: Station[] = [];
 
+  /**
+   * The shot changed (a cut of the broadcast): the tracks, the spots people stand at and the heights flown through belong to the shot
+   * before. What the athlete's clothes look like is kept, it is the same person in the next one.
+   */
+  cut(): void {
+    this.tracks = [];
+    this.stations = [];
+    this.band = null;
+    this.athleteTorso = null;
+    this.everChose = false;
+  }
+
   /** `maxAthletes`: jumpers to keep (synchro films two) — the tracks with the most travel. */
   constructor(private readonly maxAthletes = 1) {}
 

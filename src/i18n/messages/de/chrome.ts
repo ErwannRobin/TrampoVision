@@ -373,6 +373,10 @@ export const chrome: Translation<typeof en> = {
   'library.sentKept':
     'Analyse an die Bibliothek gesendet: Die gespeicherte liest mehr vom Clip ({score}, Ihre {mine}) und bleibt.',
   'library.sendFailed': 'Die Analyse konnte nicht an die Bibliothek gesendet werden: {reason}',
+  'library.all': { one: 'Den übrigen Clip analysieren', other: 'Die {n} übrigen Clips nacheinander analysieren' },
+  'library.batch': 'Bibliothek: Clip {n} von {total}',
+  'library.batchStop': 'Stopp',
+  'library.batchDone': 'Bibliothek: {done} von {total} Clips analysiert.',
   'export.series': 'Analyse speichern (JSON)',
   'export.seriesHint':
     'Jedes Bild: alle Gelenke mit Bewertungen, Schwerpunkt, Ausrichtung, Phase sowie die Rohausgabe des Modells. Öffnen Sie die Datei später, um die Analyse zu überspringen.',

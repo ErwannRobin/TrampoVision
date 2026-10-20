@@ -10,6 +10,7 @@ import { LM } from '../../pose/landmarks';
 import type { PoseDetection, PoseSource } from '../../pose/types';
 import { disposeVideo, estimateFps, frameSeekTime, loadVideo, seekTo } from '../../video/frames';
 import { loadSample, loadSamples, type Sample } from '../../video/sample';
+import { downloadLibraryClip, fetchLibrary, inNeedOrder, percent, type LibraryClip } from '../../sync/library';
 import { DEFAULT_MOTION_CONFIG, type CameraSetting, type CameraType, type MotionConfig } from '../config';
 import { bodyBox, focusOnAthletes } from '../focus';
 import { APP_WITH_RESULT, putHandoff, type PageSettings } from '../handoff';
@@ -47,6 +48,7 @@ const sourceBox = $('source');
 const pickLabel = $('pick');
 const fileInput = $<HTMLInputElement>('file');
 const sampleSelect = $<HTMLSelectElement>('sample');
+const librarySelect = $<HTMLSelectElement>('library');
 const loadedBox = $('loaded');
 const videoName = $('video-name');
 const resetButton = $<HTMLButtonElement>('reset');
@@ -545,6 +547,7 @@ function updateControls(): void {
   }
   fileInput.disabled = working;
   sampleSelect.disabled = working;
+  librarySelect.disabled = working;
   pickLabel.classList.toggle('is-busy', working);
   for (const control of document.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
     '.md-settings input, .md-settings select',
@@ -638,6 +641,37 @@ async function openSample(sample: Sample): Promise<void> {
   }
 }
 
+/** Downloads a clip of the analysis library (the Trampoline-AQA dataset) and opens it like a video that was chosen: its video only. */
+async function openLibraryClip(clip: LibraryClip): Promise<void> {
+  const mine = ++opening;
+  closeSession();
+  updateControls();
+  try {
+    setStatus(`Downloading ${clip.title}…`);
+    const { file } = await downloadLibraryClip(clip, (done) => {
+      if (mine === opening) setStatus(`Downloading ${clip.title}… ${Math.round(done * 100)} %`);
+    });
+    if (mine === opening) await openVideo(file);
+  } catch (error) {
+    if (mine === opening) setStatus(error instanceof Error ? error.message : String(error), 'error');
+  }
+}
+
+// The analysis library: the clips of the Trampoline-AQA dataset, hardest first (how little of each the app has read). None without a review service.
+void fetchLibrary().then((clips) => {
+  if (clips.length === 0) return;
+  for (const clip of inNeedOrder(clips)) {
+    const read = clip.analysis ? percent(clip.analysis.score) : 'not analyzed';
+    librarySelect.append(new Option(`${clip.title} · ${read}`, clip.id));
+  }
+  librarySelect.hidden = false;
+  librarySelect.addEventListener('change', () => {
+    const clip = clips.find((c) => c.id === librarySelect.value);
+    librarySelect.value = '';
+    if (clip) void openLibraryClip(clip);
+  });
+});
+
 // The samples of the app. None without an asset host (nor an index of its samples): the picker stays hidden, as the app's sample menu does.
 void loadSamples().then((samples) => {
   if (samples.length === 0) return;
@@ -695,6 +729,12 @@ async function processFrame(s: Session): Promise<void> {
   const t0 = performance.now();
   const timeMs = Math.round((frame / s.fps) * 1000);
   const result = layer.process(s.video, timeMs);
+  // A cut of the broadcast: the zoom, the follow verdict and the turn were learnt on another shot, as in the app.
+  if (result?.cut) {
+    follow.reset();
+    zoomGate = new ZoomGate();
+    viewer?.reset();
+  }
   // On a camera that follows the athlete the detector steps aside, as in the app: its box sits off the athlete there.
   const following = follow.push(result, timeMs);
   const masked = layer.render(s.video);

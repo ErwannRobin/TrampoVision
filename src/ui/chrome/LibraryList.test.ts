@@ -15,8 +15,8 @@ const clip = (n: number, score: number | null): LibraryClip => ({
       : { score, found: 1, jumps: 8, backend: 'mediapipe', merged: false, contributions: 1, updatedAt: '' },
 });
 
-const render = (clips: LibraryClip[], busy = false) =>
-  renderToStaticMarkup(createElement(LibraryList, { clips, onOpen: () => {}, busy }));
+const render = (clips: LibraryClip[], busy = false, onAll?: () => void) =>
+  renderToStaticMarkup(createElement(LibraryList, { clips, onOpen: () => {}, onAll, busy }));
 
 describe('the library on the first screen', () => {
   it('is absent when there is no library', () => {
@@ -35,5 +35,11 @@ describe('the library on the first screen', () => {
 
   it('does not open a clip while another is being read', () => {
     expect(render([clip(1, null)], true)).toContain('disabled');
+  });
+
+  it('offers to analyze all the clips left only when some are left', () => {
+    expect(render([clip(1, null), clip(2, null)], false, () => {})).toContain('Analyze the 2 clips left');
+    expect(render([clip(1, 0.9)], false, () => {})).not.toContain('Analyze the');
+    expect(render([clip(1, null)])).not.toContain('Analyze the');
   });
 });

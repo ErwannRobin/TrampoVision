@@ -201,3 +201,14 @@ describe('the clothes of the athlete', () => {
     expect(after(rows, 5.6).every((xs) => xs !== null && xs.length === 0)).toBe(true);
   });
 });
+
+describe('a cut of the broadcast', () => {
+  it('makes the selector forget the shot before: it does not know who jumps until somebody travels again', () => {
+    const selector = new JumperSelector();
+    const rows = run(selector, (t) => [person(0.5, jumpY(t, 0.7, 0.25, 1)), person(0.2, 0.7)], 6);
+    expect(after(rows, 5).every((r) => r !== null && r.length === 1)).toBe(true);
+    selector.cut();
+    // The next shot has only a person who stands where the jumper stood.
+    expect(selector.push([person(0.5, 0.7)], 6)).toBeNull();
+  });
+});

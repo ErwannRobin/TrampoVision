@@ -1,10 +1,12 @@
 import { t, tp } from '../../i18n';
 import { inNeedOrder, percent, type LibraryClip } from '../../sync/library';
-import { Badge, Disclosure, type BadgeTone } from '../kit';
+import { Badge, Button, Disclosure, type BadgeTone } from '../kit';
 
 export interface LibraryListProps {
   clips: LibraryClip[];
   onOpen: (clip: LibraryClip) => void;
+  /** Analyzes the clips nobody analyzed, one after the other. Without it there is no such button. */
+  onAll?: () => void;
   busy: boolean;
 }
 
@@ -19,12 +21,17 @@ function readBadge(clip: LibraryClip): { tone: BadgeTone; text: string } {
  * The clips of the library on the first screen, the ones that need an analysis first. Opening one analyzes it when nobody did, and
  * the analysis goes back to the library on its own (src/sync/library.ts): that is what the list is for.
  */
-export function LibraryList({ clips, onOpen, busy }: LibraryListProps) {
+export function LibraryList({ clips, onOpen, onAll, busy }: LibraryListProps) {
   if (clips.length === 0) return null;
   const todo = clips.filter((c) => !c.analysis).length;
   return (
     <Disclosure className="library" title={t('library.title')} meta={tp('library.count', clips.length, { todo })}>
       <p className="library__hint">{t('library.hint')}</p>
+      {onAll && todo > 0 && (
+        <Button variant="secondary" className="library__all" disabled={busy} onClick={onAll}>
+          {tp('library.all', todo)}
+        </Button>
+      )}
       <ul className="library__list">
         {inNeedOrder(clips).map((clip) => {
           const badge = readBadge(clip);

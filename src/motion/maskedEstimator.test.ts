@@ -26,6 +26,7 @@ function frame(coverage: number): MotionResult {
     periodS: null,
     rhythmFit: 0,
     coverage,
+    cut: false,
     noise: 0,
     shift: 0,
     camera: { type: 'fixed', dx: 0, dy: 0, known: false, speed: 0, athleteShare: 0 },
@@ -456,6 +457,16 @@ describe('the follow clip', () => {
     for (let t = 0; t <= 1000; t += 40) known = watch.push(fast, t);
     expect(known).toBe(true);
     expect(watch.push(still, 1040)).toBe(true);
+  });
+
+  it('is not known any more after a cut of the broadcast: the next shot may be a steady one', () => {
+    const watch = new FollowWatch();
+    const fast = frame(1);
+    fast.camera.speed = 0.5;
+    for (let ms = 0; ms <= 1500; ms += 40) watch.push(fast, ms);
+    expect(watch.followClip).toBe(true);
+    watch.reset();
+    expect(watch.followClip).toBe(false);
   });
 
   it('is not known from two fast stretches of the clip with a seek between them', () => {

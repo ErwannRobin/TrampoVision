@@ -25,6 +25,8 @@ export interface LandingProps {
   /** The videos of the library and the best analysis of each: none without a review service. Opening one is `onLibrary`. */
   library: LibraryClip[];
   onLibrary: (clip: LibraryClip) => void;
+  /** Analyzes the clips of the library that have no analysis, one after the other. */
+  onLibraryAll?: () => void;
   onOpenSeries: (file: File) => void;
   /** The dataset saved in this browser: shown as its own section when it holds something. */
   dataset: DatasetApi;
@@ -120,6 +122,7 @@ export function Landing({
   onExample,
   library,
   onLibrary,
+  onLibraryAll,
   onOpenSeries,
   dataset,
   recent,
@@ -218,7 +221,7 @@ export function Landing({
             {t('landing.about')}
           </a>
           {recent && <RecentSets {...recent} busy={busy} />}
-          <LibraryList clips={library} onOpen={onLibrary} busy={busy} />
+          <LibraryList clips={library} onOpen={onLibrary} onAll={onLibraryAll} busy={busy} />
           <ul className="landing__notes">
             <li>
               <Icon name="video" size={17} />

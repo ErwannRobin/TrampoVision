@@ -60,6 +60,12 @@ export class ZoomGate {
   private smallSinceMs: number | null = null;
   private on = false;
 
+  /** A new shot: the steadiness of the one before is no proof for this one. */
+  reset(): void {
+    this.smallSinceMs = null;
+    this.on = false;
+  }
+
   helps(result: MotionResult, timestampMs: number): boolean {
     const { athleteShare, speed } = result.camera;
     const small =
@@ -220,6 +226,13 @@ export function withMotionMask(inner: PoseEstimatorFactory, options: MotionMaskO
             const result = layer.process(video, timestampMs);
             options.onFrame?.(result);
             athletes = result;
+            // A cut of the broadcast: the next shot may be a wide one from a steady camera, or a close-up, whatever the last one was.
+            if (result?.cut) {
+              selector.cut();
+              zoomGate.reset();
+              viewer?.reset();
+              follow.reset();
+            }
             followClip = follow.push(result, timestampMs);
             // A follow clip is read as it is (`FOLLOW_KNOWN_S`).
             if (hidesSomething(result) && !followClip && options.hide !== false) source = layer.render(video);

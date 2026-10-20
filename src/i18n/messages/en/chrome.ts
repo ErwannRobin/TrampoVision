@@ -376,6 +376,10 @@ export const chrome = {
   'library.sentKept':
     'Analysis sent to the library: the one stored reads more of the clip ({score}, yours {mine}), so it stays.',
   'library.sendFailed': 'The analysis could not be sent to the library: {reason}',
+  'library.all': { one: 'Analyze the {n} clip left, one by one', other: 'Analyze the {n} clips left, one by one' },
+  'library.batch': 'Library: clip {n} of {total}',
+  'library.batchStop': 'Stop',
+  'library.batchDone': 'Library: {done} of {total} clips analyzed.',
   'export.series': 'Save analysis (JSON)',
   'export.seriesHint':
     'Every frame: all joints with scores, center of mass, orientation, phase, plus the raw model output. Open it later to skip the analysis.',
