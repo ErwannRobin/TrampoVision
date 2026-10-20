@@ -372,6 +372,10 @@ export const chrome: Translation<typeof en> = {
   'library.sentKept':
     'Analyse envoyée à la bibliothèque : celle qui y est lit plus du clip ({score}, la vôtre {mine}), elle reste.',
   'library.sendFailed': 'L’analyse n’a pas pu être envoyée à la bibliothèque : {reason}',
+  'library.all': { one: 'Analyser le clip restant', other: 'Analyser les {n} clips restants, un par un' },
+  'library.batch': 'Bibliothèque : clip {n} sur {total}',
+  'library.batchStop': 'Arrêter',
+  'library.batchDone': 'Bibliothèque : {done} clips analysés sur {total}.',
   'export.series': 'Enregistrer l’analyse (JSON)',
   'export.seriesHint':
     'Chaque image : toutes les articulations avec leurs scores, le centre de masse, l’orientation, la phase, ainsi que la sortie brute du modèle. Ouvrez-la plus tard pour éviter de refaire l’analyse.',

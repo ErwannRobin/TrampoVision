@@ -358,6 +358,10 @@ export const chrome: Translation<typeof en> = {
   'library.sentKept':
     '解析をライブラリに送りました。保存済みの結果のほうが多く読み取れている({score}、あなたの結果は {mine})ため、そのまま残ります。',
   'library.sendFailed': '解析をライブラリに送れませんでした: {reason}',
+  'library.all': { one: '残りの{n}本を解析', other: '残りの{n}本を順に解析' },
+  'library.batch': 'ライブラリ: {n}/{total}本目',
+  'library.batchStop': '停止',
+  'library.batchDone': 'ライブラリ: {total}本中{done}本を解析しました。',
   'export.series': '解析を保存（JSON）',
   'export.seriesHint':
     'フレームごとに、スコア付きの全関節、重心、向き、フェーズ、モデルの生の出力を保存します。後で開けば解析をやり直す必要がありません。',

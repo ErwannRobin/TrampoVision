@@ -55,6 +55,7 @@ import { readBundle, writeBundle } from './video/bundle';
 import {
   downloadLibraryClip,
   fetchLibrary,
+  inNeedOrder,
   percent,
   sendLibraryAnalysis,
   type LibraryClip,
@@ -93,7 +94,7 @@ import { About } from './ui/About';
 import { useAbout } from './ui/chrome/aboutRoute';
 import { useReviewRoute } from './ui/chrome/reviewRoute';
 import { ReviewMode } from './ui/review/mode/ReviewMode';
-import { Icon, ActivityToast, type MenuGroupDef } from './ui/kit';
+import { Button, Icon, ActivityToast, type MenuGroupDef } from './ui/kit';
 import { useLocalStorage } from './ui/hooks';
 import { analysisWarnings } from './ui/quality';
 import { AthleteInsights } from './ui/rail/AthleteInsights';
@@ -335,6 +336,11 @@ function AppView({ playhead }: { playhead: Playhead }) {
   const libraryFile = useRef<{ file: File; id: string } | null>(null);
   // Set when the pose model has just analyzed a library clip: the analysis is sent as soon as it is on screen.
   const pendingLibrary = useRef<string | null>(null);
+  // "Analyze all": the clips nobody analyzed go through the pose model one by one. `batchSettle` ends the wait for the clip on screen.
+  const [batch, setBatch] = useState<{ n: number; total: number } | null>(null);
+  const batching = useRef(false);
+  const batchStop = useRef(false);
+  const batchSettle = useRef<(() => void) | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   // The masked copy of the clip (from the motion detector) that the pose model reads while the clip is what is shown; null without one.
   const maskedRef = useRef<MaskedCopy | null>(null);
@@ -606,6 +612,43 @@ function AppView({ playhead }: { playhead: Playhead }) {
     }
   }
 
+  function settleBatch() {
+    const settle = batchSettle.current;
+    batchSettle.current = null;
+    settle?.();
+  }
+
+  /** Stops the batch, and the analysis it is running. */
+  function stopBatch() {
+    batchStop.current = true;
+    abort.current?.abort();
+    settleBatch();
+  }
+
+  /** Analyzes the clips of the library that have no analysis, one after the other; each result goes to the library as it is made. */
+  async function analyzeAll() {
+    if (batching.current) return;
+    const queue = inNeedOrder(library).filter((c) => !c.analysis);
+    batching.current = true;
+    batchStop.current = false;
+    let done = 0;
+    for (const [i, clip] of queue.entries()) {
+      if (batchStop.current) break;
+      setBatch({ n: i + 1, total: queue.length });
+      const settled = new Promise<void>((resolve) => (batchSettle.current = resolve));
+      await openLibrary(clip);
+      // The clip did not download: the next one.
+      if (libraryFile.current?.id === clip.id) {
+        await settled;
+        if (!batchStop.current) done++;
+      }
+    }
+    batchSettle.current = null;
+    batching.current = false;
+    setBatch(null);
+    if (!batchStop.current) setNotice(t('library.batchDone', { done, total: queue.length }));
+  }
+
   /** The id of the library clip on screen, or null when the clip is any other video. */
   function libraryIdOnScreen(): string | null {
     const open = libraryFile.current;
@@ -654,7 +697,11 @@ function AppView({ playhead }: { playhead: Playhead }) {
     // A video with its analysis inside (a shared clip, or "Video with analysis"): the video alone goes on, with that analysis in
     // place of the pose model, under the name of the clip it was made from when it comes from a link.
     const seq = ++openSeq.current;
-    if (libraryFile.current?.file !== next) libraryFile.current = null;
+    if (libraryFile.current?.file !== next) {
+      libraryFile.current = null;
+      // The person opened something else: the batch is over.
+      if (batching.current) stopBatch();
+    }
     pendingLibrary.current = null;
     const bundle = await readBundle(next);
     if (seq !== openSeq.current) return;
@@ -757,7 +804,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
         }
       }
       if (series && openSeriesText(series, next.name, { withVideo: true })) return;
-      if (!advanced) {
+      if (!advanced || batching.current) {
         // The live view goes straight to the analysis: a coach on the trampoline has nothing to set up first.
         if (!measured) setNotice(t('app.fpsAssumed'));
         setStatus({ kind: 'idle' });
@@ -901,6 +948,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
       // Several athletes are shown together first: that is what they were filmed for.
       setCompare(athletes.length > 1);
       setTracks(athletes);
+      if (athletes.length === 0) settleBatch();
       // A library clip: this analysis is the library's to judge, sent once it is on screen (see the effect below).
       pendingLibrary.current = libraryIdOnScreen();
       setStatus({ kind: 'idle' });
@@ -977,6 +1025,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
     abort.current?.abort();
     openSeq.current++;
     leaveShare();
+    if (batching.current) stopBatch();
     libraryFile.current = null;
     pendingLibrary.current = null;
     if (url) URL.revokeObjectURL(url);
@@ -1066,6 +1115,11 @@ function AppView({ playhead }: { playhead: Playhead }) {
     return toSeriesJson(buildPoseSeriesSet(athletes, { fileName: name, stride, minVisibility: 0.4, calibration: cal }));
   }
 
+  // A clip of the batch that fails (a video that does not open, a model that does not load) does not hold the rest back.
+  useEffect(() => {
+    if (status.kind === 'error' && status.severity !== 'warning') settleBatch();
+  }, [status]); // oxlint-disable-line react-hooks/exhaustive-deps
+
   // The analysis of a library clip goes to the library by itself: it keeps the best reading of each clip, and joins two when each reads
   // a different part well. A failure only costs the contribution, so it is a line in the notice and nothing more.
   useEffect(() => {
@@ -1077,12 +1131,14 @@ function AppView({ playhead }: { playhead: Playhead }) {
         const outcome = await sendLibraryAnalysis(id, serializeSeries(fileName, id, calibration));
         setNotice((prev) => [prev, libraryNotice(outcome)].filter(Boolean).join(' '));
         void fetchLibrary(true).then((found) => found.length && setLibrary(found));
+        settleBatch();
       } catch (err) {
         setNotice((prev) =>
           [prev, t('library.sendFailed', { reason: err instanceof Error ? err.message : String(err) })]
             .filter(Boolean)
             .join(' '),
         );
+        settleBatch();
       }
     })();
   }, [tracks, result, status.kind]); // oxlint-disable-line react-hooks/exhaustive-deps
@@ -1682,6 +1738,15 @@ function AppView({ playhead }: { playhead: Playhead }) {
         />
       )}
 
+      {batch && (
+        <div className="library-batch" role="status">
+          <span>{t('library.batch', { n: batch.n, total: batch.total })}</span>
+          <Button variant="secondary" onClick={stopBatch}>
+            {t('library.batchStop')}
+          </Button>
+        </div>
+      )}
+
       <StatusBanners
         status={status}
         notice={notice}
@@ -1727,6 +1792,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
               onExample={(example) => void openShared(example.id)}
               library={library}
               onLibrary={(clip) => void openLibrary(clip)}
+              onLibraryAll={() => void analyzeAll()}
               onOpenSeries={(f) => void openSeries(f)}
               dataset={dataset}
               recent={{
