@@ -360,6 +360,19 @@ export const chrome: Translation<typeof en> = {
     'Der Dienst zum Teilen ist nicht erreichbar. Prüfen Sie die Verbindung und versuchen Sie es erneut.',
   'share.errHttp': 'Das Teilen hat nicht funktioniert (HTTP {status}).',
   'share.errGone': 'Dieser geteilte Clip ist nicht mehr verfügbar: Er wurde gelöscht oder ist abgelaufen.',
+  'library.title': 'Analysebibliothek',
+  'library.count': { one: '{n} Clip, {todo} zu analysieren', other: '{n} Clips, {todo} zu analysieren' },
+  'library.hint':
+    'Wettkampfclips aus dem Datensatz Trampoline-AQA. Wählen Sie einen ohne Analyse (oder mit einer schwachen): Er wird hier analysiert, und das Ergebnis geht automatisch an die Bibliothek. Sie behält die beste Auswertung jedes Clips und fügt zwei Auswertungen zusammen, wenn jede einen anderen Teil gut liest.',
+  'library.todo': 'Zu analysieren',
+  'library.errGone': 'Dieser Clip ist nicht mehr in der Bibliothek.',
+  'library.sentFirst': 'Analyse an die Bibliothek gesendet: {score} des Clips gelesen.',
+  'library.sentBetter': 'Analyse an die Bibliothek gesendet: Sie liest mehr vom Clip ({before} vorher, jetzt {score}).',
+  'library.sentMerged':
+    'Analyse an die Bibliothek gesendet und mit der gespeicherten zusammengeführt: jetzt {score} des Clips gelesen (vorher {before}).',
+  'library.sentKept':
+    'Analyse an die Bibliothek gesendet: Die gespeicherte liest mehr vom Clip ({score}, Ihre {mine}) und bleibt.',
+  'library.sendFailed': 'Die Analyse konnte nicht an die Bibliothek gesendet werden: {reason}',
   'export.series': 'Analyse speichern (JSON)',
   'export.seriesHint':
     'Jedes Bild: alle Gelenke mit Bewertungen, Schwerpunkt, Ausrichtung, Phase sowie die Rohausgabe des Modells. Öffnen Sie die Datei später, um die Analyse zu überspringen.',

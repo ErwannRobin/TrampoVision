@@ -366,6 +366,63 @@
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+/* The library of the dataset's clips on the first screen: a short scrolling list, the clips to analyze first. */
+.library {
+  max-width: 30em;
+  margin-top: 28px;
+}
+.library__hint {
+  margin-bottom: 10px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.library__list {
+  display: grid;
+  max-height: 20em;
+  overflow-y: auto;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+}
+.library__clip {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.library__list li:last-child .library__clip {
+  border-bottom: 0;
+}
+.library__clip:hover:not(:disabled),
+.library__clip:focus-visible {
+  background: var(--panel-2);
+}
+.library__clip:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.library__clip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.library__title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (pointer: coarse) {
+  .library__clip {
+    min-height: 44px;
+  }
+}
 .landing__notes {
   display: grid;
   gap: 12px;

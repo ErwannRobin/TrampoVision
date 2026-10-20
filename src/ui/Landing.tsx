@@ -4,9 +4,11 @@ import { REVIEW_API_URL, fetchQueueCount } from '../sync/reviewSync';
 import type { DatasetApi } from '../dataset/useDataset';
 import { ABOUT_HASH } from './chrome/aboutRoute';
 import { HeroArcs } from './chrome/HeroArcs';
+import { LibraryList } from './chrome/LibraryList';
 import { RecentSets, type RecentSetsProps } from './chrome/RecentSets';
 import { DemoSkeleton } from './DemoSkeleton';
 import { DatasetBar, EvaluationReport } from './EvaluationView';
+import type { LibraryClip } from '../sync/library';
 import { canShare, type Example } from '../sync/share';
 import type { Sample } from '../video/sample';
 import { useMediaQuery } from './hooks';
@@ -20,6 +22,9 @@ export interface LandingProps {
   /** The clips other people shared and listed, offered after the samples; opening one is `onExample`. */
   examples: Example[];
   onExample: (example: Example) => void;
+  /** The videos of the library and the best analysis of each: none without a review service. Opening one is `onLibrary`. */
+  library: LibraryClip[];
+  onLibrary: (clip: LibraryClip) => void;
   onOpenSeries: (file: File) => void;
   /** The dataset saved in this browser: shown as its own section when it holds something. */
   dataset: DatasetApi;
@@ -113,6 +118,8 @@ export function Landing({
   onSample,
   examples,
   onExample,
+  library,
+  onLibrary,
   onOpenSeries,
   dataset,
   recent,
@@ -211,6 +218,7 @@ export function Landing({
             {t('landing.about')}
           </a>
           {recent && <RecentSets {...recent} busy={busy} />}
+          <LibraryList clips={library} onOpen={onLibrary} busy={busy} />
           <ul className="landing__notes">
             <li>
               <Icon name="video" size={17} />

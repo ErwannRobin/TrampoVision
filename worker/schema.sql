@@ -42,3 +42,17 @@ CREATE TABLE IF NOT EXISTS examples (
   listed_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS examples_listed ON examples (listed_at);
+
+-- The best analysis of each video of the library (worker/src/library.ts). The file is in R2 under `library/<video_id>.<version>.series.gz`;
+-- a new version is written first, this row moves to it, and the old file goes, so the score here is always the one of the file it names.
+CREATE TABLE IF NOT EXISTS library_analysis (
+  video_id      TEXT PRIMARY KEY,   -- the id of the video: `v-` and 12 hex digits (src/dataset/videoId.ts)
+  version       INTEGER NOT NULL,
+  score         REAL NOT NULL,      -- share of the clip read as bounces (src/moderation/completion.ts), 0..1
+  found         REAL NOT NULL,      -- share of the frames where the athlete is found
+  jumps         INTEGER NOT NULL,
+  backend       TEXT NOT NULL,      -- the pose model(s) that read it
+  merged        INTEGER NOT NULL DEFAULT 0,   -- how many times two analyses were stitched into this one
+  contributions INTEGER NOT NULL DEFAULT 1,   -- how many analyses were sent for this video
+  updated_at    TEXT NOT NULL
+);

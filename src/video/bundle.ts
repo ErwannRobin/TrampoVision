@@ -72,12 +72,12 @@ async function scanBoxes(file: ByteSource): Promise<Box[] | null> {
   return boxes.length ? boxes : null;
 }
 
-const gzip = async (text: string): Promise<Uint8Array<ArrayBuffer>> =>
+export const gzip = async (text: string): Promise<Uint8Array<ArrayBuffer>> =>
   new Uint8Array(
     await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer(),
   );
 
-const gunzip = (data: Blob): Promise<string> =>
+export const gunzip = (data: Blob): Promise<string> =>
   new Response(data.stream().pipeThrough(new DecompressionStream('gzip'))).text();
 
 export interface Bundle {

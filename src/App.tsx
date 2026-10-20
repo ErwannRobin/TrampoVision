@@ -53,6 +53,14 @@ import { estimatorFactory } from './pose/engines';
 import { loadSample, loadSampleSeries, loadSamples, type Sample } from './video/sample';
 import { readBundle, writeBundle } from './video/bundle';
 import {
+  downloadLibraryClip,
+  fetchLibrary,
+  percent,
+  sendLibraryAnalysis,
+  type LibraryClip,
+  type LibraryOutcome,
+} from './sync/library';
+import {
   canShare,
   deleteShare,
   downloadShare,
@@ -233,6 +241,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
   const [samples, setSamples] = useState<Sample[]>([]);
   // The clips other people shared and listed (see ShareDialog): offered next to the samples.
   const [examples, setExamples] = useState<Example[]>([]);
+  // The library of the dataset's clips, each with the best analysis made of it so far (see sync/library.ts).
+  const [library, setLibrary] = useState<LibraryClip[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [fps, setFps] = useState(30);
   const [model, setModel] = useState<ModelVariant>('full');
@@ -321,6 +331,10 @@ function AppView({ playhead }: { playhead: Playhead }) {
   // The clip opened from a share link (?share=): the file as it was downloaded, and its link, which the share dialog then shows.
   const sharedFile = useRef<File | null>(null);
   const [openedShare, setOpenedShare] = useState<StoredShare | null>(null);
+  // The clip opened from the library: the file as it was downloaded, and its id. An analysis made of that file goes back to the library.
+  const libraryFile = useRef<{ file: File; id: string } | null>(null);
+  // Set when the pose model has just analyzed a library clip: the analysis is sent as soon as it is on screen.
+  const pendingLibrary = useRef<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   // The masked copy of the clip (from the motion detector) that the pose model reads while the clip is what is shown; null without one.
   const maskedRef = useRef<MaskedCopy | null>(null);
@@ -451,6 +465,7 @@ function AppView({ playhead }: { playhead: Playhead }) {
     let live = true;
     void loadSamples().then((found) => live && setSamples(found));
     void fetchExamples().then((found) => live && setExamples(found));
+    void fetchLibrary().then((found) => live && setLibrary(found));
     return () => {
       live = false;
     };
@@ -576,6 +591,37 @@ function AppView({ playhead }: { playhead: Playhead }) {
     }
   }
 
+  /** Opens a clip of the library: with its best analysis when it has one, else the pose model analyzes it and the result goes back. */
+  async function openLibrary(clip: LibraryClip) {
+    setStatus({ kind: 'loading', stage: 'downloading', progress: 0 });
+    try {
+      const { file: video, series } = await downloadLibraryClip(clip, (progress) =>
+        setStatus({ kind: 'loading', stage: 'downloading', progress }),
+      );
+      libraryFile.current = { file: video, id: clip.id };
+      await onFile(video, series ?? undefined);
+    } catch (err) {
+      libraryFile.current = null;
+      setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  /** The id of the library clip on screen, or null when the clip is any other video. */
+  function libraryIdOnScreen(): string | null {
+    const open = libraryFile.current;
+    return open && open.file === fileRef.current ? open.id : null;
+  }
+
+  /** What the library did with the analysis, in words. */
+  function libraryNotice(outcome: LibraryOutcome): string {
+    if (outcome.kept === 'stored') {
+      return t('library.sentKept', { score: percent(outcome.score), mine: percent(outcome.incomingScore) });
+    }
+    if (outcome.previousScore === null) return t('library.sentFirst', { score: percent(outcome.score) });
+    const text = outcome.kept === 'merged' ? 'library.sentMerged' : 'library.sentBetter';
+    return t(text, { score: percent(outcome.score), before: percent(outcome.previousScore) });
+  }
+
   /** Leaves the clip opened from a link: the address and the share dialog forget it. */
   function leaveShare() {
     sharedFile.current = null;
@@ -608,6 +654,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
     // A video with its analysis inside (a shared clip, or "Video with analysis"): the video alone goes on, with that analysis in
     // place of the pose model, under the name of the clip it was made from when it comes from a link.
     const seq = ++openSeq.current;
+    if (libraryFile.current?.file !== next) libraryFile.current = null;
+    pendingLibrary.current = null;
     const bundle = await readBundle(next);
     if (seq !== openSeq.current) return;
     const fromLink = next === sharedFile.current;
@@ -853,6 +901,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
       // Several athletes are shown together first: that is what they were filmed for.
       setCompare(athletes.length > 1);
       setTracks(athletes);
+      // A library clip: this analysis is the library's to judge, sent once it is on screen (see the effect below).
+      pendingLibrary.current = libraryIdOnScreen();
       setStatus({ kind: 'idle' });
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -927,6 +977,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
     abort.current?.abort();
     openSeq.current++;
     leaveShare();
+    libraryFile.current = null;
+    pendingLibrary.current = null;
     if (url) URL.revokeObjectURL(url);
     dropMasked();
     fileRef.current = null;
@@ -1013,6 +1065,27 @@ function AppView({ playhead }: { playhead: Playhead }) {
     }));
     return toSeriesJson(buildPoseSeriesSet(athletes, { fileName: name, stride, minVisibility: 0.4, calibration: cal }));
   }
+
+  // The analysis of a library clip goes to the library by itself: it keeps the best reading of each clip, and joins two when each reads
+  // a different part well. A failure only costs the contribution, so it is a line in the notice and nothing more.
+  useEffect(() => {
+    const id = pendingLibrary.current;
+    if (!id || !result || tracks.length === 0 || status.kind !== 'idle') return;
+    pendingLibrary.current = null;
+    void (async () => {
+      try {
+        const outcome = await sendLibraryAnalysis(id, serializeSeries(fileName, id, calibration));
+        setNotice((prev) => [prev, libraryNotice(outcome)].filter(Boolean).join(' '));
+        void fetchLibrary(true).then((found) => found.length && setLibrary(found));
+      } catch (err) {
+        setNotice((prev) =>
+          [prev, t('library.sendFailed', { reason: err instanceof Error ? err.message : String(err) })]
+            .filter(Boolean)
+            .join(' '),
+        );
+      }
+    })();
+  }, [tracks, result, status.kind]); // oxlint-disable-line react-hooks/exhaustive-deps
 
   /** The clip with its analysis inside, as it plays here: the H.264 copy when the original had to be converted. */
   async function bundleOfClip(): Promise<Blob> {
@@ -1652,6 +1725,8 @@ function AppView({ playhead }: { playhead: Playhead }) {
               onSample={(sample) => void onSample(sample)}
               examples={examples}
               onExample={(example) => void openShared(example.id)}
+              library={library}
+              onLibrary={(clip) => void openLibrary(clip)}
               onOpenSeries={(f) => void openSeries(f)}
               dataset={dataset}
               recent={{
