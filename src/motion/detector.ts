@@ -3,6 +3,7 @@ import { CAMERA_PROFILES, CameraTypeEstimator } from './cameraType';
 import { mergeMotionConfig, type CameraType, type MotionConfig } from './config';
 import { clamp01, dilate, labelPieces, ramp, shiftPicture, wholePixels } from './grid';
 import { ColumnRhythm } from './rhythm';
+import { ShotCutDetector } from './shotCut';
 import type { Box, GrayFrame, MotionResult } from './types';
 import { VerticalFlow, type Compensation } from './verticalFlow';
 
@@ -116,6 +117,9 @@ export class TrampolineMotionDetector {
   private readonly panY = { value: 0 };
   private athleteWidth: number | null = null;
   private lastTimeMs: number | null = null;
+  private readonly shots = new ShotCutDetector();
+  /** True for the frame that starts a new shot of the video. */
+  private cutNow = false;
   private fps = 0;
   private found = false;
   private periodS: number | null = null;
@@ -263,10 +267,14 @@ export class TrampolineMotionDetector {
   push(frame: GrayFrame, timeMs: number): MotionResult {
     if (frame.width !== this.width || frame.height !== this.height) this.allocate(frame.width, frame.height);
     let dt = 0;
+    // The picture changes all at once (a broadcast going from the wide shot to a close-up or a replay): the same goes as for a seek.
+    const shotCut = this.shots.push(frame);
+    this.cutNow = false;
     if (this.lastTimeMs !== null) {
       dt = (timeMs - this.lastTimeMs) / 1000;
-      // A cut (a seek, a dropped stretch): what was learned about the frames before it says nothing about this one.
-      if (dt <= 0 || dt > this.cfg.maxGapS) {
+      // A cut (a seek, a dropped stretch, a new shot): what was learned about the frames before it says nothing about this one.
+      if (dt <= 0 || dt > this.cfg.maxGapS || shotCut) {
+        this.cutNow = true;
         this.reset();
         this.hinted = null;
         dt = 0;
@@ -715,6 +723,7 @@ export class TrampolineMotionDetector {
       periodS: this.periodS,
       rhythmFit: this.rhythmFit,
       coverage: this.mask.length > 0 ? sum / this.mask.length : 1,
+      cut: this.cutNow,
       noise: this.noise,
       shift: this.flow?.shift ?? 0,
       camera: {
