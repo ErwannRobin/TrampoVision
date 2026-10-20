@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkUpload,
-  contentRange,
   isShareId,
   looksLikeVideo,
   randomToken,
@@ -10,6 +9,7 @@ import {
   MAX_LIVE_SHARE_BYTES,
   MAX_SHARE_BYTES,
 } from './shares';
+import { contentRange } from './r2';
 
 const empty = { lastDay: 0, live: 0 };
 

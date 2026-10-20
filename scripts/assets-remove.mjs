@@ -1,4 +1,4 @@
-// Deletes a whole kind of asset from the public Vercel Blob store, after a confirmation (one file: asset-remove.mjs).
+// Deletes a whole kind of asset from the R2 bucket of the assets, after a confirmation (one file: asset-remove.mjs).
 //
 //   npm run assets-remove                          asks what to remove
 //   npm run assets-remove -- videos                the sample videos (.mp4, .MOV), not their saved analysis
@@ -10,7 +10,7 @@
 //
 // Removing samples rewrites samples/index.json, so their buttons go away within a minute.
 import { createInterface } from 'node:readline/promises';
-import { deleteFromStore, hasToken, listStore } from './blob-store.mjs';
+import { deleteFromStore, hasToken, listStore, tokenHelp } from './asset-store.mjs';
 
 const groups = {
   videos: ['the sample videos only (samples/*.mp4, *.MOV)', (p) => /^samples\/.+\.(mp4|mov)$/i.test(p)],
@@ -28,7 +28,7 @@ const dryRun = args.includes('--dry-run');
 const yes = args.includes('--yes');
 let group = args.find((a) => !a.startsWith('--'));
 if (!hasToken) {
-  console.error('[remove] set BLOB_READ_WRITE_TOKEN (the read-write token of the Blob store)');
+  console.error(`[remove] ${tokenHelp}`);
   process.exit(1);
 }
 

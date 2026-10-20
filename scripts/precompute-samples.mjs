@@ -13,7 +13,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { root } from './blob-store.mjs';
+import { root } from './asset-store.mjs';
 
 const args = process.argv.slice(2);
 const force = args.includes('--force');
@@ -44,10 +44,11 @@ if (!todo.length) {
   process.exit(0);
 }
 
-// The app, without the review service: nothing the analysis does is sent anywhere.
+// The app, without the review service: nothing the analysis does is sent anywhere. Without the asset host too: the models come from
+// public/, not downloaded again by each fresh headless browser.
 const server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], {
   cwd: root,
-  env: { ...process.env, VITE_REVIEW_API_URL: '', VITE_REVIEW_INGEST_TOKEN: '' },
+  env: { ...process.env, VITE_REVIEW_API_URL: '', VITE_REVIEW_INGEST_TOKEN: '', VITE_ASSET_BASE_URL: '' },
   stdio: 'ignore',
 });
 const stop = () => server.kill();

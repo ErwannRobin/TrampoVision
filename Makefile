@@ -56,10 +56,13 @@ check: typecheck worker-check lint format-check test ## Typecheck, lint, format 
 
 ci: check build ## Everything CI runs
 
-##@ Assets (the Blob asset host reads BLOB_READ_WRITE_TOKEN, .env.local or .env)
+##@ Assets (the R2 bucket the review Worker serves; the upload reads R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, .env.local or .env)
 
 assets-download: node_modules ## Re-download MediaPipe runtime + pose models into public/
 	npm run fetch-assets
+
+assets-bucket: node_modules ## Create the R2 bucket of the assets, once, before the first upload and the Worker deploy that binds it
+	cd worker && npx wrangler r2 bucket create trampovision-assets --location weur
 
 assets-upload: node_modules ## Upload models, wasm, samples: [SAMPLES=dir] [FORCE=1] [DRY_RUN=1]
 	npm run assets-upload -- $(if $(SAMPLES),--samples $(SAMPLES)) $(if $(DRY_RUN),--dry-run) $(if $(FORCE),--force)
@@ -69,7 +72,7 @@ assets-precompute: node_modules ## Analyze sample videos so the app skips the po
 	npm run precompute-samples -- $(if $(SAMPLES),--samples $(SAMPLES)) $(if $(FORCE),--force)
 
 asset-remove: node_modules ## Delete from the host: make asset-remove NAME... [DRY_RUN=1]
-	$(call require,ASSET_NAMES,make asset-remove synchro.mp4 [other ...] [DRY_RUN=1]  (a store path or a sample name; a name without extension removes the clip: .mp4 .MOV .pose.json))
+	$(call require,ASSET_NAMES,make asset-remove synchro.mp4 [other ...] [DRY_RUN=1]  (a bucket path or a sample name; a name without extension removes the clip: .mp4 .MOV .pose.json))
 	npm run asset-remove -- $(ASSET_NAMES) $(if $(DRY_RUN),--dry-run)
 
 assets-remove: node_modules ## Delete a kind after a confirmation: [WHAT=videos|samples|models|wasm|all] [YES=1] [DRY_RUN=1]

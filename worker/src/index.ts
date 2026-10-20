@@ -1,8 +1,9 @@
 import { FIG_ELEMENTS } from '../../src/skills/fig/elements';
+import { handleAssets, type AssetEnv } from './assets';
 import { originAllowed, parseIngest, parseReview, tokenMatches, STATUSES, type JumpRow } from './logic';
 import { handleShares, type ShareEnv } from './shares';
 
-export interface Env extends ShareEnv {
+export interface Env extends ShareEnv, AssetEnv {
   DB: D1Database;
   ALLOWED_ORIGIN: string;
   /** Regular expression of the preview deployments of the app that may call too (optional). */
@@ -78,6 +79,10 @@ export default {
       if (path === '/elements' && req.method === 'GET') {
         return reply({ elements: FIG_ELEMENTS.map((e) => ({ id: e.id, name: e.name })) });
       }
+
+      // The app's models, wasm and samples (assets.ts): public, read only.
+      const asset = await handleAssets(req, env, path, h, reply);
+      if (asset) return asset;
 
       // Shared clips (shares.ts): uploading takes the app's token, reading takes the link, removing takes the uploader's key.
       const shared = await handleShares(req, env, path, canWrite(req, env), h, reply);
