@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readBundle, writeBundle } from './bundle';
+import { readBundle, readSeries, writeBundle } from './bundle';
 
 /** One box: 4-byte size, 4-character type, then `content` bytes of filler. */
 function box(type: string, content: number, size = 8 + content): Uint8Array<ArrayBuffer> {
@@ -83,5 +83,22 @@ describe('video with its analysis inside', () => {
     const damaged = bundle.slice();
     damaged.fill(0, damaged.length - 20);
     expect((await readBundle(new Blob([damaged]))).series).toBe(null);
+  });
+
+  it('reads the analysis alone from ranges of the file, never the video', async () => {
+    const bundle = await writeBundle(mp4(), SERIES);
+    const reads: [number, number][] = [];
+    const source = {
+      size: bundle.size,
+      read: async (start: number, end: number) => {
+        reads.push([start, end]);
+        return bundle.slice(start, end);
+      },
+    };
+    expect(await readSeries(source)).toBe(SERIES);
+    // One read of 32 bytes at most per box header, then the analysis box: nothing of the 5 kB mdat.
+    expect(reads.slice(0, 4).every(([s, e]) => e - s <= 32)).toBe(true);
+    expect(reads).toHaveLength(5);
+    expect(await readSeries({ size: mp4().size, read: async (s, e) => mp4().slice(s, e) })).toBe(null);
   });
 });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Banner, Button } from '../ui/kit';
-import { API, ApiError, clipUrl, listClips, remove, setLabel, unlist } from './api';
+import { API, ApiError, clipCompletion, clipUrl, listClips, remove, setLabel, unlist } from './api';
+import { completionBadge, type Completion } from './completion';
 import { FILTERS, formatBytes, shortDate, stayText, type Clip, type Filter, type Totals } from './logic';
 
 const KEY_STORE = 'trampovision.moderationKey';
@@ -22,6 +23,73 @@ const writeKey = (key: string) => {
 };
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/** One clip scored at a time: its analysis runs again on this page's thread. */
+let queue: Promise<unknown> = Promise.resolve();
+function queued<T>(work: () => Promise<T>): Promise<T> {
+  const next = queue.then(work);
+  queue = next.catch(() => undefined);
+  return next;
+}
+
+type ScoreState = { kind: 'waiting' } | { kind: 'done'; value: Completion | null } | { kind: 'error'; message: string };
+
+/** The completion score of a clip, worked out once the row comes near the screen. */
+function ClipScore({ clipKey, clip }: { clipKey: string; clip: Clip }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [state, setState] = useState<ScoreState>({ kind: 'waiting' });
+  const { id, size } = clip;
+  useEffect(() => {
+    let cancelled = false;
+    const start = () =>
+      void queued(() => clipCompletion(clipKey, { id, size })).then(
+        (value) => !cancelled && setState({ kind: 'done', value }),
+        (err) => !cancelled && setState({ kind: 'error', message: message(err) }),
+      );
+    if (typeof IntersectionObserver === 'undefined' || !ref.current) {
+      start();
+      return () => void (cancelled = true);
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        observer.disconnect();
+        start();
+      },
+      { rootMargin: '400px' },
+    );
+    observer.observe(ref.current);
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [clipKey, id, size]);
+
+  let body;
+  if (state.kind === 'waiting') body = <span>Analyzed …</span>;
+  else if (state.kind === 'error') body = <span title={state.message}>Score unavailable</span>;
+  else if (state.value === null) body = <Badge title="The clip carries no analysis">No analysis</Badge>;
+  else {
+    const { score, found, jumps } = state.value;
+    const badge = completionBadge(score);
+    body = (
+      <>
+        <Badge
+          tone={badge.tone}
+          title={`Share of the clip where the athlete is found inside a run of bounces. Athlete found in ${Math.round(found * 100)}% of the clip.`}
+        >
+          {badge.text}
+        </Badge>
+        <span>{jumps === 1 ? '1 jump' : `${jumps} jumps`}</span>
+      </>
+    );
+  }
+  return (
+    <span ref={ref} className="mod__score">
+      {body}
+    </span>
+  );
+}
 
 function KeyForm({ error, onKey }: { error: string; onKey: (key: string) => void }) {
   const [value, setValue] = useState('');
@@ -56,6 +124,7 @@ function KeyForm({ error, onKey }: { error: string; onKey: (key: string) => void
 
 function ClipRow({
   clip,
+  clipKey,
   busy,
   canList,
   onRename,
@@ -64,6 +133,7 @@ function ClipRow({
   onPreview,
 }: {
   clip: Clip;
+  clipKey: string;
   busy: boolean;
   canList: boolean;
   onRename: (title: string) => void;
@@ -103,6 +173,7 @@ function ClipRow({
     <li className="mod__clip sheet">
       <div className="mod__meta">
         {clip.listed ? <Badge tone="ok">Listed</Badge> : <Badge>Not listed</Badge>}
+        <ClipScore clipKey={clipKey} clip={clip} />
         <span>{stayText(clip)}</span>
         <span>{formatBytes(clip.size)}</span>
         <span>Uploaded {shortDate(clip.createdAt)}</span>
@@ -269,6 +340,7 @@ export function ModerationPage() {
           <ClipRow
             key={clip.id}
             clip={clip}
+            clipKey={key}
             busy={busyId === clip.id}
             canList={!full}
             onRename={(title) => void act(clip.id, () => setLabel(key, clip.id, title))}

@@ -1,4 +1,6 @@
-import { readClips, type Filter } from './logic';
+import { readSeries } from '../video/bundle';
+import { seriesCompletion, type Completion } from './completion';
+import { readClips, type Clip, type Filter } from './logic';
 
 /**
  * The calls of the moderation page. They take the owner's key (the Worker's REVIEW_TOKEN), typed by the owner and kept for this tab only:
@@ -22,7 +24,11 @@ async function call(path: string, key: string, init: RequestInit = {}): Promise<
   try {
     response = await fetch(`${API}${path}`, {
       ...init,
-      headers: { authorization: `Bearer ${key}`, ...(init.body ? { 'content-type': 'application/json' } : {}) },
+      headers: {
+        ...(init.headers as Record<string, string> | undefined),
+        authorization: `Bearer ${key}`,
+        ...(init.body ? { 'content-type': 'application/json' } : {}),
+      },
     });
   } catch {
     throw new ApiError('The service cannot be reached. Check the connection.', 0);
@@ -58,4 +64,42 @@ export async function remove(key: string, id: string): Promise<void> {
 export async function clipUrl(key: string, id: string): Promise<string> {
   const response = await call(`/shares/${id}`, key);
   return URL.createObjectURL(await response.blob());
+}
+
+/** Scores already worked out, by clip id. A shared clip never changes, so its score holds until the clip is gone. */
+const SCORES_STORE = 'trampovision.moderationScores.v1';
+const scores: Record<string, Completion | null> = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(SCORES_STORE) ?? '{}') as Record<string, Completion | null>;
+  } catch {
+    return {};
+  }
+})();
+
+/**
+ * How much of the clip the app read well (see completion.ts), from the analysis inside it. Only the box headers and the analysis
+ * box are downloaded, a few range requests: never the video. Null when the clip carries no analysis.
+ */
+export async function clipCompletion(key: string, clip: Pick<Clip, 'id' | 'size'>): Promise<Completion | null> {
+  if (clip.id in scores) return scores[clip.id];
+  const series = await readSeries({
+    size: clip.size,
+    read: async (start, end) => {
+      const response = await call(`/shares/${clip.id}`, key, { headers: { range: `bytes=${start}-${end - 1}` } });
+      if (response.status !== 206) {
+        // The whole file is coming: stop it.
+        void response.body?.cancel();
+        throw new ApiError('The service does not send a part of a file.', response.status);
+      }
+      return response.blob();
+    },
+  });
+  const score = series === null ? null : seriesCompletion(series);
+  scores[clip.id] = score;
+  try {
+    localStorage.setItem(SCORES_STORE, JSON.stringify(scores));
+  } catch {
+    /* worked out again next time */
+  }
+  return score;
 }

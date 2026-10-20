@@ -57,6 +57,11 @@
   color: var(--text-2);
   font-size: var(--fs-sm);
 }
+.mod__score {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 .mod__title-row {
   display: flex;
   gap: 8px;
