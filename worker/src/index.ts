@@ -27,7 +27,8 @@ const cors = (env: Env, req: Request): Record<string, string> => {
   return origin && originAllowed(origin, env.ALLOWED_ORIGIN, env.PREVIEW_ORIGIN_PATTERN)
     ? {
         'access-control-allow-origin': origin,
-        'access-control-allow-headers': 'authorization, content-type',
+        // range: the moderation page reads only the analysis at the end of a shared clip.
+        'access-control-allow-headers': 'authorization, content-type, range',
         'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
         vary: 'origin',
       }
