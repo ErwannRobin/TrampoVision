@@ -8,6 +8,9 @@ import { REVIEW_API_URL } from './reviewSync';
  * where the video leaves the browser: only when the person asks for a link, after the dialog says where it goes and for how long.
  * The Worker's origin is the review service's, so the Content-Security-Policy and the local-only guard need nothing more. Without a
  * review service (`VITE_REVIEW_API_URL`) there is no sharing.
+ *
+ * Right after the upload the dialog suggests listing the clip among the examples of the first screen. A listed clip is kept for good
+ * (until its uploader stops sharing it) and everyone sees it in the menu; that is asked for separately, with its own words.
  */
 
 export const SHARE_API_URL = REVIEW_API_URL;
@@ -18,6 +21,8 @@ const TOKEN = (import.meta.env.VITE_REVIEW_INGEST_TOKEN as string | undefined) |
 export const SHARE_DAYS = 90;
 /** The largest clip the Worker accepts. */
 export const MAX_SHARE_BYTES = 100_000_000;
+/** The longest name of a listed clip, as the Worker keeps it. */
+export const MAX_EXAMPLE_LABEL = 60;
 
 /** What the Worker answers to an upload. `deleteKey` is the only way to remove the clip before it expires. */
 export interface ShareReceipt {
@@ -46,6 +51,12 @@ export function withoutShare(search: string): string {
   params.delete(SHARE_PARAM);
   const rest = params.toString();
   return rest ? `?${rest}` : '';
+}
+
+/** A clip listed among the examples of the first screen. */
+export interface Example {
+  id: string;
+  label: string;
 }
 
 /** A refusal of the Worker in words. */
@@ -108,6 +119,45 @@ export async function downloadShare(id: string, onProgress?: (fraction: number) 
   return new File([download.blob], `trampovision-${id}.${type === 'video/quicktime' ? 'mov' : 'mp4'}`, { type });
 }
 
+/** The clips listed among the examples, newest first. Empty without a sharing service, or when it cannot be reached or read. */
+export async function fetchExamples(): Promise<Example[]> {
+  if (!SHARE_API_URL) return [];
+  try {
+    const response = await fetch(`${SHARE_API_URL}/examples`);
+    if (!response.ok) return [];
+    const body: unknown = await response.json();
+    const list = body && typeof body === 'object' ? (body as { examples?: unknown }).examples : null;
+    return Array.isArray(list) ? list.flatMap(exampleOf) : [];
+  } catch {
+    return [];
+  }
+}
+
+function exampleOf(raw: unknown): Example[] {
+  const e = raw as Partial<Example> | null;
+  return e && typeof e.id === 'string' && ID.test(e.id) && typeof e.label === 'string' && e.label.trim()
+    ? [{ id: e.id, label: e.label.trim() }]
+    : [];
+}
+
+/** Lists a shared clip among the examples, under `label`, for good. Takes the key the upload gave. */
+export async function listExample(id: string, deleteKey: string, label: string): Promise<void> {
+  if (!SHARE_API_URL) throw new Error(t('share.unavailable'));
+  let response: Response;
+  try {
+    response = await fetch(`${SHARE_API_URL}/shares/${id}/example`, {
+      method: 'PUT',
+      headers: { authorization: `Bearer ${deleteKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ label }),
+    });
+  } catch {
+    throw new Error(shareErrorText(0));
+  }
+  if (response.status === 404) throw new Error(t('share.errGone'));
+  if (response.status === 503) throw new Error(t('share.errExamplesFull'));
+  if (!response.ok) throw new Error(shareErrorText(response.status));
+}
+
 /** Removes a shared clip: the link no longer opens it. */
 export async function deleteShare(id: string, deleteKey: string): Promise<void> {
   if (!SHARE_API_URL) throw new Error(t('share.unavailable'));
@@ -130,8 +180,11 @@ export async function deleteShare(id: string, deleteKey: string): Promise<void> 
  */
 export interface StoredShare {
   id: string;
+  /** When the Worker deletes the clip; empty for a listed clip, which stays until it is stopped. */
   expiresAt: string;
   deleteKey?: string;
+  /** The clip is listed among the examples. */
+  listed?: boolean;
 }
 
 const STORE_KEY = 'trampovision.shares';

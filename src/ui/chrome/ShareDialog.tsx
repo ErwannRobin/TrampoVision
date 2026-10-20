@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { formatPercent, getLocale, t, useLocale } from '../../i18n';
-import { SHARE_DAYS, shareLink, type StoredShare } from '../../sync/share';
+import { MAX_EXAMPLE_LABEL, SHARE_DAYS, shareLink, type StoredShare } from '../../sync/share';
 import { Banner, Button, IconButton } from '../kit';
 
 export interface ShareDialogProps {
@@ -12,12 +12,15 @@ export interface ShareDialogProps {
   onCreate: (opts: { onProgress: (fraction: number | null) => void; signal: AbortSignal }) => Promise<StoredShare>;
   /** Removes the shared copy. */
   onStop: (share: StoredShare) => Promise<void>;
+  /** Lists the shared clip among the examples of the start screen, for good, under a title. Gives the share as it is then. */
+  onList: (share: StoredShare, label: string) => Promise<StoredShare>;
 }
 
 type Phase =
   | { kind: 'ask' }
   | { kind: 'working'; progress: number | null }
   | { kind: 'done'; share: StoredShare }
+  | { kind: 'listing'; share: StoredShare }
   | { kind: 'stopping'; share: StoredShare }
   | { kind: 'stopped' };
 
@@ -30,7 +33,7 @@ const day = (iso: string) => {
  * Sharing the clip as a link: what leaves the browser and for how long is said first, then the upload, then the link to copy or
  * send, and the way to remove the shared copy. Nothing is uploaded before the person asks for the link.
  */
-export function ShareDialog({ open, onClose, existing, onCreate, onStop }: ShareDialogProps) {
+export function ShareDialog({ open, onClose, existing, onCreate, onStop, onList }: ShareDialogProps) {
   useLocale();
   const titleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -39,6 +42,7 @@ export function ShareDialog({ open, onClose, existing, onCreate, onStop }: Share
   const [phase, setPhase] = useState<Phase>({ kind: 'ask' });
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
+  const [title, setTitle] = useState('');
 
   // Each opening starts from what is known of this clip then, whatever it becomes while the dialog is open.
   useEffect(() => {
@@ -46,6 +50,7 @@ export function ShareDialog({ open, onClose, existing, onCreate, onStop }: Share
     setPhase(existing ? { kind: 'done', share: existing } : { kind: 'ask' });
     setError('');
     setNote('');
+    setTitle('');
   }, [open]); // oxlint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -84,6 +89,17 @@ export function ShareDialog({ open, onClose, existing, onCreate, onStop }: Share
     try {
       await onStop(share);
       setPhase({ kind: 'stopped' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setPhase({ kind: 'done', share });
+    }
+  }
+
+  async function list(share: StoredShare) {
+    setError('');
+    setPhase({ kind: 'listing', share });
+    try {
+      setPhase({ kind: 'done', share: await onList(share, title.trim()) });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setPhase({ kind: 'done', share });
@@ -165,7 +181,7 @@ export function ShareDialog({ open, onClose, existing, onCreate, onStop }: Share
               </>
             )}
 
-            {(phase.kind === 'done' || phase.kind === 'stopping') && (
+            {(phase.kind === 'done' || phase.kind === 'listing' || phase.kind === 'stopping') && (
               <>
                 <label className="share__label" htmlFor={`${titleId}-link`}>
                   {t('share.link')}
@@ -188,6 +204,35 @@ export function ShareDialog({ open, onClose, existing, onCreate, onStop }: Share
                 </div>
                 {phase.share.expiresAt && (
                   <p className="share__fine">{t('share.until', { date: day(phase.share.expiresAt) })}</p>
+                )}
+                {phase.share.listed && <p role="status">{t('share.listed')}</p>}
+                {/* Only the person who uploaded it can list it: the key is theirs. */}
+                {phase.share.deleteKey && !phase.share.listed && (
+                  <form
+                    className="share__list"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (title.trim() && phase.kind === 'done') void list(phase.share);
+                    }}
+                  >
+                    <h3 className="share__list-title">{t('share.listTitle')}</h3>
+                    <p>{t('share.listText', { days: SHARE_DAYS })}</p>
+                    <p className="share__fine">{t('share.listFine')}</p>
+                    <label className="share__label" htmlFor={`${titleId}-name`}>
+                      {t('share.listName')}
+                    </label>
+                    <input
+                      id={`${titleId}-name`}
+                      className="share__link"
+                      value={title}
+                      maxLength={MAX_EXAMPLE_LABEL}
+                      disabled={phase.kind !== 'done'}
+                      onChange={(e) => setTitle(e.target.value)}
+                    />
+                    <Button type="submit" icon="film" disabled={phase.kind !== 'done' || !title.trim()}>
+                      {phase.kind === 'listing' ? t('share.listing') : t('share.list')}
+                    </Button>
+                  </form>
                 )}
                 {phase.share.deleteKey && (
                   <div className="share__stop">

@@ -33,3 +33,12 @@ CREATE TABLE IF NOT EXISTS shares (
   delete_hash  TEXT NOT NULL       -- SHA-256 of the key the uploader received to remove it
 );
 CREATE INDEX IF NOT EXISTS shares_created ON shares (created_at);
+
+-- The shared clips their uploader listed among the examples of the first screen. A listed clip never expires: its file is in R2 under
+-- `examples/<id>` (outside the bucket's expiry rule) and its `shares` row has no end date. It goes when its uploader stops sharing it.
+CREATE TABLE IF NOT EXISTS examples (
+  id        TEXT PRIMARY KEY,   -- the id of the clip, in `shares`
+  label     TEXT NOT NULL,   -- the name the uploader gave it, shown in the menu
+  listed_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS examples_listed ON examples (listed_at);

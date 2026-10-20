@@ -7,7 +7,7 @@ import { HeroArcs } from './chrome/HeroArcs';
 import { RecentSets, type RecentSetsProps } from './chrome/RecentSets';
 import { DemoSkeleton } from './DemoSkeleton';
 import { DatasetBar, EvaluationReport } from './EvaluationView';
-import { canShare } from '../sync/share';
+import { canShare, type Example } from '../sync/share';
 import type { Sample } from '../video/sample';
 import { useMediaQuery } from './hooks';
 import { Icon, Menu, Switch, type IconName } from './kit';
@@ -17,6 +17,9 @@ export interface LandingProps {
   /** The sample videos on offer: none when there is no asset host. */
   samples: Sample[];
   onSample: (sample: Sample) => void;
+  /** The clips other people shared and listed, offered after the samples; opening one is `onExample`. */
+  examples: Example[];
+  onExample: (example: Example) => void;
   onOpenSeries: (file: File) => void;
   /** The dataset saved in this browser: shown as its own section when it holds something. */
   dataset: DatasetApi;
@@ -108,6 +111,8 @@ export function Landing({
   onFile,
   samples,
   onSample,
+  examples,
+  onExample,
   onOpenSeries,
   dataset,
   recent,
@@ -136,7 +141,7 @@ export function Landing({
             ) : (
               <VideoButton label={t('landing.choose')} icon="upload" primary busy={busy} onFile={onFile} />
             )}
-            {samples.length > 0 && (
+            {samples.length + examples.length > 0 && (
               <Menu
                 label={t('landing.sample')}
                 icon="film"
@@ -152,7 +157,17 @@ export function Landing({
                       onSelect: () => onSample(sample),
                     })),
                   },
-                ]}
+                  {
+                    id: 'examples',
+                    title: samples.length > 0 ? t('landing.examples') : undefined,
+                    items: examples.map((example) => ({
+                      id: example.id,
+                      label: example.label,
+                      disabled: busy,
+                      onSelect: () => onExample(example),
+                    })),
+                  },
+                ].filter((group) => group.items.length > 0)}
               />
             )}
           </div>
@@ -181,6 +196,14 @@ export function Landing({
             </label>
           )}
           {advanced && REVIEW_API_URL && <ReviewLink />}
+          {advanced && REVIEW_API_URL && (
+            <ToolLink
+              href="/moderation.html"
+              icon="shield"
+              title={t('landing.moderation')}
+              hint={t('landing.moderationHint')}
+            />
+          )}
           {advanced && (
             <ToolLink href="/motion.html" icon="target" title={t('landing.motion')} hint={t('landing.motionHint')} />
           )}

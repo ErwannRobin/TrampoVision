@@ -56,6 +56,7 @@ export const chrome = {
   'landing.film': 'Film a set',
   'landing.choose': 'Choose a video',
   'landing.sample': 'Try a sample',
+  'landing.examples': 'Shared by users',
   'landing.drop': 'or drop a video anywhere on this page',
   'landing.openSaved': 'Open a saved analysis',
   'landing.review': 'Review jumps',
@@ -63,6 +64,8 @@ export const chrome = {
   'landing.reviewWaiting': '{n} waiting for a check',
   'landing.motion': 'Motion detector',
   'landing.motionHint': 'Experimental: isolate the athlete before the pose model',
+  'landing.moderation': 'Moderate shared clips',
+  'landing.moderationHint': 'The owner’s page: list, rename or delete the clips people shared',
   'landing.followHint': 'Slower, but keeps the analysis on the jumper, not on a spotter or a coach.',
   'landing.secondHint':
     'Slower: where the pose model is unsure, a stronger one reads those frames again and the two readings are merged. 200 MB to download the first time.',
@@ -341,6 +344,16 @@ export const chrome = {
   'share.stopText': 'Stopping deletes the uploaded copy: the link will no longer open it.',
   'share.stop': 'Stop sharing',
   'share.stopped': 'The shared copy is deleted: the link no longer opens it.',
+  'share.listTitle': 'Add it to the examples?',
+  'share.listText':
+    'It would appear in the “Try a sample” menu of the start screen, for everyone who opens the app. Unlike a plain link, a listed clip is not deleted after {days} days: it stays until you stop sharing it.',
+  'share.listFine':
+    'Anyone can watch it. List only a clip the athlete (or their parents) agreed to show publicly, and leave the athlete’s name out of its title.',
+  'share.listName': 'Title in the menu',
+  'share.list': 'Add to the examples',
+  'share.listing': 'Adding…',
+  'share.listed': 'Listed in the examples. It stays until you stop sharing it.',
+  'share.errExamplesFull': 'The examples are full for now.',
   'share.noClip': 'There is no analyzed video to share.',
   'share.unavailable': 'Sharing is not available in this version of the app.',
   'share.errTooLarge': 'The video is too large to share ({mb} MB at most).',
