@@ -31,6 +31,11 @@ export const SEQUENCE_JOINTS: { name: string; index: number }[] = [
 
 /** How much a joint sample is trusted, by how it was obtained (see stabilize.ts). */
 export const STATE_TRUST = [0, 1, 0.6, 0.4] as const;
+/**
+ * The joints of a frame the model read turned over and the analysis turned back (see `computeAnalysis`) are trusted like bridged
+ * ones: they are the model's own points, but a model that takes head for feet has not read the rest of the body well either.
+ */
+export const TURNED_BACK_TRUST = 0.6;
 
 const TRUNK_JOINTS = [LM.L_SHOULDER, LM.R_SHOULDER, LM.L_HIP, LM.R_HIP];
 
@@ -123,12 +128,13 @@ export function computeFrameShape(result: AnalysisResult, cfg: SkillConfig): Fra
 
   for (let i = 0; i < n; i++) {
     // Trust: how the core joints of this sample were obtained.
+    const repaired = result.orientationFlipped[i] ? TURNED_BACK_TRUST : 1;
     let q = 0;
     for (const k of CORE_LANDMARKS) q += STATE_TRUST[result.jointState[k][i]] ?? 0;
-    fs.quality[i] = q / CORE_LANDMARKS.length;
+    fs.quality[i] = (repaired * q) / CORE_LANDMARKS.length;
     let qt = 0;
     for (const k of TRUNK_JOINTS) qt += STATE_TRUST[result.jointState[k][i]] ?? 0;
-    fs.trunkQuality[i] = qt / TRUNK_JOINTS.length;
+    fs.trunkQuality[i] = (repaired * qt) / TRUNK_JOINTS.length;
 
     const pts = result.landmarks[i];
     if (!pts) continue;

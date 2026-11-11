@@ -11,7 +11,7 @@ import {
   jumpHeadline,
   TIER_TEXT,
 } from './insights';
-import { analysisWarnings } from './quality';
+import { analysisWarnings, framesLostInFlight } from './quality';
 
 describe('confidenceTier', () => {
   it('reads the classifier score against its own minimum', () => {
@@ -98,5 +98,31 @@ describe('analysisWarnings', () => {
     const { track } = mannequinRoutine({ jumps: [{ v0: 4.4, shape: 'straight' }], facing: 1 });
     const result = computeAnalysis(track, { athleteHeightM: 1.75 });
     expect(analysisWarnings(result)).toEqual([]);
+  });
+
+  it('says so when the pose model lost the athlete in much of the flights, and how to film', () => {
+    const { track, truth } = mannequinRoutine({
+      jumps: [
+        { v0: 6.5, turns: 1, shape: 'tuck' },
+        { v0: 6.5, turns: 1, shape: 'tuck' },
+      ],
+      facing: 1,
+    });
+    // A third of each flight with nobody found, around its top.
+    const lost = {
+      ...track,
+      frames: track.frames.map((f, i) => (truth.apex.some((a) => Math.abs(i / 30 - a) < 0.22) ? null : f)),
+    };
+    const result = computeAnalysis(lost, { athleteHeightM: 1.75 });
+    expect(result.jumps.cycles).toHaveLength(2);
+    const { air, lost: hard } = framesLostInFlight(result);
+    expect(hard / air).toBeGreaterThan(0.25);
+    const warnings = analysisWarnings(result);
+    expect(warnings.some((w) => w.includes('60 frames a second'))).toBe(true);
+    // A frame or two lost is not worth a warning.
+    const few = { ...track, frames: track.frames.map((f, i) => (i === Math.round(truth.apex[0] * 30) ? null : f)) };
+    expect(analysisWarnings(computeAnalysis(few, { athleteHeightM: 1.75 })).some((w) => w.includes('60 frames'))).toBe(
+      false,
+    );
   });
 });

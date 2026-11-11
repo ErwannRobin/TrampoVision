@@ -90,6 +90,8 @@ export const insights = {
   'quality.rotationStep':
     'Body orientation changes by more than 120° between two samples: rotations may be undercounted. Analyze every frame.',
   'quality.missingCom': 'The center of mass is missing in {share} of the frames.',
+  'quality.lostInFlight':
+    'In {share} of the frames in the air the pose model lost the athlete or read them upside down, as it does on a fast, blurred or inverted body. Those frames were bridged or turned back: check the skills named. For fast skills, film at 60 frames a second or more with a short exposure (good light).',
   'quality.cutOff': 'A jump is cut off at the start or end of the clip: its takeoff or landing is unknown.',
 
   // Why the marked trampoline was refused

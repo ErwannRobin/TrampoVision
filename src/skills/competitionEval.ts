@@ -529,8 +529,10 @@ export function formatPose(s: CompetitionSummary): string {
   const pct = (v: number) => `${(100 * v).toFixed(1)}%`;
   return (
     `joints in ${pct(p.coverage)} of the frames in the air, ${pct(p.joint)} of the height off; center of mass in ` +
-    `${pct(p.comCoverage)}, ${pct(p.com)} off; orientation ${p.orientationDeg.toFixed(1)}° off; hip angle ${p.hipDeg.toFixed(1)}° off; ` +
-    `on the frames the model failed: joints in ${pct(p.failedCoverage)}, ${pct(p.failedJoint)} off, hip angle ${p.failedHipDeg.toFixed(1)}° off`
+    `${pct(p.comCoverage)}, ${pct(p.com)} off; orientation ${p.orientationDeg.toFixed(1)}° off; hip angle ${p.hipDeg.toFixed(1)}° off` +
+    (Number.isFinite(p.failedJoint)
+      ? `; on the frames the model failed: joints in ${pct(p.failedCoverage)}, ${pct(p.failedJoint)} off, hip angle ${p.failedHipDeg.toFixed(1)}° off`
+      : '')
   );
 }
 
