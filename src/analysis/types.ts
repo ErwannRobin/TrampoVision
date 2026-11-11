@@ -54,6 +54,11 @@ export interface AnalysisOptions {
    * rotation count is not thrown off (see orientation.ts). Default true; false unwraps the trunk angle exactly as it was measured.
    */
   repairOrientation?: boolean;
+  /**
+   * Put the frames the orientation tracker overruled right in the track itself and read it again (see `computeAnalysis`). Default
+   * true; false keeps the landmarks as the pose model gave them (only the orientation is repaired), to see what the second reading is worth.
+   */
+  repairFrames?: boolean;
 }
 
 export const DEFAULT_ANALYSIS_OPTIONS: AnalysisOptions = {
@@ -62,6 +67,7 @@ export const DEFAULT_ANALYSIS_OPTIONS: AnalysisOptions = {
   calibration: null,
   scaleSource: 'auto',
   repairOrientation: true,
+  repairFrames: true,
 };
 
 export interface AnalysisSummary {
@@ -110,6 +116,8 @@ export interface AnalysisResult {
     /** Frames whose trunk angle was read 180° away from the pose model's (a head/feet flip repaired by the orientation tracker), and how many separate stretches. */
     orientationFlippedFrames: number;
     orientationFlipRuns: number;
+    /** Frames whose trunk angle fitted neither as read nor turned over, and were dropped (see orientation.ts). */
+    orientationRejectedFrames: number;
   };
   time: Float64Array;
   /** Smoothed, gap-filled landmarks in pixels (null where no athlete could be located). Visibility = per-joint score. */
@@ -123,6 +131,8 @@ export interface AnalysisResult {
   comY: Float64Array; // px (image coordinates, y down)
   /** Share of body mass whose segments were visible when the COM was computed (COM is dropped below 0.5). */
   comCoverage: Float64Array;
+  /** 1 where the center of mass was not measured but put on the parabola of the flight (the athlete lost in mid-air, see ballistic.ts). */
+  comBridged: Uint8Array;
   /** COM height above the reference in `meta.heightReference`, meters. */
   height: Float64Array;
   /** COM vertical velocity, m/s, positive = up. */
@@ -139,6 +149,8 @@ export interface AnalysisResult {
   orientation: Float64Array;
   /** 1 where the trunk angle of a frame was read 180° away from the pose model's (a head/feet flip put back by the orientation tracker). */
   orientationFlipped: Uint8Array;
+  /** 1 where the frame was dropped because its trunk angle had nothing to do with the frames around it. */
+  orientationRejected: Uint8Array;
   /** Body-line (ankles→head) angle made continuous like `orientation`. */
   lineOrientation: Float64Array;
   /** Cumulative trunk rotation, degrees, relative to the first valid sample. */
