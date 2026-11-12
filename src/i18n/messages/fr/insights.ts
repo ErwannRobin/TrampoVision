@@ -92,6 +92,8 @@ export const insights: Translation<typeof en> = {
   'quality.rotationStep':
     'L’orientation du corps change de plus de 120° entre deux échantillons : les rotations sont peut-être sous-comptées. Analysez chaque image.',
   'quality.missingCom': 'Le centre de masse est absent sur {share} des images.',
+  'quality.lostInFlight':
+    'Sur {share} des images en l’air, le modèle de pose a perdu l’athlète ou l’a lu la tête en bas, comme sur un corps rapide, flou ou renversé. Ces images ont été comblées ou retournées : vérifiez les figures annoncées. Pour les figures rapides, filmez à 60 images par seconde ou plus, avec un temps de pose court (bonne lumière).',
   'quality.cutOff': 'Un saut est coupé au début ou à la fin du clip : son impulsion ou sa réception est inconnue.',
 
   'calibration.error.sizes': 'Les dimensions de la toile doivent être positives.',

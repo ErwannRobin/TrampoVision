@@ -8,7 +8,7 @@ import type { AnalysisResult, PoseTrack } from './types';
 /**
  * How well the pose model read the athlete, without labels: the frames where its reading cannot be trusted, and which of them a
  * second, slower model should read again (see fusion.ts). A flight is doubtful when the athlete was not measured through it, when
- * the orientation tracker had to turn a reading over (head where the feet are), when the rotation fails the checks the classifier
+ * the orientation tracker had to turn a reading over (head where the feet are) or leave one out, when the rotation fails the checks the classifier
  * uses (it went one way and came back, it jumped between two frames, the body line did not turn with the trunk), when the joints
  * were read with little confidence, or when the athlete rotates at all: on the sample clips MediaPipe read 1 of 5 and 0 of 4
  * somersaults cleanly where RTMPose-m read 5 of 5 and 3 of 5 (eval-consistency, first four checks), so a rotating flight is
@@ -109,7 +109,8 @@ export function checkPose(
     for (let i = from; i <= to; i++) {
       if (measured(i)) seen++;
       score += result.confidence[i];
-      flipped += result.orientationFlipped[i];
+      // Turned back, or left out: either way the tracker overruled the model's reading of the frame.
+      flipped += result.orientationFlipped[i] + result.orientationRejected[i];
       if (i > from && Number.isFinite(result.orientation[i]) && Number.isFinite(result.orientation[i - 1]))
         path += Math.abs(result.orientation[i] - result.orientation[i - 1]);
     }

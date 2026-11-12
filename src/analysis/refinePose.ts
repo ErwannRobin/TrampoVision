@@ -15,8 +15,10 @@ import type { PoseTrack } from './types';
  *
  * The second model does not look for the athlete itself: it reads the box around where the first model saw them (the crop is cut
  * from the frame at full resolution, so a small athlete is read large, without the motion detector's zoom). Where the first model
- * lost them, the box comes from the second model's own reading a moment before, or from the first model's readings on both sides of
- * the gap, and the person detector (YOLOX) puts it on the person nearest to it.
+ * lost them, the box is put where the flight takes the athlete (the center of mass of the analysis, which follows the parabola of
+ * the flight through the frames with nobody: see ballistic.ts); off a flight it comes from the second model's own reading a moment
+ * before, or from the first model's readings on both sides of the gap. The person detector (YOLOX) puts a guessed box on the person
+ * nearest to it.
  */
 
 export interface RefineOptions {
@@ -108,16 +110,70 @@ function lerpBox(a: Box, b: Box, u: number): Box {
 
 const meanScore = (pose: Keypoint[]) => CORE.reduce((s, k) => s + (pose[k]?.visibility ?? 0), 0) / CORE.length;
 
-/** Where to look for one athlete in frame `f`: their own box, else a guess from around, and whether it is a guess. */
+/** Where the athlete is in each frame, pixels, NaN where not known: the center of mass of the analysis, bridged through a flight. */
+export interface AthletePath {
+  x: ArrayLike<number>;
+  y: ArrayLike<number>;
+}
+
+/**
+ * The box where the flight takes the athlete in a frame with nobody: a square around the point of the path, as big as the athlete
+ * was at the nearest sightings (a body that turns fills a box of its own length whichever way it lies), and off the path by as much
+ * as the box of those sightings was off it. Null when the path does not say where the athlete is, or nobody was seen within reach.
+ *
+ * A straight line between the boxes on both sides of the gap misses a body in the air: over a gap of T seconds it is g T² / 8 below
+ * the parabola in the middle (44 cm for 0.6 s), more than the margin of the box.
+ */
+function pathBox(track: PoseTrack, f: number, reach: number, path: AthletePath): Box | null {
+  const at = (g: number) =>
+    Number.isFinite(path.x[g]) && Number.isFinite(path.y[g]) ? { x: path.x[g], y: path.y[g] } : null;
+  const here = at(f);
+  if (!here) return null;
+  const sighting = (dir: 1 | -1) => {
+    for (let g = f + dir; g >= 0 && g < track.frames.length && Math.abs(g - f) <= reach; g += dir) {
+      // The first model's sightings only: they are the same on every run, and a reading of the second model made in a guessed box
+      // is not a measure of the athlete's size.
+      const pose = track.frames[g];
+      const box = pose ? boxOfPose(pose) : null;
+      const center = box ? at(g) : null;
+      if (!box || !center) continue;
+      return {
+        g,
+        side: Math.max(box.x2 - box.x1, box.y2 - box.y1),
+        dx: (box.x1 + box.x2) / 2 - center.x,
+        dy: (box.y1 + box.y2) / 2 - center.y,
+      };
+    }
+    return null;
+  };
+  const before = sighting(-1);
+  const after = sighting(1);
+  if (!before && !after) return null;
+  const a = before ?? after!;
+  const b = after ?? before!;
+  const u = b.g === a.g ? 0 : (f - a.g) / (b.g - a.g);
+  const cx = here.x + a.dx + (b.dx - a.dx) * u;
+  const cy = here.y + a.dy + (b.dy - a.dy) * u;
+  const half = (Math.max(a.side, b.side) * GUESS_GROWTH) / 2;
+  return { x1: cx - half, y1: cy - half, x2: cx + half, y2: cy + half, score: 1 };
+}
+
+/**
+ * Where to look for one athlete in frame `f`: their own box, else a guess, and whether it is a guess. With `path` (where the
+ * analysis puts the athlete), a frame with nobody is looked at where the flight takes them.
+ */
 export function guideBox(
   track: PoseTrack,
   second: (Keypoint[] | null)[],
   f: number,
   reach: number,
+  path?: AthletePath | null,
 ): { box: Box; guessed: boolean } | null {
   const own = track.frames[f];
   const ownBox = own ? boxOfPose(own) : null;
   if (ownBox) return { box: ownBox, guessed: false };
+  const onPath = path ? pathBox(track, f, reach, path) : null;
+  if (onPath) return { box: onPath, guessed: true };
   for (let g = f - 1; g >= Math.max(0, f - OWN_REACH); g--) {
     const prev = second[g];
     const box = prev ? boxOfPose(prev, MIN_ALONE_SCORE) : null;
@@ -157,7 +213,11 @@ export async function readAgain(
   wanted: Uint8Array[],
   estimator: BoxPoseEstimator,
   readFrame: FrameReader,
-  options: Pick<RefineOptions, 'signal' | 'onProgress'> & { reach: number },
+  options: Pick<RefineOptions, 'signal' | 'onProgress'> & {
+    reach: number;
+    /** Where the analysis puts each athlete (see `guideBox`), in the order of the tracks. */
+    paths?: (AthletePath | null)[];
+  },
 ): Promise<(Keypoint[] | null)[][]> {
   const n = frames.length;
   const second = tracks.map(() => Array.from({ length: n }, (): Keypoint[] | null => null));
@@ -169,7 +229,9 @@ export async function readAgain(
     if (options.signal?.aborted) throw new DOMException('Analysis cancelled', 'AbortError');
     const source = await readFrame(f);
     const { width, height } = tracks[0];
-    const guides = tracks.map((tr, a) => (wanted[a][f] ? guideBox(tr, second[a], f, options.reach) : null));
+    const guides = tracks.map((tr, a) =>
+      wanted[a][f] ? guideBox(tr, second[a], f, options.reach, options.paths?.[a]) : null,
+    );
     // The detector only where a box is a guess: it puts the guess on the person nearest to it.
     const people = guides.some((g) => g?.guessed) ? await estimator.findPeople(source, 6) : [];
     const boxes: Box[] = [];
@@ -214,7 +276,8 @@ export async function refinePoseTracks(
   options: RefineOptions,
 ): Promise<{ tracks: PoseTrack[]; report: RefineReport }> {
   const settings = { athleteHeightM: options.athleteHeightM, scaleSource: 'athlete' as const, calibration: null };
-  const checks = tracks.map((tr) => checkPose(tr, computeAnalysis(tr, settings), options.check));
+  const analyses = tracks.map((tr) => computeAnalysis(tr, settings));
+  const checks = tracks.map((tr, a) => checkPose(tr, analyses[a], options.check));
   const n = tracks[0]?.frames.length ?? 0;
   const wanted = checks.map((c) => (options.everyFrame ? new Uint8Array(n).fill(1) : c.frames));
   const frames = new Uint8Array(n);
@@ -254,7 +317,12 @@ export async function refinePoseTracks(
         await seekTo(video, Math.min(frameSeekTime(frame, sourceFps), duration - 1e-3));
         return video;
       },
-      { signal: options.signal, onProgress: options.onProgress, reach: Math.round(tracks[0].fps * 1) },
+      {
+        signal: options.signal,
+        onProgress: options.onProgress,
+        reach: Math.round(tracks[0].fps * 1),
+        paths: analyses.map((r) => ({ x: r.comX, y: r.comY })),
+      },
     );
     const out = tracks.map((tr, a) => {
       if (!wanted[a].some(Boolean)) return tr;

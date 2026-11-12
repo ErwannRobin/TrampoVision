@@ -53,7 +53,8 @@ export function completion(result: AnalysisResult): Completion {
   let found = 0;
   let read = 0;
   for (let i = 0; i < n; i++) {
-    if (!Number.isFinite(result.comY[i])) continue;
+    // A center of mass put on the parabola of a flight is not the athlete found.
+    if (!Number.isFinite(result.comY[i]) || result.comBridged[i]) continue;
     found++;
     if (inRun[i]) read++;
   }

@@ -122,6 +122,67 @@ describe('trackOrientation', () => {
     expect(trackOrientation({ angle: [NaN, NaN] }).flippedFrames).toBe(0);
     expect(trackOrientation({ angle: [NaN, 30, NaN] }).orientation[1]).toBe(30);
   });
+
+  it('leaves out a frame read at an angle that has nothing to do with the body, and says so', () => {
+    const { truth, wrapped } = spin(70, 14, 0.1);
+    // Neither where the body is nor half a turn from it.
+    const wild = wrapped.map((a, i) => (i === 30 || i === 31 || i === 45 ? wrapDegrees(a + 75) : a));
+    const tracked = trackOrientation({ angle: wild });
+    expect(Array.from(tracked.rejected).flatMap((v, i) => (v ? [i] : []))).toEqual([30, 31, 45]);
+    expect(tracked.rejectedFrames).toBe(3);
+    expect(tracked.flippedFrames).toBe(0);
+    // Their orientation is that of the frames around them, and nobody else is disturbed.
+    for (let i = 0; i < truth.length; i++) expect(Math.abs(tracked.orientation[i] - truth[i])).toBeLessThan(2);
+    // Taken as read, the same frames throw the orientation off by their own error.
+    expect(Math.abs(plainOrientation(wild).orientation[30] - truth[30])).toBeGreaterThan(60);
+  });
+
+  it('follows a body that turned more than half a turn, and sped up, while nobody saw it', () => {
+    // 8° a frame before the gap, 30° after it: the body folded in between. The turn over the gap is the mean of the two rates.
+    const truth: number[] = [];
+    let a = 0;
+    for (let i = 0; i < 60; i++) {
+      truth.push(a);
+      a += i < 20 ? 8 : i < 38 ? 8 + ((i - 20) * 22) / 18 : 30;
+    }
+    const seen = truth.map((v, i) => (i >= 20 && i < 38 ? NaN : wrapDegrees(v)));
+    expect(truth[38] - truth[19]).toBeGreaterThan(300);
+    const tracked = trackOrientation({ angle: seen });
+    for (let i = 38; i < 60; i++) expect(tracked.orientation[i]).toBeCloseTo(truth[i], 6);
+    // With the rate before the gap alone, the body is put a whole turn back.
+    const oneSided = unwrapDegrees(seen);
+    expect(Math.abs(oneSided[59] - truth[59])).toBeGreaterThan(300);
+    // The same when the frames of the gap are there but not to be used (bridged joints): they get the orientation in between.
+    const bridged = truth.map((v, i) => (i >= 20 && i < 38 ? wrapDegrees(truth[19] - (i - 19) * 3) : wrapDegrees(v)));
+    const ignore = truth.map((_, i) => (i >= 20 && i < 38 ? 1 : 0));
+    const ignoring = trackOrientation({ angle: bridged, ignore });
+    expect(ignoring.orientation[59]).toBeCloseTo(truth[59], 6);
+    for (let i = 20; i < 38; i++) {
+      expect(ignoring.orientation[i]).toBeGreaterThan(truth[19]);
+      expect(ignoring.orientation[i]).toBeLessThan(truth[38]);
+    }
+  });
+
+  it('does not let a body in the air turn back', () => {
+    // A slow single somersault (8.5° a frame). The model loses the athlete upside down for 10 frames, then reads two frames with the
+    // head where the feet are, loses them again, and reads them right from there on. Taken as read, the two frames say the body
+    // went back by 85° during the gap: cheaper than two flips for a tracker that only asks for a smooth turn, and impossible.
+    const truth = Array.from({ length: 44 }, (_, i) => -8.5 * i);
+    const seen = truth.map((v, i) => {
+      if ((i >= 17 && i < 27) || (i >= 29 && i < 32)) return NaN;
+      return wrapDegrees(i === 27 || i === 28 ? v + 180 : v);
+    });
+    const tracked = trackOrientation({ angle: seen });
+    expect(tracked.orientation[43]).toBeCloseTo(truth[43], 6);
+    expect(tracked.flipped[27] + tracked.flipped[28]).toBe(2);
+    // Without the rule the two frames are taken as read, and the count is off.
+    const free = trackOrientation({ angle: seen }, { backSigmaDeg: Infinity });
+    expect(Math.abs(free.orientation[43] - truth[43])).toBeGreaterThan(150);
+    // On the bed (where no reading is overruled) the body may rock back as it likes.
+    const rocking = [0, 12, 24, 36, 48, 60, 30, 0, -30, -60, -30, 0];
+    const bed = trackOrientation({ angle: rocking, allowFlip: rocking.map(() => 0) });
+    expect(Array.from(bed.orientation)).toEqual(rocking);
+  });
 });
 
 /** Frames [from, to) of a track as the pose model would give them after a head/feet flip. */

@@ -40,37 +40,45 @@ describe('synthetic evaluation', () => {
     expect(s.confidentWrong).toBe(0);
   });
 
-  it.each(['mirror', 'rotate180'] as const)(
-    'never gives a confident wrong skill when the pose model flips inverted athletes (%s)',
-    (flip) => {
-      const s = evaluate(
-        { ...base, name: `pose flip (${flip}), jitter 1%`, noise: 0.01, flip },
-        { routines: ROUTINES },
-      );
-      log(s);
-      expect(s.confidentWrong).toBe(0);
-      // Jumps that never invert are unaffected.
-      for (const t of ['straight-jump', 'tuck-jump', 'pike-jump'] as const)
-        expect(s.matrix[t][t] ?? 0).toBeGreaterThanOrEqual(ROUTINES * 0.95);
-      // The somersaults are not named firmly (unclassified or a tentative guess): the limit is shown, not hidden.
-      const somersaults = s.rows.filter((r) => r.truth === 'back' || r.truth === 'front');
-      expect(
-        somersaults.filter((r) => r.predicted === 'unclassified' || r.certainty === 'tentative').length,
-      ).toBeGreaterThanOrEqual(ROUTINES * 2 * 0.9);
-    },
-  );
+  it('never gives a confident wrong skill when the pose model mirrors inverted athletes', () => {
+    const s = evaluate(
+      { ...base, name: 'pose flip (mirror), jitter 1%', noise: 0.01, flip: 'mirror' },
+      { routines: ROUTINES },
+    );
+    log(s);
+    expect(s.confidentWrong).toBe(0);
+    // Jumps that never invert are unaffected.
+    for (const t of ['straight-jump', 'tuck-jump', 'pike-jump'] as const)
+      expect(s.matrix[t][t] ?? 0).toBeGreaterThanOrEqual(ROUTINES * 0.95);
+    // A mirrored body is not one turned over, so nothing puts it right: the somersaults are not named firmly (unclassified or a
+    // tentative guess). The limit is shown, not hidden.
+    const somersaults = s.rows.filter((r) => r.truth === 'back' || r.truth === 'front');
+    expect(
+      somersaults.filter((r) => r.predicted === 'unclassified' || r.certainty === 'tentative').length,
+    ).toBeGreaterThanOrEqual(ROUTINES * 2 * 0.9);
+  });
 
-  it('names the somersaults of an athlete the model turned over, as flagged guesses, thanks to the orientation repair', () => {
+  it('names the somersaults of an athlete the model turned over, once the frames are turned back', () => {
     const turned: Condition = { ...base, name: 'pose flip (rotate180), jitter 1%', noise: 0.01, flip: 'rotate180' };
     const repaired = evaluate(turned, { routines: ROUTINES });
+    const orientationOnly = evaluate(turned, { routines: ROUTINES, analysis: { repairFrames: false } });
     const plain = evaluate(turned, { routines: ROUTINES, analysis: { repairOrientation: false } });
     log(repaired);
     expect(repaired.confidentWrong).toBe(0);
-    expect(repaired.accuracy).toBeGreaterThanOrEqual(0.9);
+    expect(repaired.accuracy).toBeGreaterThanOrEqual(0.95);
     expect(plain.accuracy).toBeLessThan(0.7);
-    // Named, but never firmly: the flipped frames still bend the center of mass and the joint angles.
-    const somersaults = repaired.rows.filter((r) => r.truth === 'back' || r.truth === 'front');
-    expect(somersaults.filter((r) => r.certainty === 'tentative').length).toBeGreaterThanOrEqual(ROUTINES * 2 * 0.9);
+    for (const t of ['straight-jump', 'tuck-jump', 'pike-jump'] as const)
+      expect(repaired.matrix[t][t] ?? 0).toBeGreaterThanOrEqual(ROUTINES * 0.95);
+    // With the frames turned back the center of mass and the joint angles are the athlete's again: the somersaults are named firmly.
+    const firm = (s: typeof repaired) =>
+      s.rows.filter((r) => (r.truth === 'back' || r.truth === 'front') && r.correct && r.certainty !== 'tentative')
+        .length;
+    expect(firm(repaired)).toBeGreaterThanOrEqual(ROUTINES * 2 * 0.9);
+    // With only the orientation put back, as before, they were right too but never firmly: the turned-over frames still bent the
+    // center of mass and the joint angles.
+    expect(orientationOnly.confidentWrong).toBe(0);
+    expect(orientationOnly.accuracy).toBeGreaterThanOrEqual(0.9);
+    expect(firm(orientationOnly)).toBeLessThanOrEqual(ROUTINES * 2 * 0.1);
   });
 
   it('does not name a somersault seen from far off side-on (yaw 70°)', () => {

@@ -112,6 +112,9 @@ eval-consistency: node_modules ## Label-free rotation quality of jumps or a pose
 	$(call require,FILE,make eval-consistency FILE=<dataset.json | export.ndjson | pose-series.json> [BASELINE=f.json | SAVE=f.json])
 	npx vite-node scripts/consistency.ts $(FILE) $(if $(BASELINE),--baseline $(BASELINE)) $(if $(SAVE),--save $(SAVE))
 
+eval-competition: node_modules ## Synthetic check of fast skills (doubles, triples, a pose model that fails): [ROUTINES=80] [FPS=30,25] [PLAIN=1]
+	npx vite-node scripts/competition.ts $(if $(ROUTINES),--routines $(ROUTINES)) $(if $(FPS),--fps $(FPS)) $(if $(PLAIN),--plain)
+
 eval-fusion: node_modules ## Replay the pose check and the merge of two saved analyses of one clip: FIRST= SECOND= [ALL=1]
 	$(call require,FIRST,make eval-fusion FIRST=mediapipe.json SECOND=rtmpose.json [ALL=1])
 	$(call require,SECOND,make eval-fusion FIRST=mediapipe.json SECOND=rtmpose.json [ALL=1])

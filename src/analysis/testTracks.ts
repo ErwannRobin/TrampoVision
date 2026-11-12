@@ -13,6 +13,11 @@ export interface JumpSpec {
   turns?: number;
   /** Horizontal drift of the athlete during the flight, meters (+ = right in the image). */
   driftM?: number;
+  /**
+   * The share of the rotation done at each share of the flight (0 → 0, 1 → 1, never going back). Default: a steady turn. A real body
+   * turns faster while it is folded (see `spinProfile` in skills/competitionEval.ts).
+   */
+  spin?: (u: number) => number;
 }
 
 /** What the routine generator tells a pose builder about one frame. */
@@ -171,7 +176,7 @@ export function syntheticRoutine(o: RoutineOptions): { track: PoseTrack; truth: 
       kind: 'flight',
       jump: k,
       h: (tau) => v0 * tau - 0.5 * G * tau * tau,
-      a: (tau) => a0 + (360 * turns * tau) / flight,
+      a: (tau) => a0 + 360 * turns * (jump.spin ? jump.spin(tau / flight) : tau / flight),
       x: (tau) => xt + (drift * tau) / flight,
     });
     t += flight;

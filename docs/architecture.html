@@ -3392,7 +3392,7 @@
           how: [
             'Points with visibility under 0.4 are treated as missing.',
             'Glitch: a joint farther than 20 % of the body length from the median of its own neighbours in time (plus or minus 0.07 s) is rejected. If 40 % or more of the core joints of a frame are glitches, the whole frame is dropped.',
-            'Gaps up to 0.3 s are bridged with a parabola through the samples on both sides. Longer gaps stay missing.',
+            "Gaps up to 0.3 s are bridged in the athlete's own frame: a lost joint keeps its place in the body while the body moves along a parabola and turns at the rate it turned before and after the gap. Longer gaps stay missing.",
             'Every joint path gets a confidence-weighted local quadratic fit over 0.15 s.',
             'Each sample keeps a state: missing, measured, interpolated or corrected. Filled samples never look as sure as measured ones.',
           ],
@@ -3417,13 +3417,14 @@
             'Head, trunk, upper arms, forearms, hands, thighs, shanks and feet, with de Leva-style mass fractions.',
             'It is only reported when at least half of the body mass was visible.',
             'Its height and vertical velocity drive the whole jump detection.',
+            'Lost in mid-flight: where the athlete is not seen for up to 1.6 s and both sides are in the same free fall, the centre of mass is put on the parabola of the flight. The joints stay missing.',
           ],
-          io: ['Clean landmarks', 'COM x, y per frame, mass coverage'],
+          io: ['Clean landmarks', 'COM x, y per frame, mass coverage, frames put on the parabola'],
           numbers: [
             ['Segments', '14'],
             ['Min. coverage', '50 %'],
           ],
-          files: ['src/analysis/com.ts'],
+          files: ['src/analysis/com.ts', 'src/analysis/ballistic.ts'],
           caveat:
             'The mass fractions were written from memory (they sum to 1, tested). The README asks to verify them before scientific use.',
         },
@@ -3477,14 +3478,20 @@
           sum: 'The angle of the trunk (hips to shoulders), kept continuous through full turns.',
           how: [
             'Clockwise as seen in the video is positive. It is unwrapped so 350, 355, 360, 365 never falls back to 0.',
-            'Head/feet flips: the pose model sometimes puts the head where the feet are. Each frame gets two readings (as measured and 180 degrees away). A small dynamic-programming search picks the smoothest path, with a price per switch.',
-            'Frames where the trunk joints were replaced after a glitch are not trusted and are interpolated.',
-            'A flip can only be put back while the athlete is in the air.',
+            'Head/feet flips: the pose model sometimes puts the head where the feet are. Each frame gets three readings (as measured, 180 degrees away, or left out). A small dynamic-programming search picks the smoothest path, with a price per switch and per frame left out.',
+            'A body in the air cannot turn back, and across a gap it kept turning: the gap is bridged with the mean of the rate before and after it.',
+            'Frames with no measured shoulder or no measured hip give no angle and are interpolated.',
+            'A reading can only be overruled while the athlete is in the air.',
+            "The frames that were overruled are then put right in the track (turned back, or dropped) and the track is read a second time, so the landmarks and the centre of mass are the athlete's too.",
           ],
           io: ['Clean landmarks', 'Orientation wrapped and continuous, angular velocity'],
-          files: ['src/analysis/orientation.ts', 'src/analysis/signal.ts (unwrapDegrees)'],
+          files: [
+            'src/analysis/orientation.ts',
+            'src/analysis/computeAnalysis.ts (repairTrack)',
+            'src/analysis/signal.ts (unwrapDegrees)',
+          ],
           caveat:
-            'On the one real clip checked, the repair put back only 4 frames. The bigger problem there was the pose model losing the trunk joints in inverted tucks.',
+            'Checked on a simulated pose failure only (make eval-competition), not on real footage. On the one real clip looked at before these rules, the bigger problem was the pose model losing the trunk joints in inverted tucks, which the gap rule and the bridge in the body frame are for.',
         },
         {
           id: 'an-jumps',

@@ -90,6 +90,8 @@ export const insights: Translation<typeof en> = {
   'quality.rotationStep':
     'Die Körperausrichtung ändert sich zwischen zwei Stichproben um mehr als 120°: Rotationen werden möglicherweise zu niedrig gezählt. Analysieren Sie jedes Bild.',
   'quality.missingCom': 'Der Körperschwerpunkt fehlt in {share} der Bilder.',
+  'quality.lostInFlight':
+    'In {share} der Bilder in der Luft hat das Posenmodell den Athleten verloren oder kopfüber gelesen, wie bei einem schnellen, unscharfen oder umgedrehten Körper. Diese Bilder wurden überbrückt oder zurückgedreht: Prüfen Sie die genannten Elemente. Filmen Sie schnelle Elemente mit 60 Bildern pro Sekunde oder mehr und kurzer Belichtungszeit (gutes Licht).',
   'quality.cutOff': 'Ein Sprung ist am Anfang oder Ende des Clips abgeschnitten: Absprung oder Landung sind unbekannt.',
 
   'calibration.error.sizes': 'Die Größen des Sprungtuchs müssen positiv sein.',

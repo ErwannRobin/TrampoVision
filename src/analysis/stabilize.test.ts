@@ -133,3 +133,73 @@ describe('stabilizePose', () => {
     expect(Number.isFinite(s.bodyLengthPx)).toBe(true);
   });
 });
+
+describe('bridging in the body frame', () => {
+  // A double somersault in 1.06 s: the body turns about 23° a frame.
+  const fast = () => syntheticRoutine({ jumps: [{ v0: 5.2, turns: 2 }] });
+  const worstOff = (s: ReturnType<typeof stabilizePose>, track: PoseTrack, k: number, from: number, to: number) => {
+    let worst = 0;
+    for (let i = from; i < to; i++)
+      worst = Math.max(
+        worst,
+        Math.hypot(s.landmarks[i]![k].x - track.frames[i]![k].x, s.landmarks[i]![k].y - track.frames[i]![k].y),
+      );
+    return worst;
+  };
+  const length = (pts: { x: number; y: number }[], a: number, b: number) =>
+    Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y);
+
+  it('keeps the shape of a turning body through a gap, where joints bridged one by one squeeze it', () => {
+    const { track, truth } = fast();
+    const mid = Math.round(truth.apex[0] * 30);
+    const lost = cloneTrack(track);
+    for (let i = mid - 3; i < mid + 3; i++) lost.frames[i] = null;
+    const rigid = stabilizePose(lost);
+    const jointwise = stabilizePose(lost, { rigidBridge: false });
+    // The head is far from the pelvis: it travels a long arc during the gap (the body turns 160° in it).
+    expect(worstOff(rigid, track, LM.NOSE, mid - 3, mid + 3)).toBeLessThan(8);
+    expect(worstOff(jointwise, track, LM.NOSE, mid - 3, mid + 3)).toBeGreaterThan(25);
+    // The body keeps its size: shoulder to hip, hip to ankle (175 px tall).
+    const real = length(track.frames[mid]!, LM.L_SHOULDER, LM.L_HIP);
+    expect(Math.abs(length(rigid.landmarks[mid]!, LM.L_SHOULDER, LM.L_HIP) - real)).toBeLessThan(0.05 * real);
+    expect(length(jointwise.landmarks[mid]!, LM.L_SHOULDER, LM.L_HIP)).toBeLessThan(0.75 * real);
+    // Bridged samples are labelled as before.
+    expect(rigid.state[LM.NOSE][mid]).toBe(JOINT_STATE.interpolated);
+    expect(rigid.stats.interpolated).toBe(jointwise.stats.interpolated);
+  });
+
+  it('turns the body the right way round when it turned more than half a turn while lost', () => {
+    const { track, truth } = fast();
+    const mid = Math.round(truth.apex[0] * 30);
+    const lost = cloneTrack(track);
+    // 9 frames: about 205° of rotation, more than half a turn. The short way round is the wrong one.
+    for (let i = mid - 4; i < mid + 5; i++) lost.frames[i] = null;
+    const rigid = stabilizePose(lost);
+    expect(worstOff(rigid, track, LM.NOSE, mid - 4, mid + 5)).toBeLessThan(12);
+    expect(worstOff(stabilizePose(lost, { rigidBridge: false }), track, LM.NOSE, mid - 4, mid + 5)).toBeGreaterThan(60);
+  });
+
+  it('keeps one lost joint at its place in the body while the body turns', () => {
+    const { track, truth } = fast();
+    const mid = Math.round(truth.apex[0] * 30);
+    const bad = cloneTrack(track);
+    for (let i = mid - 3; i < mid + 3; i++) bad.frames[i]![LM.R_WRIST].visibility = 0.05;
+    expect(worstOff(stabilizePose(bad), track, LM.R_WRIST, mid - 3, mid + 3)).toBeLessThan(4);
+    expect(worstOff(stabilizePose(bad, { rigidBridge: false }), track, LM.R_WRIST, mid - 3, mid + 3)).toBeGreaterThan(
+      8,
+    );
+  });
+
+  it('gives what the joint-by-joint bridge gave on a body that does not turn', () => {
+    const { track } = oneJump();
+    const lost = cloneTrack(track);
+    for (let i = 20; i < 25; i++) lost.frames[i] = null;
+    const rigid = stabilizePose(lost);
+    const jointwise = stabilizePose(lost, { rigidBridge: false });
+    for (let i = 20; i < 25; i++)
+      for (const k of [LM.NOSE, LM.L_WRIST, LM.R_ANKLE]) {
+        expect(Math.abs(rigid.landmarks[i]![k].x - jointwise.landmarks[i]![k].x)).toBeLessThan(0.5);
+        expect(Math.abs(rigid.landmarks[i]![k].y - jointwise.landmarks[i]![k].y)).toBeLessThan(0.5);
+      }
+  });
+});

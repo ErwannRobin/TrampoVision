@@ -276,20 +276,32 @@ describe('failure handling: report the limit instead of a wrong skill', () => {
     }
   });
 
-  it('puts the orientation back when the model turns the inverted athlete over (rotate 180°), and still does not answer firmly', () => {
+  it('puts the athlete back when the model turns the inverted athlete over (rotate 180°), and names the somersault', () => {
     const { track, truth } = mannequinRoutine({ jumps: somersault });
     const flipped = flipInverted(track, 'rotate180');
     const repaired = computeAnalysis(flipped);
+    const orientationOnly = computeAnalysis(flipped, { repairFrames: false });
     const plain = computeAnalysis(flipped, { repairOrientation: false });
     const t0 = Math.round(truth.takeoff[0] * 30);
     const t1 = Math.round(truth.landing[0] * 30);
     expect(repaired.meta.orientationFlippedFrames).toBeGreaterThan(0);
     expect(Math.abs(repaired.orientation[t1] - repaired.orientation[t0] - 360)).toBeLessThan(40);
     expect(Math.abs(plain.orientation[t1] - plain.orientation[t0] - 360)).toBeGreaterThan(100);
-    // The flip also bent the center of mass and the shapes, which the repair does not touch: the guess stays a flagged one.
-    const declined = analyzeSkills(repaired, { config: { forceGuess: false } }).jumps[0].prediction;
+    // The frames are turned back in the track, so the landmarks are the athlete's: in a frame the model had turned over, the head is
+    // where it really is.
+    const turned = Array.from(repaired.orientationFlipped).findIndex((v, i) => v === 1 && track.frames[i] !== null);
+    expect(turned).toBeGreaterThan(t0);
+    const nose = repaired.landmarks[turned]![LM.NOSE];
+    const real = track.frames[turned]![LM.NOSE];
+    const wrong = orientationOnly.landmarks[turned]![LM.NOSE];
+    expect(Math.hypot(nose.x - real.x, nose.y - real.y)).toBeLessThan(0.05 * 175);
+    expect(Math.hypot(wrong.x - real.x, wrong.y - real.y)).toBeGreaterThan(0.3 * 175);
+    expect(analyzeSkills(repaired, { config: { forceGuess: false } }).jumps[0].prediction.skill).toBe('front');
+    // With only the orientation put back (as it was before the frames were turned back) the flip still bent the center of mass and
+    // the shapes: the guess stayed a flagged one.
+    const declined = analyzeSkills(orientationOnly, { config: { forceGuess: false } }).jumps[0].prediction;
     expect(['front', 'back']).not.toContain(declined.skill);
-    const p = analyzeSkills(repaired).jumps[0].prediction;
+    const p = analyzeSkills(orientationOnly).jumps[0].prediction;
     expect(p.skill === 'unclassified' || p.certainty === 'tentative' || p.confidence < 0.5).toBe(true);
   });
 

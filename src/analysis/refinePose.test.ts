@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { Box } from '../pose/onnx/geometry';
 import type { BoxPoseEstimator } from '../pose/onnx/OnnxPoseEstimator';
 import type { Keypoint, PoseDetection, PoseSource } from '../pose/types';
+import { computeAnalysis } from './computeAnalysis';
 import { boxOfPose, guideBox, readAgain } from './refinePose';
 import { standingPose } from './testPose';
+import { syntheticRoutine } from './testTracks';
 import type { PoseTrack } from './types';
 
 const W = 640;
@@ -63,6 +65,64 @@ describe('the box the second model reads', () => {
     // A third of the way from 100 to 400 (the box's center sits 1.75 px ahead of the figure's: the toe points forward).
     expect((g.box.x1 + g.box.x2) / 2).toBeCloseTo(200 + 1.75);
     expect(guideBox(track([p(100), null, null, null]), [], 3, 1)).toBeNull();
+  });
+});
+
+describe('the box of an athlete lost in mid-flight', () => {
+  // 1.6 s in the air, 175 px tall; the first model loses the athlete for 0.6 s around the top of the flight.
+  const lostAtTheTop = () => {
+    const { track: whole, truth } = syntheticRoutine({ jumps: [{ v0: 4.5 }, { v0: 7.85, turns: 1 }, { v0: 4.5 }] });
+    const apex = Math.round(truth.apex[1] * 30);
+    const lost: PoseTrack = {
+      ...whole,
+      frames: whole.frames.map((f, i) => (i >= apex - 9 && i < apex + 9 ? null : f)),
+    };
+    const result = computeAnalysis(lost);
+    return { whole, lost, apex, path: { x: result.comX, y: result.comY } };
+  };
+  const center = (b: Box) => ({ x: (b.x1 + b.x2) / 2, y: (b.y1 + b.y2) / 2 });
+  const hips = (f: Keypoint[]) => ({ x: (f[23].x + f[24].x) / 2, y: (f[23].y + f[24].y) / 2 });
+
+  it('is put where the flight takes them, where a straight line between the sightings misses', () => {
+    const { whole, lost, apex, path } = lostAtTheTop();
+    const real = hips(whole.frames[apex]!);
+    const onPath = guideBox(lost, [], apex, 30, path)!;
+    expect(onPath.guessed).toBe(true);
+    const c = center(onPath.box);
+    expect(Math.hypot(c.x - real.x, c.y - real.y)).toBeLessThan(0.12 * 175);
+    // Big enough for the athlete whichever way they lie: the whole body is inside.
+    for (const p of whole.frames[apex]!) {
+      expect(p.x).toBeGreaterThan(onPath.box.x1);
+      expect(p.x).toBeLessThan(onPath.box.x2);
+      expect(p.y).toBeGreaterThan(onPath.box.y1);
+      expect(p.y).toBeLessThan(onPath.box.y2);
+    }
+    // Without the path the box is on the line between the two sightings: 44 cm (a quarter of the athlete) below the athlete.
+    const straight = center(guideBox(lost, [], apex, 30)!.box);
+    expect(straight.y - real.y).toBeGreaterThan(0.2 * 175);
+  });
+
+  it('falls back on the sightings around where the path says nothing', () => {
+    const p = (x: number) => standingPose(x, 400, 175);
+    const t = track([p(100), null, null, p(400)]);
+    const nowhere = { x: [NaN, NaN, NaN, NaN], y: [NaN, NaN, NaN, NaN] };
+    expect(guideBox(t, [], 1, 30, nowhere)).toEqual(guideBox(t, [], 1, 30));
+  });
+
+  it('lets the second model read the athlete through the gap', async () => {
+    const { whole, lost, apex, path } = lostAtTheTop();
+    const { model } = fakeModel();
+    const n = lost.frames.length;
+    const wanted = Uint8Array.from({ length: n }, (_, i) => (lost.frames[i] ? 0 : 1));
+    const big: PoseTrack = { ...lost, width: W, height: H };
+    const second = await readAgain([big], wanted, [wanted], model, read, { reach: 30, paths: [path] });
+    for (let i = apex - 9; i < apex + 9; i++) {
+      expect(second[0][i]).not.toBeNull();
+      // The fake model reads a figure filling the box it was given: its middle is where the athlete is.
+      const box = boxOfPose(second[0][i]!)!;
+      const real = hips(whole.frames[i]!);
+      expect(Math.hypot(center(box).x - real.x, center(box).y - real.y)).toBeLessThan(0.2 * 175);
+    }
   });
 });
 
