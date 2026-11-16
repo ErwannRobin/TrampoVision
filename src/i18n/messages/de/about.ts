@@ -76,4 +76,9 @@ export const about: Translation<typeof en> = {
   'about.codeTitle': 'Quellcode',
   'about.codeText': 'TrampoVision ist auf GitHub offen, mit den Tests und den Notizen dazu, wie jede Zahl entsteht.',
   'about.codeLink': 'TrampoVision auf GitHub',
+  'about.versionTitle': 'Version',
+  'about.versionText': 'Die Version der App, die Sie gerade nutzen.',
+  'about.versionCommit': 'Commit',
+  'about.versionDate': 'Veröffentlicht am',
+  'about.versionUnknown': 'unbekannt',
 };

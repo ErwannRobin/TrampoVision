@@ -73,4 +73,9 @@ export const about: Translation<typeof en> = {
   'about.codeTitle': 'ソースコード',
   'about.codeText': 'TrampoVision は GitHub で公開しており、テストと、各数値の作り方のメモがあります。',
   'about.codeLink': 'GitHub の TrampoVision',
+  'about.versionTitle': 'バージョン',
+  'about.versionText': '現在お使いのアプリのバージョンです。',
+  'about.versionCommit': 'コミット',
+  'about.versionDate': '公開日',
+  'about.versionUnknown': '不明',
 };

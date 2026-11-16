@@ -73,4 +73,10 @@ export const about = {
   'about.codeTitle': 'Source code',
   'about.codeText': 'TrampoVision is open on GitHub, with the tests and the notes on how each number is made.',
   'about.codeLink': 'TrampoVision on GitHub',
+
+  'about.versionTitle': 'Version',
+  'about.versionText': 'The version of the app you are running.',
+  'about.versionCommit': 'Commit',
+  'about.versionDate': 'Released',
+  'about.versionUnknown': 'unknown',
 } as const;

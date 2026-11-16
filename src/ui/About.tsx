@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { t, type StringKey } from '../i18n';
+import { t, useLocale, type StringKey } from '../i18n';
+import { BUILD_COMMIT, BUILD_DATE, releaseDate, shortCommit } from '../version';
 import { Button } from './kit';
 
 /** Where each link goes. The club, the FIG and the research are the ones this project points to. */
@@ -33,6 +34,7 @@ function External({ href, children }: { href: string; children: string }) {
 /** What the app is, how it works, what it cannot do, and what it comes from and points to. Opened from the top bar or the first screen. */
 export function About({ onClose }: { onClose: () => void }) {
   const title = useRef<HTMLHeadingElement>(null);
+  const locale = useLocale();
   // Move to the top of the page for a keyboard or screen reader user.
   useEffect(() => title.current?.focus({ preventScroll: true }), []);
   return (
@@ -120,6 +122,23 @@ export function About({ onClose }: { onClose: () => void }) {
         <p>
           <External href={CODE_URL}>{t('about.codeLink')}</External>
         </p>
+      </section>
+
+      <section className="about__section" aria-labelledby="about-version">
+        <h2 id="about-version">{t('about.versionTitle')}</h2>
+        <p>{t('about.versionText')}</p>
+        <dl className="about__version">
+          <dt>{t('about.versionDate')}</dt>
+          <dd>{releaseDate(BUILD_DATE, locale) ?? t('about.versionUnknown')}</dd>
+          <dt>{t('about.versionCommit')}</dt>
+          <dd>
+            {BUILD_COMMIT ? (
+              <External href={`${CODE_URL}/commit/${BUILD_COMMIT}`}>{shortCommit(BUILD_COMMIT)}</External>
+            ) : (
+              t('about.versionUnknown')
+            )}
+          </dd>
+        </dl>
       </section>
     </article>
   );
