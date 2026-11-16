@@ -146,7 +146,10 @@ export function tokenMatches(header: string | null, secret: string | undefined):
  */
 export function originAllowed(origin: string | null, allowed: string, previewPattern?: string): boolean {
   if (!origin) return false;
-  const apps = allowed.split(',').map((o) => o.trim()).filter(Boolean);
+  const apps = allowed
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
   if (apps.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return true;
   if (!previewPattern) return false;
   try {
