@@ -140,12 +140,14 @@ export function tokenMatches(header: string | null, secret: string | undefined):
 }
 
 /**
- * The origins the browser may call from: the app, localhost for development and, when `previewPattern` is set, the preview
- * deployments of the app. The pattern is a regular expression matched against the whole origin (an invalid one allows nothing).
+ * The origins the browser may call from: the app (`allowed` is one origin or several, comma-separated: the app answers on more
+ * than one domain), localhost for development and, when `previewPattern` is set, the preview deployments of the app. The pattern
+ * is a regular expression matched against the whole origin (an invalid one allows nothing).
  */
 export function originAllowed(origin: string | null, allowed: string, previewPattern?: string): boolean {
   if (!origin) return false;
-  if (origin === allowed || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return true;
+  const apps = allowed.split(',').map((o) => o.trim()).filter(Boolean);
+  if (apps.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return true;
   if (!previewPattern) return false;
   try {
     return new RegExp(`^(?:${previewPattern})$`).test(origin);

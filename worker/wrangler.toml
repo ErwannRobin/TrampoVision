@@ -32,8 +32,8 @@ simple = { limit = 5, period = 60 }
 enabled = true
 
 [vars]
-# The origin of the app: the only one the browser may call from.
-ALLOWED_ORIGIN = "https://trampo-vision.vercel.app"
+# The origins of the app (comma-separated: it answers on its Vercel domain and on its own): the only ones the browser may call from.
+ALLOWED_ORIGIN = "https://trampo-vision.vercel.app,https://trampo-vision.erwann.app"
 # The preview deployments of the app (one origin per branch and per commit), as a regular expression for the whole origin.
 # They reach the same data as the app: remove this line to keep previews out.
 PREVIEW_ORIGIN_PATTERN = 'https://trampo-vision-[a-z0-9-]+-erwann-robins-projects\.vercel\.app'

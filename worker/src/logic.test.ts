@@ -124,6 +124,15 @@ describe('allowed origins', () => {
     expect(originAllowed(null, app, preview)).toBe(false);
   });
 
+  it('allows every origin of a comma-separated list, and only those', () => {
+    const both = `${app}, https://trampo-vision.erwann.app`;
+    expect(originAllowed(app, both)).toBe(true);
+    expect(originAllowed('https://trampo-vision.erwann.app', both)).toBe(true);
+    expect(originAllowed('https://trampo-vision.erwann.app', app)).toBe(false);
+    expect(originAllowed('https://trampo-vision.erwann.app.evil.example', both)).toBe(false);
+    expect(originAllowed('', '')).toBe(false);
+  });
+
   it('allows the preview deployments of the app, and only those', () => {
     const ok = [
       'https://trampo-vision-git-claude-review-delete-erwann-robins-projects.vercel.app',
