@@ -88,3 +88,15 @@
 .app__main[hidden] {
   display: none;
 }
+.about__version {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 20px;
+  margin-top: 12px;
+}
+.about__version dt {
+  color: var(--text-3);
+}
+.about__version dd {
+  font-variant-numeric: tabular-nums;
+}

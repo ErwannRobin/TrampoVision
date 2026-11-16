@@ -1,4 +1,5 @@
 /// <reference types="node" />
+import { execSync } from 'node:child_process';
 import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineConfig } from 'vitest/config';
@@ -27,8 +28,21 @@ const csp = (extraOrigins: string[]) =>
 const installedVersion = (pkg: string): string =>
   JSON.parse(readFileSync(join('node_modules', pkg, 'package.json'), 'utf8')).version;
 
+/** The commit being built: Vercel's variable on a deployment, else git, else empty (a build outside a checkout). */
+const buildCommit = (): string => {
+  const fromVercel = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (fromVercel) return fromVercel;
+  try {
+    return execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return '';
+  }
+};
+
 export default defineConfig(({ mode }) => ({
   define: {
+    __BUILD_COMMIT__: JSON.stringify(buildCommit()),
+    __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
     __MEDIAPIPE_VERSION__: JSON.stringify(installedVersion('@mediapipe/tasks-vision')),
     __ORT_VERSION__: JSON.stringify(installedVersion('onnxruntime-web')),
     __FFMPEG_CORE_VERSION__: JSON.stringify(installedVersion('@ffmpeg/core')),
